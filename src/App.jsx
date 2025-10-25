@@ -3,9 +3,9 @@ import { Video, Plus, Instagram, Youtube, Facebook, Loader2, CheckCircle, XCircl
 
 // REPLACE THESE WITH YOUR MAKE.COM WEBHOOK URLs
 const WEBHOOKS = {
-storeSocial: ‘https://hook.us1.make.com/YOUR_STORE_SOCIAL_WEBHOOK’,
-generateVideo: ‘https://hook.us1.make.com/YOUR_GENERATE_VIDEO_WEBHOOK’,
-checkStatus: ‘https://hook.us1.make.com/YOUR_CHECK_STATUS_WEBHOOK’
+storeSocial: ‘https://hook.eu2.make.com/00i9rjwdtt2np4brm8mm7p8hla9rix78’,
+generateVideo: ‘https://hook.eu2.make.com/5efo29nninirjgj06nh69jq7lt6piiva’,
+checkStatus: ‘https://hook.eu2.make.com/1ejgvywznrgfbs4iaijt2xdlzf62n7w5’
 };
 
 const App = () => {
