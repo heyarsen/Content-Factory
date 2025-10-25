@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from ‘react’;
 import { Video, Plus, Instagram, Youtube, Facebook, Loader2, CheckCircle, XCircle, Clock } from ‘lucide-react’;
 
-// REPLACE THESE WITH YOUR MAKE.COM WEBHOOK URLs
 const WEBHOOKS = {
 storeSocial: ‘https://hook.eu2.make.com/00i9rjwdtt2np4brm8mm7p8hla9rix78’,
 generateVideo: ‘https://hook.eu2.make.com/5efo29nninirjgj06nh69jq7lt6piiva’,
@@ -27,35 +26,35 @@ loadVideos();
 loadConnectedAccounts();
 }, []);
 
-const loadVideos = async () => {
+const loadVideos = () => {
 try {
-const result = await window.storage.get(`videos_${currentUser}`);
-if (result) {
-setVideos(JSON.parse(result.value));
+const saved = localStorage.getItem(`videos_${currentUser}`);
+if (saved) {
+setVideos(JSON.parse(saved));
 }
 } catch (error) {
 console.log(‘No videos found’);
 }
 };
 
-const loadConnectedAccounts = async () => {
+const loadConnectedAccounts = () => {
 try {
-const result = await window.storage.get(`accounts_${currentUser}`);
-if (result) {
-setConnectedAccounts(JSON.parse(result.value));
+const saved = localStorage.getItem(`accounts_${currentUser}`);
+if (saved) {
+setConnectedAccounts(JSON.parse(saved));
 }
 } catch (error) {
 console.log(‘No accounts found’);
 }
 };
 
-const saveVideos = async (updatedVideos) => {
-await window.storage.set(`videos_${currentUser}`, JSON.stringify(updatedVideos));
+const saveVideos = (updatedVideos) => {
+localStorage.setItem(`videos_${currentUser}`, JSON.stringify(updatedVideos));
 setVideos(updatedVideos);
 };
 
-const saveConnectedAccounts = async (accounts) => {
-await window.storage.set(`accounts_${currentUser}`, JSON.stringify(accounts));
+const saveConnectedAccounts = (accounts) => {
+localStorage.setItem(`accounts_${currentUser}`, JSON.stringify(accounts));
 setConnectedAccounts(accounts);
 };
 
@@ -86,12 +85,12 @@ const mockToken = `${platform}_token_${Date.now()}`;
       status: 'active'
     };
     const updated = [...connectedAccounts, newAccount];
-    await saveConnectedAccounts(updated);
+    saveConnectedAccounts(updated);
     alert(`${platform} connected successfully!`);
   }
 } catch (error) {
   console.error('Error connecting account:', error);
-  alert('Failed to connect account. Check console.');
+  alert('Failed to connect account. Check console and Make.com webhook.');
 } finally {
   setIsLoading(false);
 }
@@ -140,7 +139,7 @@ try {
     };
     
     const updated = [newVideo, ...videos];
-    await saveVideos(updated);
+    saveVideos(updated);
     
     setVideoForm({
       topic: '',
@@ -151,11 +150,11 @@ try {
     });
     
     setActiveTab('videos');
-    alert('Video generation started!');
+    alert('Video generation started! Check Make.com for progress.');
   }
 } catch (error) {
   console.error('Error creating video:', error);
-  alert('Failed to create video. Check console and webhook URL.');
+  alert('Failed to create video. Check console and Make.com webhook.');
 } finally {
   setIsLoading(false);
 }
@@ -175,7 +174,7 @@ completed_at: new Date().toISOString()
 }
 return v;
 });
-await saveVideos(updatedVideos);
+saveVideos(updatedVideos);
 };
 
 const getStatusIcon = (status) => {
@@ -451,7 +450,7 @@ User: {currentUser.substring(0, 12)}…
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <p className="text-sm text-yellow-800">
             <strong>Note:</strong> In production, clicking "Connect" would redirect you to the platform's OAuth page. 
-            This demo simulates the connection for testing.
+            This demo simulates the connection for testing the Make.com integration.
           </p>
         </div>
       </div>
