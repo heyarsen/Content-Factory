@@ -80,11 +80,15 @@ const App = () => {
 
   const createUploadPostUser = async () => {
     try {
-      const username = `user_${Date.now()}`;
+      // Try different username formats - upload-post might have specific requirements
+      const timestamp = Date.now().toString();
+      const randomId = Math.random().toString(36).substring(2, 8);
+      const username = `user${randomId}`;
       
       console.log('Creating upload-post user:', username);
       
-      const response = await fetch('https://api.upload-post.com/api/uploadposts/users/create', {
+      // Try with both username formats
+      let response = await fetch('https://api.upload-post.com/api/uploadposts/users/create', {
         method: 'POST',
         headers: {
           'Authorization': `Apikey ${UPLOADPOST_API_KEY}`,
@@ -93,19 +97,40 @@ const App = () => {
         body: JSON.stringify({ username })
       });
 
-      const data = await response.json();
+      let data = await response.json();
       console.log('Create user response:', data);
+      
+      // If failed, maybe try with email format
+      if (!data.success && data.message && data.message.includes('pattern')) {
+        console.log('Trying with email format...');
+        const email = `${username}@tempmail.com`;
+        
+        response = await fetch('https://api.upload-post.com/api/uploadposts/users/create', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Apikey ${UPLOADPOST_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ 
+            username,
+            email 
+          })
+        });
+        
+        data = await response.json();
+        console.log('Create user with email response:', data);
+      }
       
       if (data.success) {
         saveUploadPostUser({ username, created: true });
         return username;
       } else {
         console.error('Failed to create user:', data);
-        alert(`Error: ${data.message || 'Failed to create user profile'}`);
+        alert(`Error creating profile: ${data.message || 'Unknown error'}\n\nPlease check console for details.`);
       }
     } catch (error) {
       console.error('Error creating upload-post user:', error);
-      alert(`Error: ${error.message}`);
+      alert(`Network error: ${error.message}`);
     }
     return null;
   };
@@ -114,16 +139,53 @@ const App = () => {
     setIsLoading(true);
     
     try {
+      // First, try to use existing username or create simple one
       let username = uploadPostUser?.username;
       
       if (!username) {
-        username = await createUploadPostUser();
-        if (!username) {
-          alert('Failed to create user profile. Please try again.');
+        // Generate a simple username
+        const randomId = Math.random().toString(36).substring(2, 10);
+        username = randomId; // Just use simple alphanumeric
+        
+        console.log('Attempting to create/use username:', username);
+        
+        // Try to create user, but don't fail if user already exists
+        try {
+          const createResponse = await fetch('https://api.upload-post.com/api/uploadposts/users/create', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Apikey ${UPLOADPOST_API_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username })
+          });
+          
+          const createData = await createResponse.json();
+          console.log('Create response:', createData);
+          
+          if (createData.success) {
+            saveUploadPostUser({ username, created: true });
+          } else if (createData.message && createData.message.includes('already exists')) {
+            // User already exists, that's fine
+            console.log('User already exists, continuing...');
+            saveUploadPostUser({ username, created: true });
+          } else {
+            // Real error
+            console.error('Error creating user:', createData);
+            alert(`Failed to create user profile: ${createData.message || 'Unknown error'}`);
+            setIsLoading(false);
+            return;
+          }
+        } catch (createError) {
+          console.error('Error in create request:', createError);
+          alert(`Network error: ${createError.message}`);
           setIsLoading(false);
           return;
         }
       }
+
+      // Now generate JWT for connecting accounts
+      console.log('Generating JWT for:', username);
 
       console.log('Generating JWT for:', username);
       
