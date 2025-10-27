@@ -9,6 +9,22 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true
+    sourcemap: false, // Disable sourcemaps for faster build
+    minify: 'esbuild', // Use esbuild for faster minification
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          icons: ['lucide-react']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 1000
+  },
+  esbuild: {
+    drop: ['console', 'debugger'] // Remove console.logs in production
+  },
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'lucide-react']
   }
 })
