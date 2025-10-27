@@ -151,10 +151,10 @@ const App = () => {
         
         // Try to create user, but don't fail if user already exists
         try {
-          const createResponse = await fetch('https://api.upload-post.com/api/uploadposts/users/create', {
+          const createResponse = await fetch('https://api.upload-post.com/api/uploadposts/users', {
             method: 'POST',
             headers: {
-              'Authorization': `Apikey ${UPLOADPOST_API_KEY}`,
+              'Authorization': `ApiKey ${UPLOADPOST_API_KEY}`,
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({ username })
