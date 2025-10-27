@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Video, Plus, Instagram, Youtube, Facebook, Loader2, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Video, Plus, Instagram, Youtube, Facebook, Loader2, CheckCircle, XCircle, Clock, ExternalLink } from 'lucide-react';
 
 const WEBHOOKS = {
   storeSocial: 'https://hook.eu2.make.com/00i9rjwdtt2np4brm8mm7p8hla9rix78',
@@ -7,12 +7,15 @@ const WEBHOOKS = {
   checkStatus: 'https://hook.eu2.make.com/1ejgvywznrgfbs4iaijt2xdlzf62n7w5'
 };
 
+const UPLOADPOST_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImluZm9zcG9sb2sub2ZmaWNlQGdtYWlsLmNvbSIsImV4cCI6NDkxMjQzMzIxNiwianRpIjoiNDA2NDI2ZTUtNWUxNi00Mjc5LThmYzQtZDUzMDlhNTQwNzIwIn0.EylwU51ZDhLFIXBL6hf49pdxCLAiwTY6tf_SW-6FktA';
+
 const App = () => {
   const [currentUser] = useState('user_' + Date.now());
   const [activeTab, setActiveTab] = useState('create');
   const [videos, setVideos] = useState([]);
   const [connectedAccounts, setConnectedAccounts] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadPostUser, setUploadPostUser] = useState(null);
   const [videoForm, setVideoForm] = useState({
     topic: '',
     style: 'casual',
@@ -24,6 +27,7 @@ const App = () => {
   useEffect(() => {
     loadVideos();
     loadConnectedAccounts();
+    loadUploadPostUser();
   }, []);
 
   const loadVideos = () => {
@@ -48,6 +52,17 @@ const App = () => {
     }
   };
 
+  const loadUploadPostUser = () => {
+    try {
+      const saved = localStorage.getItem(`uploadpost_user_${currentUser}`);
+      if (saved) {
+        setUploadPostUser(JSON.parse(saved));
+      }
+    } catch (error) {
+      console.log('No upload-post user found');
+    }
+  };
+
   const saveVideos = (updatedVideos) => {
     localStorage.setItem(`videos_${currentUser}`, JSON.stringify(updatedVideos));
     setVideos(updatedVideos);
@@ -58,41 +73,132 @@ const App = () => {
     setConnectedAccounts(accounts);
   };
 
-  const connectSocialAccount = async (platform) => {
-    setIsLoading(true);
+  const saveUploadPostUser = (userData) => {
+    localStorage.setItem(`uploadpost_user_${currentUser}`, JSON.stringify(userData));
+    setUploadPostUser(userData);
+  };
+
+  const createUploadPostUser = async () => {
     try {
-      const mockToken = `${platform}_token_${Date.now()}`;
+      const username = `user_${currentUser}`;
       
-      const response = await fetch(WEBHOOKS.storeSocial, {
+      const response = await fetch('https://api.upload-post.com/api/uploadposts/users/create', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: currentUser,
-          platform: platform,
-          access_token: mockToken,
-          refresh_token: `refresh_${mockToken}`,
-          expires_at: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString()
-        })
+        headers: {
+          'Authorization': `ApiKey ${UPLOADPOST_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ username })
       });
 
       const data = await response.json();
       
       if (data.success) {
-        const newAccount = {
-          platform,
-          connected_at: new Date().toISOString(),
-          status: 'active'
-        };
-        const updated = [...connectedAccounts, newAccount];
-        saveConnectedAccounts(updated);
-        alert(`${platform} connected successfully!`);
+        saveUploadPostUser({ username, created: true });
+        return username;
+      }
+    } catch (error) {
+      console.error('Error creating upload-post user:', error);
+    }
+    return null;
+  };
+
+  const connectSocialAccount = async () => {
+    setIsLoading(true);
+    
+    try {
+      let username = uploadPostUser?.username;
+      
+      if (!username) {
+        username = await createUploadPostUser();
+        if (!username) {
+          alert('Failed to create user profile. Please try again.');
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      const response = await fetch('https://api.upload-post.com/api/uploadposts/users/generate-jwt', {
+        method: 'POST',
+        headers: {
+          'Authorization': `ApiKey ${UPLOADPOST_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ username })
+      });
+
+      const data = await response.json();
+      
+      if (data.success && data.access_url) {
+        const confirmed = confirm(
+          'You will be redirected to upload-post.com to connect your social media accounts.\n\n' +
+          'After connecting, you can close that tab and return here.\n\n' +
+          'Click OK to continue.'
+        );
+        
+        if (confirmed) {
+          window.open(data.access_url, '_blank');
+          
+          setTimeout(() => {
+            checkConnectedAccounts(username);
+          }, 5000);
+        }
+      } else {
+        alert('Failed to generate connection link. Please try again.');
       }
     } catch (error) {
       console.error('Error connecting account:', error);
-      alert('Failed to connect account. Check console and Make.com webhook.');
+      alert('Failed to connect account. Check console.');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const checkConnectedAccounts = async (username) => {
+    try {
+      const response = await fetch(`https://api.upload-post.com/api/uploadposts/users/get/${username}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `ApiKey ${UPLOADPOST_API_KEY}`
+        }
+      });
+
+      const data = await response.json();
+      
+      if (data.success && data.profile) {
+        const socialAccounts = data.profile.social_accounts || {};
+        const connected = [];
+        
+        Object.keys(socialAccounts).forEach(platform => {
+          if (socialAccounts[platform] && socialAccounts[platform] !== null) {
+            connected.push({
+              platform,
+              connected_at: new Date().toISOString(),
+              status: 'active',
+              details: socialAccounts[platform]
+            });
+          }
+        });
+        
+        if (connected.length > 0) {
+          saveConnectedAccounts(connected);
+          alert(`Successfully connected ${connected.length} account(s)!`);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking accounts:', error);
+    }
+  };
+
+  const refreshAccounts = async () => {
+    if (!uploadPostUser?.username) {
+      alert('No user profile found. Please connect accounts first.');
+      return;
+    }
+    
+    setIsLoading(true);
+    await checkConnectedAccounts(uploadPostUser.username);
+    setIsLoading(false);
   };
 
   const createVideo = async () => {
@@ -117,6 +223,7 @@ const App = () => {
         body: JSON.stringify({
           user_id: currentUser,
           video_id: videoId,
+          uploadpost_username: uploadPostUser?.username,
           ...videoForm
         })
       });
@@ -403,47 +510,72 @@ const App = () => {
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Connect Social Media</h2>
 
-            <div className="grid gap-4 mb-8">
-              {['Instagram', 'TikTok', 'YouTube', 'Facebook'].map((platform) => {
-                const isConnected = connectedAccounts.some(
-                  (acc) => acc.platform.toLowerCase() === platform.toLowerCase()
-                );
+            <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-2">Upload-Post Connection</h3>
+                  <p className="text-sm text-gray-600">
+                    Connect your social media accounts through upload-post.com
+                  </p>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={refreshAccounts}
+                    disabled={isLoading}
+                    className="py-2 px-4 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Refresh Status
+                  </button>
+                  <button
+                    onClick={connectSocialAccount}
+                    disabled={isLoading}
+                    className="py-2 px-6 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 disabled:bg-gray-400 flex items-center space-x-2"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>Loading...</span>
+                      </>
+                    ) : (
+                      <>
+                        <ExternalLink className="w-5 h-5" />
+                        <span>Connect Accounts</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
 
-                return (
-                  <div key={platform} className="bg-white rounded-xl shadow-sm p-6">
+            {connectedAccounts.length > 0 && (
+              <div className="grid gap-4 mb-8">
+                {connectedAccounts.map((account, index) => (
+                  <div key={index} className="bg-white rounded-xl shadow-sm p-6">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
                         <div className="bg-gray-100 p-3 rounded-lg">
-                          {getSocialIcon(platform)}
+                          {getSocialIcon(account.platform)}
                         </div>
                         <div>
-                          <h3 className="font-semibold text-gray-900">{platform}</h3>
+                          <h3 className="font-semibold text-gray-900 capitalize">{account.platform}</h3>
                           <p className="text-sm text-gray-500">
-                            {isConnected ? 'Connected' : 'Not connected'}
+                            Connected on {new Date(account.connected_at).toLocaleDateString()}
                           </p>
                         </div>
                       </div>
-                      <button
-                        onClick={() => !isConnected && connectSocialAccount(platform)}
-                        disabled={isConnected || isLoading}
-                        className={`py-2 px-6 rounded-lg font-medium transition-colors ${
-                          isConnected
-                            ? 'bg-green-100 text-green-700 cursor-default'
-                            : 'bg-purple-600 text-white hover:bg-purple-700 disabled:bg-gray-400'
-                        }`}
-                      >
-                        {isConnected ? 'Connected ✓' : 'Connect'}
-                      </button>
+                      <div className="bg-green-100 text-green-700 py-2 px-4 rounded-lg font-medium">
+                        Connected ✓
+                      </div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            )}
 
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <p className="text-sm text-yellow-800">
-                <strong>Note:</strong> In production, clicking "Connect" would redirect you to the platform's OAuth page. 
-                This demo simulates the connection for testing the Make.com integration.
+                <strong>How it works:</strong> Click "Connect Accounts" to open upload-post.com in a new tab. 
+                Connect your social media accounts there, then click "Refresh Status" to sync them here.
               </p>
             </div>
           </div>
