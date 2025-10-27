@@ -341,22 +341,29 @@ const StatsCard = ({ title, value, change, icon: Icon, color = 'blue' }) => {
   );
 };
 
-// Social Account Manager Component
+// Social Account Manager Component with Fixed API Calls
 const SocialAccountManager = () => {
   const { user, connectedAccounts, uploadPostProfile, updateConnectedAccounts, updateUploadPostProfile } = useUser();
   const [loading, setLoading] = useState(false);
+  const [debugInfo, setDebugInfo] = useState('');
 
-  const createUploadPostProfile = async () => {
+  // Use the original approach that was working before
+  const connectSocialAccounts = async () => {
     if (!user) return;
-    
+
     setLoading(true);
+    setDebugInfo('Starting connection process...');
+    
     try {
-      // Create unique username based on user data
-      const username = `cf_${user.id.replace('user_', '')}`;
+      // Use a simple unique identifier for the user
+      const timestamp = Date.now().toString();
+      const randomId = Math.random().toString(36).substring(2, 8);
+      const username = `user${randomId}`;
       
-      console.log('Creating upload-post profile:', username);
+      setDebugInfo(`Creating username: ${username}`);
       
-      const response = await fetch('https://api.upload-post.com/api/uploadposts/users', {
+      // Create user with upload-post.com
+      const createResponse = await fetch('https://api.upload-post.com/api/uploadposts/users', {
         method: 'POST',
         headers: {
           'Authorization': `ApiKey ${UPLOADPOST_API_KEY}`,
@@ -365,70 +372,58 @@ const SocialAccountManager = () => {
         body: JSON.stringify({ username })
       });
 
-      const data = await response.json();
-      console.log('Create profile response:', data);
-
-      if (data.success) {
-        const profile = { username, created: true, user_id: user.id };
-        updateUploadPostProfile(profile);
-        return profile;
-      } else if (data.message && data.message.includes('already exists')) {
-        // Profile already exists, that's fine
-        const profile = { username, created: true, user_id: user.id };
-        updateUploadPostProfile(profile);
-        return profile;
+      const createData = await createResponse.json();
+      setDebugInfo(`Create response: ${JSON.stringify(createData)}`);
+      
+      let profileCreated = false;
+      
+      if (createData.success) {
+        profileCreated = true;
+      } else if (createData.message && createData.message.includes('already exists')) {
+        profileCreated = true;
+        setDebugInfo('User already exists, continuing...');
       } else {
-        throw new Error(data.message || 'Failed to create profile');
+        throw new Error(createData.message || 'Failed to create profile');
       }
-    } catch (error) {
-      console.error('Error creating profile:', error);
-      alert(`Failed to create profile: ${error.message}`);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const connectSocialAccounts = async () => {
-    if (!user) return;
-
-    setLoading(true);
-    try {
-      let profile = uploadPostProfile;
       
-      // Create profile if it doesn't exist
-      if (!profile) {
-        profile = await createUploadPostProfile();
-        if (!profile) return;
-      }
-
-      // Generate JWT for connection
-      const response = await fetch('https://api.upload-post.com/api/uploadposts/users/generate-jwt', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Apikey ${UPLOADPOST_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ username: profile.username })
-      });
-
-      const data = await response.json();
-      
-      if (data.success && data.access_url) {
-        const confirmed = confirm(
-          'You will be redirected to upload-post.com to connect your social media accounts.\n\n' +
-          'After connecting, return here and click "Refresh Status".\n\n' +
-          'Click OK to continue.'
-        );
+      if (profileCreated) {
+        // Save profile info
+        const profile = { username, created: true, user_id: user.id };
+        updateUploadPostProfile(profile);
         
-        if (confirmed) {
-          window.open(data.access_url, '_blank');
+        // Generate JWT for connecting accounts
+        setDebugInfo('Generating JWT...');
+        
+        const jwtResponse = await fetch('https://api.upload-post.com/api/uploadposts/users/generate-jwt', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Apikey ${UPLOADPOST_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ username })
+        });
+
+        const jwtData = await jwtResponse.json();
+        setDebugInfo(`JWT response: ${JSON.stringify(jwtData)}`);
+        
+        if (jwtData.success && jwtData.access_url) {
+          const confirmed = confirm(
+            'You will be redirected to upload-post.com to connect your social media accounts.\n\n' +
+            'After connecting, return here and click "Refresh Status".\n\n' +
+            'Click OK to continue.'
+          );
+          
+          if (confirmed) {
+            window.open(jwtData.access_url, '_blank');
+            setDebugInfo('Opened connection page. Please connect your accounts and return here.');
+          }
+        } else {
+          throw new Error('Failed to generate connection link');
         }
-      } else {
-        alert('Failed to generate connection link. Please try again.');
       }
     } catch (error) {
-      console.error('Error connecting accounts:', error);
+      console.error('Connection error:', error);
+      setDebugInfo(`Error: ${error.message}`);
       alert(`Connection failed: ${error.message}`);
     } finally {
       setLoading(false);
@@ -436,34 +431,44 @@ const SocialAccountManager = () => {
   };
 
   const refreshAccountStatus = async () => {
-    if (!user || !uploadPostProfile) {
+    if (!uploadPostProfile?.username) {
       alert('No profile found. Please connect accounts first.');
       return;
     }
 
     setLoading(true);
+    setDebugInfo(`Checking accounts for: ${uploadPostProfile.username}`);
+    
     try {
       const response = await fetch(`https://api.upload-post.com/api/uploadposts/users/get/${uploadPostProfile.username}`, {
         method: 'GET',
         headers: {
-          'Authorization': `Apikey ${UPLOADPOST_API_KEY}`
+          'Authorization': `Apikey ${UPLOADPOST_API_KEY}`,
+          'Accept': 'application/json'
         }
       });
 
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
       const data = await response.json();
+      setDebugInfo(`API Response: ${JSON.stringify(data, null, 2)}`);
       
       if (data.success && data.profile) {
         const socialAccounts = data.profile.social_accounts || {};
         const connected = [];
         
         Object.keys(socialAccounts).forEach(platform => {
-          if (socialAccounts[platform] && socialAccounts[platform] !== null) {
+          const accountData = socialAccounts[platform];
+          if (accountData && accountData !== null) {
             connected.push({
-              platform,
+              platform: platform.toLowerCase(),
               connected_at: new Date().toISOString(),
               status: 'active',
-              username: socialAccounts[platform].username || 'Connected',
-              user_id: user.id
+              username: accountData.username || accountData.name || 'Connected',
+              user_id: user.id,
+              details: accountData
             });
           }
         });
@@ -471,14 +476,20 @@ const SocialAccountManager = () => {
         updateConnectedAccounts(connected);
         
         if (connected.length > 0) {
-          alert(`Found ${connected.length} connected account(s)!`);
+          setDebugInfo(`Successfully found ${connected.length} connected account(s)!`);
+          alert(`Successfully found ${connected.length} connected account(s)!`);
         } else {
-          alert('No connected accounts found. Please connect your accounts first.');
+          setDebugInfo('No connected accounts found in profile.');
+          alert('No connected accounts found. Please make sure you\'ve connected your accounts on upload-post.com first.');
         }
+      } else {
+        setDebugInfo(`API returned success=false: ${data.message || 'Unknown error'}`);
+        throw new Error(data.message || 'Failed to get profile data');
       }
     } catch (error) {
-      console.error('Error refreshing accounts:', error);
-      alert(`Refresh failed: ${error.message}`);
+      console.error('Refresh error:', error);
+      setDebugInfo(`Refresh failed: ${error.message}`);
+      alert(`Refresh failed: ${error.message}\n\nPlease check the console for more details.`);
     } finally {
       setLoading(false);
     }
@@ -509,7 +520,7 @@ const SocialAccountManager = () => {
           <div className="flex items-center space-x-3">
             <button
               onClick={refreshAccountStatus}
-              disabled={loading || !uploadPostProfile}
+              disabled={loading}
               className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-all"
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
@@ -534,6 +545,15 @@ const SocialAccountManager = () => {
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
             <p className="text-sm text-blue-800">
               <strong>Profile:</strong> {uploadPostProfile.username}
+            </p>
+          </div>
+        )}
+        
+        {/* Debug Info Panel (for troubleshooting) */}
+        {debugInfo && (
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-4">
+            <p className="text-xs text-gray-600">
+              <strong>Debug:</strong> {debugInfo}
             </p>
           </div>
         )}
@@ -592,8 +612,8 @@ const SocialAccountManager = () => {
           <div>
             <h4 className="font-medium text-amber-900 mb-1">How it works</h4>
             <p className="text-sm text-amber-800">
-              1. Click "Connect Accounts" to open upload-post.com<br/>
-              2. Sign in and connect your social media accounts<br/>
+              1. Click "Connect Accounts" to create your upload-post.com profile<br/>
+              2. A new tab will open - connect your social media accounts there<br/>
               3. Return here and click "Refresh Status" to sync your accounts<br/>
               4. Start creating and publishing videos automatically!
             </p>
@@ -753,7 +773,7 @@ const VideoCreator = () => {
 
 // Main App Component
 const App = () => {
-  const { user, loading } = useUser();
+  const { user, loading, connectedAccounts } = useUser();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [authModal, setAuthModal] = useState({ isOpen: false, mode: 'login' });
 
@@ -878,7 +898,7 @@ const App = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatsCard
                   title="Connected Accounts"
-                  value={user.connectedAccounts?.length || 0}
+                  value={connectedAccounts?.length || 0}
                   change="+1 this week"
                   icon={Users}
                   color="blue"
