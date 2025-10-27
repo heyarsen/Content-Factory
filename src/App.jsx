@@ -80,25 +80,32 @@ const App = () => {
 
   const createUploadPostUser = async () => {
     try {
-      const username = `user_${currentUser}`;
+      const username = `user_${Date.now()}`;
+      
+      console.log('Creating upload-post user:', username);
       
       const response = await fetch('https://api.upload-post.com/api/uploadposts/users/create', {
         method: 'POST',
         headers: {
-          'Authorization': `ApiKey ${UPLOADPOST_API_KEY}`,
+          'Authorization': `Apikey ${UPLOADPOST_API_KEY}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ username })
       });
 
       const data = await response.json();
+      console.log('Create user response:', data);
       
       if (data.success) {
         saveUploadPostUser({ username, created: true });
         return username;
+      } else {
+        console.error('Failed to create user:', data);
+        alert(`Error: ${data.message || 'Failed to create user profile'}`);
       }
     } catch (error) {
       console.error('Error creating upload-post user:', error);
+      alert(`Error: ${error.message}`);
     }
     return null;
   };
@@ -118,16 +125,19 @@ const App = () => {
         }
       }
 
+      console.log('Generating JWT for:', username);
+      
       const response = await fetch('https://api.upload-post.com/api/uploadposts/users/generate-jwt', {
         method: 'POST',
         headers: {
-          'Authorization': `ApiKey ${UPLOADPOST_API_KEY}`,
+          'Authorization': `Apikey ${UPLOADPOST_API_KEY}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ username })
       });
 
       const data = await response.json();
+      console.log('JWT response:', data);
       
       if (data.success && data.access_url) {
         const confirmed = confirm(
@@ -156,14 +166,17 @@ const App = () => {
 
   const checkConnectedAccounts = async (username) => {
     try {
+      console.log('Checking accounts for:', username);
+      
       const response = await fetch(`https://api.upload-post.com/api/uploadposts/users/get/${username}`, {
         method: 'GET',
         headers: {
-          'Authorization': `ApiKey ${UPLOADPOST_API_KEY}`
+          'Authorization': `Apikey ${UPLOADPOST_API_KEY}`
         }
       });
 
       const data = await response.json();
+      console.log('Get user response:', data);
       
       if (data.success && data.profile) {
         const socialAccounts = data.profile.social_accounts || {};
