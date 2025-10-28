@@ -63,7 +63,7 @@ class UploadPostAPI {
 
 const uploadPost = new UploadPostAPI();
 
-// Security middleware
+// Security middleware - more permissive for development
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -72,27 +72,74 @@ app.use(helmet({
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https:"],
       scriptSrc: ["'self'"],
-      connectSrc: ["'self'", "https://api.upload-post.com"],
+      connectSrc: ["'self'", "https://api.upload-post.com", "http://localhost:*"],
     },
   },
+  crossOriginEmbedderPolicy: false,
 }));
 
-// Rate limiting
+// Rate limiting - more permissive for development
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
+  max: process.env.NODE_ENV === 'development' ? 1000 : 100, // Higher limit for development
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false
 });
 app.use('/api/', limiter);
 
-// CORS configuration
-app.use(cors({ 
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173', 
-  credentials: true 
-}));
+// CORS configuration - more permissive for development
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // In development, allow localhost and contentfabrica.com
+    if (process.env.NODE_ENV === 'development') {
+      if (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('contentfabrica.com')) {
+        return callback(null, true);
+      }
+    }
+    
+    // Production whitelist
+    const allowedOrigins = [
+      process.env.FRONTEND_URL,
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'https://contentfabrica.com',
+      'https://www.contentfabrica.com'
+    ].filter(Boolean);
+    
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+};
 
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Debug middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  if (req.path.includes('/api/auth/')) {
+    console.log('Auth request:', {
+      method: req.method,
+      path: req.path,
+      headers: req.headers,
+      body: req.body
+    });
+  }
+  next();
+});
+
+// Serve static files
 app.use(express.static(path.join(__dirname, 'dist')));
 
 // Utility functions
@@ -118,6 +165,7 @@ const authenticateToken = (req, res, next) => {
   const token = authHeader && authHeader.split(' ')[1];
   
   if (!token) {
+    console.log('No token provided');
     return res.status(401).json({ error: 'Access token required' });
   }
   
@@ -127,6 +175,7 @@ const authenticateToken = (req, res, next) => {
     const workspace = workspaces.get(decoded.workspaceId);
     
     if (!user || !workspace) {
+      console.log('User or workspace not found for token');
       return res.status(401).json({ error: 'Invalid token' });
     }
     
@@ -134,51 +183,62 @@ const authenticateToken = (req, res, next) => {
     req.workspace = workspace;
     next();
   } catch (error) {
+    console.log('Token verification error:', error.message);
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 };
 
 // Seed demo users
 const createDemoUsers = async () => {
-  const hashedPassword = await hashPassword('demo123');
-  const demoUser = {
-    id: 'demo-user-id',
-    firstName: 'Demo',
-    lastName: 'User',
-    email: 'demo@contentfabrica.com',
-    username: 'demouser',
-    password: hashedPassword,
-    role: 'USER',
-    createdAt: new Date().toISOString(),
-    emailVerified: true,
-    status: 'ACTIVE'
-  };
-  
-  const demoWorkspace = {
-    id: 'demo-workspace-id',
-    name: 'Demo Workspace',
-    slug: 'demo-workspace',
-    ownerId: demoUser.id,
-    plan: 'FREE',
-    status: 'ACTIVE',
-    createdAt: new Date().toISOString()
-  };
-  
-  users.set(demoUser.email, demoUser);
-  workspaces.set(demoWorkspace.id, demoWorkspace);
+  try {
+    const hashedPassword = await hashPassword('demo123');
+    const demoUser = {
+      id: 'demo-user-id',
+      firstName: 'Demo',
+      lastName: 'User',
+      email: 'demo@contentfabrica.com',
+      username: 'demouser',
+      password: hashedPassword,
+      role: 'USER',
+      createdAt: new Date().toISOString(),
+      emailVerified: true,
+      status: 'ACTIVE'
+    };
+    
+    const demoWorkspace = {
+      id: 'demo-workspace-id',
+      name: 'Demo Workspace',
+      slug: 'demo-workspace',
+      ownerId: demoUser.id,
+      plan: 'FREE',
+      status: 'ACTIVE',
+      createdAt: new Date().toISOString()
+    };
+    
+    users.set(demoUser.email, demoUser);
+    workspaces.set(demoWorkspace.id, demoWorkspace);
+    
+    console.log('✅ Demo user created:', demoUser.email);
+    console.log('✅ Demo workspace created:', demoWorkspace.name);
+  } catch (error) {
+    console.error('❌ Error creating demo users:', error);
+  }
 };
 
 // Auth Routes
 app.post('/api/auth/register', async (req, res) => {
   try {
+    console.log('Registration attempt:', req.body);
     const { firstName, lastName, email, password, username } = req.body;
     
     // Validation
     if (!firstName || !lastName || !email || !password) {
+      console.log('Missing required fields');
       return res.status(400).json({ error: 'All fields are required' });
     }
     
     if (users.has(email)) {
+      console.log('Email already exists:', email);
       return res.status(400).json({ error: 'Email already registered' });
     }
     
@@ -218,6 +278,8 @@ app.post('/api/auth/register', async (req, res) => {
     // Return user without password
     const { password: _, ...userWithoutPassword } = user;
     
+    console.log('✅ User registered successfully:', email);
+    
     res.status(201).json({
       success: true,
       token,
@@ -225,35 +287,45 @@ app.post('/api/auth/register', async (req, res) => {
       workspace
     });
   } catch (error) {
-    console.error('Registration error:', error);
+    console.error('❌ Registration error:', error);
     res.status(500).json({ error: 'Registration failed. Please try again.' });
   }
 });
 
 app.post('/api/auth/login', async (req, res) => {
   try {
+    console.log('Login attempt:', { email: req.body.email, timestamp: new Date().toISOString() });
     const { email, password } = req.body;
     
     if (!email || !password) {
+      console.log('❌ Missing email or password');
       return res.status(400).json({ error: 'Email and password are required' });
     }
     
+    console.log('Looking for user:', email);
+    console.log('Available users:', Array.from(users.keys()));
+    
     const user = users.get(email);
     if (!user) {
+      console.log('❌ User not found:', email);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     
+    console.log('User found, checking password...');
     const validPassword = await comparePassword(password, user.password);
     if (!validPassword) {
+      console.log('❌ Invalid password for:', email);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     
     if (user.status !== 'ACTIVE') {
+      console.log('❌ Account not active:', email);
       return res.status(401).json({ error: 'Account is not active' });
     }
     
     const workspace = Array.from(workspaces.values()).find(w => w.ownerId === user.id);
     if (!workspace) {
+      console.log('❌ No workspace found for user:', email);
       return res.status(500).json({ error: 'No workspace found for user' });
     }
     
@@ -262,6 +334,8 @@ app.post('/api/auth/login', async (req, res) => {
     // Return user without password
     const { password: _, ...userWithoutPassword } = user;
     
+    console.log('✅ Login successful:', email);
+    
     res.json({
       success: true,
       token,
@@ -269,13 +343,15 @@ app.post('/api/auth/login', async (req, res) => {
       workspace
     });
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('❌ Login error:', error);
     res.status(500).json({ error: 'Login failed. Please try again.' });
   }
 });
 
 app.get('/api/auth/verify', authenticateToken, (req, res) => {
   const { password: _, ...userWithoutPassword } = req.user;
+  
+  console.log('✅ Token verified for:', req.user.email);
   
   res.json({
     success: true,
@@ -285,6 +361,7 @@ app.get('/api/auth/verify', authenticateToken, (req, res) => {
 });
 
 app.post('/api/auth/logout', (req, res) => {
+  console.log('User logged out');
   res.json({ success: true, message: 'Logged out successfully' });
 });
 
@@ -356,11 +433,13 @@ app.get('/api/workspaces/:id', authenticateToken, (req, res) => {
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    users: users.size,
+    workspaces: workspaces.size
+  });
 });
-
-// Serve static files
-app.use(express.static(path.join(__dirname, 'dist')));
 
 // SPA fallback - must be last
 app.get('*', (req, res) => {
@@ -369,16 +448,20 @@ app.get('*', (req, res) => {
 
 // Error handling middleware
 app.use((error, req, res, next) => {
-  console.error('Server error:', error);
+  console.error('❌ Server error:', error);
   res.status(500).json({ error: 'Internal server error' });
 });
 
 // Start server
 app.listen(PORT, async () => {
   await createDemoUsers();
-  console.log(`🚀 Content Fabrica Server running on port ${PORT}`);
-  console.log(`📱 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
-  console.log(`🌐 API Base URL: http://localhost:${PORT}/api`);
+  console.log('');
+  console.log('🚀 Content Fabrica Server running!');
+  console.log(`📍 Server: http://localhost:${PORT}`);
+  console.log(`📱 Frontend: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
+  console.log(`🌐 API: http://localhost:${PORT}/api`);
+  console.log(`🧪 Demo User: demo@contentfabrica.com / demo123`);
+  console.log('');
 });
 
 export default app;
