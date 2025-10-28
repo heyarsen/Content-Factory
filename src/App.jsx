@@ -3,7 +3,9 @@ import {
   Video, Plus, Instagram, Youtube, Facebook, Loader2, CheckCircle, XCircle, 
   Clock, ExternalLink, RefreshCw, Sparkles, Send, Settings, 
   TrendingUp, Users, Zap, Eye, BarChart3, Globe, X as TwitterIcon,
-  MessageCircle, AlertCircle, ChevronRight, Play, Download
+  MessageCircle, AlertCircle, ChevronRight, Play, Download,
+  Home, ShoppingBag, User, CreditCard, Package, 
+  Star, Search, Edit, MoreHorizontal, Calendar, Maximize2
 } from 'lucide-react';
 
 // Use your backend API endpoints
@@ -18,7 +20,7 @@ const App = () => {
     return newId;
   });
 
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('analytics');
   const [videos, setVideos] = useState([]);
   const [connectedAccounts, setConnectedAccounts] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -83,7 +85,7 @@ const App = () => {
     setUploadPostUser(userData);
   };
 
-  // Connect social account
+  // API functions (keeping existing logic)
   const connectSocialAccount = async () => {
     setIsLoading(true);
     try {
@@ -118,7 +120,6 @@ const App = () => {
     }
   };
 
-  // Check connected accounts
   const checkConnectedAccounts = async (username) => {
     if (!username) {
       showNotification('No username found.', 'error');
@@ -156,7 +157,6 @@ const App = () => {
     }
   };
 
-  // Create video
   const createVideo = async () => {
     if (!videoForm.topic.trim()) {
       showNotification('Please enter a video topic.', 'error');
@@ -214,7 +214,6 @@ const App = () => {
     }
   };
 
-  // Refresh video status
   const refreshVideoStatus = async (videoId) => {
     try {
       const response = await fetch(`${API_BASE}/api/video-status/${videoId}`);
@@ -240,7 +239,6 @@ const App = () => {
     }
   };
 
-  // Post video to social media
   const postVideoToSocial = async (video) => {
     if (!video.video_url) {
       showNotification('Video URL not available yet. Please wait for generation to complete.', 'error');
@@ -323,30 +321,6 @@ const App = () => {
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'generating': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'completed': return 'bg-green-100 text-green-800 border-green-200';
-      case 'posted': return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'failed': return 'bg-red-100 text-red-800 border-red-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  const getPlatformColor = (platform) => {
-    const lower = platform.toLowerCase();
-    switch (lower) {
-      case 'instagram': return 'bg-gradient-to-r from-purple-500 to-pink-500';
-      case 'youtube': return 'bg-red-500';
-      case 'facebook': return 'bg-blue-600';
-      case 'tiktok': return 'bg-black';
-      case 'x':
-      case 'twitter': return 'bg-black';
-      case 'threads': return 'bg-black';
-      default: return 'bg-gray-500';
-    }
-  };
-
   // Stats calculations
   const stats = {
     totalVideos: videos.length,
@@ -356,7 +330,7 @@ const App = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50">
       {/* Notification */}
       {notification.show && (
         <div className={`fixed top-4 right-4 z-50 max-w-md p-4 rounded-lg shadow-lg border ${
@@ -381,188 +355,342 @@ const App = () => {
         </div>
       )}
 
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center space-x-4">
-              <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-3 rounded-xl shadow-lg">
-                <Sparkles className="w-8 h-8 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Content Factory</h1>
-                <p className="text-gray-500">AI-powered video creation & distribution</p>
-              </div>
+      {/* Sidebar - Exact Shopify Style */}
+      <div className="w-64 bg-gray-800 text-white flex flex-col">
+        {/* Logo */}
+        <div className="p-4 border-b border-gray-700">
+          <div className="flex items-center space-x-3">
+            <div className="bg-green-500 w-8 h-8 rounded flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-white" />
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <p className="text-sm text-gray-500">Logged in as</p>
-                <p className="text-sm font-medium text-gray-900">{currentUser}</p>
+            <span className="font-semibold text-lg">Content Factory</span>
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 p-2">
+          {[
+            { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+            { id: 'create', label: 'Create Video', icon: Plus },
+            { id: 'videos', label: 'Videos', icon: Video, badge: videos.length },
+            { id: 'accounts', label: 'Connected Accounts', icon: Globe },
+            { id: 'settings', label: 'Settings', icon: Settings }
+          ].map(item => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm font-medium transition-colors mb-1 ${
+                activeTab === item.id 
+                  ? 'bg-gray-700 text-white' 
+                  : 'text-gray-300 hover:text-white hover:bg-gray-700'
+              }`}
+            >
+              <div className="flex items-center space-x-3">
+                <item.icon className="w-5 h-5" />
+                <span>{item.label}</span>
               </div>
-              <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
-                <span className="text-white font-semibold text-sm">{currentUser.slice(-2).toUpperCase()}</span>
-              </div>
+              {item.badge && (
+                <span className="bg-gray-600 text-xs px-2 py-1 rounded-full">
+                  {item.badge}
+                </span>
+              )}
+            </button>
+          ))}
+        </nav>
+
+        {/* User Profile */}
+        <div className="p-4 border-t border-gray-700">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+              <span className="text-xs font-semibold">{currentUser.slice(-2).toUpperCase()}</span>
+            </div>
+            <div>
+              <p className="text-sm font-medium">Content Factory</p>
+              <p className="text-xs text-gray-400">{currentUser}</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Navigation */}
-      <div className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-8">
-            {[
-              { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-              { id: 'create', label: 'Create Video', icon: Plus },
-              { id: 'videos', label: 'My Videos', icon: Video },
-              { id: 'accounts', label: 'Connected Accounts', icon: Globe }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === tab.id 
-                    ? 'border-purple-500 text-purple-600' 
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <tab.icon className="w-5 h-5" />
-                <span>{tab.label}</span>
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <div className="bg-white border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <h1 className="text-2xl font-semibold text-gray-900">
+                {activeTab === 'analytics' && 'Analytics'}
+                {activeTab === 'create' && 'Create Video'}
+                {activeTab === 'videos' && 'Videos'}
+                {activeTab === 'accounts' && 'Connected Accounts'}
+                {activeTab === 'settings' && 'Settings'}
+              </h1>
+              {activeTab === 'analytics' && (
+                <div className="flex items-center space-x-2 text-sm text-gray-500">
+                  <Calendar className="w-4 h-4" />
+                  <span>Last 30 days</span>
+                  <span>Compare to: May 7-Jun 5, 2024</span>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center space-x-3">
+              <button className="p-2 hover:bg-gray-100 rounded-lg">
+                <Search className="w-5 h-5 text-gray-400" />
               </button>
-            ))}
+              <button className="p-2 hover:bg-gray-100 rounded-lg">
+                <Edit className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Dashboard Tab */}
-        {activeTab === 'dashboard' && (
-          <div className="space-y-8">
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-white p-6 rounded-xl shadow-sm border">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Total Videos</p>
-                    <p className="text-3xl font-bold text-gray-900">{stats.totalVideos}</p>
-                  </div>
-                  <div className="bg-blue-100 p-3 rounded-lg">
-                    <Video className="w-6 h-6 text-blue-600" />
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white p-6 rounded-xl shadow-sm border">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Completed</p>
-                    <p className="text-3xl font-bold text-gray-900">{stats.completedVideos}</p>
-                  </div>
-                  <div className="bg-green-100 p-3 rounded-lg">
-                    <CheckCircle className="w-6 h-6 text-green-600" />
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white p-6 rounded-xl shadow-sm border">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Posted</p>
-                    <p className="text-3xl font-bold text-gray-900">{stats.postedVideos}</p>
-                  </div>
-                  <div className="bg-purple-100 p-3 rounded-lg">
-                    <Send className="w-6 h-6 text-purple-600" />
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white p-6 rounded-xl shadow-sm border">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Platforms</p>
-                    <p className="text-3xl font-bold text-gray-900">{stats.connectedPlatforms}</p>
-                  </div>
-                  <div className="bg-orange-100 p-3 rounded-lg">
-                    <Globe className="w-6 h-6 text-orange-600" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="bg-white rounded-xl shadow-sm border p-8">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Quick Actions</h2>
+        {/* Content Area */}
+        <div className="flex-1 overflow-auto p-6">
+          {/* Analytics Tab - Exact Shopify Style */}
+          {activeTab === 'analytics' && (
+            <div className="space-y-6">
+              {/* Top Stats */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <button
-                  onClick={() => setActiveTab('create')}
-                  className="p-6 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl text-white hover:from-purple-600 hover:to-blue-600 transition-all transform hover:scale-105"
-                >
-                  <Plus className="w-8 h-8 mb-3" />
-                  <h3 className="text-lg font-semibold mb-1">Create Video</h3>
-                  <p className="text-purple-100 text-sm">Generate AI-powered content</p>
-                </button>
-                <button
-                  onClick={() => setActiveTab('accounts')}
-                  className="p-6 bg-gradient-to-r from-green-500 to-teal-500 rounded-xl text-white hover:from-green-600 hover:to-teal-600 transition-all transform hover:scale-105"
-                >
-                  <Globe className="w-8 h-8 mb-3" />
-                  <h3 className="text-lg font-semibold mb-1">Connect Accounts</h3>
-                  <p className="text-green-100 text-sm">Link social media platforms</p>
-                </button>
-                <button
-                  onClick={() => setActiveTab('videos')}
-                  className="p-6 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl text-white hover:from-orange-600 hover:to-red-600 transition-all transform hover:scale-105"
-                >
-                  <BarChart3 className="w-8 h-8 mb-3" />
-                  <h3 className="text-lg font-semibold mb-1">View Analytics</h3>
-                  <p className="text-orange-100 text-sm">Track video performance</p>
-                </button>
-              </div>
-            </div>
-
-            {/* Recent Videos */}
-            {videos.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm border">
-                <div className="p-6 border-b">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-bold text-gray-900">Recent Videos</h2>
-                    <button
-                      onClick={() => setActiveTab('videos')}
-                      className="text-purple-600 hover:text-purple-700 font-medium text-sm flex items-center space-x-1"
-                    >
-                      <span>View all</span>
-                      <ChevronRight className="w-4 h-4" />
+                {/* Total Videos */}
+                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-medium text-gray-600">Total Videos</h3>
+                    <button className="text-gray-400 hover:text-gray-600">
+                      <MoreHorizontal className="w-4 h-4" />
                     </button>
                   </div>
+                  <div className="flex items-baseline space-x-2">
+                    <span className="text-2xl font-bold text-gray-900">{stats.totalVideos}</span>
+                    <span className="text-sm font-medium text-green-600">+20%</span>
+                  </div>
+                  <div className="mt-4">
+                    <div className="h-12 bg-gradient-to-r from-blue-50 to-blue-100 rounded flex items-end px-2">
+                      <div className="flex space-x-1 items-end w-full">
+                        {[0.3, 0.6, 0.4, 0.8, 0.5, 0.9, 0.7, 0.6, 0.8, 0.9, 1.0, 0.7].map((height, i) => (
+                          <div key={i} className="bg-blue-500 w-2 rounded-t" style={{height: `${height * 32}px`}}></div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex justify-between mt-2 text-xs text-gray-500">
+                      <span>Jun 6</span>
+                      <span>Jun 14</span>
+                      <span>Jun 22</span>
+                      <span>Jul 5</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="p-6">
+
+                {/* Completed Videos */}
+                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-medium text-gray-600">Completed Videos</h3>
+                    <button className="text-gray-400 hover:text-gray-600">
+                      <MoreHorizontal className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="flex items-baseline space-x-2">
+                    <span className="text-2xl font-bold text-gray-900">{stats.completedVideos}</span>
+                    <span className="text-sm font-medium text-green-600">+5%</span>
+                  </div>
+                  <div className="mt-4">
+                    <div className="h-12 bg-gradient-to-r from-green-50 to-green-100 rounded flex items-end px-2">
+                      <div className="flex space-x-1 items-end w-full">
+                        {[0.2, 0.4, 0.3, 0.6, 0.4, 0.7, 0.5, 0.4, 0.6, 0.7, 0.8, 0.5].map((height, i) => (
+                          <div key={i} className="bg-green-500 w-2 rounded-t" style={{height: `${height * 32}px`}}></div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex justify-between mt-2 text-xs text-gray-500">
+                      <span>Jun 6</span>
+                      <span>Jun 14</span>
+                      <span>Jun 22</span>
+                      <span>Jul 5</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sessions by Device Type (Donut Chart) */}
+                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-medium text-gray-600">Platforms by Usage</h3>
+                    <button className="text-gray-400 hover:text-gray-600">
+                      <MoreHorizontal className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-center mt-4">
+                    <div className="relative w-32 h-32">
+                      <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 36 36">
+                        <path
+                          d="M18 2.0845
+                            a 15.9155 15.9155 0 0 1 0 31.831
+                            a 15.9155 15.9155 0 0 1 0 -31.831"
+                          fill="none"
+                          stroke="#e5e7eb"
+                          strokeWidth="3"
+                        />
+                        {/* Instagram - 40% */}
+                        <path
+                          d="M18 2.0845
+                            a 15.9155 15.9155 0 0 1 0 31.831
+                            a 15.9155 15.9155 0 0 1 0 -31.831"
+                          fill="none"
+                          stroke="#3b82f6"
+                          strokeWidth="3"
+                          strokeDasharray="40, 100"
+                        />
+                        {/* YouTube - 30% */}
+                        <path
+                          d="M18 2.0845
+                            a 15.9155 15.9155 0 0 1 0 31.831
+                            a 15.9155 15.9155 0 0 1 0 -31.831"
+                          fill="none"
+                          stroke="#ef4444"
+                          strokeWidth="3"
+                          strokeDasharray="30, 100"
+                          strokeDashoffset="-40"
+                        />
+                        {/* TikTok - 20% */}
+                        <path
+                          d="M18 2.0845
+                            a 15.9155 15.9155 0 0 1 0 31.831
+                            a 15.9155 15.9155 0 0 1 0 -31.831"
+                          fill="none"
+                          stroke="#10b981"
+                          strokeWidth="3"
+                          strokeDasharray="20, 100"
+                          strokeDashoffset="-70"
+                        />
+                        {/* Others - 10% */}
+                        <path
+                          d="M18 2.0845
+                            a 15.9155 15.9155 0 0 1 0 31.831
+                            a 15.9155 15.9155 0 0 1 0 -31.831"
+                          fill="none"
+                          stroke="#8b5cf6"
+                          strokeWidth="3"
+                          strokeDasharray="10, 100"
+                          strokeDashoffset="-90"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="text-center">
+                          <div className="text-lg font-bold text-gray-900">{stats.connectedPlatforms}K</div>
+                          <div className="text-xs text-gray-500">+8%</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                        <span>Instagram</span>
+                      </div>
+                      <span className="font-medium">40%</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                        <span>YouTube</span>
+                      </div>
+                      <span className="font-medium">30%</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <span>TikTok</span>
+                      </div>
+                      <span className="font-medium">20%</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                        <span>Others</span>
+                      </div>
+                      <span className="font-medium">10%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Charts */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Platform Performance */}
+                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-medium text-gray-600">Platform Performance</h3>
+                    <button className="text-gray-400 hover:text-gray-600">
+                      <MoreHorizontal className="w-4 h-4" />
+                    </button>
+                  </div>
                   <div className="space-y-4">
-                    {videos.slice(0, 3).map((video, index) => (
-                      <div key={video.local_id || index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                        <div className="flex items-center space-x-4">
-                          {getStatusIcon(video.status)}
-                          <div>
-                            <h3 className="font-medium text-gray-900">{video.topic}</h3>
-                            <p className="text-sm text-gray-500">{new Date(video.created_at).toLocaleDateString()}</p>
+                    {[
+                      { name: 'Instagram', value: '$11.6K', growth: '20%', color: 'bg-gradient-to-r from-purple-500 to-pink-500' },
+                      { name: 'YouTube', value: '$7.5K', growth: '5%', color: 'bg-red-500' },
+                      { name: 'TikTok', value: '$2.1K', growth: '20%', color: 'bg-black' },
+                      { name: 'Facebook', value: '$987', growth: '10%', color: 'bg-blue-600' },
+                      { name: 'Twitter', value: '$261', growth: '12%', color: 'bg-black' }
+                    ].map((platform, index) => (
+                      <div key={index} className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-8 h-8 rounded ${platform.color}`}></div>
+                          <span className="font-medium text-gray-900">{platform.name}</span>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-semibold text-gray-900">{platform.value}</div>
+                          <div className="text-sm text-green-600">+{platform.growth}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Video Performance by Topic */}
+                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-medium text-gray-600">Top Video Topics</h3>
+                    <button className="text-gray-400 hover:text-gray-600">
+                      <MoreHorizontal className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="space-y-4">
+                    {[
+                      { topic: 'Business Tips', views: '$10K', growth: '8%' },
+                      { topic: 'Tech Reviews', views: '$9.75K', growth: '2%' },
+                      { topic: 'Tutorial', views: '$7.5K', growth: '4%' },
+                      { topic: 'Lifestyle', views: '$8.5K', growth: '12%' },
+                      { topic: 'Entertainment', views: '$6K', growth: '6%' }
+                    ].map((item, index) => (
+                      <div key={index} className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-full max-w-32">
+                            <div className="text-sm font-medium text-gray-900 mb-1">{item.topic}</div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div 
+                                className="bg-blue-500 h-2 rounded-full" 
+                                style={{width: `${60 + index * 10}%`}}
+                              ></div>
+                            </div>
                           </div>
                         </div>
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(video.status)}`}>
-                          {video.status}
-                        </span>
+                        <div className="text-right">
+                          <div className="font-semibold text-gray-900">{item.views}</div>
+                          <div className="text-sm text-green-600">+{item.growth}</div>
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
 
-        {/* Create Video Tab */}
-        {activeTab === 'create' && (
-          <div className="max-w-2xl mx-auto">
-            <div className="bg-white rounded-xl shadow-sm border">
-              <div className="p-8">
+          {/* Create Video Tab */}
+          {activeTab === 'create' && (
+            <div className="max-w-2xl">
+              <div className="bg-white rounded-lg border border-gray-200 p-8">
                 <div className="text-center mb-8">
-                  <div className="bg-gradient-to-r from-purple-500 to-blue-500 w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <div className="bg-gradient-to-r from-purple-500 to-blue-500 w-16 h-16 rounded-lg flex items-center justify-center mx-auto mb-4">
                     <Sparkles className="w-8 h-8 text-white" />
                   </div>
                   <h2 className="text-2xl font-bold text-gray-900 mb-2">Create AI Video</h2>
@@ -578,7 +706,7 @@ const App = () => {
                       value={videoForm.topic}
                       onChange={(e) => setVideoForm({...videoForm, topic: e.target.value})}
                       placeholder="e.g., How to start a successful online business, 10 productivity tips for entrepreneurs, Latest trends in digital marketing..."
-                      className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none transition-all"
+                      className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-all"
                       rows={4}
                     />
                   </div>
@@ -591,7 +719,7 @@ const App = () => {
                       <select
                         value={videoForm.style}
                         onChange={(e) => setVideoForm({...videoForm, style: e.target.value})}
-                        className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                        className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                       >
                         <option value="casual">Casual & Friendly</option>
                         <option value="professional">Professional & Business</option>
@@ -607,7 +735,7 @@ const App = () => {
                       <select
                         value={videoForm.duration}
                         onChange={(e) => setVideoForm({...videoForm, duration: parseInt(e.target.value)})}
-                        className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                        className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                       >
                         <option value={30}>30 seconds - Quick & Punchy</option>
                         <option value={60}>1 minute - Perfect for Social</option>
@@ -617,42 +745,10 @@ const App = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-900 mb-3">
-                        Avatar
-                      </label>
-                      <select
-                        value={videoForm.avatar_id}
-                        onChange={(e) => setVideoForm({...videoForm, avatar_id: e.target.value})}
-                        className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-                      >
-                        <option value="default_avatar">Default Avatar</option>
-                        <option value="professional_avatar">Professional Avatar</option>
-                        <option value="friendly_avatar">Friendly Avatar</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-900 mb-3">
-                        Voice
-                      </label>
-                      <select
-                        value={videoForm.voice_id}
-                        onChange={(e) => setVideoForm({...videoForm, voice_id: e.target.value})}
-                        className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-                      >
-                        <option value="default_voice">Default Voice</option>
-                        <option value="professional_voice">Professional Voice</option>
-                        <option value="friendly_voice">Friendly Voice</option>
-                      </select>
-                    </div>
-                  </div>
-
                   <button
                     onClick={createVideo}
                     disabled={isLoading || !videoForm.topic.trim()}
-                    className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white py-4 px-6 rounded-xl font-semibold hover:from-purple-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 transition-all transform hover:scale-105 disabled:transform-none"
+                    className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 transition-all"
                   >
                     {isLoading ? (
                       <>
@@ -669,181 +765,225 @@ const App = () => {
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Videos Tab */}
-        {activeTab === 'videos' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">My Videos</h2>
-                <p className="text-gray-600 mt-1">{videos.length} videos created</p>
-              </div>
-              <button
-                onClick={() => setActiveTab('create')}
-                className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-6 py-3 rounded-xl font-semibold hover:from-purple-600 hover:to-blue-600 flex items-center space-x-2 transition-all"
-              >
-                <Plus className="w-5 h-5" />
-                <span>New Video</span>
-              </button>
-            </div>
-
-            {videos.length === 0 ? (
-              <div className="bg-white rounded-xl shadow-sm border p-12 text-center">
-                <div className="bg-gray-100 w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-6">
-                  <Video className="w-8 h-8 text-gray-400" />
+          {/* Videos Tab */}
+          {activeTab === 'videos' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">Videos</h2>
+                  <p className="text-gray-600 mt-1">{videos.length} videos created</p>
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">No videos yet</h3>
-                <p className="text-gray-600 mb-6">Create your first AI-generated video to get started with automated content creation.</p>
                 <button
                   onClick={() => setActiveTab('create')}
-                  className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-6 py-3 rounded-xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all"
-                >
-                  Create Your First Video
-                </button>
-              </div>
-            ) : (
-              <div className="grid gap-6">
-                {videos.map((video, index) => (
-                  <div key={video.local_id || index} className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                    <div className="p-6">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3 mb-3">
-                            {getStatusIcon(video.status)}
-                            <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(video.status)}`}>
-                              {video.status}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              {new Date(video.created_at).toLocaleDateString()}
-                            </span>
-                          </div>
-                          <h3 className="text-lg font-semibold text-gray-900 mb-2">{video.topic}</h3>
-                          <div className="flex items-center space-x-6 text-sm text-gray-500">
-                            <span className="flex items-center space-x-1">
-                              <Settings className="w-4 h-4" />
-                              <span>Style: {video.style}</span>
-                            </span>
-                            <span className="flex items-center space-x-1">
-                              <Clock className="w-4 h-4" />
-                              <span>Duration: {video.duration}s</span>
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => refreshVideoStatus(video.video_id)}
-                            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
-                            title="Refresh status"
-                          >
-                            <RefreshCw className="w-5 h-5" />
-                          </button>
-                          {video.video_url && (
-                            <a
-                              href={video.video_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors flex items-center space-x-1"
-                              title="View video"
-                            >
-                              <Play className="w-5 h-5" />
-                            </a>
-                          )}
-                          {video.status === 'completed' && video.video_url && (
-                            <button
-                              onClick={() => postVideoToSocial(video)}
-                              disabled={isLoading}
-                              className="bg-gradient-to-r from-green-500 to-teal-500 text-white px-4 py-2 rounded-lg font-medium hover:from-green-600 hover:to-teal-600 disabled:opacity-50 flex items-center space-x-2 transition-all"
-                            >
-                              <Send className="w-4 h-4" />
-                              <span>Post to Social</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Accounts Tab */}
-        {activeTab === 'accounts' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Connected Accounts</h2>
-                <p className="text-gray-600 mt-1">Manage your social media connections</p>
-              </div>
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => uploadPostUser?.username && checkConnectedAccounts(uploadPostUser.username)}
-                  disabled={isLoading || !uploadPostUser?.username}
-                  className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-200 disabled:opacity-50 flex items-center space-x-2 transition-colors"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  <span>Refresh</span>
-                </button>
-                <button
-                  onClick={connectSocialAccount}
-                  disabled={isLoading}
-                  className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-6 py-2 rounded-lg font-medium hover:from-purple-600 hover:to-blue-600 disabled:opacity-50 flex items-center space-x-2 transition-all"
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 flex items-center space-x-2 transition-all"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>Connect Account</span>
+                  <span>New Video</span>
                 </button>
+              </div>
+
+              {videos.length === 0 ? (
+                <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+                  <div className="bg-gray-100 w-16 h-16 rounded-lg flex items-center justify-center mx-auto mb-6">
+                    <Video className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">No videos yet</h3>
+                  <p className="text-gray-600 mb-6">Create your first AI-generated video to get started with automated content creation.</p>
+                  <button
+                    onClick={() => setActiveTab('create')}
+                    className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all"
+                  >
+                    Create Your First Video
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                  <div className="px-6 py-4 border-b border-gray-200">
+                    <h3 className="text-sm font-semibold text-gray-900">All Videos</h3>
+                  </div>
+                  <div className="divide-y divide-gray-200">
+                    {videos.map((video, index) => (
+                      <div key={video.local_id || index} className="px-6 py-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-4">
+                            {getStatusIcon(video.status)}
+                            <div>
+                              <h3 className="font-medium text-gray-900">{video.topic}</h3>
+                              <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
+                                <span>Style: {video.style}</span>
+                                <span>Duration: {video.duration}s</span>
+                                <span>{new Date(video.created_at).toLocaleDateString()}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              video.status === 'generating' ? 'bg-blue-100 text-blue-800' :
+                              video.status === 'completed' ? 'bg-green-100 text-green-800' :
+                              video.status === 'posted' ? 'bg-purple-100 text-purple-800' :
+                              video.status === 'failed' ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {video.status}
+                            </span>
+                            <button
+                              onClick={() => refreshVideoStatus(video.video_id)}
+                              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+                              title="Refresh status"
+                            >
+                              <RefreshCw className="w-4 h-4" />
+                            </button>
+                            {video.video_url && (
+                              <a
+                                href={video.video_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+                                title="View video"
+                              >
+                                <Play className="w-4 h-4" />
+                              </a>
+                            )}
+                            {video.status === 'completed' && video.video_url && (
+                              <button
+                                onClick={() => postVideoToSocial(video)}
+                                disabled={isLoading}
+                                className="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center space-x-1 transition-all"
+                              >
+                                <Send className="w-3 h-3" />
+                                <span>Post</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Connected Accounts Tab */}
+          {activeTab === 'accounts' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">Connected Accounts</h2>
+                  <p className="text-gray-600 mt-1">Manage your social media connections</p>
+                </div>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => uploadPostUser?.username && checkConnectedAccounts(uploadPostUser.username)}
+                    disabled={isLoading || !uploadPostUser?.username}
+                    className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-200 disabled:opacity-50 flex items-center space-x-2 transition-colors"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    <span>Refresh</span>
+                  </button>
+                  <button
+                    onClick={connectSocialAccount}
+                    disabled={isLoading}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center space-x-2 transition-all"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Connect Account</span>
+                  </button>
+                </div>
+              </div>
+
+              {connectedAccounts.length === 0 ? (
+                <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+                  <div className="bg-gray-100 w-16 h-16 rounded-lg flex items-center justify-center mx-auto mb-6">
+                    <Globe className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">No accounts connected</h3>
+                  <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                    Connect your social media accounts to start posting videos automatically across multiple platforms.
+                  </p>
+                  <button
+                    onClick={connectSocialAccount}
+                    disabled={isLoading}
+                    className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 transition-all"
+                  >
+                    {isLoading ? 'Connecting...' : 'Connect Your First Account'}
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                  <div className="px-6 py-4 border-b border-gray-200">
+                    <h3 className="text-sm font-semibold text-gray-900">Connected Platforms</h3>
+                  </div>
+                  <div className="divide-y divide-gray-200">
+                    {connectedAccounts.map((account, index) => (
+                      <div key={index} className="px-6 py-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-4">
+                            <div className={`p-2 rounded text-white ${
+                              account.platform.toLowerCase() === 'instagram' ? 'bg-gradient-to-r from-purple-500 to-pink-500' :
+                              account.platform.toLowerCase() === 'youtube' ? 'bg-red-500' :
+                              account.platform.toLowerCase() === 'facebook' ? 'bg-blue-600' :
+                              account.platform.toLowerCase() === 'tiktok' ? 'bg-black' :
+                              'bg-gray-500'
+                            }`}>
+                              {getSocialIcon(account.platform)}
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-gray-900 capitalize">{account.platform}</h3>
+                              <p className="text-sm text-gray-600">{account.account_name}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-4">
+                            <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                              Connected
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {new Date(account.connected_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Settings Tab */}
+          {activeTab === 'settings' && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Application Settings</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Default Video Style</label>
+                    <select className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                      <option>Casual & Friendly</option>
+                      <option>Professional & Business</option>
+                      <option>Energetic & Dynamic</option>
+                      <option>Educational & Informative</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Default Duration</label>
+                    <select className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                      <option>30 seconds</option>
+                      <option>1 minute</option>
+                      <option>1.5 minutes</option>
+                      <option>2 minutes</option>
+                    </select>
+                  </div>
+                  <button className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors">
+                    Save Settings
+                  </button>
+                </div>
               </div>
             </div>
-
-            {connectedAccounts.length === 0 ? (
-              <div className="bg-white rounded-xl shadow-sm border p-12 text-center">
-                <div className="bg-gray-100 w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-6">
-                  <Globe className="w-8 h-8 text-gray-400" />
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">No accounts connected</h3>
-                <p className="text-gray-600 mb-6 max-w-md mx-auto">
-                  Connect your social media accounts to start posting videos automatically across multiple platforms.
-                </p>
-                <button
-                  onClick={connectSocialAccount}
-                  disabled={isLoading}
-                  className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-6 py-3 rounded-xl font-semibold hover:from-purple-600 hover:to-blue-600 disabled:opacity-50 transition-all"
-                >
-                  {isLoading ? 'Connecting...' : 'Connect Your First Account'}
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {connectedAccounts.map((account, index) => (
-                  <div key={index} className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                    <div className="p-6">
-                      <div className="flex items-center space-x-4 mb-4">
-                        <div className={`p-3 rounded-xl text-white ${getPlatformColor(account.platform)}`}>
-                          {getSocialIcon(account.platform)}
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-900 capitalize">{account.platform}</h3>
-                          <p className="text-sm text-gray-600">{account.account_name}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                          Connected
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          {new Date(account.connected_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
