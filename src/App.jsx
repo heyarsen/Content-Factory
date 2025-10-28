@@ -7,8 +7,6 @@ const WEBHOOKS = {
   checkStatus: 'https://hook.eu2.make.com/1ejgvywznrgfbs4iaijt2xdlzf62n7w5'
 };
 
-const UPLOADPOST_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImluZm9zcG9sb2sub2ZmaWNlQGdtYWlsLmNvbSIsImV4cCI6NDkxMjQzMzIxNiwianRpIjoiNDA2NDI2ZTUtNWUxNi00Mjc5LThmYzQtZDUzMDlhNTQwNzIwIn0.EylwU51ZDhLFIXBL6hf49pdxCLAiwTY6tf_SW-6FktA';
-
 const App = () => {
   const [currentUser] = useState(() => {
     const saved = localStorage.getItem('app_user_id');
@@ -33,9 +31,9 @@ const App = () => {
 
   useEffect(() => {
     loadVideos();
-    loadUploadPostUser();
-    if (uploadPostUser?.username) {
-      checkConnectedAccounts(uploadPostUser.username);
+    const userData = loadUploadPostUser();
+    if (userData?.username) {
+      checkConnectedAccounts(userData.username);
     }
   }, []);
 
@@ -86,56 +84,28 @@ const App = () => {
       let username = uploadPostUser?.username;
       
       if (!username) {
-        const randomId = Math.random().toString(36).substring(2, 10);
-        username = randomId;
-        
+        username = Math.random().toString(36).substring(2, 10);
         console.log('Creating upload-post user:', username);
-        
-        try {
-          const createResponse = await fetch('https://api.upload-post.com/api/uploadposts/users', {
-            method: 'POST',
-            headers: {
-              'Authorization': `ApiKey ${UPLOADPOST_API_KEY}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ username })
-          });
-          
-          const createData = await createResponse.json();
-          console.log('Create response:', createData);
-          
-          if (createData.success || (createData.message && createData.message.includes('already exists'))) {
-            saveUploadPostUser({ username, created: true });
-          } else {
-            console.error('Error creating user:', createData);
-            alert(`Failed to create user profile: ${createData.message || 'Unknown error'}`);
-            setIsLoading(false);
-            return;
-          }
-        } catch (createError) {
-          console.error('Error in create request:', createError);
-          alert(`Network error: ${createError.message}`);
-          setIsLoading(false);
-          return;
-        }
       }
 
-      console.log('Generating JWT for:', username);
-      
-      const response = await fetch('https://api.upload-post.com/api/uploadposts/generate-jwt', {
+      // Call Make.com webhook to handle upload-post API
+      const response = await fetch(WEBHOOKS.storeSocial, {
         method: 'POST',
-        headers: {
-          'Authorization': `ApiKey ${UPLOADPOST_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ username })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'connect_accounts',
+          user_id: currentUser,
+          username: username
+        })
       });
 
       const data = await response.json();
-      console.log('JWT response:', data);
+      console.log('Connection response:', data);
       
       if (data.success && data.access_url) {
-        const newWindow = window.open(data.access_url, '_blank', 'width=800,height=600');
+        saveUploadPostUser({ username, created: true });
+        
+        window.open(data.access_url, '_blank', 'width=800,height=600');
         
         alert(
           'A new window has opened for you to connect your social media accounts.\n\n' +
@@ -145,7 +115,7 @@ const App = () => {
           'Your connected accounts will appear here.'
         );
       } else {
-        alert('Failed to generate connection link. Please try again.');
+        alert('Failed to generate connection link. Please check Make.com logs.');
       }
     } catch (error) {
       console.error('Error connecting account:', error);
@@ -169,32 +139,27 @@ const App = () => {
     try {
       console.log('Checking accounts for:', username);
       
-      const response = await fetch(`https://api.upload-post.com/api/uploadposts/users/${username}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `ApiKey ${UPLOADPOST_API_KEY}`
-        }
+      // Call Make.com webhook to get accounts
+      const response = await fetch(WEBHOOKS.checkStatus, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'get_accounts',
+          username: username
+        })
       });
 
       const data = await response.json();
-      console.log('Get user response:', data);
+      console.log('Get accounts response:', data);
       
-      if (data.success && data.profile) {
-        const socialAccounts = data.profile.social_accounts || {};
-        const connected = [];
-        
-        Object.keys(socialAccounts).forEach(platform => {
-          const accountData = socialAccounts[platform];
-          if (accountData && accountData !== null && typeof accountData === 'object') {
-            connected.push({
-              platform,
-              connected_at: new Date().toISOString(),
-              status: 'active',
-              account_name: accountData.username || accountData.name || platform,
-              details: accountData
-            });
-          }
-        });
+      if (data.success && data.accounts) {
+        const connected = data.accounts.map(account => ({
+          platform: account.platform,
+          connected_at: account.connected_at || new Date().toISOString(),
+          status: 'active',
+          account_name: account.name || account.username || account.platform,
+          details: account
+        }));
         
         saveConnectedAccounts(connected);
         
@@ -386,12 +351,187 @@ const App = () => {
               <p className="text-gray-600">Generate AI-powered videos and post to your social media</p>
             </div>
 
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-4">
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">
+                    Video topic
+                  </label>
+                  <textarea
+                    value={videoForm.topic}
+                    onChange={(e) => setVideoForm({ ...videoForm, topic: e.target.value })}
+                    placeholder="Describe what your video should be about..."
+                    rows={4}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-900 mb-2">Style</label>
+                    <select
+                      value={videoForm.style}
+                      onChange={(e) => setVideoForm({ ...videoForm, style: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    >
+                      <option value="casual">Casual</option>
+                      <option value="professional">Professional</option>
+                      <option value="energetic">Energetic</option>
+                      <option value="educational">Educational</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-900 mb-2">
+                      Duration
+                    </label>
+                    <input
+                      type="number"
+                      value={videoForm.duration}
+                      onChange={(e) => setVideoForm({ ...videoForm, duration: parseInt(e.target.value) })}
+                      min="15"
+                      max="180"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Seconds (15-180)</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {connectedAccounts.length > 0 ? (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  <p className="text-sm font-medium text-green-900">
+                    Connected to {connectedAccounts.length} account(s): {connectedAccounts.map(a => a.platform).join(', ')}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                <p className="text-sm text-yellow-800">
+                  <strong>Connect accounts first:</strong> Go to the Accounts tab to connect your social media
+                </p>
+              </div>
+            )}
+
+            <button
+              onClick={createVideo}
+              disabled={isLoading || connectedAccounts.length === 0}
+              className="w-full bg-gray-900 text-white py-3.5 px-6 rounded-lg font-semibold text-sm hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2 shadow-sm"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Creating...</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="w-5 h-5" />
+                  <span>Generate video</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
+        {activeTab === 'videos' && (
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-1">Your videos</h2>
+                <p className="text-gray-600 text-sm">Manage and track your generated videos</p>
+              </div>
+              <button
+                onClick={loadVideos}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 flex items-center space-x-2 border border-gray-300 rounded-lg hover:border-gray-400 transition-colors"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>Refresh</span>
+              </button>
+            </div>
+
+            {videos.length === 0 ? (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Video className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No videos yet</h3>
+                <p className="text-gray-600 text-sm mb-6">Create your first AI-generated video to get started</p>
+                <button
+                  onClick={() => setActiveTab('create')}
+                  className="inline-flex items-center px-5 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create video
+                </button>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {videos.map((video) => (
+                  <div key={video.video_id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-3">
+                          {getStatusIcon(video.status)}
+                          <span className="text-sm font-medium text-gray-900 capitalize">{video.status}</span>
+                          {video.status === 'generating' && (
+                            <span className="text-xs text-gray-500">Processing...</span>
+                          )}
+                        </div>
+                        <h3 className="text-base font-semibold text-gray-900 mb-2">{video.topic}</h3>
+                        <div className="flex items-center space-x-4 text-xs text-gray-500">
+                          <span className="font-medium">{video.style}</span>
+                          <span>•</span>
+                          <span>{video.duration}s</span>
+                          <span>•</span>
+                          <span>{new Date(video.created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                      {video.status === 'generating' && (
+                        <button
+                          onClick={() => refreshVideoStatus(video.video_id)}
+                          className="text-sm font-medium text-gray-700 hover:text-gray-900 px-3 py-1.5 border border-gray-300 rounded-lg hover:border-gray-400 transition-colors"
+                        >
+                          Check status
+                        </button>
+                      )}
+                    </div>
+                    
+                    {video.video_url && (
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <a
+                          href={video.video_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center text-sm font-medium text-gray-900 hover:text-gray-700"
+                        >
+                          View video
+                          <ExternalLink className="w-4 h-4 ml-1.5" />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'accounts' && (
+          <div>
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Social accounts</h2>
+              <p className="text-gray-600">Connect your social media accounts to post videos</p>
+            </div>
+
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <h3 className="font-semibold text-gray-900 mb-1">Upload-Post Connection</h3>
                   <p className="text-sm text-gray-600">
-                    Securely connect your social media accounts through upload-post.com
+                    Securely connect your social media accounts
                   </p>
                   {uploadPostUser?.username && (
                     <p className="text-xs text-gray-500 mt-1">
