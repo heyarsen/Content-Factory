@@ -34,6 +34,7 @@ model User {
   notifications   Notification[]
   activities      Activity[]
   sessions        Session[]
+  socialAccounts  SocialAccount[]
   
   @@map("users")
 }
@@ -50,6 +51,32 @@ model Session {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   @@map("sessions")
+}
+
+model SocialAccount {
+  id              String            @id @default(cuid())
+  platform        Platform
+  platformUserId  String
+  displayName     String?
+  username        String?
+  profileImage    String?
+  accessToken     String?
+  refreshToken    String?
+  tokenExpiry     DateTime?
+  isConnected     Boolean           @default(true)
+  uploadPostProfileId String?
+  metadata        Json              @default("{}")
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  // Relationships
+  userId          String
+  workspaceId     String
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace       Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, workspaceId, platform])
+  @@map("social_accounts")
 }
 
 model Workspace {
@@ -73,6 +100,7 @@ model Workspace {
   calendar    CalendarEvent[]
   analytics   Analytics[]
   campaigns   Campaign[]
+  socialAccounts SocialAccount[]
   
   @@map("workspaces")
 }
@@ -341,6 +369,7 @@ enum Platform {
   FACEBOOK
   TWITTER
   LINKEDIN
+  THREADS
 }
 
 enum PostStatus {
@@ -390,4 +419,6 @@ enum NotificationType {
   CAMPAIGN_STARTED
   ANALYTICS_REPORT
   SYSTEM_UPDATE
+  SOCIAL_ACCOUNT_CONNECTED
+  SOCIAL_ACCOUNT_DISCONNECTED
 }
