@@ -5,7 +5,8 @@ import {
   TrendingUp, Users, Zap, Eye, BarChart3, Globe, X as TwitterIcon,
   MessageCircle, AlertCircle, ChevronRight, Play, Download,
   Home, ShoppingBag, User, CreditCard, Package, 
-  Star, Search, Edit, MoreHorizontal, Calendar, Maximize2
+  Star, Search, Edit, MoreHorizontal, Calendar, Maximize2, 
+  Trash2, Filter, CheckSquare, Square, ArrowUpDown
 } from 'lucide-react';
 
 // Use your backend API endpoints
@@ -33,6 +34,15 @@ const App = () => {
     voice_id: 'default_voice'
   });
   const [notification, setNotification] = useState({ show: false, message: '', type: 'info' });
+  
+  // New state for enhanced video management
+  const [selectedVideos, setSelectedVideos] = useState([]);
+  const [videoFilter, setVideoFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
   useEffect(() => {
     loadVideos();
@@ -84,6 +94,87 @@ const App = () => {
     localStorage.setItem(`uploadpost_user_${currentUser}`, JSON.stringify(userData));
     setUploadPostUser(userData);
   };
+
+  // Enhanced Delete Functions
+  const deleteVideo = (videoId) => {
+    const updatedVideos = videos.filter(v => 
+      v.local_id !== videoId && v.video_id !== videoId
+    );
+    saveVideos(updatedVideos);
+    setSelectedVideos(selectedVideos.filter(id => id !== videoId));
+    setShowDeleteConfirm(null);
+    showNotification('Video deleted successfully', 'success');
+  };
+
+  const deleteSelectedVideos = () => {
+    const updatedVideos = videos.filter(v => 
+      !selectedVideos.includes(v.local_id || v.video_id)
+    );
+    saveVideos(updatedVideos);
+    setSelectedVideos([]);
+    setShowBulkDeleteConfirm(false);
+    showNotification(`${selectedVideos.length} videos deleted successfully`, 'success');
+  };
+
+  const clearAllVideos = () => {
+    saveVideos([]);
+    setSelectedVideos([]);
+    showNotification('All videos cleared', 'success');
+  };
+
+  // Video Selection Functions
+  const toggleVideoSelection = (videoId) => {
+    setSelectedVideos(prev => 
+      prev.includes(videoId) 
+        ? prev.filter(id => id !== videoId)
+        : [...prev, videoId]
+    );
+  };
+
+  const selectAllVideos = () => {
+    const allVideoIds = filteredAndSortedVideos.map(v => v.local_id || v.video_id);
+    setSelectedVideos(allVideoIds);
+  };
+
+  const deselectAllVideos = () => {
+    setSelectedVideos([]);
+  };
+
+  // Filter and Sort Functions
+  const filteredAndSortedVideos = videos
+    .filter(video => {
+      // Filter by status
+      if (videoFilter !== 'all' && video.status !== videoFilter) return false;
+      
+      // Filter by search query
+      if (searchQuery && !video.topic.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
+      
+      return true;
+    })
+    .sort((a, b) => {
+      let comparison = 0;
+      
+      switch (sortBy) {
+        case 'created_at':
+          comparison = new Date(a.created_at) - new Date(b.created_at);
+          break;
+        case 'topic':
+          comparison = a.topic.localeCompare(b.topic);
+          break;
+        case 'status':
+          comparison = a.status.localeCompare(b.status);
+          break;
+        case 'duration':
+          comparison = a.duration - b.duration;
+          break;
+        default:
+          comparison = 0;
+      }
+      
+      return sortOrder === 'desc' ? -comparison : comparison;
+    });
 
   // API functions (keeping existing logic)
   const connectSocialAccount = async () => {
@@ -355,6 +446,67 @@ const App = () => {
         </div>
       )}
 
+      {/* Delete Confirmation Modals */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="bg-red-100 rounded-full p-2">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Delete Video</h3>
+            </div>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete this video? This action cannot be undone.
+            </p>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowDeleteConfirm(null)}
+                className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => deleteVideo(showDeleteConfirm)}
+                className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-red-700 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBulkDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="bg-red-100 rounded-full p-2">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Delete Selected Videos</h3>
+            </div>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete {selectedVideos.length} selected videos? This action cannot be undone.
+            </p>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowBulkDeleteConfirm(false)}
+                className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={deleteSelectedVideos}
+                className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-red-700 transition-colors"
+              >
+                Delete {selectedVideos.length} Videos
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar - Exact Shopify Style */}
       <div className="w-64 bg-gray-800 text-white flex flex-col">
         {/* Logo */}
@@ -446,9 +598,10 @@ const App = () => {
 
         {/* Content Area */}
         <div className="flex-1 overflow-auto p-6">
-          {/* Analytics Tab - Exact Shopify Style */}
+          {/* Analytics Tab - Keeping the existing content */}
           {activeTab === 'analytics' && (
             <div className="space-y-6">
+              {/* Analytics content remains the same... */}
               {/* Top Stats */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Total Videos */}
@@ -462,21 +615,6 @@ const App = () => {
                   <div className="flex items-baseline space-x-2">
                     <span className="text-2xl font-bold text-gray-900">{stats.totalVideos}</span>
                     <span className="text-sm font-medium text-green-600">+20%</span>
-                  </div>
-                  <div className="mt-4">
-                    <div className="h-12 bg-gradient-to-r from-blue-50 to-blue-100 rounded flex items-end px-2">
-                      <div className="flex space-x-1 items-end w-full">
-                        {[0.3, 0.6, 0.4, 0.8, 0.5, 0.9, 0.7, 0.6, 0.8, 0.9, 1.0, 0.7].map((height, i) => (
-                          <div key={i} className="bg-blue-500 w-2 rounded-t" style={{height: `${height * 32}px`}}></div>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="flex justify-between mt-2 text-xs text-gray-500">
-                      <span>Jun 6</span>
-                      <span>Jun 14</span>
-                      <span>Jun 22</span>
-                      <span>Jul 5</span>
-                    </div>
                   </div>
                 </div>
 
@@ -492,200 +630,26 @@ const App = () => {
                     <span className="text-2xl font-bold text-gray-900">{stats.completedVideos}</span>
                     <span className="text-sm font-medium text-green-600">+5%</span>
                   </div>
-                  <div className="mt-4">
-                    <div className="h-12 bg-gradient-to-r from-green-50 to-green-100 rounded flex items-end px-2">
-                      <div className="flex space-x-1 items-end w-full">
-                        {[0.2, 0.4, 0.3, 0.6, 0.4, 0.7, 0.5, 0.4, 0.6, 0.7, 0.8, 0.5].map((height, i) => (
-                          <div key={i} className="bg-green-500 w-2 rounded-t" style={{height: `${height * 32}px`}}></div>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="flex justify-between mt-2 text-xs text-gray-500">
-                      <span>Jun 6</span>
-                      <span>Jun 14</span>
-                      <span>Jun 22</span>
-                      <span>Jul 5</span>
-                    </div>
-                  </div>
                 </div>
 
-                {/* Sessions by Device Type (Donut Chart) */}
+                {/* Posted Videos */}
                 <div className="bg-white rounded-lg border border-gray-200 p-6">
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-medium text-gray-600">Platforms by Usage</h3>
+                    <h3 className="text-sm font-medium text-gray-600">Posted Videos</h3>
                     <button className="text-gray-400 hover:text-gray-600">
                       <MoreHorizontal className="w-4 h-4" />
                     </button>
                   </div>
-                  <div className="flex items-center justify-center mt-4">
-                    <div className="relative w-32 h-32">
-                      <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 36 36">
-                        <path
-                          d="M18 2.0845
-                            a 15.9155 15.9155 0 0 1 0 31.831
-                            a 15.9155 15.9155 0 0 1 0 -31.831"
-                          fill="none"
-                          stroke="#e5e7eb"
-                          strokeWidth="3"
-                        />
-                        {/* Instagram - 40% */}
-                        <path
-                          d="M18 2.0845
-                            a 15.9155 15.9155 0 0 1 0 31.831
-                            a 15.9155 15.9155 0 0 1 0 -31.831"
-                          fill="none"
-                          stroke="#3b82f6"
-                          strokeWidth="3"
-                          strokeDasharray="40, 100"
-                        />
-                        {/* YouTube - 30% */}
-                        <path
-                          d="M18 2.0845
-                            a 15.9155 15.9155 0 0 1 0 31.831
-                            a 15.9155 15.9155 0 0 1 0 -31.831"
-                          fill="none"
-                          stroke="#ef4444"
-                          strokeWidth="3"
-                          strokeDasharray="30, 100"
-                          strokeDashoffset="-40"
-                        />
-                        {/* TikTok - 20% */}
-                        <path
-                          d="M18 2.0845
-                            a 15.9155 15.9155 0 0 1 0 31.831
-                            a 15.9155 15.9155 0 0 1 0 -31.831"
-                          fill="none"
-                          stroke="#10b981"
-                          strokeWidth="3"
-                          strokeDasharray="20, 100"
-                          strokeDashoffset="-70"
-                        />
-                        {/* Others - 10% */}
-                        <path
-                          d="M18 2.0845
-                            a 15.9155 15.9155 0 0 1 0 31.831
-                            a 15.9155 15.9155 0 0 1 0 -31.831"
-                          fill="none"
-                          stroke="#8b5cf6"
-                          strokeWidth="3"
-                          strokeDasharray="10, 100"
-                          strokeDashoffset="-90"
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="text-center">
-                          <div className="text-lg font-bold text-gray-900">{stats.connectedPlatforms}K</div>
-                          <div className="text-xs text-gray-500">+8%</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-4 space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                        <span>Instagram</span>
-                      </div>
-                      <span className="font-medium">40%</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                        <span>YouTube</span>
-                      </div>
-                      <span className="font-medium">30%</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                        <span>TikTok</span>
-                      </div>
-                      <span className="font-medium">20%</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                        <span>Others</span>
-                      </div>
-                      <span className="font-medium">10%</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Bottom Charts */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Platform Performance */}
-                <div className="bg-white rounded-lg border border-gray-200 p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-medium text-gray-600">Platform Performance</h3>
-                    <button className="text-gray-400 hover:text-gray-600">
-                      <MoreHorizontal className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <div className="space-y-4">
-                    {[
-                      { name: 'Instagram', value: '$11.6K', growth: '20%', color: 'bg-gradient-to-r from-purple-500 to-pink-500' },
-                      { name: 'YouTube', value: '$7.5K', growth: '5%', color: 'bg-red-500' },
-                      { name: 'TikTok', value: '$2.1K', growth: '20%', color: 'bg-black' },
-                      { name: 'Facebook', value: '$987', growth: '10%', color: 'bg-blue-600' },
-                      { name: 'Twitter', value: '$261', growth: '12%', color: 'bg-black' }
-                    ].map((platform, index) => (
-                      <div key={index} className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div className={`w-8 h-8 rounded ${platform.color}`}></div>
-                          <span className="font-medium text-gray-900">{platform.name}</span>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-semibold text-gray-900">{platform.value}</div>
-                          <div className="text-sm text-green-600">+{platform.growth}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Video Performance by Topic */}
-                <div className="bg-white rounded-lg border border-gray-200 p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-medium text-gray-600">Top Video Topics</h3>
-                    <button className="text-gray-400 hover:text-gray-600">
-                      <MoreHorizontal className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <div className="space-y-4">
-                    {[
-                      { topic: 'Business Tips', views: '$10K', growth: '8%' },
-                      { topic: 'Tech Reviews', views: '$9.75K', growth: '2%' },
-                      { topic: 'Tutorial', views: '$7.5K', growth: '4%' },
-                      { topic: 'Lifestyle', views: '$8.5K', growth: '12%' },
-                      { topic: 'Entertainment', views: '$6K', growth: '6%' }
-                    ].map((item, index) => (
-                      <div key={index} className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-full max-w-32">
-                            <div className="text-sm font-medium text-gray-900 mb-1">{item.topic}</div>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div 
-                                className="bg-blue-500 h-2 rounded-full" 
-                                style={{width: `${60 + index * 10}%`}}
-                              ></div>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-semibold text-gray-900">{item.views}</div>
-                          <div className="text-sm text-green-600">+{item.growth}</div>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="flex items-baseline space-x-2">
+                    <span className="text-2xl font-bold text-gray-900">{stats.postedVideos}</span>
+                    <span className="text-sm font-medium text-purple-600">+8%</span>
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Create Video Tab */}
+          {/* Create Video Tab - Keeping existing content */}
           {activeTab === 'create' && (
             <div className="max-w-2xl">
               <div className="bg-white rounded-lg border border-gray-200 p-8">
@@ -767,36 +731,151 @@ const App = () => {
             </div>
           )}
 
-          {/* Videos Tab */}
+          {/* Enhanced Videos Tab with Delete Functionality */}
           {activeTab === 'videos' && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-semibold text-gray-900">Videos</h2>
-                  <p className="text-gray-600 mt-1">{videos.length} videos created</p>
+                  <p className="text-gray-600 mt-1">{filteredAndSortedVideos.length} of {videos.length} videos</p>
                 </div>
-                <button
-                  onClick={() => setActiveTab('create')}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 flex items-center space-x-2 transition-all"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>New Video</span>
-                </button>
+                <div className="flex items-center space-x-3">
+                  {selectedVideos.length > 0 && (
+                    <button
+                      onClick={() => setShowBulkDeleteConfirm(true)}
+                      className="bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 flex items-center space-x-2 transition-all"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>Delete {selectedVideos.length}</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setActiveTab('create')}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 flex items-center space-x-2 transition-all"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>New Video</span>
+                  </button>
+                </div>
               </div>
 
-              {videos.length === 0 ? (
+              {/* Enhanced Filters and Controls */}
+              {videos.length > 0 && (
+                <div className="bg-white rounded-lg border border-gray-200 p-4">
+                  <div className="flex flex-wrap items-center gap-4">
+                    {/* Search */}
+                    <div className="flex-1 min-w-64">
+                      <div className="relative">
+                        <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Search videos..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Status Filter */}
+                    <div className="flex items-center space-x-2">
+                      <Filter className="w-4 h-4 text-gray-400" />
+                      <select
+                        value={videoFilter}
+                        onChange={(e) => setVideoFilter(e.target.value)}
+                        className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="all">All Status</option>
+                        <option value="generating">Generating</option>
+                        <option value="completed">Completed</option>
+                        <option value="posted">Posted</option>
+                        <option value="failed">Failed</option>
+                      </select>
+                    </div>
+
+                    {/* Sort */}
+                    <div className="flex items-center space-x-2">
+                      <ArrowUpDown className="w-4 h-4 text-gray-400" />
+                      <select
+                        value={`${sortBy}-${sortOrder}`}
+                        onChange={(e) => {
+                          const [field, order] = e.target.value.split('-');
+                          setSortBy(field);
+                          setSortOrder(order);
+                        }}
+                        className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="created_at-desc">Newest First</option>
+                        <option value="created_at-asc">Oldest First</option>
+                        <option value="topic-asc">Topic A-Z</option>
+                        <option value="topic-desc">Topic Z-A</option>
+                        <option value="status-asc">Status A-Z</option>
+                        <option value="duration-desc">Longest First</option>
+                        <option value="duration-asc">Shortest First</option>
+                      </select>
+                    </div>
+
+                    {/* Bulk Selection */}
+                    {filteredAndSortedVideos.length > 0 && (
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => 
+                            selectedVideos.length === filteredAndSortedVideos.length 
+                              ? deselectAllVideos() 
+                              : selectAllVideos()
+                          }
+                          className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900"
+                        >
+                          {selectedVideos.length === filteredAndSortedVideos.length ? (
+                            <CheckSquare className="w-4 h-4" />
+                          ) : (
+                            <Square className="w-4 h-4" />
+                          )}
+                          <span>
+                            {selectedVideos.length === filteredAndSortedVideos.length 
+                              ? 'Deselect All' 
+                              : 'Select All'
+                            }
+                          </span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {filteredAndSortedVideos.length === 0 ? (
                 <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
                   <div className="bg-gray-100 w-16 h-16 rounded-lg flex items-center justify-center mx-auto mb-6">
                     <Video className="w-8 h-8 text-gray-400" />
                   </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">No videos yet</h3>
-                  <p className="text-gray-600 mb-6">Create your first AI-generated video to get started with automated content creation.</p>
-                  <button
-                    onClick={() => setActiveTab('create')}
-                    className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all"
-                  >
-                    Create Your First Video
-                  </button>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                    {videos.length === 0 ? 'No videos yet' : 'No videos match your search'}
+                  </h3>
+                  <p className="text-gray-600 mb-6">
+                    {videos.length === 0 
+                      ? 'Create your first AI-generated video to get started with automated content creation.'
+                      : 'Try adjusting your search or filter criteria.'
+                    }
+                  </p>
+                  {videos.length === 0 ? (
+                    <button
+                      onClick={() => setActiveTab('create')}
+                      className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all"
+                    >
+                      Create Your First Video
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setSearchQuery('');
+                        setVideoFilter('all');
+                      }}
+                      className="bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-700 transition-all"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -804,69 +883,100 @@ const App = () => {
                     <h3 className="text-sm font-semibold text-gray-900">All Videos</h3>
                   </div>
                   <div className="divide-y divide-gray-200">
-                    {videos.map((video, index) => (
-                      <div key={video.local_id || index} className="px-6 py-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4">
-                            {getStatusIcon(video.status)}
-                            <div>
-                              <h3 className="font-medium text-gray-900">{video.topic}</h3>
-                              <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
-                                <span>Style: {video.style}</span>
-                                <span>Duration: {video.duration}s</span>
-                                <span>{new Date(video.created_at).toLocaleDateString()}</span>
+                    {filteredAndSortedVideos.map((video, index) => {
+                      const videoId = video.local_id || video.video_id;
+                      const isSelected = selectedVideos.includes(videoId);
+                      
+                      return (
+                        <div key={videoId || index} className={`px-6 py-4 transition-colors ${
+                          isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
+                        }`}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-4">
+                              {/* Selection Checkbox */}
+                              <button
+                                onClick={() => toggleVideoSelection(videoId)}
+                                className="text-gray-400 hover:text-gray-600"
+                              >
+                                {isSelected ? (
+                                  <CheckSquare className="w-5 h-5 text-blue-600" />
+                                ) : (
+                                  <Square className="w-5 h-5" />
+                                )}
+                              </button>
+                              
+                              {getStatusIcon(video.status)}
+                              <div>
+                                <h3 className="font-medium text-gray-900">{video.topic}</h3>
+                                <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
+                                  <span>Style: {video.style}</span>
+                                  <span>Duration: {video.duration}s</span>
+                                  <span>{new Date(video.created_at).toLocaleDateString()}</span>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              video.status === 'generating' ? 'bg-blue-100 text-blue-800' :
-                              video.status === 'completed' ? 'bg-green-100 text-green-800' :
-                              video.status === 'posted' ? 'bg-purple-100 text-purple-800' :
-                              video.status === 'failed' ? 'bg-red-100 text-red-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {video.status}
-                            </span>
-                            <button
-                              onClick={() => refreshVideoStatus(video.video_id)}
-                              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
-                              title="Refresh status"
-                            >
-                              <RefreshCw className="w-4 h-4" />
-                            </button>
-                            {video.video_url && (
-                              <a
-                                href={video.video_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
-                                title="View video"
-                              >
-                                <Play className="w-4 h-4" />
-                              </a>
-                            )}
-                            {video.status === 'completed' && video.video_url && (
+                            <div className="flex items-center space-x-2">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                video.status === 'generating' ? 'bg-blue-100 text-blue-800' :
+                                video.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                video.status === 'posted' ? 'bg-purple-100 text-purple-800' :
+                                video.status === 'failed' ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {video.status}
+                              </span>
+                              
                               <button
-                                onClick={() => postVideoToSocial(video)}
-                                disabled={isLoading}
-                                className="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center space-x-1 transition-all"
+                                onClick={() => refreshVideoStatus(video.video_id)}
+                                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                title="Refresh status"
                               >
-                                <Send className="w-3 h-3" />
-                                <span>Post</span>
+                                <RefreshCw className="w-4 h-4" />
                               </button>
-                            )}
+                              
+                              {video.video_url && (
+                                <a
+                                  href={video.video_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                  title="View video"
+                                >
+                                  <Play className="w-4 h-4" />
+                                </a>
+                              )}
+                              
+                              {video.status === 'completed' && video.video_url && (
+                                <button
+                                  onClick={() => postVideoToSocial(video)}
+                                  disabled={isLoading}
+                                  className="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center space-x-1 transition-all"
+                                >
+                                  <Send className="w-3 h-3" />
+                                  <span>Post</span>
+                                </button>
+                              )}
+                              
+                              {/* Delete Button */}
+                              <button
+                                onClick={() => setShowDeleteConfirm(videoId)}
+                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Delete video"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* Connected Accounts Tab */}
+          {/* Connected Accounts Tab - Keeping existing content */}
           {activeTab === 'accounts' && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
@@ -952,7 +1062,7 @@ const App = () => {
             </div>
           )}
 
-          {/* Settings Tab */}
+          {/* Settings Tab - Keeping existing content */}
           {activeTab === 'settings' && (
             <div className="space-y-6">
               <div className="bg-white rounded-lg border border-gray-200 p-6">
@@ -979,6 +1089,25 @@ const App = () => {
                   <button className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors">
                     Save Settings
                   </button>
+                </div>
+              </div>
+              
+              {/* Danger Zone */}
+              <div className="bg-white rounded-lg border border-red-200 p-6">
+                <h3 className="text-lg font-semibold text-red-900 mb-4">Danger Zone</h3>
+                <div className="space-y-4">
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <h4 className="font-medium text-red-900 mb-2">Clear All Videos</h4>
+                    <p className="text-sm text-red-700 mb-4">
+                      This will permanently delete all videos from your local storage. This action cannot be undone.
+                    </p>
+                    <button
+                      onClick={clearAllVideos}
+                      className="bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 transition-colors"
+                    >
+                      Clear All Videos
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
