@@ -25,36 +25,38 @@ class UploadPostAPI {
     this.baseURL = 'https://api.upload-post.com';
   }
 
-  async createProfile(userId, workspaceId, platforms) {
+  async createAuthURL(userId, workspaceId, platforms = []) {
     if (!this.apiKey) {
-      throw new Error('UPLOADPOST_KEY not configured');
+      console.warn('UPLOADPOST_KEY not configured, using demo mode');
+      return null;
     }
 
-    const profileId = `cf_${userId}_${workspaceId}`;
-    
     try {
-      const response = await fetch(`${this.baseURL}/oauth/authorize`, {
+      const response = await fetch(`${this.baseURL}/auth/connect`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          user: profileId,
-          platforms: platforms,
+          user_id: `cf_${userId}`,
+          workspace_id: workspaceId,
+          platforms: platforms.length > 0 ? platforms : ['instagram', 'youtube', 'tiktok', 'facebook', 'twitter', 'linkedin'],
           redirect_uri: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth/callback`,
-          state: JSON.stringify({ userId, workspaceId })
+          webhook_url: `${process.env.BACKEND_URL || 'http://localhost:4000'}/api/social-accounts/webhook`,
+          state: JSON.stringify({ userId, workspaceId, timestamp: Date.now() })
         })
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || `API Error: ${response.status}`);
+        const error = await response.json().catch(() => ({ message: `HTTP ${response.status}` }));
+        throw new Error(error.message || `Upload-Post API Error: ${response.status}`);
       }
 
-      return await response.json();
+      const data = await response.json();
+      return data.authorization_url || data.auth_url;
     } catch (error) {
-      console.error('UploadPost API Error:', error);
+      console.error('Upload-Post API Error:', error);
       throw error;
     }
   }
@@ -64,10 +66,8 @@ class UploadPostAPI {
       return [];
     }
 
-    const profileId = `cf_${userId}_${workspaceId}`;
-    
     try {
-      const response = await fetch(`${this.baseURL}/api/accounts/${profileId}`, {
+      const response = await fetch(`${this.baseURL}/accounts/${userId}?workspace=${workspaceId}`, {
         headers: {
           'Authorization': `Bearer ${this.apiKey}`
         }
@@ -75,13 +75,33 @@ class UploadPostAPI {
 
       if (response.ok) {
         const data = await response.json();
-        return data.accounts || [];
+        return data.accounts || data.data || [];
       }
     } catch (error) {
-      console.error('Error fetching connected accounts:', error);
+      console.error('Error fetching connected accounts from Upload-Post:', error);
     }
     
     return [];
+  }
+
+  async disconnectAccount(userId, accountId) {
+    if (!this.apiKey) {
+      return false;
+    }
+
+    try {
+      const response = await fetch(`${this.baseURL}/accounts/${accountId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`
+        }
+      });
+
+      return response.ok;
+    } catch (error) {
+      console.error('Error disconnecting account:', error);
+      return false;
+    }
   }
 }
 
@@ -143,8 +163,9 @@ const createDemoUsers = () => {
   users.set(adminUser.email, adminUser);
   workspaces.set(adminWorkspace.id, adminWorkspace);
 
-  // Seed some demo social accounts for testing
-  if (process.env.UPLOADPOST_KEY) {
+  // Only seed demo accounts if Upload-Post is not configured
+  if (!process.env.UPLOADPOST_KEY) {
+    // Seed some demo social accounts for testing when Upload-Post is not available
     socialAccounts.set(demoUser.id, [
       {
         id: 'demo-instagram-1',
@@ -657,7 +678,7 @@ app.post('/api/videos/clear-all', authenticateToken, (req, res) => {
   }
 });
 
-// Social accounts with Upload-Post integration
+// Social accounts with proper Upload-Post integration
 app.get('/api/social-accounts', authenticateToken, async (req, res) => { 
   try {
     let accounts = socialAccounts.get(req.user.id) || [];
@@ -667,8 +688,17 @@ app.get('/api/social-accounts', authenticateToken, async (req, res) => {
       try {
         const realAccounts = await uploadPostAPI.getConnectedAccounts(req.user.id, req.workspace.id);
         if (realAccounts.length > 0) {
-          accounts = realAccounts;
-          // Cache the accounts
+          // Transform Upload-Post format to our expected format
+          accounts = realAccounts.map(acc => ({
+            id: acc.id,
+            platform: acc.platform,
+            username: acc.username || acc.handle,
+            displayName: acc.display_name || acc.name,
+            isConnected: acc.is_active !== false,
+            profileImage: acc.profile_image || acc.avatar_url,
+            connectedAt: acc.connected_at || acc.created_at
+          }));
+          // Cache the transformed accounts
           socialAccounts.set(req.user.id, accounts);
         }
       } catch (error) {
@@ -688,43 +718,106 @@ app.post('/api/social-accounts/connect', authenticateToken, async (req, res) => 
   try {
     const { platforms = ['instagram', 'youtube', 'tiktok', 'facebook', 'twitter', 'linkedin'] } = req.body;
     
-    // Check if Upload-Post API key is configured
-    if (!process.env.UPLOADPOST_KEY) {
-      return res.status(400).json({ 
-        error: 'Social media integration not configured. Please contact support.',
-        code: 'INTEGRATION_NOT_CONFIGURED'
-      });
-    }
-
-    try {
-      const result = await uploadPostAPI.createProfile(req.user.id, req.workspace.id, platforms);
-      
-      if (result.authorization_url) {
-        res.json({ 
-          success: true, 
-          auth_url: result.authorization_url,
-          message: 'Authorization URL generated successfully. Complete the setup in the popup window.'
+    // Try Upload-Post integration first
+    if (process.env.UPLOADPOST_KEY) {
+      try {
+        const authUrl = await uploadPostAPI.createAuthURL(req.user.id, req.workspace.id, platforms);
+        
+        if (authUrl) {
+          return res.json({ 
+            success: true, 
+            auth_url: authUrl,
+            message: 'Upload-Post connection URL generated. Complete the setup in the popup window.'
+          });
+        }
+      } catch (apiError) {
+        console.error('Upload-Post API Error:', apiError);
+        
+        // If Upload-Post fails, inform user about the issue
+        return res.status(400).json({
+          success: false,
+          error: `Upload-Post connection failed: ${apiError.message}`,
+          code: 'UPLOADPOST_API_ERROR'
         });
-      } else {
-        throw new Error('No authorization URL received from Upload-Post');
       }
-    } catch (apiError) {
-      console.error('Upload-Post API Error:', apiError);
-      
-      // For demo purposes, return a demo URL if Upload-Post fails
-      res.json({ 
-        success: true, 
-        auth_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/demo/social-connect?platforms=${platforms.join(',')}&user=${req.user.id}&workspace=${req.workspace.id}`,
-        message: 'Demo mode: Use the demo social account connection flow.'
-      });
     }
+    
+    // Fallback: Return error if no Upload-Post key is configured
+    return res.status(400).json({ 
+      success: false,
+      error: 'Social media integration not configured. Please contact support to set up Upload-Post integration.',
+      code: 'INTEGRATION_NOT_CONFIGURED'
+    });
+    
   } catch (error) {
     console.error('Connect social accounts error:', error);
     res.status(500).json({ error: 'Failed to initiate social account connection' });
   }
 });
 
-// OAuth callback handler for Upload-Post
+// Upload-Post webhook handler
+app.post('/api/social-accounts/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  try {
+    // Verify webhook signature if needed
+    const signature = req.headers['x-uploadpost-signature'];
+    
+    const payload = JSON.parse(req.body);
+    const { event, data } = payload;
+    
+    console.log('Upload-Post webhook received:', { event, data });
+    
+    switch (event) {
+      case 'account.connected':
+        // Handle successful account connection
+        if (data.user_id && data.user_id.startsWith('cf_')) {
+          const userId = data.user_id.replace('cf_', '');
+          const account = {
+            id: data.account_id,
+            platform: data.platform,
+            username: data.username,
+            displayName: data.display_name,
+            isConnected: true,
+            profileImage: data.profile_image,
+            connectedAt: new Date().toISOString()
+          };
+          
+          // Update cached accounts
+          const existing = socialAccounts.get(userId) || [];
+          const updated = existing.filter(acc => acc.id !== account.id);
+          updated.push(account);
+          socialAccounts.set(userId, updated);
+        }
+        break;
+        
+      case 'account.disconnected':
+        // Handle account disconnection
+        if (data.user_id && data.user_id.startsWith('cf_')) {
+          const userId = data.user_id.replace('cf_', '');
+          const existing = socialAccounts.get(userId) || [];
+          const updated = existing.filter(acc => acc.id !== data.account_id);
+          socialAccounts.set(userId, updated);
+        }
+        break;
+        
+      case 'post.published':
+        // Handle successful post publication
+        console.log('Post published successfully:', data);
+        break;
+        
+      case 'post.failed':
+        // Handle failed post publication
+        console.error('Post publication failed:', data);
+        break;
+    }
+    
+    res.status(200).json({ received: true });
+  } catch (error) {
+    console.error('Webhook error:', error);
+    res.status(500).json({ error: 'Webhook processing failed' });
+  }
+});
+
+// OAuth callback handler for Upload-Post (optional - usually handled by Upload-Post directly)
 app.get('/api/social-accounts/callback', async (req, res) => {
   try {
     const { code, state, error } = req.query;
@@ -734,12 +827,17 @@ app.get('/api/social-accounts/callback', async (req, res) => {
     }
     
     if (code && state) {
-      const { userId, workspaceId } = JSON.parse(state);
-      
-      // Here you would exchange the code for access tokens with Upload-Post
-      // For now, we'll simulate successful connection
-      
-      res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/?connected=success`);
+      try {
+        const stateData = JSON.parse(state);
+        const { userId, workspaceId } = stateData;
+        
+        // The actual token exchange should be handled by Upload-Post's webhook
+        // This is just a fallback redirect
+        res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/?connected=success`);
+      } catch (parseError) {
+        console.error('Error parsing state:', parseError);
+        res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/?error=invalid_state`);
+      }
     } else {
       res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/?error=invalid_callback`);
     }
@@ -749,30 +847,34 @@ app.get('/api/social-accounts/callback', async (req, res) => {
   }
 });
 
-// Demo social connection handler
-app.get('/demo/social-connect', (req, res) => {
-  const { platforms, user, workspace } = req.query;
-  
-  if (!platforms || !user || !workspace) {
-    return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/?error=invalid_demo_params`);
+// Disconnect social account
+app.delete('/api/social-accounts/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Try to disconnect from Upload-Post first
+    if (process.env.UPLOADPOST_KEY) {
+      const disconnected = await uploadPostAPI.disconnectAccount(req.user.id, id);
+      if (disconnected) {
+        // Remove from local cache
+        const existing = socialAccounts.get(req.user.id) || [];
+        const updated = existing.filter(acc => acc.id !== id);
+        socialAccounts.set(req.user.id, updated);
+        
+        return res.json({ success: true, message: 'Account disconnected successfully' });
+      }
+    }
+    
+    // Fallback: remove from local cache only
+    const existing = socialAccounts.get(req.user.id) || [];
+    const updated = existing.filter(acc => acc.id !== id);
+    socialAccounts.set(req.user.id, updated);
+    
+    res.json({ success: true, message: 'Account removed from cache' });
+  } catch (error) {
+    console.error('Disconnect account error:', error);
+    res.status(500).json({ error: 'Failed to disconnect account' });
   }
-  
-  // Create demo connected accounts
-  const demoAccounts = platforms.split(',').map(platform => ({
-    id: `demo-${platform}-${Date.now()}`,
-    platform: platform.toLowerCase(),
-    username: `demo_${platform}_user`,
-    displayName: `Demo ${platform.charAt(0).toUpperCase() + platform.slice(1)} Account`,
-    isConnected: true,
-    profileImage: `https://via.placeholder.com/40x40?text=${platform.charAt(0).toUpperCase()}`,
-    connectedAt: new Date().toISOString()
-  }));
-  
-  // Store demo accounts
-  socialAccounts.set(user, demoAccounts);
-  
-  // Redirect back to app with success
-  res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/?connected=demo_success`);
 });
 
 // Posts with Upload-Post integration
@@ -785,8 +887,12 @@ app.post('/api/posts', authenticateToken, async (req, res) => {
     
     // Check if user has connected accounts for the specified platforms
     const userAccounts = socialAccounts.get(req.user.id) || [];
-    const connectedPlatforms = userAccounts.map(acc => acc.platform);
-    const missingPlatforms = platforms?.filter(p => !connectedPlatforms.includes(p.toLowerCase())) || [];
+    const connectedPlatforms = userAccounts
+      .filter(acc => acc.isConnected !== false)
+      .map(acc => acc.platform.toLowerCase());
+    
+    const requestedPlatforms = platforms?.map(p => p.toLowerCase()) || connectedPlatforms;
+    const missingPlatforms = requestedPlatforms.filter(p => !connectedPlatforms.includes(p));
     
     if (missingPlatforms.length > 0) {
       return res.status(400).json({ 
@@ -798,13 +904,17 @@ app.post('/api/posts', authenticateToken, async (req, res) => {
     
     // For demo purposes, simulate posting
     setTimeout(() => {
-      v.status = 'PUBLISHED';
-      v.updatedAt = new Date().toISOString();
+      const currentVideo = videos.get(videoId);
+      if (currentVideo) {
+        currentVideo.status = 'PUBLISHED';
+        currentVideo.updatedAt = new Date().toISOString();
+      }
     }, 1000);
     
     res.json({ 
       success: true, 
-      message: `Video posted to ${platforms?.join(', ') || 'connected platforms'} successfully!` 
+      message: `Video posted to ${requestedPlatforms.join(', ')} successfully!`,
+      platforms: requestedPlatforms
     });
   } catch (error) {
     console.error('Post video error:', error);
@@ -836,10 +946,11 @@ app.listen(PORT, () => {
   if (process.env.UPLOADPOST_KEY) {
     console.log('✅ Upload-Post integration configured');
     console.log('🔗 Social accounts: Connect via Upload-Post API');
+    console.log('📡 Webhook endpoint: /api/social-accounts/webhook');
   } else {
     console.log('⚠️  Upload-Post API key not configured');
     console.log('   Set UPLOADPOST_KEY environment variable to enable real social media connections');
-    console.log('📝 Demo mode: Social accounts will use demo connections');
+    console.log('❌ Social media integration disabled - users will see configuration error');
   }
 });
 
