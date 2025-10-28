@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { AuthProvider } from './contexts/AuthContext';
+import AuthWrapper from './components/auth/AuthWrapper';
+import { useAuth } from './contexts/AuthContext';
 import { 
   Video, Plus, Instagram, Youtube, Facebook, Loader2, CheckCircle, XCircle, 
   Clock, ExternalLink, RefreshCw, Sparkles, Send, Settings, 
@@ -6,36 +9,25 @@ import {
   MessageCircle, AlertCircle, ChevronRight, Play, Download,
   Home, ShoppingBag, User, CreditCard, Package, 
   Star, Search, Edit, MoreHorizontal, Calendar, Maximize2, 
-  Trash2, Filter, CheckSquare, Square, ArrowUpDown
+  Trash2, Filter, CheckSquare, Square, ArrowUpDown, LogOut
 } from 'lucide-react';
 
-// Use your backend API endpoints
-const API_BASE = window.location.origin;
-
-const App = () => {
-  const [currentUser] = useState(() => {
-    const saved = localStorage.getItem('app_user_id');
-    if (saved) return saved;
-    const newId = 'user_' + Date.now();
-    localStorage.setItem('app_user_id', newId);
-    return newId;
-  });
-
+const MainApp = () => {
+  const { user, workspace, logout, apiCall } = useAuth();
   const [activeTab, setActiveTab] = useState('analytics');
   const [videos, setVideos] = useState([]);
   const [connectedAccounts, setConnectedAccounts] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [uploadPostUser, setUploadPostUser] = useState(null);
   const [videoForm, setVideoForm] = useState({
     topic: '',
-    style: 'casual',
+    style: 'CASUAL',
     duration: 60,
     avatar_id: 'default_avatar',
     voice_id: 'default_voice'
   });
   const [notification, setNotification] = useState({ show: false, message: '', type: 'info' });
   
-  // New state for enhanced video management
+  // Enhanced state for video management
   const [selectedVideos, setSelectedVideos] = useState([]);
   const [videoFilter, setVideoFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -45,81 +37,111 @@ const App = () => {
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
   useEffect(() => {
-    loadVideos();
-    const userData = loadUploadPostUser();
-    if (userData?.username) {
-      checkConnectedAccounts(userData.username);
+    if (user && workspace) {
+      loadUserData();
     }
-  }, []);
+  }, [user, workspace]);
+
+  const loadUserData = async () => {
+    await Promise.all([
+      loadVideos(),
+      loadConnectedAccounts()
+    ]);
+  };
 
   const showNotification = (message, type = 'info') => {
     setNotification({ show: true, message, type });
     setTimeout(() => setNotification({ show: false, message: '', type: 'info' }), 5000);
   };
 
-  const loadVideos = () => {
+  const loadVideos = async () => {
     try {
-      const saved = localStorage.getItem(`videos_${currentUser}`);
-      if (saved) setVideos(JSON.parse(saved));
-    } catch {
-      console.log('No videos found');
-    }
-  };
-
-  const loadUploadPostUser = () => {
-    try {
-      const saved = localStorage.getItem(`uploadpost_user_${currentUser}`);
-      if (saved) {
-        const userData = JSON.parse(saved);
-        setUploadPostUser(userData);
-        return userData;
+      const response = await apiCall(`/api/videos?workspaceId=${workspace.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setVideos(data.videos || []);
+      } else {
+        console.error('Failed to load videos');
       }
-    } catch {
-      console.log('No upload-post user found');
+    } catch (error) {
+      console.error('Error loading videos:', error);
     }
-    return null;
   };
 
-  const saveVideos = (updatedVideos) => {
-    localStorage.setItem(`videos_${currentUser}`, JSON.stringify(updatedVideos));
-    setVideos(updatedVideos);
-  };
-
-  const saveConnectedAccounts = (accounts) => {
-    localStorage.setItem(`accounts_${currentUser}`, JSON.stringify(accounts));
-    setConnectedAccounts(accounts);
-  };
-
-  const saveUploadPostUser = (userData) => {
-    localStorage.setItem(`uploadpost_user_${currentUser}`, JSON.stringify(userData));
-    setUploadPostUser(userData);
+  const loadConnectedAccounts = async () => {
+    try {
+      const response = await apiCall(`/api/social-accounts?workspaceId=${workspace.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setConnectedAccounts(data.accounts || []);
+      } else {
+        console.error('Failed to load connected accounts');
+      }
+    } catch (error) {
+      console.error('Error loading connected accounts:', error);
+    }
   };
 
   // Enhanced Delete Functions
-  const deleteVideo = (videoId) => {
-    const updatedVideos = videos.filter(v => 
-      v.local_id !== videoId && v.video_id !== videoId
-    );
-    saveVideos(updatedVideos);
-    setSelectedVideos(selectedVideos.filter(id => id !== videoId));
-    setShowDeleteConfirm(null);
-    showNotification('Video deleted successfully', 'success');
+  const deleteVideo = async (videoId) => {
+    try {
+      const response = await apiCall(`/api/videos/${videoId}`, {
+        method: 'DELETE'
+      });
+      
+      if (response.ok) {
+        setVideos(prev => prev.filter(v => v.id !== videoId));
+        setSelectedVideos(prev => prev.filter(id => id !== videoId));
+        setShowDeleteConfirm(null);
+        showNotification('Video deleted successfully', 'success');
+      } else {
+        const data = await response.json();
+        showNotification(data.error || 'Failed to delete video', 'error');
+      }
+    } catch (error) {
+      showNotification('Error deleting video', 'error');
+    }
   };
 
-  const deleteSelectedVideos = () => {
-    const updatedVideos = videos.filter(v => 
-      !selectedVideos.includes(v.local_id || v.video_id)
-    );
-    saveVideos(updatedVideos);
-    setSelectedVideos([]);
-    setShowBulkDeleteConfirm(false);
-    showNotification(`${selectedVideos.length} videos deleted successfully`, 'success');
+  const deleteSelectedVideos = async () => {
+    try {
+      const response = await apiCall('/api/videos/bulk-delete', {
+        method: 'POST',
+        body: JSON.stringify({ video_ids: selectedVideos })
+      });
+      
+      if (response.ok) {
+        setVideos(prev => prev.filter(v => !selectedVideos.includes(v.id)));
+        setSelectedVideos([]);
+        setShowBulkDeleteConfirm(false);
+        showNotification(`${selectedVideos.length} videos deleted successfully`, 'success');
+      } else {
+        const data = await response.json();
+        showNotification(data.error || 'Failed to delete videos', 'error');
+      }
+    } catch (error) {
+      showNotification('Error deleting videos', 'error');
+    }
   };
 
-  const clearAllVideos = () => {
-    saveVideos([]);
-    setSelectedVideos([]);
-    showNotification('All videos cleared', 'success');
+  const clearAllVideos = async () => {
+    try {
+      const response = await apiCall('/api/videos/clear-all', {
+        method: 'POST',
+        body: JSON.stringify({ workspaceId: workspace.id })
+      });
+      
+      if (response.ok) {
+        setVideos([]);
+        setSelectedVideos([]);
+        showNotification('All videos cleared', 'success');
+      } else {
+        const data = await response.json();
+        showNotification(data.error || 'Failed to clear videos', 'error');
+      }
+    } catch (error) {
+      showNotification('Error clearing videos', 'error');
+    }
   };
 
   // Video Selection Functions
@@ -132,7 +154,7 @@ const App = () => {
   };
 
   const selectAllVideos = () => {
-    const allVideoIds = filteredAndSortedVideos.map(v => v.local_id || v.video_id);
+    const allVideoIds = filteredAndSortedVideos.map(v => v.id);
     setSelectedVideos(allVideoIds);
   };
 
@@ -144,10 +166,11 @@ const App = () => {
   const filteredAndSortedVideos = videos
     .filter(video => {
       // Filter by status
-      if (videoFilter !== 'all' && video.status !== videoFilter) return false;
+      if (videoFilter !== 'all' && video.status.toLowerCase() !== videoFilter.toLowerCase()) return false;
       
       // Filter by search query
-      if (searchQuery && !video.topic.toLowerCase().includes(searchQuery.toLowerCase())) {
+      if (searchQuery && !video.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
+          !video.topic.toLowerCase().includes(searchQuery.toLowerCase())) {
         return false;
       }
       
@@ -158,10 +181,10 @@ const App = () => {
       
       switch (sortBy) {
         case 'created_at':
-          comparison = new Date(a.created_at) - new Date(b.created_at);
+          comparison = new Date(a.createdAt) - new Date(b.createdAt);
           break;
-        case 'topic':
-          comparison = a.topic.localeCompare(b.topic);
+        case 'title':
+          comparison = a.title.localeCompare(b.title);
           break;
         case 'status':
           comparison = a.status.localeCompare(b.status);
@@ -176,73 +199,26 @@ const App = () => {
       return sortOrder === 'desc' ? -comparison : comparison;
     });
 
-  // API functions (keeping existing logic)
   const connectSocialAccount = async () => {
     setIsLoading(true);
     try {
-      let username = uploadPostUser?.username || `user_${Math.random().toString(36).substring(2, 10)}`;
-
-      const response = await fetch(`${API_BASE}/api/connect-accounts`, {
+      const response = await apiCall('/api/social-accounts/connect', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username })
+        body: JSON.stringify({ workspaceId: workspace.id })
       });
 
       const data = await response.json();
       
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to connect accounts');
-      }
-
-      saveUploadPostUser({ username: data.username });
-
-      if (data.access_url) {
-        window.open(data.access_url, '_blank', 'width=800,height=700,scrollbars=yes,resizable=yes');
-        showNotification('Connection window opened! Complete the setup and click "Refresh Accounts" when done.', 'info');
+      if (response.ok && data.success) {
+        if (data.auth_url) {
+          window.open(data.auth_url, '_blank', 'width=800,height=700,scrollbars=yes,resizable=yes');
+          showNotification('Connection window opened! Complete the setup and click "Refresh Accounts" when done.', 'info');
+        }
       } else {
-        throw new Error('No connection URL returned');
+        showNotification(data.error || 'Failed to connect accounts', 'error');
       }
-
-    } catch (err) {
-      console.error('Connect accounts error:', err);
-      showNotification(`Failed to connect accounts: ${err.message}`, 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const checkConnectedAccounts = async (username) => {
-    if (!username) {
-      showNotification('No username found.', 'error');
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const response = await fetch(`${API_BASE}/api/accounts/${username}`);
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to load accounts');
-      }
-
-      if (data.data?.accounts && data.data.accounts.length > 0) {
-        const formattedAccounts = data.data.accounts.map(acc => ({
-          platform: acc.platform,
-          account_name: acc.name || acc.username || acc.display_name,
-          connected_at: acc.connected_at || new Date().toISOString(),
-          status: 'active',
-          details: acc,
-          avatar: acc.social_images
-        }));
-        saveConnectedAccounts(formattedAccounts);
-        showNotification(`Found ${formattedAccounts.length} connected accounts!`, 'success');
-      } else {
-        setConnectedAccounts([]);
-        showNotification('No connected accounts found. Connect your social media accounts to get started.', 'info');
-      }
-    } catch (err) {
-      console.error('Check accounts error:', err);
-      showNotification(`Error loading accounts: ${err.message}`, 'error');
+    } catch (error) {
+      showNotification('Error connecting accounts', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -259,47 +235,34 @@ const App = () => {
     }
 
     setIsLoading(true);
-    const localVideoId = `vid_${Date.now()}`;
-
     try {
-      const response = await fetch(`${API_BASE}/api/create-video`, {
+      const response = await apiCall('/api/videos', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(videoForm)
+        body: JSON.stringify({
+          ...videoForm,
+          workspaceId: workspace.id,
+          title: videoForm.topic
+        })
       });
 
       const data = await response.json();
       
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create video');
-      }
-
-      if (data.data?.video_id || data.video_id) {
-        const newVideo = {
-          ...videoForm,
-          local_id: localVideoId,
-          video_id: data.data?.video_id || data.video_id,
-          status: 'generating',
-          created_at: new Date().toISOString(),
-          video_url: null
-        };
-        saveVideos([newVideo, ...videos]);
+      if (response.ok && data.success) {
+        setVideos(prev => [data.video, ...prev]);
         setActiveTab('videos');
         setVideoForm({ 
           topic: '', 
-          style: 'casual', 
+          style: 'CASUAL', 
           duration: 60, 
           avatar_id: 'default_avatar', 
           voice_id: 'default_voice' 
         });
         showNotification('Video generation started! Check the videos tab for progress.', 'success');
       } else {
-        throw new Error('No video ID returned from API');
+        showNotification(data.error || 'Failed to create video', 'error');
       }
-
-    } catch (err) {
-      console.error('Create video error:', err);
-      showNotification(`Error generating video: ${err.message}`, 'error');
+    } catch (error) {
+      showNotification('Error creating video', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -307,37 +270,26 @@ const App = () => {
 
   const refreshVideoStatus = async (videoId) => {
     try {
-      const response = await fetch(`${API_BASE}/api/video-status/${videoId}`);
-      const data = await response.json();
+      const response = await apiCall(`/api/videos/${videoId}/status`);
       
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to get video status');
+      if (response.ok) {
+        const data = await response.json();
+        setVideos(prev => prev.map(v =>
+          v.id === videoId ? { ...v, ...data.video } : v
+        ));
+        showNotification('Video status updated!', 'success');
+      } else {
+        const data = await response.json();
+        showNotification(data.error || 'Failed to refresh video status', 'error');
       }
-
-      const updated = videos.map(v =>
-        v.video_id === videoId ? { 
-          ...v, 
-          status: data.data?.status || data.status || 'unknown',
-          video_url: data.data?.video_url || data.video_url || data.url
-        } : v
-      );
-      saveVideos(updated);
-      showNotification('Video status updated!', 'success');
-
-    } catch (err) {
-      console.error('Refresh video status error:', err);
-      showNotification(`Failed to refresh video status: ${err.message}`, 'error');
+    } catch (error) {
+      showNotification('Error refreshing video status', 'error');
     }
   };
 
   const postVideoToSocial = async (video) => {
-    if (!video.video_url) {
+    if (!video.videoUrl) {
       showNotification('Video URL not available yet. Please wait for generation to complete.', 'error');
-      return;
-    }
-
-    if (!uploadPostUser?.username) {
-      showNotification('No connected user found. Please connect your accounts first.', 'error');
       return;
     }
 
@@ -352,12 +304,11 @@ const App = () => {
 
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/post-video`, {
+      const response = await apiCall('/api/posts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username: uploadPostUser.username,
-          video_url: video.video_url,
+          videoId: video.id,
+          workspaceId: workspace.id,
           caption: `Check out this AI-generated video about: ${video.topic} #AI #ContentCreation #VideoMarketing`,
           platforms: selectedPlatforms
         })
@@ -365,21 +316,16 @@ const App = () => {
 
       const data = await response.json();
       
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to post video');
-      }
-
-      if (data.success) {
-        const updated = videos.map(v =>
-          v.video_id === video.video_id ? { ...v, status: 'posted' } : v
-        );
-        saveVideos(updated);
+      if (response.ok && data.success) {
+        setVideos(prev => prev.map(v =>
+          v.id === video.id ? { ...v, status: 'PUBLISHED' } : v
+        ));
         showNotification(`Video posted to ${selectedPlatforms.length} platforms successfully! 🎉`, 'success');
+      } else {
+        showNotification(data.error || 'Failed to post video', 'error');
       }
-
-    } catch (err) {
-      console.error('Post video error:', err);
-      showNotification(`Error posting video: ${err.message}`, 'error');
+    } catch (error) {
+      showNotification('Error posting video', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -387,27 +333,25 @@ const App = () => {
 
   // Helper functions
   const getStatusIcon = (status) => {
-    switch (status) {
-      case 'pending':
-      case 'generating': return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />;
-      case 'completed': return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case 'posted': return <CheckCircle className="w-4 h-4 text-purple-500" />;
-      case 'failed': return <XCircle className="w-4 h-4 text-red-500" />;
+    switch (status?.toUpperCase()) {
+      case 'GENERATING': return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />;
+      case 'COMPLETED': return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case 'PUBLISHED': return <CheckCircle className="w-4 h-4 text-purple-500" />;
+      case 'FAILED': return <XCircle className="w-4 h-4 text-red-500" />;
       default: return <Clock className="w-4 h-4 text-gray-400" />;
     }
   };
 
   const getSocialIcon = (platform) => {
-    const lower = platform.toLowerCase();
+    const lower = platform?.toLowerCase();
     const iconClass = "w-5 h-5";
     switch (lower) {
       case 'instagram': return <Instagram className={iconClass} />;
       case 'youtube': return <Youtube className={iconClass} />;
       case 'facebook': return <Facebook className={iconClass} />;
       case 'tiktok': return <Video className={iconClass} />;
-      case 'x': 
       case 'twitter': return <TwitterIcon className={iconClass} />;
-      case 'threads': return <MessageCircle className={iconClass} />;
+      case 'linkedin': return <MessageCircle className={iconClass} />;
       default: return <Video className={iconClass} />;
     }
   };
@@ -415,9 +359,14 @@ const App = () => {
   // Stats calculations
   const stats = {
     totalVideos: videos.length,
-    completedVideos: videos.filter(v => v.status === 'completed' || v.status === 'posted').length,
-    postedVideos: videos.filter(v => v.status === 'posted').length,
+    completedVideos: videos.filter(v => v.status === 'COMPLETED' || v.status === 'PUBLISHED').length,
+    publishedVideos: videos.filter(v => v.status === 'PUBLISHED').length,
     connectedPlatforms: connectedAccounts.length
+  };
+
+  const handleLogout = () => {
+    logout();
+    showNotification('Successfully logged out', 'success');
   };
 
   return (
@@ -507,7 +456,7 @@ const App = () => {
         </div>
       )}
 
-      {/* Sidebar - Exact Shopify Style */}
+      {/* Sidebar */}
       <div className="w-64 bg-gray-800 text-white flex flex-col">
         {/* Logo */}
         <div className="p-4 border-b border-gray-700">
@@ -515,7 +464,10 @@ const App = () => {
             <div className="bg-green-500 w-8 h-8 rounded flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
-            <span className="font-semibold text-lg">Content Factory</span>
+            <div>
+              <span className="font-semibold text-lg">Content Factory</span>
+              <p className="text-xs text-gray-400">{workspace?.name}</p>
+            </div>
           </div>
         </div>
 
@@ -552,14 +504,25 @@ const App = () => {
 
         {/* User Profile */}
         <div className="p-4 border-t border-gray-700">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-              <span className="text-xs font-semibold">{currentUser.slice(-2).toUpperCase()}</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                <span className="text-xs font-semibold">
+                  {user?.firstName?.[0]}{user?.lastName?.[0]}
+                </span>
+              </div>
+              <div>
+                <p className="text-sm font-medium">{user?.firstName} {user?.lastName}</p>
+                <p className="text-xs text-gray-400">@{user?.username}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-medium">Content Factory</p>
-              <p className="text-xs text-gray-400">{currentUser}</p>
-            </div>
+            <button
+              onClick={handleLogout}
+              className="p-2 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded transition-colors"
+              title="Logout"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </div>
@@ -577,79 +540,62 @@ const App = () => {
                 {activeTab === 'accounts' && 'Connected Accounts'}
                 {activeTab === 'settings' && 'Settings'}
               </h1>
-              {activeTab === 'analytics' && (
-                <div className="flex items-center space-x-2 text-sm text-gray-500">
-                  <Calendar className="w-4 h-4" />
-                  <span>Last 30 days</span>
-                  <span>Compare to: May 7-Jun 5, 2024</span>
-                </div>
-              )}
             </div>
             <div className="flex items-center space-x-3">
-              <button className="p-2 hover:bg-gray-100 rounded-lg">
-                <Search className="w-5 h-5 text-gray-400" />
-              </button>
-              <button className="p-2 hover:bg-gray-100 rounded-lg">
-                <Edit className="w-5 h-5 text-gray-400" />
-              </button>
+              <div className="text-sm text-gray-600">
+                Welcome back, <span className="font-medium">{user?.firstName}</span>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Content Area */}
         <div className="flex-1 overflow-auto p-6">
-          {/* Analytics Tab - Keeping the existing content */}
+          {/* Analytics Tab */}
           {activeTab === 'analytics' && (
             <div className="space-y-6">
-              {/* Analytics content remains the same... */}
               {/* Top Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Total Videos */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="bg-white rounded-lg border border-gray-200 p-6">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-sm font-medium text-gray-600">Total Videos</h3>
-                    <button className="text-gray-400 hover:text-gray-600">
-                      <MoreHorizontal className="w-4 h-4" />
-                    </button>
                   </div>
                   <div className="flex items-baseline space-x-2">
                     <span className="text-2xl font-bold text-gray-900">{stats.totalVideos}</span>
-                    <span className="text-sm font-medium text-green-600">+20%</span>
                   </div>
                 </div>
 
-                {/* Completed Videos */}
                 <div className="bg-white rounded-lg border border-gray-200 p-6">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-sm font-medium text-gray-600">Completed Videos</h3>
-                    <button className="text-gray-400 hover:text-gray-600">
-                      <MoreHorizontal className="w-4 h-4" />
-                    </button>
                   </div>
                   <div className="flex items-baseline space-x-2">
                     <span className="text-2xl font-bold text-gray-900">{stats.completedVideos}</span>
-                    <span className="text-sm font-medium text-green-600">+5%</span>
                   </div>
                 </div>
 
-                {/* Posted Videos */}
                 <div className="bg-white rounded-lg border border-gray-200 p-6">
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-medium text-gray-600">Posted Videos</h3>
-                    <button className="text-gray-400 hover:text-gray-600">
-                      <MoreHorizontal className="w-4 h-4" />
-                    </button>
+                    <h3 className="text-sm font-medium text-gray-600">Published Videos</h3>
                   </div>
                   <div className="flex items-baseline space-x-2">
-                    <span className="text-2xl font-bold text-gray-900">{stats.postedVideos}</span>
-                    <span className="text-sm font-medium text-purple-600">+8%</span>
+                    <span className="text-2xl font-bold text-gray-900">{stats.publishedVideos}</span>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-medium text-gray-600">Connected Platforms</h3>
+                  </div>
+                  <div className="flex items-baseline space-x-2">
+                    <span className="text-2xl font-bold text-gray-900">{stats.connectedPlatforms}</span>
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Create Video Tab - Keeping existing content */}
+          {/* Create Video Tab */}
           {activeTab === 'create' && (
             <div className="max-w-2xl">
               <div className="bg-white rounded-lg border border-gray-200 p-8">
@@ -685,10 +631,10 @@ const App = () => {
                         onChange={(e) => setVideoForm({...videoForm, style: e.target.value})}
                         className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                       >
-                        <option value="casual">Casual & Friendly</option>
-                        <option value="professional">Professional & Business</option>
-                        <option value="energetic">Energetic & Dynamic</option>
-                        <option value="educational">Educational & Informative</option>
+                        <option value="CASUAL">Casual & Friendly</option>
+                        <option value="PROFESSIONAL">Professional & Business</option>
+                        <option value="ENERGETIC">Energetic & Dynamic</option>
+                        <option value="EDUCATIONAL">Educational & Informative</option>
                       </select>
                     </div>
 
@@ -731,7 +677,7 @@ const App = () => {
             </div>
           )}
 
-          {/* Enhanced Videos Tab with Delete Functionality */}
+          {/* Videos Tab */}
           {activeTab === 'videos' && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
@@ -788,7 +734,7 @@ const App = () => {
                         <option value="all">All Status</option>
                         <option value="generating">Generating</option>
                         <option value="completed">Completed</option>
-                        <option value="posted">Posted</option>
+                        <option value="published">Published</option>
                         <option value="failed">Failed</option>
                       </select>
                     </div>
@@ -807,8 +753,8 @@ const App = () => {
                       >
                         <option value="created_at-desc">Newest First</option>
                         <option value="created_at-asc">Oldest First</option>
-                        <option value="topic-asc">Topic A-Z</option>
-                        <option value="topic-desc">Topic Z-A</option>
+                        <option value="title-asc">Title A-Z</option>
+                        <option value="title-desc">Title Z-A</option>
                         <option value="status-asc">Status A-Z</option>
                         <option value="duration-desc">Longest First</option>
                         <option value="duration-asc">Shortest First</option>
@@ -884,7 +830,7 @@ const App = () => {
                   </div>
                   <div className="divide-y divide-gray-200">
                     {filteredAndSortedVideos.map((video, index) => {
-                      const videoId = video.local_id || video.video_id;
+                      const videoId = video.id;
                       const isSelected = selectedVideos.includes(videoId);
                       
                       return (
@@ -907,36 +853,36 @@ const App = () => {
                               
                               {getStatusIcon(video.status)}
                               <div>
-                                <h3 className="font-medium text-gray-900">{video.topic}</h3>
+                                <h3 className="font-medium text-gray-900">{video.title || video.topic}</h3>
                                 <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
                                   <span>Style: {video.style}</span>
                                   <span>Duration: {video.duration}s</span>
-                                  <span>{new Date(video.created_at).toLocaleDateString()}</span>
+                                  <span>{new Date(video.createdAt).toLocaleDateString()}</span>
                                 </div>
                               </div>
                             </div>
                             <div className="flex items-center space-x-2">
                               <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                video.status === 'generating' ? 'bg-blue-100 text-blue-800' :
-                                video.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                video.status === 'posted' ? 'bg-purple-100 text-purple-800' :
-                                video.status === 'failed' ? 'bg-red-100 text-red-800' :
+                                video.status === 'GENERATING' ? 'bg-blue-100 text-blue-800' :
+                                video.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
+                                video.status === 'PUBLISHED' ? 'bg-purple-100 text-purple-800' :
+                                video.status === 'FAILED' ? 'bg-red-100 text-red-800' :
                                 'bg-gray-100 text-gray-800'
                               }`}>
-                                {video.status}
+                                {video.status?.toLowerCase()}
                               </span>
                               
                               <button
-                                onClick={() => refreshVideoStatus(video.video_id)}
+                                onClick={() => refreshVideoStatus(video.id)}
                                 className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                                 title="Refresh status"
                               >
                                 <RefreshCw className="w-4 h-4" />
                               </button>
                               
-                              {video.video_url && (
+                              {video.videoUrl && (
                                 <a
-                                  href={video.video_url}
+                                  href={video.videoUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
@@ -946,7 +892,7 @@ const App = () => {
                                 </a>
                               )}
                               
-                              {video.status === 'completed' && video.video_url && (
+                              {video.status === 'COMPLETED' && video.videoUrl && (
                                 <button
                                   onClick={() => postVideoToSocial(video)}
                                   disabled={isLoading}
@@ -976,7 +922,7 @@ const App = () => {
             </div>
           )}
 
-          {/* Connected Accounts Tab - Keeping existing content */}
+          {/* Connected Accounts Tab */}
           {activeTab === 'accounts' && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
@@ -986,8 +932,8 @@ const App = () => {
                 </div>
                 <div className="flex space-x-3">
                   <button
-                    onClick={() => uploadPostUser?.username && checkConnectedAccounts(uploadPostUser.username)}
-                    disabled={isLoading || !uploadPostUser?.username}
+                    onClick={loadConnectedAccounts}
+                    disabled={isLoading}
                     className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-200 disabled:opacity-50 flex items-center space-x-2 transition-colors"
                   >
                     <RefreshCw className="w-4 h-4" />
@@ -1032,17 +978,19 @@ const App = () => {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-4">
                             <div className={`p-2 rounded text-white ${
-                              account.platform.toLowerCase() === 'instagram' ? 'bg-gradient-to-r from-purple-500 to-pink-500' :
-                              account.platform.toLowerCase() === 'youtube' ? 'bg-red-500' :
-                              account.platform.toLowerCase() === 'facebook' ? 'bg-blue-600' :
-                              account.platform.toLowerCase() === 'tiktok' ? 'bg-black' :
+                              account.platform?.toLowerCase() === 'instagram' ? 'bg-gradient-to-r from-purple-500 to-pink-500' :
+                              account.platform?.toLowerCase() === 'youtube' ? 'bg-red-500' :
+                              account.platform?.toLowerCase() === 'facebook' ? 'bg-blue-600' :
+                              account.platform?.toLowerCase() === 'tiktok' ? 'bg-black' :
+                              account.platform?.toLowerCase() === 'twitter' ? 'bg-blue-400' :
+                              account.platform?.toLowerCase() === 'linkedin' ? 'bg-blue-700' :
                               'bg-gray-500'
                             }`}>
                               {getSocialIcon(account.platform)}
                             </div>
                             <div>
                               <h3 className="font-semibold text-gray-900 capitalize">{account.platform}</h3>
-                              <p className="text-sm text-gray-600">{account.account_name}</p>
+                              <p className="text-sm text-gray-600">{account.account_name || account.username}</p>
                             </div>
                           </div>
                           <div className="flex items-center space-x-4">
@@ -1050,7 +998,7 @@ const App = () => {
                               Connected
                             </span>
                             <span className="text-xs text-gray-500">
-                              {new Date(account.connected_at).toLocaleDateString()}
+                              {new Date(account.connected_at || account.createdAt).toLocaleDateString()}
                             </span>
                           </div>
                         </div>
@@ -1062,7 +1010,7 @@ const App = () => {
             </div>
           )}
 
-          {/* Settings Tab - Keeping existing content */}
+          {/* Settings Tab */}
           {activeTab === 'settings' && (
             <div className="space-y-6">
               <div className="bg-white rounded-lg border border-gray-200 p-6">
@@ -1099,7 +1047,7 @@ const App = () => {
                   <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                     <h4 className="font-medium text-red-900 mb-2">Clear All Videos</h4>
                     <p className="text-sm text-red-700 mb-4">
-                      This will permanently delete all videos from your local storage. This action cannot be undone.
+                      This will permanently delete all videos from your workspace. This action cannot be undone.
                     </p>
                     <button
                       onClick={clearAllVideos}
@@ -1115,6 +1063,16 @@ const App = () => {
         </div>
       </div>
     </div>
+  );
+};
+
+const App = () => {
+  return (
+    <AuthProvider>
+      <AuthWrapper>
+        <MainApp />
+      </AuthWrapper>
+    </AuthProvider>
   );
 };
 
