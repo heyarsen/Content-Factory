@@ -2,8 +2,17 @@ import React, { createContext, useContext, useReducer, useEffect } from 'react';
 
 const AuthContext = createContext();
 
-// API Base URL - in development use proxy, in production use relative URLs
-const API_BASE_URL = import.meta.env.DEV ? '' : '';
+// API Base URL - automatically detects environment
+const getApiBaseUrl = () => {
+  // If we're in development and running on localhost, use empty string for proxy
+  if (import.meta.env.DEV && window.location.hostname === 'localhost') {
+    return '';
+  }
+  // For production or when accessing via domain name, use relative URLs
+  return '';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 const initialState = {
   user: null,
@@ -66,6 +75,7 @@ export const AuthProvider = ({ children }) => {
   const verifyToken = async (token) => {
     try {
       console.log('Verifying token with URL:', `${API_BASE_URL}/api/auth/verify`);
+      console.log('Current location:', window.location.href);
       
       const response = await fetch(`${API_BASE_URL}/api/auth/verify`, {
         headers: {
@@ -100,10 +110,13 @@ export const AuthProvider = ({ children }) => {
     try {
       dispatch({ type: 'LOADING', payload: true });
       
-      console.log('Attempting login with URL:', `${API_BASE_URL}/api/auth/login`);
+      const apiUrl = `${API_BASE_URL}/api/auth/login`;
+      console.log('Attempting login with URL:', apiUrl);
+      console.log('Current location:', window.location.href);
+      console.log('Environment:', import.meta.env.MODE);
       console.log('Login data:', { email, password: '***' });
       
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -112,6 +125,7 @@ export const AuthProvider = ({ children }) => {
       });
 
       console.log('Login response status:', response.status);
+      console.log('Login response URL:', response.url);
       
       const data = await response.json();
       console.log('Login response data:', data);
@@ -142,9 +156,10 @@ export const AuthProvider = ({ children }) => {
     try {
       dispatch({ type: 'LOADING', payload: true });
       
-      console.log('Attempting registration with URL:', `${API_BASE_URL}/api/auth/register`);
+      const apiUrl = `${API_BASE_URL}/api/auth/register`;
+      console.log('Attempting registration with URL:', apiUrl);
       
-      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
