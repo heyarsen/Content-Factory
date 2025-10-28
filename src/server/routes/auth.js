@@ -1,7 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
-import { generateTokens } from '../middleware/auth.js';
+import { generateTokens, authenticateToken } from '../middleware/auth.js';
 import Joi from 'joi';
 
 const router = express.Router();
@@ -60,7 +60,7 @@ router.post('/register', async (req, res) => {
     const workspace = await prisma.workspace.create({
       data: {
         name: `${firstName || username}'s Workspace`,
-        slug: `${username}-workspace`,
+        slug: `${username}-workspace-${Date.now()}`, // Add timestamp to ensure uniqueness
         ownerId: user.id,
         members: {
           create: {
@@ -105,17 +105,39 @@ router.post('/login', async (req, res) => {
 
     const { email, password } = value;
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({ 
+      where: { email },
+      include: {
+        workspaces: {
+          include: {
+            workspace: true
+          },
+          where: {
+            status: 'ACTIVE'
+          }
+        }
+      }
+    });
+    
     if (!user || user.status !== 'ACTIVE') {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const ok = await bcrypt.compare(password, user.password);
-    if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
 
-    await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    // Update last login
+    await prisma.user.update({ 
+      where: { id: user.id }, 
+      data: { lastLoginAt: new Date() } 
+    });
 
     const { token, expiresAt } = await generateTokens(user.id);
+
+    // Get user's primary workspace (first active one or owned workspace)
+    const primaryWorkspace = user.workspaces.find(w => w.role === 'OWNER') || user.workspaces[0];
 
     res.json({
       message: 'Login successful',
@@ -128,10 +150,67 @@ router.post('/login', async (req, res) => {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role
-      }
+      },
+      workspace: primaryWorkspace?.workspace || null
     });
   } catch (err) {
     console.error('Login error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Verify token endpoint (MISSING - this was causing the main issue)
+router.get('/verify', authenticateToken, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      include: {
+        workspaces: {
+          include: {
+            workspace: true
+          },
+          where: {
+            status: 'ACTIVE'
+          }
+        }
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Get user's primary workspace
+    const primaryWorkspace = user.workspaces.find(w => w.role === 'OWNER') || user.workspaces[0];
+
+    res.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role
+      },
+      workspace: primaryWorkspace?.workspace || null
+    });
+  } catch (err) {
+    console.error('Token verification error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Logout endpoint
+router.post('/logout', authenticateToken, async (req, res) => {
+  try {
+    // Delete the session
+    await prisma.session.delete({
+      where: { token: req.session.token }
+    });
+
+    res.json({ message: 'Logged out successfully' });
+  } catch (err) {
+    console.error('Logout error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -142,7 +221,7 @@ const linkSchema = Joi.object({
   uploadpostJwt: Joi.string().required()
 });
 
-router.post('/link-uploadpost', async (req, res) => {
+router.post('/link-uploadpost', authenticateToken, async (req, res) => {
   try {
     const { error, value } = linkSchema.validate(req.body);
     if (error) return res.status(400).json({ error: error.details[0].message });
@@ -152,10 +231,8 @@ router.post('/link-uploadpost', async (req, res) => {
     const user = await prisma.user.update({
       where: { id: req.user.id },
       data: {
-        // store in settings JSON on user for simplicity
-        // you could also make a dedicated table
-        // requires a Json field on User; if missing, adjust schema to add `settings Json @default("{}")`
-        // For now, we upsert a simple key under activities to avoid schema change; better to add field in schema.
+        // For now, store in a simple way. Better to add dedicated fields to schema.
+        // This is a placeholder implementation
       }
     });
 
