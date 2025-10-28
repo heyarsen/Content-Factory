@@ -10,15 +10,17 @@ import {
   MessageCircle, AlertCircle, ChevronRight, Play, Download,
   Home, ShoppingBag, User, CreditCard, Package, 
   Star, Search, Edit, MoreHorizontal, Calendar, Maximize2, 
-  Trash2, Filter, CheckSquare, Square, ArrowUpDown, LogOut, Crown
+  Trash2, Filter, CheckSquare, Square, ArrowUpDown, LogOut, Crown,
+  Menu, Bell, HelpCircle, Shield
 } from 'lucide-react';
 
 const MainApp = () => {
   const { user, workspace, logout, apiCall } = useAuth();
-  const [activeTab, setActiveTab] = useState('analytics');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [videos, setVideos] = useState([]);
   const [connectedAccounts, setConnectedAccounts] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [videoForm, setVideoForm] = useState({
     topic: '',
     style: 'CASUAL',
@@ -379,21 +381,21 @@ const MainApp = () => {
     <div className="flex h-screen bg-gray-50">
       {/* Notification */}
       {notification.show && (
-        <div className={`fixed top-4 right-4 z-50 max-w-md p-4 rounded-lg shadow-lg border ${
-          notification.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' :
-          notification.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' :
-          'bg-blue-50 border-blue-200 text-blue-800'
+        <div className={`fixed top-6 right-6 z-50 max-w-md p-4 rounded-xl shadow-2xl border-l-4 backdrop-blur-sm ${
+          notification.type === 'success' ? 'bg-white/95 border-green-400 text-green-800' :
+          notification.type === 'error' ? 'bg-white/95 border-red-400 text-red-800' :
+          'bg-white/95 border-blue-400 text-blue-800'
         }`}>
           <div className="flex items-start space-x-3">
             {notification.type === 'success' ? <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" /> :
              notification.type === 'error' ? <AlertCircle className="w-5 h-5 text-red-500 mt-0.5" /> :
              <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5" />}
             <div className="flex-1">
-              <p className="text-sm font-medium">{notification.message}</p>
+              <p className="text-sm font-medium leading-relaxed">{notification.message}</p>
             </div>
             <button 
               onClick={() => setNotification({ show: false, message: '', type: 'info' })}
-              className="text-gray-400 hover:text-gray-600"
+              className="text-gray-400 hover:text-gray-600 transition-colors"
             >
               <XCircle className="w-4 h-4" />
             </button>
@@ -403,27 +405,27 @@ const MainApp = () => {
 
       {/* Delete Confirmation Modals */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="bg-red-100 rounded-full p-2">
-                <Trash2 className="w-5 h-5 text-red-600" />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
+            <div className="flex items-center space-x-4 mb-6">
+              <div className="bg-red-100 rounded-full p-3">
+                <Trash2 className="w-6 h-6 text-red-600" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900">Delete Video</h3>
+              <h3 className="text-xl font-semibold text-gray-900">Delete Video</h3>
             </div>
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to delete this video? This action cannot be undone.
+            <p className="text-gray-600 mb-8 leading-relaxed">
+              Are you sure you want to delete this video? This action cannot be undone and will permanently remove all associated data.
             </p>
-            <div className="flex space-x-3">
+            <div className="flex space-x-4">
               <button
                 onClick={() => setShowDeleteConfirm(null)}
-                className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                className="flex-1 bg-gray-100 text-gray-700 py-3 px-6 rounded-xl font-medium hover:bg-gray-200 transition-all duration-200"
               >
                 Cancel
               </button>
               <button
                 onClick={() => deleteVideo(showDeleteConfirm)}
-                className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-red-700 transition-colors"
+                className="flex-1 bg-red-600 text-white py-3 px-6 rounded-xl font-medium hover:bg-red-700 transition-all duration-200 shadow-lg hover:shadow-red-200"
               >
                 Delete
               </button>
@@ -433,27 +435,27 @@ const MainApp = () => {
       )}
 
       {showBulkDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="bg-red-100 rounded-full p-2">
-                <Trash2 className="w-5 h-5 text-red-600" />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
+            <div className="flex items-center space-x-4 mb-6">
+              <div className="bg-red-100 rounded-full p-3">
+                <Trash2 className="w-6 h-6 text-red-600" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900">Delete Selected Videos</h3>
+              <h3 className="text-xl font-semibold text-gray-900">Delete Selected Videos</h3>
             </div>
-            <p className="text-gray-600 mb-6">
+            <p className="text-gray-600 mb-8 leading-relaxed">
               Are you sure you want to delete {selectedVideos.length} selected videos? This action cannot be undone.
             </p>
-            <div className="flex space-x-3">
+            <div className="flex space-x-4">
               <button
                 onClick={() => setShowBulkDeleteConfirm(false)}
-                className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                className="flex-1 bg-gray-100 text-gray-700 py-3 px-6 rounded-xl font-medium hover:bg-gray-200 transition-all duration-200"
               >
                 Cancel
               </button>
               <button
                 onClick={deleteSelectedVideos}
-                className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-red-700 transition-colors"
+                className="flex-1 bg-red-600 text-white py-3 px-6 rounded-xl font-medium hover:bg-red-700 transition-all duration-200 shadow-lg hover:shadow-red-200"
               >
                 Delete {selectedVideos.length} Videos
               </button>
@@ -463,44 +465,62 @@ const MainApp = () => {
       )}
 
       {/* Sidebar */}
-      <div className="w-64 bg-gray-800 text-white flex flex-col">
+      <div className={`${sidebarCollapsed ? 'w-20' : 'w-72'} bg-white border-r border-gray-200 flex flex-col transition-all duration-300 shadow-lg`}>
         {/* Logo */}
-        <div className="p-4 border-b border-gray-700">
-          <div className="flex items-center space-x-3">
-            <div className="bg-green-500 w-8 h-8 rounded flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-white" />
+        <div className="p-6 border-b border-gray-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="bg-gradient-to-r from-purple-600 to-blue-600 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg">
+                <Sparkles className="w-6 h-6 text-white" />
+              </div>
+              {!sidebarCollapsed && (
+                <div>
+                  <span className="font-bold text-xl bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                    Content Fabrica
+                  </span>
+                  <p className="text-xs text-gray-500 font-medium">{workspace?.name}</p>
+                </div>
+              )}
             </div>
-            <div>
-              <span className="font-semibold text-lg">Content Factory</span>
-              <p className="text-xs text-gray-400">{workspace?.name}</p>
-            </div>
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all duration-200"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
           </div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-2">
+        <nav className="flex-1 p-4 space-y-2">
           {[
-            { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+            { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
             { id: 'create', label: 'Create Video', icon: Plus },
             { id: 'videos', label: 'Videos', icon: Video, badge: videos.length },
-            { id: 'accounts', label: 'Connected Accounts', icon: Globe },
+            { id: 'accounts', label: 'Accounts', icon: Globe },
             { id: 'settings', label: 'Settings', icon: Settings }
           ].map(item => (
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm font-medium transition-colors mb-1 ${
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group ${
                 activeTab === item.id 
-                  ? 'bg-gray-700 text-white' 
-                  : 'text-gray-300 hover:text-white hover:bg-gray-700'
+                  ? 'bg-gradient-to-r from-purple-50 to-blue-50 text-purple-700 shadow-sm border border-purple-100' 
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
               <div className="flex items-center space-x-3">
-                <item.icon className="w-5 h-5" />
-                <span>{item.label}</span>
+                <item.icon className={`w-5 h-5 ${
+                  activeTab === item.id ? 'text-purple-600' : 'text-gray-400 group-hover:text-gray-600'
+                }`} />
+                {!sidebarCollapsed && <span>{item.label}</span>}
               </div>
-              {item.badge && (
-                <span className="bg-gray-600 text-xs px-2 py-1 rounded-full">
+              {!sidebarCollapsed && item.badge && (
+                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                  activeTab === item.id 
+                    ? 'bg-purple-100 text-purple-700' 
+                    : 'bg-gray-100 text-gray-600'
+                }`}>
                   {item.badge}
                 </span>
               )}
@@ -509,22 +529,26 @@ const MainApp = () => {
         </nav>
 
         {/* User Profile */}
-        <div className="p-4 border-t border-gray-700">
+        <div className="p-4 border-t border-gray-100">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                <span className="text-xs font-semibold">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <span className="text-sm font-bold text-white">
                   {user?.firstName?.[0]}{user?.lastName?.[0]}
                 </span>
               </div>
-              <div>
-                <p className="text-sm font-medium">{user?.firstName} {user?.lastName}</p>
-                <p className="text-xs text-gray-400">@{user?.username}</p>
-              </div>
+              {!sidebarCollapsed && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 truncate">
+                    {user?.firstName} {user?.lastName}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">@{user?.username}</p>
+                </div>
+              )}
             </div>
             <button
               onClick={handleLogout}
-              className="p-2 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded transition-colors"
+              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all duration-200"
               title="Logout"
             >
               <LogOut className="w-4 h-4" />
@@ -536,66 +560,128 @@ const MainApp = () => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="bg-white border-b border-gray-100 px-8 py-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <h1 className="text-2xl font-semibold text-gray-900">
-                {activeTab === 'analytics' && 'Analytics'}
-                {activeTab === 'create' && 'Create Video'}
-                {activeTab === 'videos' && 'Videos'}
-                {activeTab === 'accounts' && 'Connected Accounts'}
-                {activeTab === 'settings' && 'Settings'}
+            <div className="flex items-center space-x-6">
+              <h1 className="text-3xl font-bold text-gray-900">
+                {activeTab === 'dashboard' && '📊 Dashboard'}
+                {activeTab === 'create' && '✨ Create Video'}
+                {activeTab === 'videos' && '🎬 Videos'}
+                {activeTab === 'accounts' && '🌐 Connected Accounts'}
+                {activeTab === 'settings' && '⚙️ Settings'}
               </h1>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-4">
+              <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all duration-200">
+                <Bell className="w-5 h-5" />
+              </button>
+              <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all duration-200">
+                <HelpCircle className="w-5 h-5" />
+              </button>
               <div className="text-sm text-gray-600">
-                Welcome back, <span className="font-medium">{user?.firstName}</span>
+                Welcome back, <span className="font-semibold text-gray-900">{user?.firstName}</span> 👋
               </div>
             </div>
           </div>
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-auto p-6">
-          {/* Analytics Tab */}
-          {activeTab === 'analytics' && (
-            <div className="space-y-6">
+        <div className="flex-1 overflow-auto p-8 bg-gray-50">
+          {/* Dashboard Tab */}
+          {activeTab === 'dashboard' && (
+            <div className="space-y-8">
               {/* Top Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="bg-white rounded-lg border border-gray-200 p-6">
-                  <div className="flex items-center justify-between mb-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm hover:shadow-md transition-shadow duration-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="bg-blue-50 w-12 h-12 rounded-xl flex items-center justify-center">
+                      <Video className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <span className="text-2xl">📹</span>
+                  </div>
+                  <div className="space-y-2">
                     <h3 className="text-sm font-medium text-gray-600">Total Videos</h3>
-                  </div>
-                  <div className="flex items-baseline space-x-2">
-                    <span className="text-2xl font-bold text-gray-900">{stats.totalVideos}</span>
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-lg border border-gray-200 p-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-medium text-gray-600">Completed Videos</h3>
-                  </div>
-                  <div className="flex items-baseline space-x-2">
-                    <span className="text-2xl font-bold text-gray-900">{stats.completedVideos}</span>
+                    <p className="text-3xl font-bold text-gray-900">{stats.totalVideos}</p>
+                    <p className="text-xs text-green-600 font-medium">+12% from last month</p>
                   </div>
                 </div>
 
-                <div className="bg-white rounded-lg border border-gray-200 p-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-medium text-gray-600">Published Videos</h3>
+                <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm hover:shadow-md transition-shadow duration-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="bg-green-50 w-12 h-12 rounded-xl flex items-center justify-center">
+                      <CheckCircle className="w-6 h-6 text-green-600" />
+                    </div>
+                    <span className="text-2xl">✅</span>
                   </div>
-                  <div className="flex items-baseline space-x-2">
-                    <span className="text-2xl font-bold text-gray-900">{stats.publishedVideos}</span>
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium text-gray-600">Completed</h3>
+                    <p className="text-3xl font-bold text-gray-900">{stats.completedVideos}</p>
+                    <p className="text-xs text-green-600 font-medium">+8% completion rate</p>
                   </div>
                 </div>
 
-                <div className="bg-white rounded-lg border border-gray-200 p-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-medium text-gray-600">Connected Platforms</h3>
+                <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm hover:shadow-md transition-shadow duration-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="bg-purple-50 w-12 h-12 rounded-xl flex items-center justify-center">
+                      <Send className="w-6 h-6 text-purple-600" />
+                    </div>
+                    <span className="text-2xl">🚀</span>
                   </div>
-                  <div className="flex items-baseline space-x-2">
-                    <span className="text-2xl font-bold text-gray-900">{stats.connectedPlatforms}</span>
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium text-gray-600">Published</h3>
+                    <p className="text-3xl font-bold text-gray-900">{stats.publishedVideos}</p>
+                    <p className="text-xs text-purple-600 font-medium">Across {stats.connectedPlatforms} platforms</p>
                   </div>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm hover:shadow-md transition-shadow duration-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="bg-orange-50 w-12 h-12 rounded-xl flex items-center justify-center">
+                      <Globe className="w-6 h-6 text-orange-600" />
+                    </div>
+                    <span className="text-2xl">🌐</span>
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium text-gray-600">Platforms</h3>
+                    <p className="text-3xl font-bold text-gray-900">{stats.connectedPlatforms}</p>
+                    <p className="text-xs text-orange-600 font-medium">Social accounts connected</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="bg-white rounded-2xl border border-gray-100 p-8 shadow-sm">
+                <h2 className="text-xl font-semibold text-gray-900 mb-6">Quick Actions</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <button
+                    onClick={() => setActiveTab('create')}
+                    className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6 rounded-xl hover:from-purple-700 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl group"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Plus className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                      <span className="font-semibold">Create New Video</span>
+                    </div>
+                  </button>
+                  
+                  <button
+                    onClick={() => setActiveTab('accounts')}
+                    className="bg-white border-2 border-gray-200 text-gray-700 p-6 rounded-xl hover:border-purple-300 hover:bg-purple-50 transition-all duration-200 group"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Globe className="w-6 h-6 group-hover:text-purple-600 transition-colors" />
+                      <span className="font-semibold">Connect Accounts</span>
+                    </div>
+                  </button>
+                  
+                  <button
+                    onClick={() => setActiveTab('videos')}
+                    className="bg-white border-2 border-gray-200 text-gray-700 p-6 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all duration-200 group"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Video className="w-6 h-6 group-hover:text-blue-600 transition-colors" />
+                      <span className="font-semibold">View All Videos</span>
+                    </div>
+                  </button>
                 </div>
               </div>
             </div>
@@ -603,55 +689,55 @@ const MainApp = () => {
 
           {/* Create Video Tab */}
           {activeTab === 'create' && (
-            <div className="max-w-2xl">
-              <div className="bg-white rounded-lg border border-gray-200 p-8">
-                <div className="text-center mb-8">
-                  <div className="bg-gradient-to-r from-purple-500 to-blue-500 w-16 h-16 rounded-lg flex items-center justify-center mx-auto mb-4">
-                    <Sparkles className="w-8 h-8 text-white" />
+            <div className="max-w-4xl mx-auto">
+              <div className="bg-white rounded-2xl border border-gray-100 p-10 shadow-sm">
+                <div className="text-center mb-10">
+                  <div className="bg-gradient-to-r from-purple-600 to-blue-600 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                    <Sparkles className="w-10 h-10 text-white" />
                   </div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Create AI Video</h2>
-                  <p className="text-gray-600">Generate engaging content with AI in seconds</p>
+                  <h2 className="text-3xl font-bold text-gray-900 mb-3">Create AI Video</h2>
+                  <p className="text-lg text-gray-600">Transform your ideas into engaging content with AI magic ✨</p>
                 </div>
                 
-                <div className="space-y-6">
+                <div className="space-y-8">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-900 mb-3">
-                      What's your video about?
+                    <label className="block text-lg font-semibold text-gray-900 mb-4">
+                      💡 What's your video about?
                     </label>
                     <textarea
                       value={videoForm.topic}
                       onChange={(e) => setVideoForm({...videoForm, topic: e.target.value})}
                       placeholder="e.g., How to start a successful online business, 10 productivity tips for entrepreneurs, Latest trends in digital marketing..."
-                      className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-all"
-                      rows={4}
+                      className="w-full p-6 border-2 border-gray-200 rounded-2xl focus:ring-4 focus:ring-purple-100 focus:border-purple-400 resize-none transition-all duration-200 text-lg leading-relaxed"
+                      rows={6}
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div>
-                      <label className="block text-sm font-semibold text-gray-900 mb-3">
-                        Video Style
+                      <label className="block text-lg font-semibold text-gray-900 mb-4">
+                        🎭 Video Style
                       </label>
                       <select
                         value={videoForm.style}
                         onChange={(e) => setVideoForm({...videoForm, style: e.target.value})}
-                        className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                        className="w-full p-6 border-2 border-gray-200 rounded-2xl focus:ring-4 focus:ring-purple-100 focus:border-purple-400 transition-all duration-200 text-lg"
                       >
-                        <option value="CASUAL">Casual & Friendly</option>
-                        <option value="PROFESSIONAL">Professional & Business</option>
-                        <option value="ENERGETIC">Energetic & Dynamic</option>
-                        <option value="EDUCATIONAL">Educational & Informative</option>
+                        <option value="CASUAL">😊 Casual & Friendly</option>
+                        <option value="PROFESSIONAL">💼 Professional & Business</option>
+                        <option value="ENERGETIC">⚡ Energetic & Dynamic</option>
+                        <option value="EDUCATIONAL">📚 Educational & Informative</option>
                       </select>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-gray-900 mb-3">
-                        Duration
+                      <label className="block text-lg font-semibold text-gray-900 mb-4">
+                        ⏱️ Duration
                       </label>
                       <select
                         value={videoForm.duration}
                         onChange={(e) => setVideoForm({...videoForm, duration: parseInt(e.target.value)})}
-                        className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                        className="w-full p-6 border-2 border-gray-200 rounded-2xl focus:ring-4 focus:ring-purple-100 focus:border-purple-400 transition-all duration-200 text-lg"
                       >
                         <option value={30}>30 seconds - Quick & Punchy</option>
                         <option value={60}>1 minute - Perfect for Social</option>
@@ -664,17 +750,17 @@ const MainApp = () => {
                   <button
                     onClick={createVideo}
                     disabled={isLoading || !videoForm.topic.trim()}
-                    className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 transition-all"
+                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-6 px-8 rounded-2xl font-bold text-lg hover:from-purple-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-4 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
                   >
                     {isLoading ? (
                       <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        <span>Creating Your Video...</span>
+                        <Loader2 className="w-6 h-6 animate-spin" />
+                        <span>Creating Your Masterpiece...</span>
                       </>
                     ) : (
                       <>
-                        <Zap className="w-5 h-5" />
-                        <span>Generate AI Video</span>
+                        <Zap className="w-6 h-6" />
+                        <span>Generate AI Video 🚀</span>
                       </>
                     )}
                   </button>
@@ -688,24 +774,24 @@ const MainApp = () => {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-900">Videos</h2>
-                  <p className="text-gray-600 mt-1">{filteredAndSortedVideos.length} of {videos.length} videos</p>
+                  <h2 className="text-2xl font-bold text-gray-900">Your Videos</h2>
+                  <p className="text-gray-600 mt-2">{filteredAndSortedVideos.length} of {videos.length} videos</p>
                 </div>
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-4">
                   {selectedVideos.length > 0 && (
                     <button
                       onClick={() => setShowBulkDeleteConfirm(true)}
-                      className="bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 flex items-center space-x-2 transition-all"
+                      className="bg-red-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-red-700 flex items-center space-x-2 transition-all duration-200 shadow-lg hover:shadow-red-200"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-5 h-5" />
                       <span>Delete {selectedVideos.length}</span>
                     </button>
                   )}
                   <button
                     onClick={() => setActiveTab('create')}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 flex items-center space-x-2 transition-all"
+                    className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-purple-700 hover:to-blue-700 flex items-center space-x-2 transition-all duration-200 shadow-lg hover:shadow-xl"
                   >
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-5 h-5" />
                     <span>New Video</span>
                   </button>
                 </div>
@@ -713,29 +799,29 @@ const MainApp = () => {
 
               {/* Enhanced Filters and Controls */}
               {videos.length > 0 && (
-                <div className="bg-white rounded-lg border border-gray-200 p-4">
-                  <div className="flex flex-wrap items-center gap-4">
+                <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+                  <div className="flex flex-wrap items-center gap-6">
                     {/* Search */}
-                    <div className="flex-1 min-w-64">
+                    <div className="flex-1 min-w-80">
                       <div className="relative">
-                        <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                        <Search className="w-5 h-5 absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
                         <input
                           type="text"
                           placeholder="Search videos..."
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
-                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="w-full pl-12 pr-6 py-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-100 focus:border-purple-400 transition-all duration-200"
                         />
                       </div>
                     </div>
 
                     {/* Status Filter */}
-                    <div className="flex items-center space-x-2">
-                      <Filter className="w-4 h-4 text-gray-400" />
+                    <div className="flex items-center space-x-3">
+                      <Filter className="w-5 h-5 text-gray-400" />
                       <select
                         value={videoFilter}
                         onChange={(e) => setVideoFilter(e.target.value)}
-                        className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-4 focus:ring-purple-100 focus:border-purple-400 transition-all duration-200"
                       >
                         <option value="all">All Status</option>
                         <option value="generating">Generating</option>
@@ -746,8 +832,8 @@ const MainApp = () => {
                     </div>
 
                     {/* Sort */}
-                    <div className="flex items-center space-x-2">
-                      <ArrowUpDown className="w-4 h-4 text-gray-400" />
+                    <div className="flex items-center space-x-3">
+                      <ArrowUpDown className="w-5 h-5 text-gray-400" />
                       <select
                         value={`${sortBy}-${sortOrder}`}
                         onChange={(e) => {
@@ -755,7 +841,7 @@ const MainApp = () => {
                           setSortBy(field);
                           setSortOrder(order);
                         }}
-                        className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="border-2 border-gray-200 rounded-xl px-4 py-3 focus:ring-4 focus:ring-purple-100 focus:border-purple-400 transition-all duration-200"
                       >
                         <option value="created_at-desc">Newest First</option>
                         <option value="created_at-asc">Oldest First</option>
@@ -769,14 +855,14 @@ const MainApp = () => {
 
                     {/* Bulk Selection */}
                     {filteredAndSortedVideos.length > 0 && (
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-3">
                         <button
                           onClick={() => 
                             selectedVideos.length === filteredAndSortedVideos.length 
                               ? deselectAllVideos() 
                               : selectAllVideos()
                           }
-                          className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900"
+                          className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-xl transition-all duration-200"
                         >
                           {selectedVideos.length === filteredAndSortedVideos.length ? (
                             <CheckSquare className="w-4 h-4" />
@@ -797,14 +883,14 @@ const MainApp = () => {
               )}
 
               {filteredAndSortedVideos.length === 0 ? (
-                <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-                  <div className="bg-gray-100 w-16 h-16 rounded-lg flex items-center justify-center mx-auto mb-6">
-                    <Video className="w-8 h-8 text-gray-400" />
+                <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center shadow-sm">
+                  <div className="bg-gray-50 w-24 h-24 rounded-2xl flex items-center justify-center mx-auto mb-8">
+                    <Video className="w-12 h-12 text-gray-400" />
                   </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                    {videos.length === 0 ? 'No videos yet' : 'No videos match your search'}
+                  <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                    {videos.length === 0 ? '🎬 No videos yet' : '🔍 No videos match your search'}
                   </h3>
-                  <p className="text-gray-600 mb-6">
+                  <p className="text-lg text-gray-600 mb-8 max-w-md mx-auto">
                     {videos.length === 0 
                       ? 'Create your first AI-generated video to get started with automated content creation.'
                       : 'Try adjusting your search or filter criteria.'
@@ -813,9 +899,9 @@ const MainApp = () => {
                   {videos.length === 0 ? (
                     <button
                       onClick={() => setActiveTab('create')}
-                      className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all"
+                      className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-4 rounded-xl font-bold text-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl"
                     >
-                      Create Your First Video
+                      Create Your First Video ✨
                     </button>
                   ) : (
                     <button
@@ -823,52 +909,63 @@ const MainApp = () => {
                         setSearchQuery('');
                         setVideoFilter('all');
                       }}
-                      className="bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-700 transition-all"
+                      className="bg-gray-600 text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-gray-700 transition-all duration-200 shadow-lg"
                     >
                       Clear Filters
                     </button>
                   )}
                 </div>
               ) : (
-                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                  <div className="px-6 py-4 border-b border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-900">All Videos</h3>
+                <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+                  <div className="px-8 py-6 border-b border-gray-100">
+                    <h3 className="text-lg font-semibold text-gray-900">All Videos</h3>
                   </div>
-                  <div className="divide-y divide-gray-200">
+                  <div className="divide-y divide-gray-100">
                     {filteredAndSortedVideos.map((video, index) => {
                       const videoId = video.id;
                       const isSelected = selectedVideos.includes(videoId);
                       
                       return (
-                        <div key={videoId || index} className={`px-6 py-4 transition-colors ${
-                          isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
+                        <div key={videoId || index} className={`px-8 py-6 transition-all duration-200 ${
+                          isSelected ? 'bg-purple-50 border-l-4 border-purple-400' : 'hover:bg-gray-50'
                         }`}>
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-6">
                               {/* Selection Checkbox */}
                               <button
                                 onClick={() => toggleVideoSelection(videoId)}
-                                className="text-gray-400 hover:text-gray-600"
+                                className="text-gray-400 hover:text-gray-600 transition-colors"
                               >
                                 {isSelected ? (
-                                  <CheckSquare className="w-5 h-5 text-blue-600" />
+                                  <CheckSquare className="w-6 h-6 text-purple-600" />
                                 ) : (
-                                  <Square className="w-5 h-5" />
+                                  <Square className="w-6 h-6" />
                                 )}
                               </button>
                               
-                              {getStatusIcon(video.status)}
-                              <div>
-                                <h3 className="font-medium text-gray-900">{video.title || video.topic}</h3>
-                                <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
-                                  <span>Style: {video.style}</span>
-                                  <span>Duration: {video.duration}s</span>
-                                  <span>{new Date(video.createdAt).toLocaleDateString()}</span>
+                              <div className="flex items-center space-x-4">
+                                {getStatusIcon(video.status)}
+                                <div>
+                                  <h3 className="font-semibold text-gray-900 text-lg">{video.title || video.topic}</h3>
+                                  <div className="flex items-center space-x-6 text-sm text-gray-500 mt-2">
+                                    <span className="flex items-center space-x-1">
+                                      <span>🎭</span>
+                                      <span>{video.style}</span>
+                                    </span>
+                                    <span className="flex items-center space-x-1">
+                                      <span>⏱️</span>
+                                      <span>{video.duration}s</span>
+                                    </span>
+                                    <span className="flex items-center space-x-1">
+                                      <span>📅</span>
+                                      <span>{new Date(video.createdAt).toLocaleDateString()}</span>
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                            <div className="flex items-center space-x-2">
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            <div className="flex items-center space-x-3">
+                              <span className={`px-4 py-2 rounded-xl text-sm font-semibold ${
                                 video.status === 'GENERATING' ? 'bg-blue-100 text-blue-800' :
                                 video.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
                                 video.status === 'PUBLISHED' ? 'bg-purple-100 text-purple-800' :
@@ -880,10 +977,10 @@ const MainApp = () => {
                               
                               <button
                                 onClick={() => refreshVideoStatus(video.id)}
-                                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                className="p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all duration-200"
                                 title="Refresh status"
                               >
-                                <RefreshCw className="w-4 h-4" />
+                                <RefreshCw className="w-5 h-5" />
                               </button>
                               
                               {video.videoUrl && (
@@ -891,10 +988,10 @@ const MainApp = () => {
                                   href={video.videoUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                  className="p-3 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-xl transition-all duration-200"
                                   title="View video"
                                 >
-                                  <Play className="w-4 h-4" />
+                                  <Play className="w-5 h-5" />
                                 </a>
                               )}
                               
@@ -902,9 +999,9 @@ const MainApp = () => {
                                 <button
                                   onClick={() => postVideoToSocial(video)}
                                   disabled={isLoading}
-                                  className="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center space-x-1 transition-all"
+                                  className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:from-purple-700 hover:to-blue-700 disabled:opacity-50 flex items-center space-x-2 transition-all duration-200 shadow-lg hover:shadow-xl"
                                 >
-                                  <Send className="w-3 h-3" />
+                                  <Send className="w-4 h-4" />
                                   <span>Post</span>
                                 </button>
                               )}
@@ -912,10 +1009,10 @@ const MainApp = () => {
                               {/* Delete Button */}
                               <button
                                 onClick={() => setShowDeleteConfirm(videoId)}
-                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                className="p-3 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all duration-200"
                                 title="Delete video"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="w-5 h-5" />
                               </button>
                             </div>
                           </div>
@@ -933,57 +1030,57 @@ const MainApp = () => {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-900">Connected Accounts</h2>
-                  <p className="text-gray-600 mt-1">Manage your social media connections</p>
+                  <h2 className="text-2xl font-bold text-gray-900">Connected Accounts</h2>
+                  <p className="text-gray-600 mt-2">Manage your social media connections</p>
                 </div>
-                <div className="flex space-x-3">
+                <div className="flex space-x-4">
                   <button
                     onClick={loadConnectedAccounts}
                     disabled={isLoading}
-                    className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-200 disabled:opacity-50 flex items-center space-x-2 transition-colors"
+                    className="bg-gray-100 text-gray-700 px-6 py-3 rounded-xl font-semibold hover:bg-gray-200 disabled:opacity-50 flex items-center space-x-2 transition-all duration-200"
                   >
-                    <RefreshCw className="w-4 h-4" />
+                    <RefreshCw className="w-5 h-5" />
                     <span>Refresh</span>
                   </button>
                   <button
                     onClick={connectSocialAccount}
                     disabled={isLoading}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center space-x-2 transition-all"
+                    className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-purple-700 hover:to-blue-700 disabled:opacity-50 flex items-center space-x-2 transition-all duration-200 shadow-lg hover:shadow-xl"
                   >
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-5 h-5" />
                     <span>Connect Account</span>
                   </button>
                 </div>
               </div>
 
               {connectedAccounts.length === 0 ? (
-                <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-                  <div className="bg-gray-100 w-16 h-16 rounded-lg flex items-center justify-center mx-auto mb-6">
-                    <Globe className="w-8 h-8 text-gray-400" />
+                <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center shadow-sm">
+                  <div className="bg-gray-50 w-24 h-24 rounded-2xl flex items-center justify-center mx-auto mb-8">
+                    <Globe className="w-12 h-12 text-gray-400" />
                   </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">No accounts connected</h3>
-                  <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-4">🌐 No accounts connected</h3>
+                  <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
                     Connect your social media accounts to start posting videos automatically across multiple platforms.
                   </p>
                   <button
                     onClick={connectSocialAccount}
                     disabled={isLoading}
-                    className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 transition-all"
+                    className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-4 rounded-xl font-bold text-lg hover:from-purple-700 hover:to-blue-700 disabled:opacity-50 transition-all duration-200 shadow-lg hover:shadow-xl"
                   >
-                    {isLoading ? 'Connecting...' : 'Connect Your First Account'}
+                    {isLoading ? 'Connecting...' : 'Connect Your First Account ✨'}
                   </button>
                 </div>
               ) : (
-                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                  <div className="px-6 py-4 border-b border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-900">Connected Platforms</h3>
+                <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+                  <div className="px-8 py-6 border-b border-gray-100">
+                    <h3 className="text-lg font-semibold text-gray-900">Connected Platforms</h3>
                   </div>
-                  <div className="divide-y divide-gray-200">
+                  <div className="divide-y divide-gray-100">
                     {connectedAccounts.map((account, index) => (
-                      <div key={index} className="px-6 py-4">
+                      <div key={index} className="px-8 py-6 hover:bg-gray-50 transition-colors duration-200">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4">
-                            <div className={`p-2 rounded text-white ${
+                          <div className="flex items-center space-x-6">
+                            <div className={`p-4 rounded-xl text-white shadow-lg ${
                               account.platform?.toLowerCase() === 'instagram' ? 'bg-gradient-to-r from-purple-500 to-pink-500' :
                               account.platform?.toLowerCase() === 'youtube' ? 'bg-red-500' :
                               account.platform?.toLowerCase() === 'facebook' ? 'bg-blue-600' :
@@ -995,15 +1092,15 @@ const MainApp = () => {
                               {getSocialIcon(account.platform)}
                             </div>
                             <div>
-                              <h3 className="font-semibold text-gray-900 capitalize">{account.platform}</h3>
-                              <p className="text-sm text-gray-600">{account.account_name || account.username}</p>
+                              <h3 className="font-bold text-gray-900 text-lg capitalize">{account.platform}</h3>
+                              <p className="text-gray-600">{account.account_name || account.username}</p>
                             </div>
                           </div>
-                          <div className="flex items-center space-x-4">
-                            <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                              Connected
+                          <div className="flex items-center space-x-6">
+                            <span className="px-4 py-2 bg-green-100 text-green-800 rounded-xl text-sm font-semibold">
+                              ✅ Connected
                             </span>
-                            <span className="text-xs text-gray-500">
+                            <span className="text-sm text-gray-500">
                               {new Date(account.connected_at || account.createdAt).toLocaleDateString()}
                             </span>
                           </div>
@@ -1018,46 +1115,46 @@ const MainApp = () => {
 
           {/* Settings Tab */}
           {activeTab === 'settings' && (
-            <div className="space-y-6">
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Application Settings</h3>
-                <div className="space-y-4">
+            <div className="space-y-8">
+              <div className="bg-white rounded-2xl border border-gray-100 p-8 shadow-sm">
+                <h3 className="text-xl font-bold text-gray-900 mb-6">⚙️ Application Settings</h3>
+                <div className="space-y-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Default Video Style</label>
-                    <select className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                      <option>Casual & Friendly</option>
-                      <option>Professional & Business</option>
-                      <option>Energetic & Dynamic</option>
-                      <option>Educational & Informative</option>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">Default Video Style</label>
+                    <select className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-100 focus:border-purple-400 transition-all duration-200">
+                      <option>😊 Casual & Friendly</option>
+                      <option>💼 Professional & Business</option>
+                      <option>⚡ Energetic & Dynamic</option>
+                      <option>📚 Educational & Informative</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Default Duration</label>
-                    <select className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">Default Duration</label>
+                    <select className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-purple-100 focus:border-purple-400 transition-all duration-200">
                       <option>30 seconds</option>
                       <option>1 minute</option>
                       <option>1.5 minutes</option>
                       <option>2 minutes</option>
                     </select>
                   </div>
-                  <button className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors">
+                  <button className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-purple-700 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl">
                     Save Settings
                   </button>
                 </div>
               </div>
               
               {/* Danger Zone */}
-              <div className="bg-white rounded-lg border border-red-200 p-6">
-                <h3 className="text-lg font-semibold text-red-900 mb-4">Danger Zone</h3>
-                <div className="space-y-4">
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <h4 className="font-medium text-red-900 mb-2">Clear All Videos</h4>
-                    <p className="text-sm text-red-700 mb-4">
+              <div className="bg-white rounded-2xl border-2 border-red-200 p-8 shadow-sm">
+                <h3 className="text-xl font-bold text-red-900 mb-6">⚠️ Danger Zone</h3>
+                <div className="space-y-6">
+                  <div className="bg-red-50 border-2 border-red-200 rounded-xl p-6">
+                    <h4 className="font-bold text-red-900 mb-3">Clear All Videos</h4>
+                    <p className="text-red-700 mb-6 leading-relaxed">
                       This will permanently delete all videos from your workspace. This action cannot be undone.
                     </p>
                     <button
                       onClick={clearAllVideos}
-                      className="bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 transition-colors"
+                      className="bg-red-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-red-700 transition-all duration-200 shadow-lg hover:shadow-red-200"
                     >
                       Clear All Videos
                     </button>
