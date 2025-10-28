@@ -4,6 +4,20 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
+// Import route handlers
+import authRoutes from './src/server/routes/auth.js';
+import videosRoutes from './src/server/routes/videos.js';
+import postsRoutes from './src/server/routes/posts.js';
+import workspacesRoutes from './src/server/routes/workspaces.js';
+import analyticsRoutes from './src/server/routes/analytics.js';
+import calendarRoutes from './src/server/routes/calendar.js';
+import notificationsRoutes from './src/server/routes/notifications.js';
+import usersRoutes from './src/server/routes/users.js';
+import socialAccountsRoutes from './src/server/routes/socialAccounts.js';
+
+// Import middleware
+import { authenticateToken } from './src/server/middleware/auth.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -124,8 +138,30 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Static assets (vite build)
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// Auth middleware
-const authenticateToken = (req, res, next) => {
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(), 
+    users: users.size, 
+    videos: videos.size,
+    uploadPostKey: process.env.UPLOADPOST_KEY ? 'configured' : 'missing'
+  });
+});
+
+// API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/videos', videosRoutes);
+app.use('/api/posts', postsRoutes);
+app.use('/api/workspaces', workspacesRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/calendar', calendarRoutes);
+app.use('/api/notifications', notificationsRoutes);
+app.use('/api/users', usersRoutes);
+app.use('/api/social-accounts', socialAccountsRoutes);
+
+// Legacy demo authentication (for development)
+const legacyAuthenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'Access token required' });
@@ -147,12 +183,7 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
-// Health
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'healthy', timestamp: new Date().toISOString(), users: users.size, videos: videos.size });
-});
-
-// Auth
+// Demo auth endpoints (legacy support)
 app.post('/api/auth/register', (req, res) => {
   try {
     const { firstName, lastName, email, username, password, workspaceName } = req.body;
@@ -193,14 +224,14 @@ app.post('/api/auth/login', (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Login failed' }); }
 });
 
-app.get('/api/auth/verify', authenticateToken, (req, res) => {
+app.get('/api/auth/verify', legacyAuthenticateToken, (req, res) => {
   const { password: _, ...safeUser } = req.user; res.json({ success: true, user: safeUser, workspace: req.workspace });
 });
 
-app.post('/api/auth/logout', authenticateToken, (req, res) => { sessions.delete(req.token); res.json({ success: true }); });
+app.post('/api/auth/logout', legacyAuthenticateToken, (req, res) => { sessions.delete(req.token); res.json({ success: true }); });
 
-// Admin APIs
-app.get('/api/admin/stats', authenticateToken, requireAdmin, (req, res) => {
+// Admin APIs (legacy)
+app.get('/api/admin/stats', legacyAuthenticateToken, requireAdmin, (req, res) => {
   const allUsers = Array.from(users.values());
   const allVideos = Array.from(videos.values());
   const stats = {
@@ -214,12 +245,12 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, (req, res) => {
   res.json({ success: true, stats });
 });
 
-app.get('/api/admin/users', authenticateToken, requireAdmin, (req, res) => {
+app.get('/api/admin/users', legacyAuthenticateToken, requireAdmin, (req, res) => {
   const data = Array.from(users.values()).map(u => { const { password, ...rest } = u; return rest; });
   res.json({ success: true, users: data });
 });
 
-app.put('/api/admin/users/:id/status', authenticateToken, requireAdmin, (req, res) => {
+app.put('/api/admin/users/:id/status', legacyAuthenticateToken, requireAdmin, (req, res) => {
   const { id } = req.params; const { status } = req.body;
   if (!['ACTIVE','INACTIVE','SUSPENDED'].includes(status)) return res.status(400).json({ error: 'Invalid status' });
   const entry = Array.from(users.entries()).find(([email,u]) => u.id === id);
@@ -228,7 +259,7 @@ app.put('/api/admin/users/:id/status', authenticateToken, requireAdmin, (req, re
   const { password, ...rest } = u; res.json({ success: true, user: rest });
 });
 
-app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, (req, res) => {
+app.delete('/api/admin/users/:id', legacyAuthenticateToken, requireAdmin, (req, res) => {
   const { id } = req.params;
   const entry = Array.from(users.entries()).find(([email,u]) => u.id === id);
   if (!entry) return res.status(404).json({ error: 'User not found' });
@@ -244,17 +275,17 @@ app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, (req, res) =
   res.json({ success: true });
 });
 
-app.get('/api/admin/videos', authenticateToken, requireAdmin, (req, res) => {
+app.get('/api/admin/videos', legacyAuthenticateToken, requireAdmin, (req, res) => {
   res.json({ success: true, videos: Array.from(videos.values()) });
 });
 
-// User video APIs
-app.get('/api/videos', authenticateToken, (req, res) => {
+// Legacy video APIs (for backwards compatibility)
+app.get('/api/videos', legacyAuthenticateToken, (req, res) => {
   const list = Array.from(videos.values()).filter(v => v.workspaceId === req.workspace.id);
   res.json({ success: true, videos: list });
 });
 
-app.post('/api/videos', authenticateToken, (req, res) => {
+app.post('/api/videos', legacyAuthenticateToken, (req, res) => {
   const { title, topic, style, duration, description } = req.body;
   if (!title || !topic) return res.status(400).json({ error: 'Title and topic are required' });
   const id = `video_${Date.now()}`;
@@ -264,33 +295,36 @@ app.post('/api/videos', authenticateToken, (req, res) => {
   res.status(201).json({ success: true, video: v });
 });
 
-app.get('/api/videos/:id/status', authenticateToken, (req, res) => {
+app.get('/api/videos/:id/status', legacyAuthenticateToken, (req, res) => {
   const v = videos.get(req.params.id); if (!v || v.workspaceId !== req.workspace.id) return res.status(404).json({ error: 'Video not found' });
   res.json({ success: true, video: v });
 });
 
-app.delete('/api/videos/:id', authenticateToken, (req, res) => {
+app.delete('/api/videos/:id', legacyAuthenticateToken, (req, res) => {
   const v = videos.get(req.params.id); if (!v || v.workspaceId !== req.workspace.id) return res.status(404).json({ error: 'Video not found' });
   videos.delete(req.params.id); res.json({ success: true });
 });
 
-app.post('/api/videos/bulk-delete', authenticateToken, (req, res) => {
+app.post('/api/videos/bulk-delete', legacyAuthenticateToken, (req, res) => {
   const { video_ids } = req.body; if (!Array.isArray(video_ids)) return res.status(400).json({ error: 'video_ids array required' });
   let count = 0; video_ids.forEach(id => { const v = videos.get(id); if (v && v.workspaceId === req.workspace.id){ videos.delete(id); count++; }});
   res.json({ success: true, deletedCount: count });
 });
 
-app.post('/api/videos/clear-all', authenticateToken, (req, res) => {
+app.post('/api/videos/clear-all', legacyAuthenticateToken, (req, res) => {
   const toDelete = Array.from(videos.entries()).filter(([id,v]) => v.workspaceId === req.workspace.id);
   toDelete.forEach(([id]) => videos.delete(id)); res.json({ success: true, deletedCount: toDelete.length });
 });
 
-// Social accounts (mock)
-app.get('/api/social-accounts', authenticateToken, (req, res) => { res.json({ success: true, accounts: socialAccounts.get(req.user.id)||[] }); });
-app.post('/api/social-accounts/connect', authenticateToken, (req, res) => { res.json({ success: true, auth_url: 'https://auth.example.com/mock' }); });
-
-// Posts (mock)
-app.post('/api/posts', authenticateToken, (req, res) => { const { videoId, platforms } = req.body; const v = videos.get(videoId); if (!v || !v.videoUrl) return res.status(400).json({ error: 'Video not ready' }); v.status='PUBLISHED'; v.updatedAt=new Date().toISOString(); res.json({ success: true }); });
+// Legacy posts (mock)
+app.post('/api/posts', legacyAuthenticateToken, (req, res) => { 
+  const { videoId, platforms } = req.body; 
+  const v = videos.get(videoId); 
+  if (!v || !v.videoUrl) return res.status(400).json({ error: 'Video not ready' }); 
+  v.status='PUBLISHED'; 
+  v.updatedAt=new Date().toISOString(); 
+  res.json({ success: true }); 
+});
 
 // Legacy pointers
 app.post('/api/connect-accounts', (req,res)=>res.json({ message:'Use /api/social-accounts/connect' }));
@@ -300,7 +334,9 @@ app.get('/api/video-status/:id', (req,res)=>res.json({ message:'Use /api/videos/
 app.post('/api/post-video', (req,res)=>res.json({ message:'Use /api/posts' }));
 
 // SPA fallback
-app.get('*', (req, res) => { res.sendFile(path.join(__dirname, 'dist/index.html')); });
+app.get('*', (req, res) => { 
+  res.sendFile(path.join(__dirname, 'dist/index.html')); 
+});
 
 // Start server
 app.listen(PORT, () => {
@@ -308,6 +344,15 @@ app.listen(PORT, () => {
   console.log(`🚀 Server on :${PORT}`);
   console.log('🔐 Accounts: demo@contentfactory.com/demo123 | admin@contentfactory.com/admin123');
   console.log('👑 Admin APIs enabled: /api/admin/* (requires admin token)');
+  console.log('📱 Social Accounts: /api/social-accounts/* (UploadPost integration)');
+  
+  // Check if UploadPost API key is configured
+  if (process.env.UPLOADPOST_KEY) {
+    console.log('✅ UploadPost API key configured');
+  } else {
+    console.log('⚠️  UploadPost API key not found in environment variables');
+    console.log('   Set UPLOADPOST_KEY in your .env file to enable social media publishing');
+  }
 });
 
 export default app;
