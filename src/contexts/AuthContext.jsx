@@ -2,8 +2,8 @@ import React, { createContext, useContext, useReducer, useEffect } from 'react';
 
 const AuthContext = createContext();
 
-// API Base URL - automatically detects development vs production
-const API_BASE_URL = import.meta.env.PROD ? '' : '';
+// API Base URL - in development use proxy, in production use relative URLs
+const API_BASE_URL = import.meta.env.DEV ? '' : '';
 
 const initialState = {
   user: null,
@@ -65,6 +65,8 @@ export const AuthProvider = ({ children }) => {
 
   const verifyToken = async (token) => {
     try {
+      console.log('Verifying token with URL:', `${API_BASE_URL}/api/auth/verify`);
+      
       const response = await fetch(`${API_BASE_URL}/api/auth/verify`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -98,6 +100,9 @@ export const AuthProvider = ({ children }) => {
     try {
       dispatch({ type: 'LOADING', payload: true });
       
+      console.log('Attempting login with URL:', `${API_BASE_URL}/api/auth/login`);
+      console.log('Login data:', { email, password: '***' });
+      
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
@@ -106,7 +111,10 @@ export const AuthProvider = ({ children }) => {
         body: JSON.stringify({ email, password })
       });
 
+      console.log('Login response status:', response.status);
+      
       const data = await response.json();
+      console.log('Login response data:', data);
 
       if (response.ok && data.success) {
         localStorage.setItem('auth_token', data.token);
@@ -133,6 +141,8 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     try {
       dispatch({ type: 'LOADING', payload: true });
+      
+      console.log('Attempting registration with URL:', `${API_BASE_URL}/api/auth/register`);
       
       const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: 'POST',
