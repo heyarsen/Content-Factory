@@ -21,7 +21,7 @@ const users = new Map();
 const sessions = new Map();
 const workspaces = new Map();
 const videos = new Map();
-const socialAccounts = new Map();
+const socialAccounts = new Map(); // userId -> array of social accounts
 
 class UploadPostAPI {
   constructor() {
@@ -53,11 +53,23 @@ class UploadPostAPI {
     return data.jwt || data.token;
   }
   async getAccounts(userId){
+    // Only get accounts for the specific user
     const res = await fetch(`${this.baseURL}/uploadposts/users?user_id=${encodeURIComponent(userId)}`, { headers: this.authHeaders(false) });
     if (!res.ok) return [];
     const data = await res.json();
     const list = data?.profiles || data?.users || [];
-    return list.map(p=>({ id: p.profile_id||p.id, platform: (p.platform||'').toLowerCase(), username: p.username||p.handle, displayName: p.display_name||p.name, isConnected: p.is_active!==false, profileImage: p.profile_image||p.avatar_url, connectedAt: p.connected_at||p.created_at }));
+    const userProfile = list.find(p => p.user_id === userId);
+    if (!userProfile) return [];
+    
+    return userProfile.social_accounts ? Object.entries(userProfile.social_accounts).map(([platform, accountData]) => ({
+      id: `${userId}_${platform}`,
+      platform: platform.toLowerCase(),
+      username: accountData.username || accountData.handle,
+      displayName: accountData.display_name || accountData.name,
+      isConnected: accountData.is_active !== false,
+      profileImage: accountData.profile_image || accountData.avatar_url,
+      connectedAt: accountData.connected_at || accountData.created_at
+    })) : [];
   }
 }
 
@@ -128,12 +140,15 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Debug middleware
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
-  if (req.path.includes('/api/auth/')) {
-    console.log('Auth request:', {
+  if (req.path.includes('/api/auth/') || req.path.includes('/api/social-accounts')) {
+    console.log('API request:', {
       method: req.method,
       path: req.path,
-      headers: req.headers,
-      body: req.body
+      headers: {
+        authorization: req.headers.authorization ? 'Bearer ***' : undefined,
+        'content-type': req.headers['content-type']
+      },
+      body: req.method !== 'GET' ? req.body : undefined
     });
   }
   next();
@@ -188,7 +203,7 @@ const authenticateToken = (req, res, next) => {
   }
 };
 
-// Seed demo users
+// Seed demo users with social accounts
 const createDemoUsers = async () => {
   try {
     const hashedPassword = await hashPassword('demo123');
@@ -215,11 +230,35 @@ const createDemoUsers = async () => {
       createdAt: new Date().toISOString()
     };
     
+    // Create demo social accounts for this user only
+    const demoSocialAccounts = [
+      {
+        id: 'account_1',
+        platform: 'instagram',
+        username: 'demo_instagram',
+        displayName: 'Demo Instagram',
+        isConnected: true,
+        profileImage: 'https://via.placeholder.com/40/E4405F/FFFFFF?text=IG',
+        connectedAt: new Date().toISOString()
+      },
+      {
+        id: 'account_2',
+        platform: 'tiktok',
+        username: 'demo_tiktok',
+        displayName: 'Demo TikTok',
+        isConnected: true,
+        profileImage: 'https://via.placeholder.com/40/000000/FFFFFF?text=TT',
+        connectedAt: new Date().toISOString()
+      }
+    ];
+    
     users.set(demoUser.email, demoUser);
     workspaces.set(demoWorkspace.id, demoWorkspace);
+    socialAccounts.set(demoUser.id, demoSocialAccounts);
     
     console.log('✅ Demo user created:', demoUser.email);
     console.log('✅ Demo workspace created:', demoWorkspace.name);
+    console.log('✅ Demo social accounts created:', demoSocialAccounts.length);
   } catch (error) {
     console.error('❌ Error creating demo users:', error);
   }
@@ -272,6 +311,7 @@ app.post('/api/auth/register', async (req, res) => {
     
     users.set(email, user);
     workspaces.set(workspaceId, workspace);
+    socialAccounts.set(userId, []); // Initialize empty social accounts
     
     const token = generateToken(userId, workspaceId);
     
@@ -365,21 +405,61 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ success: true, message: 'Logged out successfully' });
 });
 
-// Social accounts routes
+// Social accounts routes - FIXED to show only current user's accounts
 app.get('/api/social-accounts', authenticateToken, async (req, res) => {
   try {
+    console.log('Getting social accounts for user:', req.user.id);
+    
     let accounts = socialAccounts.get(req.user.id) || [];
+    console.log('Found accounts for user:', accounts.length);
+    
+    // If using real UploadPost API and have the key
     if (process.env.UPLOADPOST_KEY) {
       try {
-        accounts = await uploadPost.getAccounts(req.user.id);
+        const uploadPostAccounts = await uploadPost.getAccounts(req.user.id);
+        console.log('UploadPost accounts:', uploadPostAccounts.length);
+        accounts = uploadPostAccounts;
         socialAccounts.set(req.user.id, accounts);
       } catch (error) {
         console.error('UploadPost API error:', error);
       }
     }
+    
     res.json({ success: true, accounts });
   } catch (error) {
-    console.error('Social accounts error:', error);
+    console.error('❌ Social accounts error:', error);
+    res.status(500).json({ error: 'Failed to fetch social accounts' });
+  }
+});
+
+// Workspace-specific social accounts
+app.get('/api/social-accounts/workspace/:workspaceId', authenticateToken, async (req, res) => {
+  try {
+    const { workspaceId } = req.params;
+    console.log('Getting social accounts for workspace:', workspaceId, 'user:', req.user.id);
+    
+    // Verify user has access to this workspace
+    if (req.workspace.id !== workspaceId) {
+      return res.status(403).json({ error: 'Access denied to workspace' });
+    }
+    
+    let accounts = socialAccounts.get(req.user.id) || [];
+    console.log('Found accounts for user in workspace:', accounts.length);
+    
+    // If using real UploadPost API
+    if (process.env.UPLOADPOST_KEY) {
+      try {
+        const uploadPostAccounts = await uploadPost.getAccounts(req.user.id);
+        accounts = uploadPostAccounts;
+        socialAccounts.set(req.user.id, accounts);
+      } catch (error) {
+        console.error('UploadPost API error:', error);
+      }
+    }
+    
+    res.json({ socialAccounts: accounts });
+  } catch (error) {
+    console.error('❌ Workspace social accounts error:', error);
     res.status(500).json({ error: 'Failed to fetch social accounts' });
   }
 });
@@ -387,6 +467,7 @@ app.get('/api/social-accounts', authenticateToken, async (req, res) => {
 app.post('/api/social-accounts/connect', authenticateToken, async (req, res) => {
   try {
     const FE = process.env.FRONTEND_URL || 'http://localhost:5173';
+    
     if (process.env.UPLOADPOST_KEY) {
       await uploadPost.ensureUser({
         id: req.user.id,
@@ -394,22 +475,42 @@ app.post('/api/social-accounts/connect', authenticateToken, async (req, res) => 
         firstName: req.user.firstName,
         lastName: req.user.lastName
       });
-      const jwt = await uploadPost.generateJWT(req.user.id);
-      const connectUrl = `https://uploadpost.io/connect?jwt=${encodeURIComponent(jwt)}&redirect_uri=${encodeURIComponent(FE + '/?connected=success')}`;
-      return res.json({ success: true, auth_url: connectUrl });
+      const jwtToken = await uploadPost.generateJWT(req.user.id);
+      const connectUrl = `https://uploadpost.io/connect?jwt=${encodeURIComponent(jwtToken)}&redirect_uri=${encodeURIComponent(FE + '/?connected=success')}`;
+      return res.json({ success: true, auth_url: connectUrl, connectionUrl: connectUrl });
     }
+    
     // Demo fallback
-    return res.json({ success: true, auth_url: FE + '/demo/social-connect.html', demo: true });
+    return res.json({ 
+      success: true, 
+      connectionUrl: FE + '/demo/social-connect.html', 
+      demo: true 
+    });
   } catch (error) {
-    console.error('Social connect error:', error);
+    console.error('❌ Social connect error:', error);
     return res.status(502).json({ success: false, error: `Upload-Post error: ${error.message}` });
   }
+});
+
+// Available platforms
+app.get('/api/social-accounts/platforms', (req, res) => {
+  const platforms = [
+    { id: 'instagram', name: 'Instagram', description: 'Share photos and stories', color: '#E4405F' },
+    { id: 'tiktok', name: 'TikTok', description: 'Upload short videos', color: '#000000' },
+    { id: 'youtube', name: 'YouTube', description: 'Upload and manage videos', color: '#FF0000' },
+    { id: 'facebook', name: 'Facebook', description: 'Post updates and media', color: '#1877F2' },
+    { id: 'x', name: 'X (Twitter)', description: 'Post tweets and media', color: '#1DA1F2' },
+    { id: 'linkedin', name: 'LinkedIn', description: 'Professional networking', color: '#0A66C2' },
+    { id: 'threads', name: 'Threads', description: 'Text-based conversations', color: '#000000' }
+  ];
+  
+  res.json({ platforms });
 });
 
 // Demo social connect page
 app.get('/demo/social-connect.html', (req, res) => {
   res.setHeader('Content-Type', 'text/html');
-  res.end(`<!doctype html><meta charset="utf-8"><title>Demo Connect</title><style>body{font-family:system-ui;padding:24px;text-align:center;background:#f9fafb;color:#111827} .container{max-width:400px;margin:0 auto;background:white;padding:32px;border-radius:16px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1)} .spinner{width:40px;height:40px;border:4px solid #e5e7eb;border-top:4px solid #6366f1;border-radius:50%;animation:spin 1s linear infinite;margin:16px auto} h2{color:#1f2937;margin-bottom:16px} @keyframes spin{to{transform:rotate(360deg)}}</style><div class="container"><h2>Connecting demo accounts…</h2><div class="spinner"></div><p>This is a demo environment. In production, you would connect to real social media accounts.</p></div><script>setTimeout(()=>{ try{ window.opener && window.opener.postMessage({ type:'demo_connect_success' },'*'); }catch(e){} window.close(); }, 2000);</script>`);
+  res.end(`<!doctype html><meta charset="utf-8"><title>Demo Connect</title><style>body{font-family:system-ui;padding:24px;text-align:center;background:#f9fafb;color:#111827} .container{max-width:400px;margin:0 auto;background:white;padding:32px;border-radius:16px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1)} .spinner{width:40px;height:40px;border:4px solid #e5e7eb;border-top:4px solid #6366f1;border-radius:50%;animation:spin 1s linear infinite;margin:16px auto} h2{color:#1f2937;margin-bottom:16px} @keyframes spin{to{transform:rotate(360deg)}}</style><div class="container"><h2>Connecting demo accounts…</h2><div class="spinner"></div><p>This is a demo environment. Your accounts are being connected.</p></div><script>setTimeout(()=>{ try{ window.opener && window.opener.postMessage({ type:'demo_connect_success' },'*'); }catch(e){} window.close(); }, 2000);</script>`);
 });
 
 // Basic API routes for demo
@@ -437,7 +538,8 @@ app.get('/api/health', (req, res) => {
     status: 'ok', 
     timestamp: new Date().toISOString(),
     users: users.size,
-    workspaces: workspaces.size
+    workspaces: workspaces.size,
+    socialAccounts: socialAccounts.size
   });
 });
 
