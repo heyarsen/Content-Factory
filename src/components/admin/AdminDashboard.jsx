@@ -51,7 +51,11 @@ const AdminDashboard = () => {
       const response = await apiCall(`/api/admin/stats?timeRange=${timeRange}`);
       if (response.ok) {
         const data = await response.json();
-        setAdminStats(data.stats);
+        if (data.success) {
+          setAdminStats(data.stats);
+        }
+      } else {
+        console.error('Failed to load admin stats:', response.status);
       }
     } catch (error) {
       console.error('Error loading admin stats:', error);
@@ -63,7 +67,11 @@ const AdminDashboard = () => {
       const response = await apiCall('/api/admin/users');
       if (response.ok) {
         const data = await response.json();
-        setUsers(data.users || []);
+        if (data.success) {
+          setUsers(data.users || []);
+        }
+      } else {
+        console.error('Failed to load users:', response.status);
       }
     } catch (error) {
       console.error('Error loading users:', error);
@@ -75,7 +83,11 @@ const AdminDashboard = () => {
       const response = await apiCall('/api/admin/videos');
       if (response.ok) {
         const data = await response.json();
-        setVideos(data.videos || []);
+        if (data.success) {
+          setVideos(data.videos || []);
+        }
+      } else {
+        console.error('Failed to load videos:', response.status);
       }
     } catch (error) {
       console.error('Error loading videos:', error);
@@ -90,15 +102,19 @@ const AdminDashboard = () => {
       });
       
       if (response.ok) {
-        setUsers(prev => prev.map(u => 
-          u.id === userId ? { ...u, status } : u
-        ));
-        showNotification(`User ${status.toLowerCase()} successfully`, 'success');
+        const data = await response.json();
+        if (data.success) {
+          setUsers(prev => prev.map(u => 
+            u.id === userId ? { ...u, status } : u
+          ));
+          showNotification(`User ${status.toLowerCase()} successfully`, 'success');
+        }
       } else {
         const data = await response.json();
         showNotification(data.error || 'Failed to update user status', 'error');
       }
     } catch (error) {
+      console.error('Error updating user status:', error);
       showNotification('Error updating user status', 'error');
     }
   };
@@ -114,24 +130,28 @@ const AdminDashboard = () => {
       });
       
       if (response.ok) {
-        setUsers(prev => prev.filter(u => u.id !== userId));
-        showNotification('User deleted successfully', 'success');
+        const data = await response.json();
+        if (data.success) {
+          setUsers(prev => prev.filter(u => u.id !== userId));
+          showNotification('User deleted successfully', 'success');
+        }
       } else {
         const data = await response.json();
         showNotification(data.error || 'Failed to delete user', 'error');
       }
     } catch (error) {
+      console.error('Error deleting user:', error);
       showNotification('Error deleting user', 'error');
     }
   };
 
   const filteredUsers = users.filter(user => {
-    const matchesSearch = user.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         user.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         user.username.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = user.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         user.lastName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         user.username?.toLowerCase().includes(searchQuery.toLowerCase());
     
-    const matchesFilter = filterStatus === 'all' || user.status.toLowerCase() === filterStatus.toLowerCase();
+    const matchesFilter = filterStatus === 'all' || user.status?.toLowerCase() === filterStatus.toLowerCase();
     
     return matchesSearch && matchesFilter;
   });
@@ -335,7 +355,7 @@ const AdminDashboard = () => {
                       <TrendingUp className="w-5 h-5 text-green-500" />
                     </div>
                     <div className="flex items-baseline space-x-2">
-                      <span className="text-3xl font-bold text-gray-900">{adminStats?.totalSessions || '1.2K'}</span>
+                      <span className="text-3xl font-bold text-gray-900">{adminStats?.totalSessions || '0'}</span>
                       <span className="text-sm font-medium text-green-600">+12%</span>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">Avg session: {adminStats?.avgSessionTime || '15min'}</p>
@@ -396,9 +416,9 @@ const AdminDashboard = () => {
                   </div>
                 </div>
 
-                {/* Recent Activity */}
+                {/* Recent Users */}
                 <div className="bg-white rounded-lg border border-gray-200 p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Users</h3>
                   <div className="space-y-4">
                     {users.slice(0, 5).map(user => (
                       <div key={user.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
@@ -532,12 +552,14 @@ const AdminDashboard = () => {
                                       Activate
                                     </button>
                                   )}
-                                  <button
-                                    onClick={() => deleteUser(user.id)}
-                                    className="text-red-600 hover:text-red-800 text-sm font-medium ml-2"
-                                  >
-                                    Delete
-                                  </button>
+                                  {user.role !== 'ADMIN' && (
+                                    <button
+                                      onClick={() => deleteUser(user.id)}
+                                      className="text-red-600 hover:text-red-800 text-sm font-medium ml-2"
+                                    >
+                                      Delete
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -648,8 +670,28 @@ const AdminDashboard = () => {
                       <Database className="w-5 h-5 text-blue-500" />
                     </div>
                     <p className="text-2xl font-bold text-gray-900">45%</p>
-                    <p className="text-xs text-gray-500 mt-1">2.1GB of 4.6GB used</p>
+                    <p className="text-xs text-gray-500 mt-1">Memory usage</p>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Settings Tab */}
+            {activeTab === 'settings' && (
+              <div className="space-y-6">
+                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Admin Settings</h3>
+                  <p className="text-gray-600">Admin configuration options will be available here.</p>
+                </div>
+              </div>
+            )}
+
+            {/* Analytics Tab */}
+            {activeTab === 'analytics' && (
+              <div className="space-y-6">
+                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Platform Analytics</h3>
+                  <p className="text-gray-600">Detailed analytics and reports will be available here.</p>
                 </div>
               </div>
             )}
