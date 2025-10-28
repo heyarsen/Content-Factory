@@ -12,30 +12,49 @@ import {
   FaSync,
   FaExternalLinkAlt,
   FaCheck,
-  FaTimes
+  FaTimes,
+  FaExclamationTriangle
 } from 'react-icons/fa';
+import { useAuth } from '../../contexts/AuthContext';
 
 const platformIcons = {
   INSTAGRAM: FaInstagram,
+  instagram: FaInstagram,
   TIKTOK: FaTiktok,
+  tiktok: FaTiktok,
   YOUTUBE: FaYoutube,
+  youtube: FaYoutube,
   FACEBOOK: FaFacebook,
+  facebook: FaFacebook,
   TWITTER: FaTwitter,
+  twitter: FaTwitter,
+  x: FaTwitter,
   LINKEDIN: FaLinkedin,
-  THREADS: FaTwitter // Using Twitter icon as placeholder for Threads
+  linkedin: FaLinkedin,
+  THREADS: FaTwitter,
+  threads: FaTwitter
 };
 
 const platformColors = {
   INSTAGRAM: '#E4405F',
+  instagram: '#E4405F',
   TIKTOK: '#000000',
+  tiktok: '#000000',
   YOUTUBE: '#FF0000',
+  youtube: '#FF0000',
   FACEBOOK: '#1877F2',
+  facebook: '#1877F2',
   TWITTER: '#1DA1F2',
+  twitter: '#1DA1F2',
+  x: '#1DA1F2',
   LINKEDIN: '#0A66C2',
-  THREADS: '#000000'
+  linkedin: '#0A66C2',
+  THREADS: '#000000',
+  threads: '#000000'
 };
 
 const SocialAccountsManager = ({ workspaceId, onAccountsUpdate }) => {
+  const { apiCall } = useAuth();
   const [socialAccounts, setSocialAccounts] = useState([]);
   const [platforms, setPlatforms] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,18 +74,20 @@ const SocialAccountsManager = ({ workspaceId, onAccountsUpdate }) => {
 
   const fetchSocialAccounts = async () => {
     try {
-      const response = await fetch(`/api/social-accounts/workspace/${workspaceId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      setError(null);
+      console.log('Fetching social accounts for workspace:', workspaceId);
+      
+      const response = await apiCall(`/api/social-accounts/workspace/${workspaceId}`);
 
       if (response.ok) {
         const data = await response.json();
-        setSocialAccounts(data.socialAccounts);
-        onAccountsUpdate?.(data.socialAccounts);
+        console.log('Social accounts response:', data);
+        setSocialAccounts(data.socialAccounts || []);
+        onAccountsUpdate?.(data.socialAccounts || []);
       } else {
-        setError('Failed to fetch social accounts');
+        const errorData = await response.json();
+        console.error('Failed to fetch social accounts:', errorData);
+        setError(errorData.error || 'Failed to fetch social accounts');
       }
     } catch (error) {
       console.error('Error fetching social accounts:', error);
@@ -78,7 +99,7 @@ const SocialAccountsManager = ({ workspaceId, onAccountsUpdate }) => {
 
   const fetchPlatforms = async () => {
     try {
-      const response = await fetch('/api/social-accounts/platforms');
+      const response = await apiCall('/api/social-accounts/platforms');
       if (response.ok) {
         const data = await response.json();
         setPlatforms(data.platforms);
@@ -98,12 +119,8 @@ const SocialAccountsManager = ({ workspaceId, onAccountsUpdate }) => {
     setError(null);
 
     try {
-      const response = await fetch('/api/social-accounts/connect', {
+      const response = await apiCall('/api/social-accounts/connect', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
         body: JSON.stringify({
           workspaceId,
           platforms: selectedPlatforms,
@@ -116,7 +133,8 @@ const SocialAccountsManager = ({ workspaceId, onAccountsUpdate }) => {
         const data = await response.json();
         setConnectionUrl(data.connectionUrl);
         // Open connection URL in new tab
-        window.open(data.connectionUrl, '_blank');
+        window.open(data.connectionUrl, '_blank', 'width=600,height=700');
+        setShowConnectModal(false);
       } else {
         const errorData = await response.json();
         setError(errorData.error || 'Failed to generate connection URL');
@@ -134,22 +152,8 @@ const SocialAccountsManager = ({ workspaceId, onAccountsUpdate }) => {
     setError(null);
 
     try {
-      const response = await fetch(`/api/social-accounts/sync/${workspaceId}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        await fetchSocialAccounts(); // Refresh the list
-        // Show success message
-        setError(null);
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || 'Failed to sync accounts');
-      }
+      // For demo, just refresh the accounts
+      await fetchSocialAccounts();
     } catch (error) {
       console.error('Error syncing accounts:', error);
       setError('Failed to sync social accounts');
@@ -164,11 +168,8 @@ const SocialAccountsManager = ({ workspaceId, onAccountsUpdate }) => {
     }
 
     try {
-      const response = await fetch(`/api/social-accounts/${accountId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+      const response = await apiCall(`/api/social-accounts/${accountId}`, {
+        method: 'DELETE'
       });
 
       if (response.ok) {
@@ -200,45 +201,67 @@ const SocialAccountsManager = ({ workspaceId, onAccountsUpdate }) => {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Social Media Accounts
-          </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Connect your social media accounts to publish content automatically
-          </p>
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-600 rounded-xl flex items-center justify-center">
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Connected Accounts
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Manage your social media connections
+            </p>
+          </div>
         </div>
         <div className="flex space-x-2">
           <button
             onClick={handleSyncAccounts}
             disabled={isSyncing}
-            className="px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 flex items-center space-x-1"
+            className="px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 flex items-center space-x-2 transition-colors"
           >
             <FaSync className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span>Sync</span>
+            <span>Refresh</span>
           </button>
           <button
             onClick={() => setShowConnectModal(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center space-x-2"
+            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl hover:from-purple-700 hover:to-blue-700 flex items-center space-x-2 transition-all"
           >
             <FaPlus className="w-4 h-4" />
-            <span>Connect Accounts</span>
+            <span>Connect Account</span>
           </button>
         </div>
       </div>
 
+      {/* Upload-Post API Key Warning */}
+      {!process.env.UPLOADPOST_KEY && (
+        <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-xl flex items-start space-x-3">
+          <FaExclamationTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-medium text-amber-800 dark:text-amber-200">Demo Mode</p>
+            <p className="text-amber-700 dark:text-amber-300">
+              Upload-Post API key not configured. Showing demo social accounts. Add your UPLOADPOST_KEY to .env to connect real accounts.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Error Message */}
       {error && (
-        <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 rounded-lg">
+        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-400 rounded-xl">
           {error}
         </div>
       )}
 
-      {/* Connected Accounts */}
-      <div className="space-y-3">
+      {/* Connected Platforms */}
+      <div>
+        <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">Connected Platforms</h4>
+        
         {socialAccounts.length === 0 ? (
           <div className="text-center py-12">
             <div className="text-gray-400 mb-4">
@@ -252,67 +275,70 @@ const SocialAccountsManager = ({ workspaceId, onAccountsUpdate }) => {
             </p>
             <button
               onClick={() => setShowConnectModal(true)}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="px-6 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl hover:from-purple-700 hover:to-blue-700 transition-all"
             >
               Connect Your First Account
             </button>
           </div>
         ) : (
-          socialAccounts.map((account) => {
-            const Icon = platformIcons[account.platform];
-            const color = platformColors[account.platform];
-            
-            return (
-              <motion.div
-                key={account.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg"
-              >
-                <div className="flex items-center space-x-4">
-                  <div className="flex-shrink-0">
-                    <Icon className="w-8 h-8" style={{ color }} />
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-gray-900 dark:text-white">
-                      {account.platform.charAt(0) + account.platform.slice(1).toLowerCase()}
-                    </h4>
-                    <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
-                      <span>{account.displayName || account.username}</span>
-                      {account.isConnected ? (
-                        <div className="flex items-center space-x-1 text-green-600 dark:text-green-400">
-                          <FaCheck className="w-3 h-3" />
-                          <span>Connected</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center space-x-1 text-red-600 dark:text-red-400">
-                          <FaTimes className="w-3 h-3" />
-                          <span>Disconnected</span>
-                        </div>
-                      )}
+          <div className="space-y-3">
+            {socialAccounts.map((account) => {
+              const platform = account.platform.toLowerCase();
+              const Icon = platformIcons[platform] || FaExternalLinkAlt;
+              const color = platformColors[platform] || '#6B7280';
+              
+              return (
+                <motion.div
+                  key={account.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-700/50"
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${color}15` }}>
+                      <Icon className="w-6 h-6" style={{ color }} />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-900 dark:text-white capitalize">
+                        {platform}
+                      </h4>
+                      <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+                        <span>{account.displayName || account.username || 'Connected Account'}</span>
+                        {account.isConnected !== false ? (
+                          <div className="flex items-center space-x-1 text-green-600 dark:text-green-400">
+                            <FaCheck className="w-3 h-3" />
+                            <span>Connected</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center space-x-1 text-gray-500 dark:text-gray-400">
+                            <span>Invalid Date</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  {account.profileImage && (
-                    <img
-                      src={account.profileImage}
-                      alt={account.displayName}
-                      className="w-8 h-8 rounded-full"
-                    />
-                  )}
-                  <button
-                    onClick={() => handleDisconnectAccount(account.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
-                    title="Disconnect account"
-                  >
-                    <FaTrash className="w-4 h-4" />
-                  </button>
-                </div>
-              </motion.div>
-            );
-          })
+                  
+                  <div className="flex items-center space-x-2">
+                    {account.profileImage && (
+                      <img
+                        src={account.profileImage}
+                        alt={account.displayName || account.username}
+                        className="w-8 h-8 rounded-full"
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                    )}
+                    <button
+                      onClick={() => handleDisconnectAccount(account.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                      title="Disconnect account"
+                    >
+                      <FaTrash className="w-4 h-4" />
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
         )}
       </div>
 
@@ -330,7 +356,7 @@ const SocialAccountsManager = ({ workspaceId, onAccountsUpdate }) => {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4"
+              className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-md w-full mx-4"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="p-6">
@@ -343,21 +369,21 @@ const SocialAccountsManager = ({ workspaceId, onAccountsUpdate }) => {
 
                 <div className="space-y-3 mb-6">
                   {platforms.map((platform) => {
-                    const Icon = platformIcons[platform.id.toUpperCase()];
+                    const Icon = platformIcons[platform.id.toLowerCase()];
                     const isSelected = selectedPlatforms.includes(platform.id);
                     
                     return (
                       <div
                         key={platform.id}
                         onClick={() => togglePlatformSelection(platform.id)}
-                        className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${
+                        className={`flex items-center p-3 border rounded-xl cursor-pointer transition-colors ${
                           isSelected
-                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                            ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/30'
                             : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
                         }`}
                       >
                         <div className="flex-shrink-0 mr-3">
-                          <Icon className="w-6 h-6" style={{ color: platform.color }} />
+                          {Icon ? <Icon className="w-6 h-6" style={{ color: platform.color }} /> : <FaExternalLinkAlt className="w-6 h-6" />}
                         </div>
                         <div className="flex-1">
                           <h4 className="font-medium text-gray-900 dark:text-white">
@@ -370,7 +396,7 @@ const SocialAccountsManager = ({ workspaceId, onAccountsUpdate }) => {
                         <div className="flex-shrink-0">
                           <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                             isSelected
-                              ? 'border-blue-500 bg-blue-500'
+                              ? 'border-purple-500 bg-purple-500'
                               : 'border-gray-300 dark:border-gray-600'
                           }`}>
                             {isSelected && <FaCheck className="w-3 h-3 text-white" />}
@@ -384,14 +410,14 @@ const SocialAccountsManager = ({ workspaceId, onAccountsUpdate }) => {
                 <div className="flex space-x-3">
                   <button
                     onClick={() => setShowConnectModal(false)}
-                    className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                    className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleConnectAccounts}
                     disabled={isConnecting || selectedPlatforms.length === 0}
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                    className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl hover:from-purple-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 transition-all"
                   >
                     {isConnecting ? (
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
