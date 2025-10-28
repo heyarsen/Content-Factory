@@ -14,7 +14,7 @@ app.use(express.json());
 // Serve static files from dist
 app.use(express.static(path.join(__dirname, 'dist')));
 
-const UPLOADPOST_API = 'https://api.upload-post.com/api/uploadposts';
+const UPLOADPOST_API = 'https://api.upload-post.com/api';
 const HEYGEN_API = 'https://api.heygen.com/v1';
 
 // Use Railway environment variables
@@ -35,8 +35,8 @@ app.post('/api/connect-accounts', async (req, res) => {
       return res.status(500).json({ success: false, error: 'UploadPost API key not configured' });
     }
 
-    // 1. Create or get user
-    const userRes = await fetch(`${UPLOADPOST_API}/users`, {
+    // 1. Create or get user profile
+    const userRes = await fetch(`${UPLOADPOST_API}/uploadposts/users`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -45,15 +45,32 @@ app.post('/api/connect-accounts', async (req, res) => {
       body: JSON.stringify({ username })
     });
     
-    if (!userRes.ok) {
+    let userData;
+    if (userRes.status === 409) {
+      // User already exists, get the existing profile
+      const getRes = await fetch(`${UPLOADPOST_API}/uploadposts/users/${username}`, {
+        headers: {
+          Authorization: `ApiKey ${UPLOADPOST_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (getRes.ok) {
+        const existingData = await getRes.json();
+        userData = { username: existingData.profile.username };
+      } else {
+        throw new Error('User exists but could not retrieve profile');
+      }
+    } else if (!userRes.ok) {
       const errorText = await userRes.text();
       throw new Error(`UploadPost API error: ${userRes.status} - ${errorText}`);
+    } else {
+      const createData = await userRes.json();
+      userData = { username: createData.profile.username };
     }
-    
-    const userData = await userRes.json();
 
     // 2. Generate JWT URL
-    const jwtRes = await fetch(`${UPLOADPOST_API}/users/generate-jwt`, {
+    const jwtRes = await fetch(`${UPLOADPOST_API}/uploadposts/users/generate-jwt`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -63,8 +80,8 @@ app.post('/api/connect-accounts', async (req, res) => {
         username: userData.username,
         redirect_url: FRONTEND_URL,
         logo_image: `${FRONTEND_URL}/logo.png`,
-        redirect_button_text: 'Return to App',
-        platforms: ['instagram', 'tiktok', 'youtube', 'facebook']
+        redirect_button_text: 'Return to Content Factory',
+        platforms: ['instagram', 'tiktok', 'youtube', 'facebook', 'x', 'threads']
       })
     });
     
@@ -77,7 +94,7 @@ app.post('/api/connect-accounts', async (req, res) => {
 
     res.json({ 
       success: true, 
-      access_url: jwtData.data.access_url, 
+      access_url: jwtData.access_url, 
       username: userData.username 
     });
   } catch (err) {
@@ -86,7 +103,7 @@ app.post('/api/connect-accounts', async (req, res) => {
   }
 });
 
-// Get connected accounts
+// Get connected accounts - FIXED ENDPOINT
 app.get('/api/accounts/:username', async (req, res) => {
   try {
     const username = req.params.username;
@@ -95,7 +112,8 @@ app.get('/api/accounts/:username', async (req, res) => {
       return res.status(500).json({ success: false, error: 'UploadPost API key not configured' });
     }
 
-    const response = await fetch(`${UPLOADPOST_API}/users/${username}/socials`, {
+    // Get specific user profile with social accounts
+    const response = await fetch(`${UPLOADPOST_API}/uploadposts/users/${username}`, {
       headers: {
         Authorization: `ApiKey ${UPLOADPOST_KEY}`,
         'Content-Type': 'application/json'
@@ -103,12 +121,36 @@ app.get('/api/accounts/:username', async (req, res) => {
     });
     
     if (!response.ok) {
+      if (response.status === 404) {
+        return res.json({ success: true, data: { accounts: [] } });
+      }
       const errorText = await response.text();
       throw new Error(`Get accounts error: ${response.status} - ${errorText}`);
     }
     
     const data = await response.json();
-    res.json(data);
+    
+    // Transform the social_accounts object into an array format
+    const accounts = [];
+    if (data.profile && data.profile.social_accounts) {
+      Object.entries(data.profile.social_accounts).forEach(([platform, accountData]) => {
+        if (accountData && typeof accountData === 'object' && accountData.display_name) {
+          accounts.push({
+            platform: platform,
+            name: accountData.display_name,
+            username: accountData.username || accountData.display_name,
+            connected_at: data.profile.created_at,
+            social_images: accountData.social_images
+          });
+        }
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      data: { accounts },
+      profile: data.profile 
+    });
   } catch (err) {
     console.error('Get accounts error:', err);
     res.status(500).json({ success: false, error: err.message });
@@ -190,7 +232,7 @@ app.get('/api/video-status/:id', async (req, res) => {
   }
 });
 
-// Post video to social media
+// Post video to social media using UploadPost video upload API
 app.post('/api/post-video', async (req, res) => {
   try {
     const { username, video_url, caption, platforms } = req.body;
@@ -203,42 +245,59 @@ app.post('/api/post-video', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Video URL is required' });
     }
 
-    // Post to each platform
-    const results = [];
+    // Use UploadPost video upload API
+    const postRes = await fetch(`${UPLOADPOST_API}/upload_videos`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `ApiKey ${UPLOADPOST_KEY}`
+      },
+      body: JSON.stringify({
+        profile: username,
+        platforms: platforms,
+        video_url: video_url,
+        title: caption || 'Check out this AI-generated video!',
+        description: caption || 'Created with Content Factory - AI-powered video generation',
+        async_upload: false // Synchronous upload for immediate feedback
+      })
+    });
     
-    for (const platform of platforms) {
-      try {
-        const postRes = await fetch(`${UPLOADPOST_API}/posts`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `ApiKey ${UPLOADPOST_KEY}`
-          },
-          body: JSON.stringify({
-            username: username,
-            platform: platform,
-            post_type: 'video',
-            media_urls: [video_url],
-            caption: caption || 'Check out this AI-generated video!',
-            schedule_time: null // Post immediately
-          })
-        });
-        
-        if (postRes.ok) {
-          const postData = await postRes.json();
-          results.push({ platform, success: true, post_id: postData.id });
-        } else {
-          const errorText = await postRes.text();
-          results.push({ platform, success: false, error: errorText });
-        }
-      } catch (platformError) {
-        results.push({ platform, success: false, error: platformError.message });
-      }
+    if (!postRes.ok) {
+      const errorText = await postRes.text();
+      throw new Error(`Upload error: ${postRes.status} - ${errorText}`);
     }
     
-    res.json({ success: true, results });
+    const data = await postRes.json();
+    res.json({ success: true, results: data });
   } catch (err) {
     console.error('Post video error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get all user profiles (for debugging)
+app.get('/api/profiles', async (req, res) => {
+  try {
+    if (!UPLOADPOST_KEY) {
+      return res.status(500).json({ success: false, error: 'UploadPost API key not configured' });
+    }
+
+    const response = await fetch(`${UPLOADPOST_API}/uploadposts/users`, {
+      headers: {
+        Authorization: `ApiKey ${UPLOADPOST_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Get profiles error: ${response.status} - ${errorText}`);
+    }
+    
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    console.error('Get profiles error:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
