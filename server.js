@@ -9,8 +9,10 @@ app.use(express.json());
 const UPLOADPOST_API = 'https://api.upload-post.com/api/uploadposts';
 const HEYGEN_API = 'https://api.heygen.com/v1';
 
-const UPLOADPOST_KEY = 'YOUR_UPLOADPOST_API_KEY';
-const HEYGEN_KEY = 'YOUR_HEYGEN_API_KEY';
+// Use Railway environment variables
+const UPLOADPOST_KEY = process.env.UPLOADPOST_KEY;
+const HEYGEN_KEY = process.env.HEYGEN_KEY;
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 // Create / connect UploadPost user
 app.post('/api/connect-accounts', async (req, res) => {
@@ -37,8 +39,8 @@ app.post('/api/connect-accounts', async (req, res) => {
       },
       body: JSON.stringify({
         username: userData.username,
-        redirect_url: 'http://localhost:3000',
-        logo_image: 'https://yourfrontend.com/logo.png',
+        redirect_url: FRONTEND_URL,
+        logo_image: `${FRONTEND_URL}/logo.png`,
         redirect_button_text: 'Return to App',
         platforms: ['instagram', 'tiktok', 'youtube']
       })
@@ -104,4 +106,5 @@ app.get('/api/video-status/:id', async (req, res) => {
   }
 });
 
-app.listen(4000, () => console.log('Server running on port 4000'));
+const PORT = process.env.PORT || 4000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
