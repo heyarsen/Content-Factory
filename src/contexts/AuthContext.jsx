@@ -2,6 +2,9 @@ import React, { createContext, useContext, useReducer, useEffect } from 'react';
 
 const AuthContext = createContext();
 
+// API Base URL - automatically detects development vs production
+const API_BASE_URL = import.meta.env.PROD ? '' : '';
+
 const initialState = {
   user: null,
   token: null,
@@ -62,9 +65,10 @@ export const AuthProvider = ({ children }) => {
 
   const verifyToken = async (token) => {
     try {
-      const response = await fetch('/api/auth/verify', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/verify`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
 
@@ -79,6 +83,7 @@ export const AuthProvider = ({ children }) => {
           }
         });
       } else {
+        console.warn('Token verification failed:', response.status);
         localStorage.removeItem('auth_token');
         dispatch({ type: 'LOADING', payload: false });
       }
@@ -93,7 +98,7 @@ export const AuthProvider = ({ children }) => {
     try {
       dispatch({ type: 'LOADING', payload: true });
       
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -103,7 +108,7 @@ export const AuthProvider = ({ children }) => {
 
       const data = await response.json();
 
-      if (response.ok) {
+      if (response.ok && data.success) {
         localStorage.setItem('auth_token', data.token);
         dispatch({
           type: 'LOGIN_SUCCESS',
@@ -119,8 +124,9 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: data.error || 'Login failed' };
       }
     } catch (error) {
+      console.error('Login error:', error);
       dispatch({ type: 'LOADING', payload: false });
-      return { success: false, error: 'Network error. Please try again.' };
+      return { success: false, error: 'Network error. Please check your connection and try again.' };
     }
   };
 
@@ -128,7 +134,7 @@ export const AuthProvider = ({ children }) => {
     try {
       dispatch({ type: 'LOADING', payload: true });
       
-      const response = await fetch('/api/auth/register', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -138,7 +144,7 @@ export const AuthProvider = ({ children }) => {
 
       const data = await response.json();
 
-      if (response.ok) {
+      if (response.ok && data.success) {
         localStorage.setItem('auth_token', data.token);
         dispatch({
           type: 'LOGIN_SUCCESS',
@@ -154,14 +160,28 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: data.error || 'Registration failed' };
       }
     } catch (error) {
+      console.error('Registration error:', error);
       dispatch({ type: 'LOADING', payload: false });
-      return { success: false, error: 'Network error. Please try again.' };
+      return { success: false, error: 'Network error. Please check your connection and try again.' };
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('auth_token');
-    dispatch({ type: 'LOGOUT' });
+  const logout = async () => {
+    try {
+      // Call logout endpoint to invalidate token on server
+      await fetch(`${API_BASE_URL}/api/auth/logout`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${state.token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      localStorage.removeItem('auth_token');
+      dispatch({ type: 'LOGOUT' });
+    }
   };
 
   const updateUser = (userData) => {
@@ -186,10 +206,14 @@ export const AuthProvider = ({ children }) => {
     };
 
     try {
-      const response = await fetch(url, config);
+      // Handle relative URLs
+      const fullUrl = url.startsWith('/') ? `${API_BASE_URL}${url}` : url;
+      
+      const response = await fetch(fullUrl, config);
       
       if (response.status === 401) {
         // Token expired or invalid
+        console.warn('Authentication expired, logging out');
         logout();
         throw new Error('Authentication expired. Please login again.');
       }
