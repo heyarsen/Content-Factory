@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider } from './contexts/AuthContext';
 import AuthWrapper from './components/auth/AuthWrapper';
+import AdminDashboard from './components/admin/AdminDashboard';
 import { useAuth } from './contexts/AuthContext';
 import { 
   Video, Plus, Instagram, Youtube, Facebook, Loader2, CheckCircle, XCircle, 
@@ -9,7 +10,7 @@ import {
   MessageCircle, AlertCircle, ChevronRight, Play, Download,
   Home, ShoppingBag, User, CreditCard, Package, 
   Star, Search, Edit, MoreHorizontal, Calendar, Maximize2, 
-  Trash2, Filter, CheckSquare, Square, ArrowUpDown, LogOut
+  Trash2, Filter, CheckSquare, Square, ArrowUpDown, LogOut, Crown
 } from 'lucide-react';
 
 const MainApp = () => {
@@ -41,6 +42,11 @@ const MainApp = () => {
       loadUserData();
     }
   }, [user, workspace]);
+
+  // Show admin dashboard if user is admin
+  if (user?.role === 'ADMIN') {
+    return <AdminDashboard />;
+  }
 
   const loadUserData = async () => {
     await Promise.all([
