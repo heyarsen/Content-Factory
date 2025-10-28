@@ -2,107 +2,97 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import proxy from './api/proxy.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 8080;
 
-console.log('🚀 Starting Content Factory Server...');
-console.log('📁 Directory:', __dirname);
-console.log('🔑 API Key configured:', process.env.UPLOADPOST_API_KEY ? 'YES' : 'NO (using fallback)');
+// Railway provides PORT, but fallback to common ports
+const PORT = process.env.PORT || process.env.port || 8080;
 
-app.use(express.json());
+console.log('=================================');
+console.log('Starting Video Generator Server');
+console.log('=================================');
+console.log('Environment:', process.env.NODE_ENV);
+console.log('PORT from env:', process.env.PORT);
+console.log('Using PORT:', PORT);
+console.log('Directory:', __dirname);
 
-// Mount proxy on /api and /api/proxy for robustness
-console.log('🔗 Mounting API proxy at /api and /api/proxy');
-app.use('/api', proxy);
-app.use('/api/proxy', proxy);
-
+// Check dist folder
 const distPath = path.join(__dirname, 'dist');
-console.log('📦 Dist path:', distPath);
-console.log('📦 Dist exists:', fs.existsSync(distPath));
+console.log('Dist path:', distPath);
+console.log('Dist exists:', fs.existsSync(distPath));
+
+if (fs.existsSync(distPath)) {
+  const files = fs.readdirSync(distPath);
+  console.log('Dist contents:', files);
+} else {
+  console.error('ERROR: dist folder not found!');
+  process.exit(1);
+}
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  console.log('❤️ Health check called');
   res.json({ 
     status: 'healthy', 
-    time: new Date().toISOString(),
-    server: 'Express Node.js',
-    proxy: 'mounted at /api & /api/proxy'
+    port: PORT,
+    timestamp: new Date().toISOString()
   });
 });
 
-// Test proxy endpoint
-app.get('/api/test-proxy', (req, res) => {
-  console.log('🧪 Test proxy endpoint called');
-  res.json({ 
-    message: 'Proxy router is working!',
-    routes: [
-      'GET /api/proxy/uploadpost/users/get/:username',
-      'GET /api/uploadpost/users/get/:username',
-      'POST /api/proxy/uploadpost/users',
-      'POST /api/proxy/uploadpost/users/generate-jwt'
-    ]
-  });
+// API endpoint to test if server is responding
+app.get('/api/test', (req, res) => {
+  res.json({ message: 'Server is working!' });
 });
 
-// Serve static files
-if (fs.existsSync(distPath)) {
-  console.log('✅ Serving static files from dist/');
-  app.use(express.static(distPath, { maxAge: '1d' }));
+// Serve static files from dist
+app.use(express.static(distPath, {
+  maxAge: '1d',
+  etag: true
+}));
+
+// Handle all routes - SPA fallback
+app.get('*', (req, res) => {
+  const indexPath = path.join(distPath, 'index.html');
+  console.log('Request for:', req.path);
   
-  // SPA fallback for everything EXCEPT /api/*
-  app.get(/^((?!^\/api\/).)*$/, (req, res) => {
-    console.log('📄 SPA fallback for:', req.path);
-    res.sendFile(path.join(distPath, 'index.html'));
-  });
-} else {
-  console.log('⚠️ No dist folder found, serving build pending message');
-  app.get(/^((?!^\/api\/).)*$/, (req, res) => {
-    res.send('Build pending... dist folder not found');
-  });
-}
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    console.error('index.html not found at:', indexPath);
+    res.status(404).send('Application not found. Build may have failed.');
+  }
+});
 
-// Error handler
+// Error handling
 app.use((err, req, res, next) => {
-  console.error('❌ Server error:', err);
-  res.status(500).json({ error: 'Internal server error', details: err.message });
+  console.error('Server error:', err);
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 // Start server
 const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log('🎉 Content Factory Server Started Successfully!');
-  console.log(`📍 URL: http://0.0.0.0:${PORT}`);
-  console.log(`❤️ Health: http://0.0.0.0:${PORT}/health`);
-  console.log(`🧪 Test: http://0.0.0.0:${PORT}/api/test-proxy`);
-  console.log(`🔗 Proxy: http://0.0.0.0:${PORT}/api/uploadpost/users/get/test`);
-  console.log('============================================');
+  console.log('=================================');
+  console.log(`✅ Server started successfully!`);
+  console.log(`   Listening on: http://0.0.0.0:${PORT}`);
+  console.log(`   Health check: http://0.0.0.0:${PORT}/health`);
+  console.log('=================================');
 });
 
 server.on('error', (error) => {
-  console.error('❌ Server startup error:', error);
+  console.error('❌ Server failed to start:', error);
   if (error.code === 'EADDRINUSE') {
     console.error(`Port ${PORT} is already in use`);
-    process.exit(1);
   }
+  process.exit(1);
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('⏹️ Shutting down gracefully...');
+  console.log('SIGTERM received, shutting down gracefully');
   server.close(() => {
-    console.log('✅ Server closed');
-    process.exit(0);
-  });
-});
-
-process.on('SIGINT', () => {
-  console.log('⏹️ Received SIGINT, shutting down...');
-  server.close(() => {
+    console.log('Server closed');
     process.exit(0);
   });
 });
