@@ -34,32 +34,60 @@ const LoginForm = ({ onSuccess, onSwitchToRegister }) => {
   };
   
   const handleSubmit = async (e) => {
+    // Prevent form submission and page reload
     e.preventDefault();
+    e.stopPropagation();
     
-    if (!validateForm()) return;
+    console.log('Form submitted, preventing default behavior');
+    
+    if (!validateForm()) {
+      console.log('Form validation failed');
+      return;
+    }
     
     setLoading(true);
     setError('');
     setErrorType('');
     
+    console.log('Attempting login for:', formData.email);
+    
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        headers: { 
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password
+        })
       });
       
+      console.log('Login response status:', response.status);
+      
       const data = await response.json();
+      console.log('Login response data:', { ...data, token: data.token ? '[TOKEN]' : null });
       
       if (data.success) {
+        console.log('Login successful, storing data and calling onSuccess');
+        
         // Store token and user data
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
-        localStorage.setItem('currentWorkspace', JSON.stringify(data.workspace));
-        localStorage.setItem('workspaces', JSON.stringify(data.workspaces));
+        if (data.workspace) {
+          localStorage.setItem('currentWorkspace', JSON.stringify(data.workspace));
+        }
+        if (data.workspaces) {
+          localStorage.setItem('workspaces', JSON.stringify(data.workspaces));
+        }
         
-        onSuccess(data);
+        // Call success callback
+        if (onSuccess) {
+          onSuccess(data);
+        }
       } else {
+        console.log('Login failed:', data.error, 'Type:', data.errorType);
+        
         // Preserve email from response if available
         if (data.email && data.email !== formData.email) {
           setFormData(prev => ({ ...prev, email: data.email }));
@@ -71,14 +99,29 @@ const LoginForm = ({ onSuccess, onSwitchToRegister }) => {
         // Clear password only if it was wrong, not for other errors
         if (data.errorType === 'invalid_password') {
           setFormData(prev => ({ ...prev, password: '' }));
+          // Focus back to password field
+          setTimeout(() => {
+            const passwordField = document.getElementById('password');
+            if (passwordField) {
+              passwordField.focus();
+            }
+          }, 100);
         }
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('Network error during login:', error);
       setError('Network error. Please check your connection and try again.');
+      setErrorType('network_error');
     } finally {
       setLoading(false);
     }
+  };
+  
+  const handleButtonClick = (e) => {
+    // Prevent any default button behavior
+    e.preventDefault();
+    e.stopPropagation();
+    handleSubmit(e);
   };
   
   const getErrorColor = () => {
@@ -110,7 +153,8 @@ const LoginForm = ({ onSuccess, onSwitchToRegister }) => {
           </p>
         </div>
         
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        {/* Form with explicit onSubmit handler */}
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit} noValidate>
           {error && (
             <div className={`bg-red-50 border border-red-200 px-4 py-3 rounded-md flex items-start ${getErrorColor()}`}>
               {getErrorIcon()}
@@ -121,7 +165,10 @@ const LoginForm = ({ onSuccess, onSwitchToRegister }) => {
                     Don't have an account?{' '}
                     <button
                       type="button"
-                      onClick={onSwitchToRegister}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        onSwitchToRegister();
+                      }}
                       className="font-medium text-blue-600 hover:text-blue-500"
                     >
                       Sign up here
@@ -134,7 +181,10 @@ const LoginForm = ({ onSuccess, onSwitchToRegister }) => {
                     <button
                       type="button"
                       className="font-medium text-blue-600 hover:text-blue-500"
-                      onClick={() => alert('Password reset feature coming soon!')}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        alert('Password reset feature coming soon!');
+                      }}
                     >
                       Reset it here
                     </button>
@@ -157,6 +207,15 @@ const LoginForm = ({ onSuccess, onSwitchToRegister }) => {
                 required
                 value={formData.email}
                 onChange={handleInputChange}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const passwordField = document.getElementById('password');
+                    if (passwordField) {
+                      passwordField.focus();
+                    }
+                  }
+                }}
                 className={`mt-1 appearance-none relative block w-full px-3 py-2 border placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm ${
                   errorType === 'email_not_found' 
                     ? 'border-orange-300 bg-orange-50' 
@@ -180,6 +239,12 @@ const LoginForm = ({ onSuccess, onSwitchToRegister }) => {
                   required
                   value={formData.password}
                   onChange={handleInputChange}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSubmit(e);
+                    }
+                  }}
                   className={`appearance-none relative block w-full px-3 py-2 border placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm pr-10 ${
                     errorType === 'invalid_password' 
                       ? 'border-red-300 bg-red-50' 
@@ -191,7 +256,10 @@ const LoginForm = ({ onSuccess, onSwitchToRegister }) => {
                 <button
                   type="button"
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  onClick={() => setShowPassword(!showPassword)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setShowPassword(!showPassword);
+                  }}
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4 text-gray-400" />
@@ -220,7 +288,10 @@ const LoginForm = ({ onSuccess, onSwitchToRegister }) => {
               <button
                 type="button"
                 className="font-medium text-blue-600 hover:text-blue-500"
-                onClick={() => alert('Password reset feature coming soon!')}
+                onClick={(e) => {
+                  e.preventDefault();
+                  alert('Password reset feature coming soon!');
+                }}
               >
                 Forgot your password?
               </button>
@@ -231,6 +302,7 @@ const LoginForm = ({ onSuccess, onSwitchToRegister }) => {
             <button
               type="submit"
               disabled={loading}
+              onClick={handleButtonClick}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
@@ -247,7 +319,10 @@ const LoginForm = ({ onSuccess, onSwitchToRegister }) => {
           <div className="text-center">
             <button
               type="button"
-              onClick={onSwitchToRegister}
+              onClick={(e) => {
+                e.preventDefault();
+                onSwitchToRegister();
+              }}
               className="text-blue-600 hover:text-blue-500 text-sm"
             >
               Don't have an account? Sign up
@@ -263,10 +338,12 @@ const LoginForm = ({ onSuccess, onSwitchToRegister }) => {
                   <p><strong>Email:</strong> {formData.email}</p>
                   <p><strong>Password Length:</strong> {formData.password.length}</p>
                   <p><strong>Error Type:</strong> {errorType || 'None'}</p>
+                  <p><strong>Loading:</strong> {loading ? 'Yes' : 'No'}</p>
                   <button
                     type="button"
                     className="text-blue-600 hover:text-blue-500"
-                    onClick={async () => {
+                    onClick={async (e) => {
+                      e.preventDefault();
                       if (!formData.email) {
                         alert('Enter an email first');
                         return;
@@ -286,6 +363,19 @@ const LoginForm = ({ onSuccess, onSwitchToRegister }) => {
                     }}
                   >
                     Check if user exists
+                  </button>
+                  <br />
+                  <button
+                    type="button"
+                    className="text-green-600 hover:text-green-500"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      console.log('Current form data:', formData);
+                      console.log('Current error:', error, errorType);
+                      console.log('Loading state:', loading);
+                    }}
+                  >
+                    Log current state
                   </button>
                 </div>
               </details>
