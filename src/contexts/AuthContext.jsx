@@ -14,6 +14,9 @@ const getApiBaseUrl = () => {
 
 const API_BASE_URL = getApiBaseUrl();
 
+// Token key for localStorage - use consistent key throughout app
+const TOKEN_KEY = 'auth_token';
+
 const initialState = {
   user: null,
   token: null,
@@ -63,19 +66,22 @@ export const AuthProvider = ({ children }) => {
 
   // Check for existing token on app load
   useEffect(() => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem(TOKEN_KEY);
+    console.log('AuthProvider: Checking for existing token:', !!token);
+    
     if (token) {
       // Verify token and get user data
       verifyToken(token);
     } else {
+      console.log('AuthProvider: No token found, setting loading to false');
       dispatch({ type: 'LOADING', payload: false });
     }
   }, []);
 
   const verifyToken = async (token) => {
     try {
-      console.log('Verifying token with URL:', `${API_BASE_URL}/api/auth/verify`);
-      console.log('Current location:', window.location.href);
+      console.log('AuthProvider: Verifying token with URL:', `${API_BASE_URL}/api/auth/verify`);
+      console.log('AuthProvider: Current location:', window.location.href);
       
       const response = await fetch(`${API_BASE_URL}/api/auth/verify`, {
         headers: {
@@ -84,8 +90,12 @@ export const AuthProvider = ({ children }) => {
         }
       });
 
+      console.log('AuthProvider: Token verification response status:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('AuthProvider: Token verification successful:', { hasUser: !!data.user, hasWorkspace: !!data.workspace });
+        
         dispatch({
           type: 'LOGIN_SUCCESS',
           payload: {
@@ -95,26 +105,26 @@ export const AuthProvider = ({ children }) => {
           }
         });
       } else {
-        console.warn('Token verification failed:', response.status);
-        localStorage.removeItem('auth_token');
+        console.warn('AuthProvider: Token verification failed:', response.status);
+        localStorage.removeItem(TOKEN_KEY);
         dispatch({ type: 'LOADING', payload: false });
       }
     } catch (error) {
-      console.error('Token verification failed:', error);
-      localStorage.removeItem('auth_token');
+      console.error('AuthProvider: Token verification failed:', error);
+      localStorage.removeItem(TOKEN_KEY);
       dispatch({ type: 'LOADING', payload: false });
     }
   };
 
   const login = async (email, password) => {
     try {
+      console.log('AuthProvider: Starting login process');
       dispatch({ type: 'LOADING', payload: true });
       
       const apiUrl = `${API_BASE_URL}/api/auth/login`;
-      console.log('Attempting login with URL:', apiUrl);
-      console.log('Current location:', window.location.href);
-      console.log('Environment:', import.meta.env.MODE);
-      console.log('Login data:', { email, password: '***' });
+      console.log('AuthProvider: Login URL:', apiUrl);
+      console.log('AuthProvider: Environment:', import.meta.env.MODE);
+      console.log('AuthProvider: Login data:', { email, password: '***' });
       
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -124,14 +134,22 @@ export const AuthProvider = ({ children }) => {
         body: JSON.stringify({ email, password })
       });
 
-      console.log('Login response status:', response.status);
-      console.log('Login response URL:', response.url);
+      console.log('AuthProvider: Login response status:', response.status);
+      console.log('AuthProvider: Login response headers:', Object.fromEntries(response.headers.entries()));
       
       const data = await response.json();
-      console.log('Login response data:', data);
+      console.log('AuthProvider: Login response data:', {
+        success: data.success,
+        hasToken: !!data.token,
+        hasUser: !!data.user,
+        hasWorkspace: !!data.workspace,
+        error: data.error
+      });
 
       if (response.ok && data.success) {
-        localStorage.setItem('auth_token', data.token);
+        console.log('AuthProvider: Login successful, storing token');
+        localStorage.setItem(TOKEN_KEY, data.token);
+        
         dispatch({
           type: 'LOGIN_SUCCESS',
           payload: {
@@ -140,13 +158,15 @@ export const AuthProvider = ({ children }) => {
             workspace: data.workspace
           }
         });
+        
         return { success: true };
       } else {
+        console.error('AuthProvider: Login failed:', data.error);
         dispatch({ type: 'LOADING', payload: false });
         return { success: false, error: data.error || 'Login failed' };
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('AuthProvider: Login error:', error);
       dispatch({ type: 'LOADING', payload: false });
       return { success: false, error: 'Network error. Please check your connection and try again.' };
     }
@@ -154,10 +174,11 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     try {
+      console.log('AuthProvider: Starting registration process');
       dispatch({ type: 'LOADING', payload: true });
       
       const apiUrl = `${API_BASE_URL}/api/auth/register`;
-      console.log('Attempting registration with URL:', apiUrl);
+      console.log('AuthProvider: Registration URL:', apiUrl);
       
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -167,10 +188,18 @@ export const AuthProvider = ({ children }) => {
         body: JSON.stringify(userData)
       });
 
+      console.log('AuthProvider: Registration response status:', response.status);
       const data = await response.json();
+      console.log('AuthProvider: Registration response data:', {
+        success: data.success,
+        hasToken: !!data.token,
+        hasUser: !!data.user,
+        hasWorkspace: !!data.workspace,
+        error: data.error
+      });
 
       if (response.ok && data.success) {
-        localStorage.setItem('auth_token', data.token);
+        localStorage.setItem(TOKEN_KEY, data.token);
         dispatch({
           type: 'LOGIN_SUCCESS',
           payload: {
@@ -185,7 +214,7 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: data.error || 'Registration failed' };
       }
     } catch (error) {
-      console.error('Registration error:', error);
+      console.error('AuthProvider: Registration error:', error);
       dispatch({ type: 'LOADING', payload: false });
       return { success: false, error: 'Network error. Please check your connection and try again.' };
     }
@@ -193,18 +222,29 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
+      console.log('AuthProvider: Starting logout process');
+      
       // Call logout endpoint to invalidate token on server
-      await fetch(`${API_BASE_URL}/api/auth/logout`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${state.token}`,
-          'Content-Type': 'application/json'
+      if (state.token) {
+        try {
+          await fetch(`${API_BASE_URL}/api/auth/logout`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${state.token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+        } catch (logoutError) {
+          console.warn('AuthProvider: Server logout failed (continuing with local logout):', logoutError);
         }
-      });
+      }
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('AuthProvider: Logout error:', error);
     } finally {
-      localStorage.removeItem('auth_token');
+      console.log('AuthProvider: Clearing local auth data');
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem('user'); // Remove legacy user data if exists
+      localStorage.removeItem('token'); // Remove legacy token if exists
       dispatch({ type: 'LOGOUT' });
     }
   };
@@ -219,7 +259,7 @@ export const AuthProvider = ({ children }) => {
 
   // Helper function to make authenticated API calls
   const apiCall = async (url, options = {}) => {
-    const token = state.token || localStorage.getItem('auth_token');
+    const token = state.token || localStorage.getItem(TOKEN_KEY);
     
     const config = {
       ...options,
@@ -233,18 +273,20 @@ export const AuthProvider = ({ children }) => {
     try {
       // Handle relative URLs
       const fullUrl = url.startsWith('/') ? `${API_BASE_URL}${url}` : url;
+      console.log('AuthProvider: Making API call to:', fullUrl);
       
       const response = await fetch(fullUrl, config);
       
       if (response.status === 401) {
         // Token expired or invalid
-        console.warn('Authentication expired, logging out');
-        logout();
+        console.warn('AuthProvider: Authentication expired, logging out');
+        await logout();
         throw new Error('Authentication expired. Please login again.');
       }
 
       return response;
     } catch (error) {
+      console.error('AuthProvider: API call error:', error);
       throw error;
     }
   };
