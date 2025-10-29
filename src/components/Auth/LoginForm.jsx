@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Loader } from 'lucide-react';
+import { Eye, EyeOff, Loader, AlertCircle } from 'lucide-react';
 
 const LoginForm = ({ onSuccess, onSwitchToRegister }) => {
   const [formData, setFormData] = useState({
@@ -10,11 +10,13 @@ const LoginForm = ({ onSuccess, onSwitchToRegister }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [errorType, setErrorType] = useState('');
   
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     setError('');
+    setErrorType('');
   };
   
   const validateForm = () => {
@@ -38,6 +40,7 @@ const LoginForm = ({ onSuccess, onSwitchToRegister }) => {
     
     setLoading(true);
     setError('');
+    setErrorType('');
     
     try {
       const response = await fetch('/api/auth/login', {
@@ -57,14 +60,42 @@ const LoginForm = ({ onSuccess, onSwitchToRegister }) => {
         
         onSuccess(data);
       } else {
+        // Preserve email from response if available
+        if (data.email && data.email !== formData.email) {
+          setFormData(prev => ({ ...prev, email: data.email }));
+        }
+        
         setError(data.error || 'Login failed');
+        setErrorType(data.errorType || '');
+        
+        // Clear password only if it was wrong, not for other errors
+        if (data.errorType === 'invalid_password') {
+          setFormData(prev => ({ ...prev, password: '' }));
+        }
       }
     } catch (error) {
       console.error('Login error:', error);
-      setError('Network error. Please try again.');
+      setError('Network error. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
+  };
+  
+  const getErrorColor = () => {
+    switch (errorType) {
+      case 'invalid_password':
+        return 'text-red-600';
+      case 'email_not_found':
+        return 'text-orange-600';
+      case 'account_inactive':
+        return 'text-yellow-600';
+      default:
+        return 'text-red-600';
+    }
+  };
+  
+  const getErrorIcon = () => {
+    return <AlertCircle className="w-4 h-4 mr-2 flex-shrink-0" />;
   };
   
   return (
@@ -81,8 +112,35 @@ const LoginForm = ({ onSuccess, onSwitchToRegister }) => {
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">
-              {error}
+            <div className={`bg-red-50 border border-red-200 px-4 py-3 rounded-md flex items-start ${getErrorColor()}`}>
+              {getErrorIcon()}
+              <div className="flex-1">
+                <p className="text-sm font-medium">{error}</p>
+                {errorType === 'email_not_found' && (
+                  <p className="text-xs mt-1 text-gray-600">
+                    Don't have an account?{' '}
+                    <button
+                      type="button"
+                      onClick={onSwitchToRegister}
+                      className="font-medium text-blue-600 hover:text-blue-500"
+                    >
+                      Sign up here
+                    </button>
+                  </p>
+                )}
+                {errorType === 'invalid_password' && (
+                  <p className="text-xs mt-1 text-gray-600">
+                    Forgot your password?{' '}
+                    <button
+                      type="button"
+                      className="font-medium text-blue-600 hover:text-blue-500"
+                      onClick={() => alert('Password reset feature coming soon!')}
+                    >
+                      Reset it here
+                    </button>
+                  </p>
+                )}
+              </div>
             </div>
           )}
           
@@ -99,8 +157,13 @@ const LoginForm = ({ onSuccess, onSwitchToRegister }) => {
                 required
                 value={formData.email}
                 onChange={handleInputChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                className={`mt-1 appearance-none relative block w-full px-3 py-2 border placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm ${
+                  errorType === 'email_not_found' 
+                    ? 'border-orange-300 bg-orange-50' 
+                    : 'border-gray-300'
+                }`}
                 placeholder="Enter your email"
+                autoComplete="email"
               />
             </div>
             
@@ -117,8 +180,13 @@ const LoginForm = ({ onSuccess, onSwitchToRegister }) => {
                   required
                   value={formData.password}
                   onChange={handleInputChange}
-                  className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm pr-10"
+                  className={`appearance-none relative block w-full px-3 py-2 border placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm pr-10 ${
+                    errorType === 'invalid_password' 
+                      ? 'border-red-300 bg-red-50' 
+                      : 'border-gray-300'
+                  }`}
                   placeholder="Enter your password"
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
@@ -149,9 +217,13 @@ const LoginForm = ({ onSuccess, onSwitchToRegister }) => {
             </div>
             
             <div className="text-sm">
-              <a href="#" className="font-medium text-blue-600 hover:text-blue-500">
+              <button
+                type="button"
+                className="font-medium text-blue-600 hover:text-blue-500"
+                onClick={() => alert('Password reset feature coming soon!')}
+              >
                 Forgot your password?
-              </a>
+              </button>
             </div>
           </div>
           
@@ -181,6 +253,44 @@ const LoginForm = ({ onSuccess, onSwitchToRegister }) => {
               Don't have an account? Sign up
             </button>
           </div>
+          
+          {/* Debug section - remove in production */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mt-4 p-3 bg-gray-100 rounded-md text-xs">
+              <details>
+                <summary className="cursor-pointer text-gray-600">Debug Info</summary>
+                <div className="mt-2 space-y-1">
+                  <p><strong>Email:</strong> {formData.email}</p>
+                  <p><strong>Password Length:</strong> {formData.password.length}</p>
+                  <p><strong>Error Type:</strong> {errorType || 'None'}</p>
+                  <button
+                    type="button"
+                    className="text-blue-600 hover:text-blue-500"
+                    onClick={async () => {
+                      if (!formData.email) {
+                        alert('Enter an email first');
+                        return;
+                      }
+                      
+                      try {
+                        const response = await fetch('/api/auth/debug-user', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ email: formData.email })
+                        });
+                        const data = await response.json();
+                        alert(JSON.stringify(data, null, 2));
+                      } catch (error) {
+                        alert('Debug request failed: ' + error.message);
+                      }
+                    }}
+                  >
+                    Check if user exists
+                  </button>
+                </div>
+              </details>
+            </div>
+          )}
         </form>
       </div>
     </div>
