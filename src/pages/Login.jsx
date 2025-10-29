@@ -3,10 +3,12 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, ArrowRight, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '../contexts/AuthContext';
 
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { login, isLoading: authLoading, isAuthenticated } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -15,6 +17,13 @@ const Login = () => {
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated && !authLoading) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, authLoading, navigate]);
 
   // Check for success message from registration
   useEffect(() => {
@@ -46,6 +55,8 @@ const Login = () => {
     
     if (!formData.password) {
       newErrors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
     }
     
     setErrors(newErrors);
@@ -63,21 +74,11 @@ const Login = () => {
     setErrors({});
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        // Store token
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        
+      console.log('Attempting login with:', { email: formData.email, password: '[HIDDEN]' });
+      
+      const result = await login(formData.email, formData.password);
+      
+      if (result.success) {
         // Handle remember me
         if (rememberMe) {
           localStorage.setItem('rememberedEmail', formData.email);
@@ -87,19 +88,20 @@ const Login = () => {
 
         toast.success('Welcome back!');
         
-        // Redirect to intended page or dashboard
-        const from = location.state?.from?.pathname || '/dashboard';
-        navigate(from, { replace: true });
+        // Navigate to dashboard
+        navigate('/dashboard', { replace: true });
       } else {
+        console.error('Login failed:', result.error);
+        
         // Handle specific error types
-        if (data.errorType === 'email_not_found') {
-          setErrors({ email: data.error });
-        } else if (data.errorType === 'invalid_password') {
-          setErrors({ password: data.error });
-        } else if (data.errorType === 'account_inactive') {
-          setErrors({ general: data.error });
+        if (result.error?.includes('email')) {
+          setErrors({ email: result.error });
+        } else if (result.error?.includes('password')) {
+          setErrors({ password: result.error });
+        } else if (result.error?.includes('account')) {
+          setErrors({ general: result.error });
         } else {
-          setErrors({ general: data.error || 'Login failed. Please try again.' });
+          setErrors({ general: result.error || 'Login failed. Please try again.' });
         }
       }
     } catch (error) {
@@ -122,6 +124,18 @@ const Login = () => {
       setErrors(prev => ({ ...prev, general: '' }));
     }
   };
+
+  // Show loading if auth is still being checked
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 mx-auto mb-4 animate-spin text-indigo-600" />
+          <p className="text-gray-600">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50 flex items-center justify-center p-4">
