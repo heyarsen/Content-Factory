@@ -11,8 +11,8 @@ const prisma = new PrismaClient();
 const registerSchema = Joi.object({
   email: Joi.string().email().required(),
   username: Joi.string().alphanum().min(3).max(30).required(),
-  firstName: Joi.string().min(1).max(50),
-  lastName: Joi.string().min(1).max(50),
+  firstName: Joi.string().min(1).max(50).allow(''),
+  lastName: Joi.string().min(1).max(50).allow(''),
   password: Joi.string().min(8).required()
 });
 
@@ -63,7 +63,15 @@ router.post('/check-email', async (req, res) => {
   try {
     const { email } = req.body;
     
-    if (!email || !Joi.string().email().validate(email).error === undefined) {
+    if (!email) {
+      return res.status(400).json({ 
+        available: false, 
+        error: 'Email is required' 
+      });
+    }
+
+    const emailValidation = Joi.string().email().validate(email);
+    if (emailValidation.error) {
       return res.status(400).json({ 
         available: false, 
         error: 'Valid email is required' 
@@ -93,8 +101,11 @@ router.post('/check-email', async (req, res) => {
 // Register
 router.post('/register', async (req, res) => {
   try {
+    console.log('Registration attempt:', { ...req.body, password: '[HIDDEN]' });
+    
     const { error, value } = registerSchema.validate(req.body);
     if (error) {
+      console.log('Validation error:', error.details[0].message);
       return res.status(400).json({ 
         success: false,
         error: error.details[0].message 
@@ -112,6 +123,7 @@ router.post('/register', async (req, res) => {
 
     if (existingUser) {
       const field = existingUser.email === email ? 'email' : 'username';
+      console.log('User already exists:', field, existingUser.email === email ? email : username);
       return res.status(400).json({ 
         success: false,
         error: `This ${field} is already registered`,
@@ -121,6 +133,7 @@ router.post('/register', async (req, res) => {
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
+    console.log('Password hashed successfully');
 
     // Create user and default workspace in a transaction
     const result = await prisma.$transaction(async (tx) => {
@@ -129,11 +142,12 @@ router.post('/register', async (req, res) => {
         data: {
           email,
           username,
-          firstName,
-          lastName,
+          firstName: firstName || null,
+          lastName: lastName || null,
           password: hashedPassword
         }
       });
+      console.log('User created:', user.id, user.email);
 
       // Create default workspace
       const workspaceName = firstName ? `${firstName}'s Workspace` : `${username}'s Workspace`;
@@ -172,12 +186,14 @@ router.post('/register', async (req, res) => {
           }
         }
       });
+      console.log('Workspace created:', workspace.id, workspace.name);
 
       return { user, workspace };
     });
 
     // Generate tokens
     const { token, expiresAt } = await generateTokens(result.user.id);
+    console.log('Token generated successfully');
 
     res.status(201).json({
       success: true,
@@ -204,20 +220,23 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// Login
+// Login with improved error handling
 router.post('/login', async (req, res) => {
   try {
+    console.log('Login attempt for email:', req.body.email);
+    
     const { error, value } = loginSchema.validate(req.body);
     if (error) {
       return res.status(400).json({ 
         success: false,
-        error: error.details[0].message 
+        error: error.details[0].message,
+        email: req.body.email // Preserve email
       });
     }
 
     const { email, password } = value;
 
-    // Find user with workspaces
+    // Find user first (separate from password check for better error messages)
     const user = await prisma.user.findUnique({ 
       where: { email },
       include: {
@@ -253,21 +272,41 @@ router.post('/login', async (req, res) => {
       }
     });
     
-    if (!user || user.status !== 'ACTIVE') {
+    if (!user) {
+      console.log('User not found:', email);
       return res.status(401).json({ 
         success: false,
-        error: 'Invalid email or password' 
+        error: 'No account found with this email address',
+        errorType: 'email_not_found',
+        email: email // Preserve email
+      });
+    }
+
+    if (user.status !== 'ACTIVE') {
+      console.log('User account not active:', email, user.status);
+      return res.status(401).json({ 
+        success: false,
+        error: 'Account is not active. Please contact support.',
+        errorType: 'account_inactive',
+        email: email // Preserve email
       });
     }
 
     // Check password
+    console.log('Checking password for user:', user.id);
     const isPasswordValid = await bcrypt.compare(password, user.password);
+    
     if (!isPasswordValid) {
+      console.log('Invalid password for user:', email);
       return res.status(401).json({ 
         success: false,
-        error: 'Invalid email or password' 
+        error: 'Incorrect password. Please check your password and try again.',
+        errorType: 'invalid_password',
+        email: email // Preserve email
       });
     }
+
+    console.log('Login successful for user:', user.id);
 
     // Update last login
     await prisma.user.update({ 
@@ -277,12 +316,13 @@ router.post('/login', async (req, res) => {
 
     // Generate tokens
     const { token, expiresAt } = await generateTokens(user.id);
+    console.log('Token generated for user:', user.id);
 
     // Get user's primary workspace (owned workspace first, then first active)
     const ownedWorkspace = user.workspaces.find(w => w.role === 'OWNER');
     const primaryWorkspace = ownedWorkspace || user.workspaces[0];
 
-    res.json({
+    const responseData = {
       success: true,
       message: 'Login successful',
       token,
@@ -304,12 +344,21 @@ router.post('/login', async (req, res) => {
         status: w.status,
         joinedAt: w.joinedAt
       }))
+    };
+
+    console.log('Sending login response for user:', user.id, {
+      hasToken: !!responseData.token,
+      hasWorkspace: !!responseData.workspace,
+      workspaceCount: responseData.workspaces.length
     });
+
+    res.json(responseData);
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ 
       success: false,
-      error: 'Login failed. Please try again.' 
+      error: 'Login failed due to server error. Please try again.',
+      email: req.body.email // Preserve email even on server error
     });
   }
 });
@@ -389,6 +438,59 @@ router.get('/verify', authenticateToken, async (req, res) => {
       success: false,
       error: 'Token verification failed' 
     });
+  }
+});
+
+// Debug endpoint to check user existence
+router.post('/debug-user', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email required' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        firstName: true,
+        lastName: true,
+        status: true,
+        createdAt: true,
+        _count: {
+          select: {
+            workspaces: true
+          }
+        }
+      }
+    });
+
+    if (!user) {
+      return res.json({ 
+        found: false, 
+        message: 'User not found' 
+      });
+    }
+
+    res.json({
+      found: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        status: user.status,
+        createdAt: user.createdAt,
+        workspaceCount: user._count.workspaces
+      }
+    });
+  } catch (err) {
+    console.error('Debug user error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
