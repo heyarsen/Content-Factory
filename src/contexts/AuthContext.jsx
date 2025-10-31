@@ -36,6 +36,14 @@ const authReducer = (state, action) => {
         isAuthenticated: true,
         isLoading: false
       };
+    case 'LOGIN_FAILED':
+      // CRITICAL: Don't change authentication state on login failure
+      // This prevents unwanted navigation
+      return {
+        ...state,
+        isLoading: false
+        // Keep isAuthenticated as false, don't clear anything else
+      };
     case 'LOGOUT':
       return {
         ...initialState,
@@ -67,21 +75,21 @@ export const AuthProvider = ({ children }) => {
   // Check for existing token on app load
   useEffect(() => {
     const token = localStorage.getItem(TOKEN_KEY);
-    console.log('AuthProvider: Checking for existing token:', !!token);
+    console.log('🔑 AuthProvider: Checking for existing token:', !!token);
     
     if (token) {
       // Verify token and get user data
       verifyToken(token);
     } else {
-      console.log('AuthProvider: No token found, setting loading to false');
+      console.log('🔑 AuthProvider: No token found, setting loading to false');
       dispatch({ type: 'LOADING', payload: false });
     }
   }, []);
 
   const verifyToken = async (token) => {
     try {
-      console.log('AuthProvider: Verifying token with URL:', `${API_BASE_URL}/api/auth/verify`);
-      console.log('AuthProvider: Current location:', window.location.href);
+      console.log('🔍 AuthProvider: Verifying token with URL:', `${API_BASE_URL}/api/auth/verify`);
+      console.log('🌐 AuthProvider: Current location:', window.location.href);
       
       const response = await fetch(`${API_BASE_URL}/api/auth/verify`, {
         headers: {
@@ -90,27 +98,27 @@ export const AuthProvider = ({ children }) => {
         }
       });
 
-      console.log('AuthProvider: Token verification response status:', response.status);
+      console.log('📊 AuthProvider: Token verification response status:', response.status);
       
       if (response.ok) {
         const data = await response.json();
-        console.log('AuthProvider: Token verification successful:', { hasUser: !!data.user, hasWorkspace: !!data.workspace });
+        console.log('✅ AuthProvider: Token verification successful:', { hasUser: !!data.data?.user, hasWorkspace: !!data.data?.workspace });
         
         dispatch({
           type: 'LOGIN_SUCCESS',
           payload: {
-            user: data.user,
+            user: data.data?.user || data.user,
             token: token,
-            workspace: data.workspace
+            workspace: data.data?.workspace || data.workspace
           }
         });
       } else {
-        console.warn('AuthProvider: Token verification failed:', response.status);
+        console.warn('⚠️ AuthProvider: Token verification failed:', response.status);
         localStorage.removeItem(TOKEN_KEY);
         dispatch({ type: 'LOADING', payload: false });
       }
     } catch (error) {
-      console.error('AuthProvider: Token verification failed:', error);
+      console.error('❌ AuthProvider: Token verification failed:', error);
       localStorage.removeItem(TOKEN_KEY);
       dispatch({ type: 'LOADING', payload: false });
     }
@@ -118,13 +126,15 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      console.log('AuthProvider: Starting login process');
+      console.log('🚀 AuthProvider: Starting login process');
+      console.log('📧 AuthProvider: Login attempt for:', email);
+      
+      // CRITICAL: Don't change loading state in reducer, handle locally
       dispatch({ type: 'LOADING', payload: true });
       
       const apiUrl = `${API_BASE_URL}/api/auth/login`;
-      console.log('AuthProvider: Login URL:', apiUrl);
-      console.log('AuthProvider: Environment:', import.meta.env.MODE);
-      console.log('AuthProvider: Login data:', { email, password: '***' });
+      console.log('🌐 AuthProvider: Login URL:', apiUrl);
+      console.log('🌍 AuthProvider: Environment:', import.meta.env.MODE);
       
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -134,51 +144,74 @@ export const AuthProvider = ({ children }) => {
         body: JSON.stringify({ email, password })
       });
 
-      console.log('AuthProvider: Login response status:', response.status);
-      console.log('AuthProvider: Login response headers:', Object.fromEntries(response.headers.entries()));
+      console.log('📊 AuthProvider: Login response status:', response.status);
       
       const data = await response.json();
-      console.log('AuthProvider: Login response data:', {
+      console.log('📊 AuthProvider: Login response data:', {
         success: data.success,
-        hasToken: !!data.token,
-        hasUser: !!data.user,
-        hasWorkspace: !!data.workspace,
-        error: data.error
+        hasToken: !!data.data?.token || !!data.token,
+        hasUser: !!data.data?.user || !!data.user,
+        hasWorkspace: !!data.data?.workspace || !!data.workspace,
+        error: data.error || data.message
       });
 
       if (response.ok && data.success) {
-        console.log('AuthProvider: Login successful, storing token');
-        localStorage.setItem(TOKEN_KEY, data.token);
+        console.log('✅ AuthProvider: Login successful, storing token');
+        
+        const token = data.data?.token || data.token;
+        const user = data.data?.user || data.user;
+        const workspace = data.data?.workspace || data.workspace;
+        
+        localStorage.setItem(TOKEN_KEY, token);
         
         dispatch({
           type: 'LOGIN_SUCCESS',
           payload: {
-            user: data.user,
-            token: data.token,
-            workspace: data.workspace
+            user: user,
+            token: token,
+            workspace: workspace
           }
         });
         
         return { success: true };
       } else {
-        console.error('AuthProvider: Login failed:', data.error);
-        dispatch({ type: 'LOADING', payload: false });
-        return { success: false, error: data.error || 'Login failed' };
+        console.error('❌ AuthProvider: Login failed:', data.error || data.message);
+        
+        // CRITICAL: Use LOGIN_FAILED instead of LOADING to prevent navigation
+        dispatch({ type: 'LOGIN_FAILED' });
+        
+        // Return specific error for form to handle
+        const errorMessage = data.error || data.message || 'Login failed';
+        
+        if (response.status === 401) {
+          // Invalid credentials
+          if (errorMessage.toLowerCase().includes('invalid credentials')) {
+            return { success: false, error: 'Wrong email or password. Please try again.' };
+          }
+        }
+        
+        return { success: false, error: errorMessage };
       }
     } catch (error) {
-      console.error('AuthProvider: Login error:', error);
-      dispatch({ type: 'LOADING', payload: false });
-      return { success: false, error: 'Network error. Please check your connection and try again.' };
+      console.error('💥 AuthProvider: Login network error:', error);
+      
+      // CRITICAL: Use LOGIN_FAILED to prevent navigation
+      dispatch({ type: 'LOGIN_FAILED' });
+      
+      return { 
+        success: false, 
+        error: 'Network error. Please check your connection and try again.' 
+      };
     }
   };
 
   const register = async (userData) => {
     try {
-      console.log('AuthProvider: Starting registration process');
+      console.log('📝 AuthProvider: Starting registration process');
       dispatch({ type: 'LOADING', payload: true });
       
       const apiUrl = `${API_BASE_URL}/api/auth/register`;
-      console.log('AuthProvider: Registration URL:', apiUrl);
+      console.log('🌐 AuthProvider: Registration URL:', apiUrl);
       
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -188,33 +221,37 @@ export const AuthProvider = ({ children }) => {
         body: JSON.stringify(userData)
       });
 
-      console.log('AuthProvider: Registration response status:', response.status);
+      console.log('📊 AuthProvider: Registration response status:', response.status);
       const data = await response.json();
-      console.log('AuthProvider: Registration response data:', {
+      console.log('📊 AuthProvider: Registration response data:', {
         success: data.success,
-        hasToken: !!data.token,
-        hasUser: !!data.user,
-        hasWorkspace: !!data.workspace,
-        error: data.error
+        hasToken: !!data.data?.token || !!data.token,
+        hasUser: !!data.data?.user || !!data.user,
+        hasWorkspace: !!data.data?.workspace || !!data.workspace,
+        error: data.error || data.message
       });
 
       if (response.ok && data.success) {
-        localStorage.setItem(TOKEN_KEY, data.token);
+        const token = data.data?.token || data.token;
+        const user = data.data?.user || data.user;
+        const workspace = data.data?.workspace || data.workspace;
+        
+        localStorage.setItem(TOKEN_KEY, token);
         dispatch({
           type: 'LOGIN_SUCCESS',
           payload: {
-            user: data.user,
-            token: data.token,
-            workspace: data.workspace
+            user: user,
+            token: token,
+            workspace: workspace
           }
         });
         return { success: true };
       } else {
         dispatch({ type: 'LOADING', payload: false });
-        return { success: false, error: data.error || 'Registration failed' };
+        return { success: false, error: data.error || data.message || 'Registration failed' };
       }
     } catch (error) {
-      console.error('AuthProvider: Registration error:', error);
+      console.error('❌ AuthProvider: Registration error:', error);
       dispatch({ type: 'LOADING', payload: false });
       return { success: false, error: 'Network error. Please check your connection and try again.' };
     }
@@ -222,7 +259,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      console.log('AuthProvider: Starting logout process');
+      console.log('👋 AuthProvider: Starting logout process');
       
       // Call logout endpoint to invalidate token on server
       if (state.token) {
@@ -235,13 +272,13 @@ export const AuthProvider = ({ children }) => {
             }
           });
         } catch (logoutError) {
-          console.warn('AuthProvider: Server logout failed (continuing with local logout):', logoutError);
+          console.warn('⚠️ AuthProvider: Server logout failed (continuing with local logout):', logoutError);
         }
       }
     } catch (error) {
-      console.error('AuthProvider: Logout error:', error);
+      console.error('❌ AuthProvider: Logout error:', error);
     } finally {
-      console.log('AuthProvider: Clearing local auth data');
+      console.log('🧹 AuthProvider: Clearing local auth data');
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem('user'); // Remove legacy user data if exists
       localStorage.removeItem('token'); // Remove legacy token if exists
@@ -273,20 +310,20 @@ export const AuthProvider = ({ children }) => {
     try {
       // Handle relative URLs
       const fullUrl = url.startsWith('/') ? `${API_BASE_URL}${url}` : url;
-      console.log('AuthProvider: Making API call to:', fullUrl);
+      console.log('📡 AuthProvider: Making API call to:', fullUrl);
       
       const response = await fetch(fullUrl, config);
       
       if (response.status === 401) {
         // Token expired or invalid
-        console.warn('AuthProvider: Authentication expired, logging out');
+        console.warn('⚠️ AuthProvider: Authentication expired, logging out');
         await logout();
         throw new Error('Authentication expired. Please login again.');
       }
 
       return response;
     } catch (error) {
-      console.error('AuthProvider: API call error:', error);
+      console.error('❌ AuthProvider: API call error:', error);
       throw error;
     }
   };
