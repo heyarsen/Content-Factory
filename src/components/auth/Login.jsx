@@ -11,13 +11,15 @@ const Login = ({ onToggleMode }) => {
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
+    
+    // Clear ALL errors when user starts typing
+    if (errors[name] || errors.general || errors.password || errors.email) {
+      setErrors({});
     }
   };
 
@@ -41,15 +43,77 @@ const Login = ({ onToggleMode }) => {
   };
 
   const handleSubmit = async (e) => {
+    // PREVENT DEFAULT FORM SUBMISSION - THIS IS CRITICAL
     e.preventDefault();
+    e.stopPropagation();
     
-    if (!validateForm()) return;
+    console.log('🔑 Login form submitted - preventing default navigation');
     
-    const result = await login(formData.email, formData.password);
+    // Clear all previous errors
+    setErrors({});
     
-    if (!result.success) {
-      setErrors({ general: result.error });
+    // Validate form first
+    if (!validateForm()) {
+      console.log('❌ Form validation failed');
+      return false; // Stop here if validation fails
     }
+    
+    // Prevent double submission
+    if (isSubmitting || isLoading) {
+      console.log('⏳ Already submitting, ignoring');
+      return false;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      console.log('🚀 Calling login with:', { email: formData.email, password: '***' });
+      
+      const result = await login(formData.email, formData.password);
+      
+      console.log('📊 Login result:', { success: result.success, error: result.error });
+      
+      if (!result.success) {
+        // Handle specific error cases
+        if (result.error?.toLowerCase().includes('invalid credentials') || 
+            result.error?.toLowerCase().includes('password') ||
+            result.error?.toLowerCase().includes('wrong')) {
+          
+          console.log('❌ Setting password error for wrong credentials');
+          setErrors({ 
+            password: 'Wrong password. Please try again.' 
+          });
+        } else if (result.error?.toLowerCase().includes('email') || 
+                   result.error?.toLowerCase().includes('user not found')) {
+          
+          console.log('❌ Setting email error for user not found');
+          setErrors({ 
+            email: 'Account not found with this email address.' 
+          });
+        } else {
+          console.log('❌ Setting general error');
+          setErrors({ 
+            general: result.error || 'Login failed. Please try again.' 
+          });
+        }
+        
+        // DO NOT NAVIGATE - STAY ON LOGIN FORM
+        console.log('🛑 Login failed - staying on form to show error');
+      } else {
+        console.log('✅ Login successful - user will be redirected by AuthContext');
+        // Success! AuthContext will handle navigation
+      }
+    } catch (error) {
+      console.error('💥 Login error:', error);
+      setErrors({ 
+        general: 'Network error. Please check your connection and try again.' 
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+    
+    // Always return false to prevent any form navigation
+    return false;
   };
 
   return (
@@ -72,11 +136,11 @@ const Login = ({ onToggleMode }) => {
 
         {/* Form */}
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {/* General Error */}
+          {/* General Error - Show at top */}
           {errors.general && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-3">
+            <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 flex items-center space-x-3">
               <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-              <span className="text-sm text-red-700">{errors.general}</span>
+              <span className="text-sm text-red-700 font-medium">{errors.general}</span>
             </div>
           )}
 
@@ -97,16 +161,20 @@ const Login = ({ onToggleMode }) => {
                   autoComplete="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className={`block w-full pl-10 pr-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
+                  className={`block w-full pl-10 pr-3 py-3 border-2 rounded-xl focus:outline-none focus:ring-4 transition-all duration-200 ${
                     errors.email 
-                      ? 'border-red-300 bg-red-50' 
-                      : 'border-gray-300 bg-white hover:border-gray-400'
+                      ? 'border-red-300 bg-red-50 focus:border-red-500 focus:ring-red-200' 
+                      : 'border-gray-300 bg-white hover:border-gray-400 focus:border-blue-500 focus:ring-blue-200'
                   }`}
                   placeholder="Enter your email"
+                  disabled={isSubmitting || isLoading}
                 />
               </div>
               {errors.email && (
-                <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+                <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                  <AlertCircle className="h-4 w-4" />
+                  {errors.email}
+                </p>
               )}
             </div>
 
@@ -126,17 +194,19 @@ const Login = ({ onToggleMode }) => {
                   autoComplete="current-password"
                   value={formData.password}
                   onChange={handleChange}
-                  className={`block w-full pl-10 pr-10 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
+                  className={`block w-full pl-10 pr-10 py-3 border-2 rounded-xl focus:outline-none focus:ring-4 transition-all duration-200 ${
                     errors.password 
-                      ? 'border-red-300 bg-red-50' 
-                      : 'border-gray-300 bg-white hover:border-gray-400'
+                      ? 'border-red-300 bg-red-50 focus:border-red-500 focus:ring-red-200' 
+                      : 'border-gray-300 bg-white hover:border-gray-400 focus:border-blue-500 focus:ring-blue-200'
                   }`}
                   placeholder="Enter your password"
+                  disabled={isSubmitting || isLoading}
                 />
                 <button
                   type="button"
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   onClick={() => setShowPassword(!showPassword)}
+                  disabled={isSubmitting || isLoading}
                 >
                   {showPassword ? (
                     <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
@@ -146,7 +216,10 @@ const Login = ({ onToggleMode }) => {
                 </button>
               </div>
               {errors.password && (
-                <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+                <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                  <AlertCircle className="h-4 w-4" />
+                  {errors.password}
+                </p>
               )}
             </div>
           </div>
@@ -161,6 +234,7 @@ const Login = ({ onToggleMode }) => {
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                disabled={isSubmitting || isLoading}
               />
               <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
                 Remember me
@@ -168,9 +242,13 @@ const Login = ({ onToggleMode }) => {
             </div>
 
             <div className="text-sm">
-              <a href="#" className="font-medium text-blue-600 hover:text-blue-500 transition-colors">
+              <button
+                type="button"
+                className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
+                disabled={isSubmitting || isLoading}
+              >
                 Forgot your password?
-              </a>
+              </button>
             </div>
           </div>
 
@@ -178,16 +256,16 @@ const Login = ({ onToggleMode }) => {
           <div>
             <button
               type="submit"
-              disabled={isLoading}
-              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
+              disabled={isSubmitting || isLoading}
+              className="group relative w-full flex justify-center py-4 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-4 focus:ring-offset-2 focus:ring-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
             >
-              {isLoading ? (
+              {isSubmitting || isLoading ? (
                 <>
                   <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                   Signing in...
                 </>
               ) : (
-                'Sign in'
+                'Sign in to Content Factory'
               )}
             </button>
           </div>
@@ -200,6 +278,7 @@ const Login = ({ onToggleMode }) => {
                 type="button"
                 onClick={onToggleMode}
                 className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
+                disabled={isSubmitting || isLoading}
               >
                 Sign up for free
               </button>
@@ -207,14 +286,44 @@ const Login = ({ onToggleMode }) => {
           </div>
         </form>
 
-        {/* Demo Credentials */}
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg border">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">Demo Account</h4>
-          <p className="text-xs text-gray-600 mb-2">Use these credentials to test the app:</p>
-          <div className="text-xs text-gray-600 space-y-1">
-            <div><strong>Email:</strong> demo@contentfactory.com</div>
-            <div><strong>Password:</strong> demo123</div>
+        {/* CORRECTED Demo Credentials */}
+        <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border-2 border-blue-200">
+          <div className="flex items-center gap-2 mb-2">
+            <Sparkles className="h-4 w-4 text-blue-600" />
+            <h4 className="text-sm font-semibold text-gray-800">Demo Account</h4>
           </div>
+          <p className="text-xs text-gray-600 mb-3">Use these credentials to test the app:</p>
+          <div className="space-y-2">
+            <div className="bg-white rounded-lg p-3 border border-blue-200">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-500 font-medium">Email:</span>
+                <code className="text-xs font-mono text-blue-700 bg-blue-100 px-2 py-1 rounded">
+                  demo@contentfabrica.com
+                </code>
+              </div>
+            </div>
+            <div className="bg-white rounded-lg p-3 border border-blue-200">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-500 font-medium">Password:</span>
+                <code className="text-xs font-mono text-blue-700 bg-blue-100 px-2 py-1 rounded">
+                  demo123
+                </code>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setFormData({
+                email: 'demo@contentfabrica.com',
+                password: 'demo123'
+              });
+              setErrors({});
+            }}
+            className="mt-3 w-full text-xs bg-blue-600 text-white py-2 px-3 rounded-lg hover:bg-blue-700 transition-all duration-200 font-medium"
+            disabled={isSubmitting || isLoading}
+          >
+            Fill Demo Credentials
+          </button>
         </div>
       </div>
     </div>
