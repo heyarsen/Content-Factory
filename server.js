@@ -16,6 +16,28 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production';
 
+// Brand Configuration
+const BRAND_CONFIG = {
+  name: 'Content Factory',
+  tagline: 'AI-Powered Content Creation',
+  version: '2.0.0',
+  author: 'Content Factory Team',
+  colors: {
+    primary: '#a855f7',
+    secondary: '#3b82f6',
+    success: '#10b981',
+    warning: '#f59e0b',
+    error: '#ef4444'
+  },
+  features: [
+    'AI Video Generation',
+    'Content Calendar',
+    'Team Collaboration',
+    'Analytics Dashboard',
+    'Social Media Publishing'
+  ]
+};
+
 // In-memory storage for demo purposes (replace with database in production)
 const users = new Map();
 const sessions = new Map();
@@ -75,6 +97,25 @@ class UploadPostAPI {
 
 const uploadPost = new UploadPostAPI();
 
+// Enhanced API Response Helper
+const createResponse = (data = null, message = null, status = 'success', meta = {}) => {
+  const response = {
+    success: status === 'success',
+    status,
+    timestamp: new Date().toISOString(),
+    brand: {
+      name: BRAND_CONFIG.name,
+      version: BRAND_CONFIG.version
+    },
+    ...meta
+  };
+
+  if (message) response.message = message;
+  if (data !== null) response.data = data;
+  
+  return response;
+};
+
 // Security middleware - more permissive for development
 app.use(helmet({
   contentSecurityPolicy: {
@@ -94,7 +135,7 @@ app.use(helmet({
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: process.env.NODE_ENV === 'development' ? 1000 : 100, // Higher limit for development
-  message: 'Too many requests from this IP, please try again later.',
+  message: createResponse(null, 'Too many requests. Please try again later.', 'error'),
   standardHeaders: true,
   legacyHeaders: false
 });
@@ -103,11 +144,11 @@ app.use('/api/', limiter);
 // CORS configuration - FIXED FOR PRODUCTION
 const corsOptions = {
   origin: function (origin, callback) {
-    console.log('CORS check - Origin:', origin);
+    console.log('🔍 CORS check - Origin:', origin);
     
     // Allow requests with no origin (like mobile apps, curl, or same-origin requests)
     if (!origin) {
-      console.log('CORS: Allowing request with no origin');
+      console.log('✅ CORS: Allowing request with no origin');
       return callback(null, true);
     }
     
@@ -143,16 +184,16 @@ const corsOptions = {
     });
     
     if (isAllowed) {
-      console.log('CORS: Allowing origin:', origin);
+      console.log('✅ CORS: Allowing origin:', origin);
       return callback(null, true);
     }
     
-    console.log('CORS: Blocking origin:', origin);
-    console.log('Allowed origins:', allowedOrigins);
+    console.log('❌ CORS: Blocking origin:', origin);
+    console.log('📋 Allowed origins:', allowedOrigins);
     
     // In production, be more permissive to avoid blocking legitimate requests
     if (process.env.NODE_ENV === 'production') {
-      console.log('CORS: Production mode - allowing request anyway');
+      console.log('🚀 CORS: Production mode - allowing request anyway');
       return callback(null, true);
     }
     
@@ -168,14 +209,17 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Debug middleware
+// Enhanced debug middleware with branding
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  const timestamp = new Date().toISOString();
+  console.log(`🌐 ${timestamp} - ${req.method} ${req.path}`);
+  
   if (req.path.includes('/api/auth/') || req.path.includes('/api/social-accounts')) {
-    console.log('API request:', {
+    console.log('📡 API request:', {
       method: req.method,
       path: req.path,
       origin: req.headers.origin,
+      userAgent: req.headers['user-agent']?.slice(0, 50) + '...',
       headers: {
         authorization: req.headers.authorization ? 'Bearer ***' : undefined,
         'content-type': req.headers['content-type']
@@ -192,7 +236,13 @@ app.use(express.static(path.join(__dirname, 'dist')));
 // Utility functions
 const generateToken = (userId, workspaceId) => {
   return jwt.sign(
-    { userId, workspaceId, timestamp: Date.now() },
+    { 
+      userId, 
+      workspaceId, 
+      timestamp: Date.now(),
+      brand: BRAND_CONFIG.name,
+      version: BRAND_CONFIG.version
+    },
     JWT_SECRET,
     { expiresIn: '7d' }
   );
@@ -212,8 +262,8 @@ const authenticateToken = (req, res, next) => {
   const token = authHeader && authHeader.split(' ')[1];
   
   if (!token) {
-    console.log('No token provided');
-    return res.status(401).json({ error: 'Access token required' });
+    console.log('🔒 No token provided');
+    return res.status(401).json(createResponse(null, 'Access token required', 'error'));
   }
   
   try {
@@ -222,16 +272,16 @@ const authenticateToken = (req, res, next) => {
     const workspace = workspaces.get(decoded.workspaceId);
     
     if (!user || !workspace) {
-      console.log('User or workspace not found for token');
-      return res.status(401).json({ error: 'Invalid token' });
+      console.log('🔒 User or workspace not found for token');
+      return res.status(401).json(createResponse(null, 'Invalid token', 'error'));
     }
     
     req.user = user;
     req.workspace = workspace;
     next();
   } catch (error) {
-    console.log('Token verification error:', error.message);
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    console.log('🔒 Token verification error:', error.message);
+    return res.status(401).json(createResponse(null, 'Invalid or expired token', 'error'));
   }
 };
 
@@ -296,21 +346,26 @@ const createDemoUsers = async () => {
   }
 };
 
-// Auth Routes
+// Brand info endpoint
+app.get('/api/brand', (req, res) => {
+  res.json(createResponse(BRAND_CONFIG, 'Brand information retrieved successfully'));
+});
+
+// Auth Routes with enhanced branding
 app.post('/api/auth/register', async (req, res) => {
   try {
-    console.log('Registration attempt:', req.body);
+    console.log('📝 Registration attempt:', { email: req.body.email, timestamp: new Date().toISOString() });
     const { firstName, lastName, email, password, username } = req.body;
     
     // Validation
     if (!firstName || !lastName || !email || !password) {
-      console.log('Missing required fields');
-      return res.status(400).json({ error: 'All fields are required' });
+      console.log('❌ Missing required fields');
+      return res.status(400).json(createResponse(null, 'All fields are required', 'error'));
     }
     
     if (users.has(email)) {
-      console.log('Email already exists:', email);
-      return res.status(400).json({ error: 'Email already registered' });
+      console.log('❌ Email already exists:', email);
+      return res.status(400).json(createResponse(null, 'Email already registered', 'error'));
     }
     
     // Create user
@@ -352,53 +407,52 @@ app.post('/api/auth/register', async (req, res) => {
     
     console.log('✅ User registered successfully:', email);
     
-    res.status(201).json({
-      success: true,
+    res.status(201).json(createResponse({
       token,
       user: userWithoutPassword,
       workspace
-    });
+    }, `Welcome to ${BRAND_CONFIG.name}! Your account has been created successfully.`, 'success'));
   } catch (error) {
     console.error('❌ Registration error:', error);
-    res.status(500).json({ error: 'Registration failed. Please try again.' });
+    res.status(500).json(createResponse(null, 'Registration failed. Please try again.', 'error'));
   }
 });
 
 app.post('/api/auth/login', async (req, res) => {
   try {
-    console.log('Login attempt:', { email: req.body.email, timestamp: new Date().toISOString() });
+    console.log('🔐 Login attempt:', { email: req.body.email, timestamp: new Date().toISOString() });
     const { email, password } = req.body;
     
     if (!email || !password) {
       console.log('❌ Missing email or password');
-      return res.status(400).json({ error: 'Email and password are required' });
+      return res.status(400).json(createResponse(null, 'Email and password are required', 'error'));
     }
     
-    console.log('Looking for user:', email);
-    console.log('Available users:', Array.from(users.keys()));
+    console.log('🔍 Looking for user:', email);
+    console.log('📋 Available users:', Array.from(users.keys()));
     
     const user = users.get(email);
     if (!user) {
       console.log('❌ User not found:', email);
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json(createResponse(null, 'Invalid credentials', 'error'));
     }
     
-    console.log('User found, checking password...');
+    console.log('🔒 User found, checking password...');
     const validPassword = await comparePassword(password, user.password);
     if (!validPassword) {
       console.log('❌ Invalid password for:', email);
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json(createResponse(null, 'Invalid credentials', 'error'));
     }
     
     if (user.status !== 'ACTIVE') {
       console.log('❌ Account not active:', email);
-      return res.status(401).json({ error: 'Account is not active' });
+      return res.status(401).json(createResponse(null, 'Account is not active', 'error'));
     }
     
     const workspace = Array.from(workspaces.values()).find(w => w.ownerId === user.id);
     if (!workspace) {
       console.log('❌ No workspace found for user:', email);
-      return res.status(500).json({ error: 'No workspace found for user' });
+      return res.status(500).json(createResponse(null, 'No workspace found for user', 'error'));
     }
     
     const token = generateToken(user.id, workspace.id);
@@ -408,15 +462,14 @@ app.post('/api/auth/login', async (req, res) => {
     
     console.log('✅ Login successful:', email);
     
-    res.json({
-      success: true,
+    res.json(createResponse({
       token,
       user: userWithoutPassword,
       workspace
-    });
+    }, `Welcome back to ${BRAND_CONFIG.name}!`, 'success'));
   } catch (error) {
     console.error('❌ Login error:', error);
-    res.status(500).json({ error: 'Login failed. Please try again.' });
+    res.status(500).json(createResponse(null, 'Login failed. Please try again.', 'error'));
   }
 });
 
@@ -425,42 +478,41 @@ app.get('/api/auth/verify', authenticateToken, (req, res) => {
   
   console.log('✅ Token verified for:', req.user.email);
   
-  res.json({
-    success: true,
+  res.json(createResponse({
     user: userWithoutPassword,
     workspace: req.workspace
-  });
+  }, 'Token verified successfully', 'success'));
 });
 
 app.post('/api/auth/logout', (req, res) => {
-  console.log('User logged out');
-  res.json({ success: true, message: 'Logged out successfully' });
+  console.log('👋 User logged out');
+  res.json(createResponse(null, `Thank you for using ${BRAND_CONFIG.name}!`, 'success'));
 });
 
-// Social accounts routes - FIXED to show only current user's accounts
+// Social accounts routes - Enhanced with branding
 app.get('/api/social-accounts', authenticateToken, async (req, res) => {
   try {
-    console.log('Getting social accounts for user:', req.user.id);
+    console.log('📱 Getting social accounts for user:', req.user.id);
     
     let accounts = socialAccounts.get(req.user.id) || [];
-    console.log('Found accounts for user:', accounts.length);
+    console.log('📊 Found accounts for user:', accounts.length);
     
     // If using real UploadPost API and have the key
     if (process.env.UPLOADPOST_KEY) {
       try {
         const uploadPostAccounts = await uploadPost.getAccounts(req.user.id);
-        console.log('UploadPost accounts:', uploadPostAccounts.length);
+        console.log('🔗 UploadPost accounts:', uploadPostAccounts.length);
         accounts = uploadPostAccounts;
         socialAccounts.set(req.user.id, accounts);
       } catch (error) {
-        console.error('UploadPost API error:', error);
+        console.error('❌ UploadPost API error:', error);
       }
     }
     
-    res.json({ success: true, accounts });
+    res.json(createResponse({ accounts }, 'Social accounts retrieved successfully', 'success'));
   } catch (error) {
     console.error('❌ Social accounts error:', error);
-    res.status(500).json({ error: 'Failed to fetch social accounts' });
+    res.status(500).json(createResponse(null, 'Failed to fetch social accounts', 'error'));
   }
 });
 
@@ -468,15 +520,15 @@ app.get('/api/social-accounts', authenticateToken, async (req, res) => {
 app.get('/api/social-accounts/workspace/:workspaceId', authenticateToken, async (req, res) => {
   try {
     const { workspaceId } = req.params;
-    console.log('Getting social accounts for workspace:', workspaceId, 'user:', req.user.id);
+    console.log('🏢 Getting social accounts for workspace:', workspaceId, 'user:', req.user.id);
     
     // Verify user has access to this workspace
     if (req.workspace.id !== workspaceId) {
-      return res.status(403).json({ error: 'Access denied to workspace' });
+      return res.status(403).json(createResponse(null, 'Access denied to workspace', 'error'));
     }
     
     let accounts = socialAccounts.get(req.user.id) || [];
-    console.log('Found accounts for user in workspace:', accounts.length);
+    console.log('📊 Found accounts for user in workspace:', accounts.length);
     
     // If using real UploadPost API
     if (process.env.UPLOADPOST_KEY) {
@@ -485,14 +537,14 @@ app.get('/api/social-accounts/workspace/:workspaceId', authenticateToken, async 
         accounts = uploadPostAccounts;
         socialAccounts.set(req.user.id, accounts);
       } catch (error) {
-        console.error('UploadPost API error:', error);
+        console.error('❌ UploadPost API error:', error);
       }
     }
     
-    res.json({ socialAccounts: accounts });
+    res.json(createResponse({ socialAccounts: accounts }, 'Workspace social accounts retrieved successfully', 'success'));
   } catch (error) {
     console.error('❌ Workspace social accounts error:', error);
-    res.status(500).json({ error: 'Failed to fetch social accounts' });
+    res.status(500).json(createResponse(null, 'Failed to fetch social accounts', 'error'));
   }
 });
 
@@ -509,18 +561,20 @@ app.post('/api/social-accounts/connect', authenticateToken, async (req, res) => 
       });
       const jwtToken = await uploadPost.generateJWT(req.user.id);
       const connectUrl = `https://uploadpost.io/connect?jwt=${encodeURIComponent(jwtToken)}&redirect_uri=${encodeURIComponent(FE + '/?connected=success')}`;
-      return res.json({ success: true, auth_url: connectUrl, connectionUrl: connectUrl });
+      return res.json(createResponse({ 
+        auth_url: connectUrl, 
+        connectionUrl: connectUrl 
+      }, 'Social media connection URL generated', 'success'));
     }
     
     // Demo fallback
-    return res.json({ 
-      success: true, 
+    return res.json(createResponse({ 
       connectionUrl: FE + '/demo/social-connect.html', 
       demo: true 
-    });
+    }, 'Demo social media connection ready', 'success'));
   } catch (error) {
     console.error('❌ Social connect error:', error);
-    return res.status(502).json({ success: false, error: `Upload-Post error: ${error.message}` });
+    return res.status(502).json(createResponse(null, `Upload-Post error: ${error.message}`, 'error'));
   }
 });
 
@@ -536,46 +590,57 @@ app.get('/api/social-accounts/platforms', (req, res) => {
     { id: 'threads', name: 'Threads', description: 'Text-based conversations', color: '#000000' }
   ];
   
-  res.json({ platforms });
+  res.json(createResponse({ platforms }, 'Available social media platforms retrieved', 'success'));
 });
 
 // Demo social connect page
 app.get('/demo/social-connect.html', (req, res) => {
   res.setHeader('Content-Type', 'text/html');
-  res.end(`<!doctype html><meta charset="utf-8"><title>Demo Connect</title><style>body{font-family:system-ui;padding:24px;text-align:center;background:#f9fafb;color:#111827} .container{max-width:400px;margin:0 auto;background:white;padding:32px;border-radius:16px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1)} .spinner{width:40px;height:40px;border:4px solid #e5e7eb;border-top:4px solid #6366f1;border-radius:50%;animation:spin 1s linear infinite;margin:16px auto} h2{color:#1f2937;margin-bottom:16px} @keyframes spin{to{transform:rotate(360deg)}}</style><div class="container"><h2>Connecting demo accounts…</h2><div class="spinner"></div><p>This is a demo environment. Your accounts are being connected.</p></div><script>setTimeout(()=>{ try{ window.opener && window.opener.postMessage({ type:'demo_connect_success' },'*'); }catch(e){} window.close(); }, 2000);</script>`);
+  res.end(`<!doctype html><meta charset="utf-8"><title>${BRAND_CONFIG.name} - Demo Connect</title><style>body{font-family:'Inter',system-ui;padding:24px;text-align:center;background:linear-gradient(135deg,#faf5ff,#eff6ff);color:#111827} .container{max-width:400px;margin:0 auto;background:white;padding:32px;border-radius:24px;box-shadow:0 25px 50px -12px rgba(168,85,247,0.25)} .spinner{width:40px;height:40px;border:4px solid #e5e7eb;border-top:4px solid #a855f7;border-radius:50%;animation:spin 1s linear infinite;margin:16px auto} h2{color:#1f2937;margin-bottom:16px;font-weight:700} .brand{color:#a855f7;font-weight:800} @keyframes spin{to{transform:rotate(360deg)}}</style><div class="container"><h2>Connecting to <span class="brand">${BRAND_CONFIG.name}</span></h2><div class="spinner"></div><p>This is a demo environment. Your social media accounts are being connected securely.</p><p style="font-size:0.875rem;color:#6b7280;margin-top:16px">${BRAND_CONFIG.tagline}</p></div><script>setTimeout(()=>{ try{ window.opener && window.opener.postMessage({ type:'demo_connect_success' },'*'); }catch(e){} window.close(); }, 2000);</script>`);
 });
 
-// Basic API routes for demo
+// Basic API routes for demo with enhanced responses
 app.get('/api/videos/workspace/:id', authenticateToken, (req, res) => {
   const workspaceVideos = Array.from(videos.values()).filter(v => v.workspaceId === req.params.id);
-  res.json({ success: true, videos: workspaceVideos });
+  res.json(createResponse({ videos: workspaceVideos }, 'Workspace videos retrieved successfully', 'success'));
 });
 
 app.get('/api/workspaces', authenticateToken, (req, res) => {
   const userWorkspaces = Array.from(workspaces.values()).filter(w => w.ownerId === req.user.id);
-  res.json({ success: true, workspaces: userWorkspaces });
+  res.json(createResponse({ workspaces: userWorkspaces }, 'User workspaces retrieved successfully', 'success'));
 });
 
 app.get('/api/workspaces/:id', authenticateToken, (req, res) => {
   const workspace = workspaces.get(req.params.id);
   if (!workspace || workspace.ownerId !== req.user.id) {
-    return res.status(404).json({ error: 'Workspace not found' });
+    return res.status(404).json(createResponse(null, 'Workspace not found', 'error'));
   }
-  res.json({ success: true, workspace });
+  res.json(createResponse({ workspace }, 'Workspace details retrieved successfully', 'success'));
 });
 
-// Health check
+// Enhanced health check with brand information
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  const healthData = {
+    status: 'healthy',
     timestamp: new Date().toISOString(),
-    users: users.size,
-    workspaces: workspaces.size,
-    socialAccounts: socialAccounts.size,
-    port: PORT,
-    nodeEnv: process.env.NODE_ENV,
-    frontendUrl: process.env.FRONTEND_URL
-  });
+    uptime: process.uptime(),
+    version: BRAND_CONFIG.version,
+    brand: BRAND_CONFIG.name,
+    environment: process.env.NODE_ENV || 'development',
+    features: BRAND_CONFIG.features,
+    stats: {
+      users: users.size,
+      workspaces: workspaces.size,
+      socialAccounts: socialAccounts.size
+    },
+    server: {
+      port: PORT,
+      nodeEnv: process.env.NODE_ENV,
+      frontendUrl: process.env.FRONTEND_URL
+    }
+  };
+  
+  res.json(createResponse(healthData, `${BRAND_CONFIG.name} server is running smoothly`, 'success'));
 });
 
 // SPA fallback - must be last
@@ -583,21 +648,37 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist/index.html'));
 });
 
-// Error handling middleware
+// Enhanced error handling middleware with branding
 app.use((error, req, res, next) => {
   console.error('❌ Server error:', error);
-  res.status(500).json({ error: 'Internal server error' });
+  
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  const errorResponse = createResponse(
+    isDevelopment ? { error: error.message, stack: error.stack } : null,
+    'An unexpected error occurred. Our team has been notified.',
+    'error',
+    { errorId: Date.now().toString() }
+  );
+  
+  res.status(500).json(errorResponse);
 });
 
-// Start server
+// Start server with enhanced branding
 app.listen(PORT, async () => {
   await createDemoUsers();
+  
   console.log('');
-  console.log('🚀 Content Fabrica Server running!');
+  console.log('🎨 ================================');
+  console.log(`🚀 ${BRAND_CONFIG.name} Server`);
+  console.log(`📝 ${BRAND_CONFIG.tagline}`);
+  console.log(`🔢 Version: ${BRAND_CONFIG.version}`);
+  console.log('🎨 ================================');
   console.log(`📍 Server: http://localhost:${PORT}`);
   console.log(`📱 Frontend: ${process.env.FRONTEND_URL || 'https://contentfabrica.com'}`);
   console.log(`🌐 API: http://localhost:${PORT}/api`);
   console.log(`🧪 Demo User: demo@contentfabrica.com / demo123`);
+  console.log(`💡 Features: ${BRAND_CONFIG.features.join(', ')}`);
+  console.log('🎨 ================================');
   console.log('');
 });
 
