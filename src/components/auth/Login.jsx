@@ -10,7 +10,14 @@ const Login = ({ onToggleMode }) => {
   const [rememberMe, setRememberMe] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const hardStopEvent = (e) => { if (!e) return; e.preventDefault(); e.stopPropagation(); e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function' && e.nativeEvent.stopImmediatePropagation(); };
+  const stopAll = (e) => {
+    if (!e) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
+      e.nativeEvent.stopImmediatePropagation();
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -36,9 +43,13 @@ const Login = ({ onToggleMode }) => {
       const result = await login(formData.email, formData.password);
       if (!result.success) {
         const msg = (result.error || '').toLowerCase();
-        if (msg.includes('invalid credentials') || msg.includes('password') || msg.includes('wrong')) setErrors({ password: 'Wrong password. Please try again.' });
-        else if (msg.includes('email') || msg.includes('user')) setErrors({ email: 'Account not found with this email address.' });
-        else setErrors({ general: result.error || 'Login failed. Please try again.' });
+        if (msg.includes('invalid credentials') || msg.includes('password') || msg.includes('wrong')) {
+          setErrors({ password: 'Wrong password. Please try again.' });
+        } else if (msg.includes('email') || msg.includes('user')) {
+          setErrors({ email: 'Account not found with this email address.' });
+        } else {
+          setErrors({ general: result.error || 'Login failed. Please try again.' });
+        }
       }
     } catch (err) {
       setErrors({ general: 'Network error. Please try again.' });
@@ -48,8 +59,8 @@ const Login = ({ onToggleMode }) => {
     return false;
   };
 
-  const handleSubmit = async (e) => { hardStopEvent(e); await submitCore(); return false; };
-  const handleEnter = async (e) => { if (e.key === 'Enter') { hardStopEvent(e); await submitCore(); } };
+  const handleSubmit = async (e) => { stopAll(e); await submitCore(); return false; };
+  const handleEnter = async (e) => { if (e.key === 'Enter') { stopAll(e); await submitCore(); } };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -64,6 +75,7 @@ const Login = ({ onToggleMode }) => {
           <p className="mt-2 text-sm text-gray-600">Sign in to your Content Factory account</p>
         </div>
 
+        {/* IMPORTANT: noValidate disables browser native validation UI */}
         <form className="mt-8 space-y-6" onSubmit={handleSubmit} onKeyDown={handleEnter} noValidate>
           {errors.general && (
             <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 flex items-center space-x-3">
@@ -87,7 +99,7 @@ const Login = ({ onToggleMode }) => {
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Lock className="h-5 w-5 text-gray-400" /></div>
                 <input id="password" name="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={formData.password} onChange={handleChange} onInvalid={(e)=>e.preventDefault()} className={`block w-full pl-10 pr-10 py-3 border-2 rounded-xl focus:outline-none focus:ring-4 transition-all duration-200 ${errors.password ? 'border-red-300 bg-red-50 focus:border-red-500 focus:ring-red-200' : 'border-gray-300 bg-white hover:border-gray-400 focus:border-blue-500 focus:ring-blue-200'}`} placeholder="Enter your password" disabled={isSubmitting || isLoading} />
-                <button type="button" className="absolute inset-y-0 right-0 pr-3 flex items-center" onClick={(e)=>{hardStopEvent(e); setShowPassword(!showPassword);}} disabled={isSubmitting || isLoading}>{showPassword ? (<EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />) : (<Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />)}</button>
+                <button type="button" className="absolute inset-y-0 right-0 pr-3 flex items-center" onClick={(e)=>{ stopAll(e); setShowPassword(!showPassword); }} disabled={isSubmitting || isLoading}>{showPassword ? (<EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />) : (<Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />)}</button>
               </div>
               {errors.password && (<p className="mt-2 text-sm text-red-600 flex items-center gap-1"><AlertCircle className="h-4 w-4" />{errors.password}</p>)}
             </div>
@@ -104,11 +116,14 @@ const Login = ({ onToggleMode }) => {
           </div>
 
           <div>
-            <button type="submit" onClick={hardStopEvent} disabled={isSubmitting || isLoading} className="group relative w-full flex justify-center py-4 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-4 focus:ring-offset-2 focus:ring-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02]">{isSubmitting || isLoading ? (<><Loader2 className="w-5 h-5 mr-2 animate-spin" />Signing in...</>) : ('Sign in to Content Factory')}</button>
+            {/* IMPORTANT: Remove any onClick stop here so submit runs */}
+            <button type="submit" disabled={isSubmitting || isLoading} className="group relative w-full flex justify-center py-4 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-4 focus:ring-offset-2 focus:ring-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02]">
+              {isSubmitting || isLoading ? (<><Loader2 className="w-5 h-5 mr-2 animate-spin" />Signing in...</>) : ('Sign in to Content Factory')}
+            </button>
           </div>
 
           <div className="text-center">
-            <p className="text-sm text-gray-600">Don't have an account?{' '}<button type="button" onClick={(e)=>{hardStopEvent(e); onToggleMode();}} className="font-medium text-blue-600 hover:text-blue-500 transition-colors" disabled={isSubmitting || isLoading}>Sign up for free</button></p>
+            <p className="text-sm text-gray-600">Don't have an account?{' '}<button type="button" onClick={(e)=>{ stopAll(e); onToggleMode(); }} className="font-medium text-blue-600 hover:text-blue-500 transition-colors" disabled={isSubmitting || isLoading}>Sign up for free</button></p>
           </div>
         </form>
 
@@ -119,7 +134,7 @@ const Login = ({ onToggleMode }) => {
             <div className="bg-white rounded-lg p-3 border border-blue-200"><div className="flex items-center justify-between"><span className="text-xs text-gray-500 font-medium">Email:</span><code className="text-xs font-mono text-blue-700 bg-blue-100 px-2 py-1 rounded">demo@contentfabrica.com</code></div></div>
             <div className="bg-white rounded-lg p-3 border border-blue-200"><div className="flex items-center justify-between"><span className="text-xs text-gray-500 font-medium">Password:</span><code className="text-xs font-mono text-blue-700 bg-blue-100 px-2 py-1 rounded">demo123</code></div></div>
           </div>
-          <button onClick={(e)=>{hardStopEvent(e); setFormData({ email: 'demo@contentfabrica.com', password: 'demo123' }); setErrors({});}} className="mt-3 w-full text-xs bg-blue-600 text-white py-2 px-3 rounded-lg hover:bg-blue-700 transition-all duration-200 font-medium" disabled={isSubmitting || isLoading}>Fill Demo Credentials</button>
+          <button onClick={(e)=>{ stopAll(e); setFormData({ email: 'demo@contentfabrica.com', password: 'demo123' }); setErrors({}); }} className="mt-3 w-full text-xs bg-blue-600 text-white py-2 px-3 rounded-lg hover:bg-blue-700 transition-all duration-200 font-medium" disabled={isSubmitting || isLoading}>Fill Demo Credentials</button>
         </div>
       </div>
     </div>
