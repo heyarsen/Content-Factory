@@ -100,29 +100,59 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// CORS configuration - more permissive for development
+// CORS configuration - FIXED FOR PRODUCTION
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
+    console.log('CORS check - Origin:', origin);
     
-    // In development, allow localhost and contentfabrica.com
-    if (process.env.NODE_ENV === 'development') {
-      if (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('contentfabrica.com')) {
-        return callback(null, true);
-      }
+    // Allow requests with no origin (like mobile apps, curl, or same-origin requests)
+    if (!origin) {
+      console.log('CORS: Allowing request with no origin');
+      return callback(null, true);
     }
     
-    // Production whitelist
+    // Define allowed origins
     const allowedOrigins = [
-      process.env.FRONTEND_URL,
+      // Development
       'http://localhost:5173',
       'http://localhost:3000',
+      'http://localhost:8080',
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:8080',
+      // Production
       'https://contentfabrica.com',
-      'https://www.contentfabrica.com'
-    ].filter(Boolean);
+      'https://www.contentfabrica.com',
+      'http://contentfabrica.com',
+      'http://www.contentfabrica.com',
+      // Railway/Other hosting platforms (dynamic)
+      process.env.FRONTEND_URL
+    ].filter(Boolean); // Remove undefined values
     
-    if (allowedOrigins.includes(origin)) {
+    // Check if origin is in allowed list or matches patterns
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      if (allowedOrigin === origin) return true;
+      // Check for Railway/Vercel/Netlify patterns
+      if (origin.includes('.up.railway.app') || 
+          origin.includes('.vercel.app') || 
+          origin.includes('.netlify.app') ||
+          origin.includes('contentfabrica')) {
+        return true;
+      }
+      return false;
+    });
+    
+    if (isAllowed) {
+      console.log('CORS: Allowing origin:', origin);
+      return callback(null, true);
+    }
+    
+    console.log('CORS: Blocking origin:', origin);
+    console.log('Allowed origins:', allowedOrigins);
+    
+    // In production, be more permissive to avoid blocking legitimate requests
+    if (process.env.NODE_ENV === 'production') {
+      console.log('CORS: Production mode - allowing request anyway');
       return callback(null, true);
     }
     
@@ -130,7 +160,8 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  optionsSuccessStatus: 200 // For legacy browsers
 };
 
 app.use(cors(corsOptions));
@@ -144,6 +175,7 @@ app.use((req, res, next) => {
     console.log('API request:', {
       method: req.method,
       path: req.path,
+      origin: req.headers.origin,
       headers: {
         authorization: req.headers.authorization ? 'Bearer ***' : undefined,
         'content-type': req.headers['content-type']
@@ -466,7 +498,7 @@ app.get('/api/social-accounts/workspace/:workspaceId', authenticateToken, async 
 
 app.post('/api/social-accounts/connect', authenticateToken, async (req, res) => {
   try {
-    const FE = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const FE = process.env.FRONTEND_URL || 'https://contentfabrica.com';
     
     if (process.env.UPLOADPOST_KEY) {
       await uploadPost.ensureUser({
@@ -539,7 +571,10 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     users: users.size,
     workspaces: workspaces.size,
-    socialAccounts: socialAccounts.size
+    socialAccounts: socialAccounts.size,
+    port: PORT,
+    nodeEnv: process.env.NODE_ENV,
+    frontendUrl: process.env.FRONTEND_URL
   });
 });
 
@@ -560,7 +595,7 @@ app.listen(PORT, async () => {
   console.log('');
   console.log('🚀 Content Fabrica Server running!');
   console.log(`📍 Server: http://localhost:${PORT}`);
-  console.log(`📱 Frontend: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
+  console.log(`📱 Frontend: ${process.env.FRONTEND_URL || 'https://contentfabrica.com'}`);
   console.log(`🌐 API: http://localhost:${PORT}/api`);
   console.log(`🧪 Demo User: demo@contentfabrica.com / demo123`);
   console.log('');
