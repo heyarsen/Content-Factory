@@ -55,9 +55,16 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
 
     // Username used for Upload-Post profile creation and linking
     // Use full email as username to avoid conflicts (e.g., heyarsen@icloud.com vs heyarsen@gmail.com)
-    const derivedUsername = user.user_metadata?.username ||
-      (userEmail ? userEmail : undefined) ||
-      userId.replace(/-/g, '_')
+    // Sanitize: Username may contain only letters, numbers, underscores, @ and hyphens
+    // So we replace dots with underscores
+    let derivedUsername = user.user_metadata?.username
+    if (!derivedUsername && userEmail) {
+      // Replace dots with underscores, keep @ and other allowed characters
+      derivedUsername = userEmail.replace(/\./g, '_')
+    }
+    if (!derivedUsername) {
+      derivedUsername = userId.replace(/-/g, '_')
+    }
 
     // Determine the final username to use
     const finalUsername = uploadPostUsername || derivedUsername || userId.replace(/-/g, '_')
