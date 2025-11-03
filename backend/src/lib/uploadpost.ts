@@ -134,15 +134,28 @@ export async function createUserProfile(
 }
 
 // Generate JWT for user to link social accounts
-export async function generateUserJWT(userId: string): Promise<string> {
+export async function generateUserJWT(userId: string, username?: string): Promise<string> {
   try {
-    console.log('Generating JWT for user:', userId)
+    console.log('Generating JWT for user:', userId, 'username:', username)
+    
+    const payload: any = {
+      user_id: userId,
+    }
+    
+    // profile_username is required by Upload-Post API
+    if (username) {
+      payload.profile_username = username
+    } else {
+      // Extract username from userId if it looks like an email, otherwise use userId
+      const extractedUsername = userId.includes('@') ? userId.split('@')[0] : userId
+      payload.profile_username = extractedUsername
+    }
+    
+    console.log('JWT generation payload:', payload)
     
     const response = await axios.post(
       `${UPLOADPOST_API_URL}/uploadposts/users/generate-jwt`,
-      {
-        user_id: userId,
-      },
+      payload,
       {
         headers: {
           'Authorization': getAuthHeader(),

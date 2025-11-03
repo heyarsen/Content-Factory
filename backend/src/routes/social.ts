@@ -134,7 +134,13 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
     // Generate JWT for linking accounts
     try {
       console.log('Generating JWT for Upload-Post user ID:', uploadPostUserId)
-      const jwt = await generateUserJWT(uploadPostUserId)
+      
+      // Get username for JWT generation (use the username we created the profile with)
+      const userEmail = user.email || user.user_metadata?.email
+      const username = user.user_metadata?.username || 
+                     (userEmail ? userEmail.split('@')[0] : uploadPostUserId)
+      
+      const jwt = await generateUserJWT(uploadPostUserId, username)
       console.log('JWT generated successfully, length:', jwt?.length)
 
       // Create or update account record
