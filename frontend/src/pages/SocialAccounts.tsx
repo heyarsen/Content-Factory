@@ -31,6 +31,8 @@ const platformNames = {
   facebook: 'Facebook',
 }
 
+const fallbackConnectBaseUrl = 'https://app.contentfabrica.com/posts'
+
 export function SocialAccounts() {
   const [accounts, setAccounts] = useState<SocialAccount[]>([])
   const [loading, setLoading] = useState(true)
@@ -112,6 +114,42 @@ export function SocialAccounts() {
   }, [connectPortal])
 
   const handleConnect = async (platform: SocialAccount['platform']) => {
+    const platformLabel = platformNames[platform] || platform
+    const portalWindow = window.open('', '_blank')
+    let portalNavigated = false
+
+    const cleanupPortalWindow = () => {
+      if (portalWindow && !portalNavigated && !portalWindow.closed) {
+        portalWindow.close()
+      }
+    }
+
+    const openUrlInPortal = (url: string) => {
+      if (!url) return
+
+      if (portalWindow && !portalWindow.closed) {
+        portalWindow.location.replace(url)
+        portalWindow.focus()
+        portalNavigated = true
+        return
+      }
+
+      const newWindow = window.open(url, '_blank')
+      if (newWindow) {
+        newWindow.focus()
+        portalNavigated = true
+      } else {
+        alert(`We couldn't automatically open the connection portal. Please open this link manually:\n\n${url}`)
+      }
+    }
+
+    if (portalWindow) {
+      portalWindow.document.write(
+        `<p style="font-family: system-ui, sans-serif; padding: 16px;">Launching ${platformLabel} connection...</p>`
+      )
+      portalWindow.document.close()
+    }
+
     setConnecting(true)
     try {
       const response = await api.post('/api/social/connect', { platform })
@@ -122,8 +160,6 @@ export function SocialAccounts() {
         duration?: string
         redirectUrl?: string
       }
-
-      const platformLabel = platformNames[platform] || platform
 
       localStorage.removeItem(`uploadpost_jwt_${platform}`)
       localStorage.removeItem(`uploadpost_userid_${platform}`)
@@ -152,14 +188,36 @@ export function SocialAccounts() {
       if (accessUrl) {
         const resolvedAccessUrl = buildPlatformUrl(accessUrl)
         localStorage.setItem(`uploadpost_access_url_${platform}`, resolvedAccessUrl)
+        openUrlInPortal(resolvedAccessUrl)
+        if (!portalNavigated) {
+          cleanupPortalWindow()
+        }
         setConnectPortal({
           platform,
           url: resolvedAccessUrl,
           duration,
           redirectUrl,
-          message: message || `Account linking initiated for ${platformLabel}.`,
+          message:
+            message ||
+            `We launched the Upload Post portal for ${platformLabel} in a new tab. Complete the steps there, then return here.`,
         })
       } else {
+        const fallbackUrl = buildPlatformUrl(fallbackConnectBaseUrl)
+        openUrlInPortal(fallbackUrl)
+        if (!portalNavigated) {
+          cleanupPortalWindow()
+        }
+        setConnectPortal({
+          platform,
+          url: fallbackUrl,
+          duration,
+          redirectUrl,
+          message:
+            message
+              ? `${message}\n\nWe opened the Upload Post portal in a new tab for you.`
+              : `We couldn't load a dedicated portal, so we opened the Upload Post dashboard in a new tab. Complete the ${platformLabel} connection there.`,
+        })
+
         const fallbackParts = [
           message || `Account linking initiated for ${platformLabel}.`,
         ]
@@ -174,17 +232,21 @@ export function SocialAccounts() {
           )
         }
 
+        fallbackParts.push(`If the new tab didn't open, copy and paste this link: ${fallbackUrl}`)
+
         alert(fallbackParts.join('\n\n'))
       }
 
       // Reload accounts to show pending status
       loadAccounts()
     } catch (error: any) {
+      cleanupPortalWindow()
       console.error('Failed to connect:', error)
-      const errorMessage = error.response?.data?.error || 
-                          error.response?.data?.details || 
-                          error.message || 
-                          'Failed to initiate connection'
+      const errorMessage =
+        error.response?.data?.error ||
+        error.response?.data?.details ||
+        error.message ||
+        'Failed to initiate connection'
       console.error('Error details:', {
         message: errorMessage,
         fullResponse: error.response?.data,
