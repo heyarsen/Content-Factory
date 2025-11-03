@@ -43,8 +43,8 @@ app.use('/api/social', socialRoutes)
 app.use('/api/posts', postRoutes)
 
 // Serve static files from frontend build (if exists)
-// Compiled path: dist/src/server.js -> go up two levels to backend/public
-const frontendDist = path.join(__dirname, '../../public')
+// Compiled path: backend/dist/server.js -> go up one level to backend/public
+const frontendDist = path.join(__dirname, '../public')
 const indexHtml = path.join(frontendDist, 'index.html')
 
 console.log('Looking for frontend at:', frontendDist)
