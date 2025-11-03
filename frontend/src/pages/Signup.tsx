@@ -100,9 +100,10 @@ export function Signup() {
                 <button
                   type="button"
                   onClick={handleResendVerification}
-                  className="text-purple-600 hover:text-purple-700 font-semibold underline"
+                  disabled={resending}
+                  className="text-purple-600 hover:text-purple-700 font-semibold underline disabled:opacity-50"
                 >
-                  Resend verification email
+                  {resending ? 'Sending...' : 'Resend verification email'}
                 </button>
               </div>
             )}
