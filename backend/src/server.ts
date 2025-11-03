@@ -14,6 +14,9 @@ dotenv.config()
 const app = express()
 const PORT = process.env.PORT || 3001
 
+// Trust proxy - required for Railway and other reverse proxies
+app.set('trust proxy', true)
+
 // Middleware
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
@@ -21,6 +24,22 @@ app.use(cors({
 }))
 app.use(express.json())
 app.use(apiLimiter)
+
+// Root route
+app.get('/', (req, res) => {
+  res.json({
+    message: 'AI Video Generation Platform API',
+    version: '1.0.0',
+    endpoints: {
+      health: '/health',
+      auth: '/api/auth',
+      videos: '/api/videos',
+      social: '/api/social',
+      posts: '/api/posts',
+    },
+    timestamp: new Date().toISOString(),
+  })
+})
 
 // Health check
 app.get('/health', (req, res) => {
