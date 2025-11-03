@@ -37,6 +37,15 @@ export function SocialAccounts() {
   const [connecting, setConnecting] = useState(false)
   const [disconnectModal, setDisconnectModal] = useState<string | null>(null)
   const [disconnecting, setDisconnecting] = useState(false)
+  const [connectPortal, setConnectPortal] = useState<{
+    platform: SocialAccount['platform']
+    url: string
+    duration?: string
+    redirectUrl?: string
+    message?: string
+  } | null>(null)
+  const [portalLoadFailed, setPortalLoadFailed] = useState(false)
+  const [copiedLink, setCopiedLink] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
 
   const loadAccounts = useCallback(async () => {
@@ -70,6 +79,38 @@ export function SocialAccounts() {
     }
   }, [searchParams, setSearchParams, loadAccounts])
 
+  useEffect(() => {
+    if (connectPortal) {
+      setPortalLoadFailed(false)
+      setCopiedLink(false)
+    }
+  }, [connectPortal?.url])
+
+  useEffect(() => {
+    if (!copiedLink) return
+    const timeout = setTimeout(() => setCopiedLink(false), 2000)
+    return () => clearTimeout(timeout)
+  }, [copiedLink])
+
+  const handleCopyPortalLink = useCallback(async () => {
+    if (!connectPortal) return
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(connectPortal.url)
+        setCopiedLink(true)
+        return
+      }
+      throw new Error('Clipboard API not available')
+    } catch (error) {
+      console.warn('Clipboard copy failed, falling back to manual copy.', error)
+      setCopiedLink(false)
+      const manualCopy = window.prompt('Copy the connection URL below:', connectPortal.url)
+      if (manualCopy === null) {
+        // User cancelled prompt; nothing else to do
+      }
+    }
+  }, [connectPortal])
+
   const handleConnect = async (platform: SocialAccount['platform']) => {
     setConnecting(true)
     try {
@@ -95,46 +136,46 @@ export function SocialAccounts() {
         localStorage.setItem(`uploadpost_redirect_url_${platform}`, redirectUrl)
       }
 
-      if (accessUrl) {
-        localStorage.setItem(`uploadpost_access_url_${platform}`, accessUrl)
-        const buildPlatformUrl = (baseUrl: string) => {
-          try {
-            const url = new URL(baseUrl)
-            if (!url.searchParams.has('platform')) {
-              url.searchParams.set('platform', platform)
-            }
-            return url.toString()
-          } catch (error) {
-            const separator = baseUrl.includes('?') ? '&' : '?'
-            return `${baseUrl}${separator}platform=${platform}`
-          }
-        }
+      const buildPlatformUrl = (baseUrl: string) => {
         try {
-          window.open(buildPlatformUrl(accessUrl), '_blank', 'noopener')
-        } catch (openError) {
-          console.warn('Unable to automatically open Upload-Post link:', openError)
+          const url = new URL(baseUrl)
+          if (!url.searchParams.has('platform')) {
+            url.searchParams.set('platform', platform)
+          }
+          return url.toString()
+        } catch (error) {
+          const separator = baseUrl.includes('?') ? '&' : '?'
+          return `${baseUrl}${separator}platform=${platform}`
         }
       }
 
-      const alertParts = [
-        message || `Account linking initiated for ${platformLabel}. Complete the steps in the new tab.`,
-      ]
-
-      if (duration) {
-        alertParts.push(`Link valid for ${duration}.`)
-      }
-
       if (accessUrl) {
-        alertParts.push(`If a new tab did not open, copy this URL to finish linking:\n${accessUrl}`)
-      }
+        const resolvedAccessUrl = buildPlatformUrl(accessUrl)
+        localStorage.setItem(`uploadpost_access_url_${platform}`, resolvedAccessUrl)
+        setConnectPortal({
+          platform,
+          url: resolvedAccessUrl,
+          duration,
+          redirectUrl,
+          message: message || `Account linking initiated for ${platformLabel}.`,
+        })
+      } else {
+        const fallbackParts = [
+          message || `Account linking initiated for ${platformLabel}.`,
+        ]
 
-      if (redirectUrl) {
-        alertParts.push(
-          `Once finished you will be redirected here automatically. If that does not happen, revisit: ${redirectUrl}`
-        )
-      }
+        if (duration) {
+          fallbackParts.push(`Link valid for ${duration}.`)
+        }
 
-      alert(alertParts.join('\n\n'))
+        if (redirectUrl) {
+          fallbackParts.push(
+            `Once finished you will be redirected automatically. If that does not happen, revisit: ${redirectUrl}`
+          )
+        }
+
+        alert(fallbackParts.join('\n\n'))
+      }
 
       // Reload accounts to show pending status
       loadAccounts()
@@ -234,7 +275,7 @@ export function SocialAccounts() {
 
                   {account?.status === 'pending' && (
                     <p className="text-xs text-gray-600 mb-4">
-                      Finish linking in the Upload-Post tab we opened. Refresh after completing the connection.
+                      Finish linking in the connection portal. If you closed it, click Connect again to reopen or use the saved link.
                     </p>
                   )}
 
@@ -271,6 +312,103 @@ export function SocialAccounts() {
             })}
           </div>
         )}
+
+        <Modal
+          isOpen={connectPortal !== null}
+          onClose={() => setConnectPortal(null)}
+          title={
+            connectPortal
+              ? `Connect ${platformNames[connectPortal.platform]}`
+              : 'Connect Social Account'
+          }
+          size="xl"
+        >
+          {connectPortal && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                {connectPortal.message ||
+                  `Follow the steps below to link your ${platformNames[connectPortal.platform]} account without leaving this tab.`}
+              </p>
+              {connectPortal.duration && (
+                <div className="text-xs text-gray-500">
+                  Link valid for {connectPortal.duration}.
+                </div>
+              )}
+              <div className="border border-gray-200 rounded-lg overflow-hidden h-[540px] bg-gray-50">
+                {!portalLoadFailed ? (
+                  <iframe
+                    key={connectPortal.url}
+                    src={connectPortal.url}
+                    title={`${platformNames[connectPortal.platform]} connection portal`}
+                    className="w-full h-full border-0"
+                    onError={() => setPortalLoadFailed(true)}
+                    onLoad={() => setPortalLoadFailed(false)}
+                    allow="clipboard-read; clipboard-write; autoplay; encrypted-media"
+                  />
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-sm text-gray-600 p-6 space-y-4">
+                    <p>The connection portal could not be displayed here.</p>
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="sm"
+                      onClick={() => window.open(connectPortal.url, '_blank', 'noopener')}
+                    >
+                      <Link2 className="w-4 h-4 mr-2" />
+                      Open in new tab
+                    </Button>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Connection URL
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={connectPortal.url}
+                    className="flex-1 text-xs px-3 py-2 border border-gray-200 rounded-md bg-white truncate"
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleCopyPortalLink}
+                  >
+                    {copiedLink ? 'Copied!' : 'Copy'}
+                  </Button>
+                </div>
+              </div>
+              {connectPortal.redirectUrl && (
+                <p className="text-xs text-gray-500">
+                  When you finish in the portal you should be redirected automatically. If that does not happen, return to{' '}
+                  <span className="font-medium text-gray-700">{connectPortal.redirectUrl}</span>.
+                </p>
+              )}
+              <div className="flex flex-wrap justify-end gap-3">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => window.open(connectPortal.url, '_blank', 'noopener')}
+                >
+                  <Link2 className="w-4 h-4 mr-2" />
+                  Open in new tab
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setConnectPortal(null)}
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
 
         <Modal
           isOpen={disconnectModal !== null}
