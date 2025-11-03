@@ -221,20 +221,40 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
         message: jwtError.message,
         stack: jwtError.stack,
         uploadPostUserId,
+        username,
+        errorResponse: jwtError.response?.data,
       })
+      
+      const errorMessage = jwtError.message || 'Failed to complete account setup'
+      const apiError = jwtError.response?.data?.message || jwtError.response?.data?.error
+      
       return res.status(500).json({
-        error: 'Failed to complete account setup',
-        details: jwtError.message,
+        error: errorMessage || 'Failed to complete account setup',
+        details: apiError || jwtError.message || 'Unknown error occurred',
         ...(process.env.NODE_ENV === 'development' && {
           stack: jwtError.stack,
+          fullError: jwtError.response?.data,
         }),
       })
     }
   } catch (error: any) {
-    console.error('Connect account error:', error)
+    console.error('Connect account error:', {
+      message: error.message,
+      stack: error.stack,
+      errorResponse: error.response?.data,
+      userId: req.userId,
+    })
+    
+    const errorMessage = error.message || 'Failed to initiate connection'
+    const apiError = error.response?.data?.message || error.response?.data?.error || error.response?.data?.details
+    
     res.status(500).json({
-      error: error.message || 'Failed to initiate connection',
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      error: errorMessage,
+      details: apiError || errorMessage,
+      ...(process.env.NODE_ENV === 'development' && {
+        stack: error.stack,
+        fullError: error.response?.data,
+      }),
     })
   }
 })

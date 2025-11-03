@@ -147,8 +147,9 @@ export async function generateUserJWT(userId: string, username?: string): Promis
     let profileUsername = username
     
     if (!profileUsername || profileUsername.trim() === '') {
-      // If userId looks like an email, use it directly; otherwise use it as-is (remove dashes if needed)
-      profileUsername = userId.includes('@') ? userId : userId.substring(0, 50).replace(/-/g, '')
+      // If userId looks like an email, use it as username (full email to avoid conflicts)
+      // Otherwise, use userId as-is (remove dashes if needed)
+      profileUsername = userId.includes('@') ? userId : userId.replace(/-/g, '_')
     }
     
     if (!profileUsername || profileUsername.trim() === '') {
