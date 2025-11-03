@@ -53,10 +53,49 @@ CREATE INDEX IF NOT EXISTS idx_scheduled_posts_user_id ON scheduled_posts(user_i
 CREATE INDEX IF NOT EXISTS idx_scheduled_posts_video_id ON scheduled_posts(video_id);
 CREATE INDEX IF NOT EXISTS idx_scheduled_posts_status ON scheduled_posts(status);
 
+-- Content categories table
+CREATE TABLE IF NOT EXISTS content_categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  category_key TEXT NOT NULL,
+  name TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+  description TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE (user_id, category_key)
+);
+
+-- Prompt templates table
+CREATE TABLE IF NOT EXISTS prompt_templates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  template_key TEXT NOT NULL,
+  template_type TEXT NOT NULL CHECK (template_type IN ('ideas', 'research', 'script')),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+  lang TEXT NOT NULL DEFAULT 'english',
+  persona TEXT,
+  config JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE (user_id, template_key),
+  UNIQUE (user_id, template_type)
+);
+
+-- Indexes for new tables
+CREATE INDEX IF NOT EXISTS idx_content_categories_user_id ON content_categories(user_id);
+CREATE INDEX IF NOT EXISTS idx_content_categories_status ON content_categories(status);
+CREATE INDEX IF NOT EXISTS idx_content_categories_order ON content_categories(user_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_prompt_templates_user_id ON prompt_templates(user_id);
+CREATE INDEX IF NOT EXISTS idx_prompt_templates_type ON prompt_templates(template_type);
+
 -- Enable Row Level Security (RLS)
 ALTER TABLE videos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE social_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE scheduled_posts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE content_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE prompt_templates ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for videos
 CREATE POLICY "Users can view own videos" ON videos FOR SELECT USING (auth.uid() = user_id);
@@ -75,4 +114,16 @@ CREATE POLICY "Users can view own scheduled posts" ON scheduled_posts FOR SELECT
 CREATE POLICY "Users can insert own scheduled posts" ON scheduled_posts FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update own scheduled posts" ON scheduled_posts FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Users can delete own scheduled posts" ON scheduled_posts FOR DELETE USING (auth.uid() = user_id);
+
+-- RLS Policies for content_categories
+CREATE POLICY "Users can view own content categories" ON content_categories FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own content categories" ON content_categories FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own content categories" ON content_categories FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own content categories" ON content_categories FOR DELETE USING (auth.uid() = user_id);
+
+-- RLS Policies for prompt_templates
+CREATE POLICY "Users can view own prompt templates" ON prompt_templates FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own prompt templates" ON prompt_templates FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own prompt templates" ON prompt_templates FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own prompt templates" ON prompt_templates FOR DELETE USING (auth.uid() = user_id);
 

@@ -38,3 +38,28 @@ export interface ScheduledPost {
   updated_at: string
 }
 
+export interface ContentCategory {
+  id: string
+  user_id: string
+  category_key: string
+  name: string
+  status: 'active' | 'inactive'
+  description: string | null
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface PromptTemplate {
+  id: string
+  user_id: string
+  template_key: string
+  template_type: 'ideas' | 'research' | 'script'
+  status: 'active' | 'inactive'
+  lang: string
+  persona: string | null
+  config: Record<string, any>
+  created_at: string
+  updated_at: string
+}
+
