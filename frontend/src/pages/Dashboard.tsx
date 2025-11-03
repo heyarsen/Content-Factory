@@ -196,7 +196,7 @@ export function Dashboard() {
                       <p className="text-xs text-slate-400">Craft on-brand assets in minutes</p>
                     </div>
                   </div>
-                  <span className="text-sm font-semibold text-brand-600 opacity-0 transition group-hover:opacity-100">Launch -></span>
+                  <span className="text-sm font-semibold text-brand-600 opacity-0 transition group-hover:opacity-100">Launch {'->'}</span>
                 </Link>
 
                 <Link
@@ -212,7 +212,7 @@ export function Dashboard() {
                       <p className="text-xs text-slate-400">Sync destinations for automated posting</p>
                     </div>
                   </div>
-                  <span className="text-sm font-semibold text-brand-600 opacity-0 transition group-hover:opacity-100">Manage -></span>
+                  <span className="text-sm font-semibold text-brand-600 opacity-0 transition group-hover:opacity-100">Manage {'->'}</span>
                 </Link>
               </div>
             </div>
