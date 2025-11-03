@@ -54,12 +54,19 @@ export async function createUserProfile(
   request: CreateUserProfileRequest
 ): Promise<UserProfile> {
   try {
+    const payload: any = {}
+    if (request.email) payload.email = request.email
+    if (request.name) payload.name = request.name
+
+    console.log('Creating Upload-Post user profile:', {
+      url: `${UPLOADPOST_API_URL}/uploadposts/users`,
+      payload,
+      hasApiKey: !!getUploadPostKey(),
+    })
+
     const response = await axios.post(
       `${UPLOADPOST_API_URL}/uploadposts/users`,
-      {
-        email: request.email,
-        name: request.name,
-      },
+      payload,
       {
         headers: {
           'Authorization': getAuthHeader(),
@@ -69,18 +76,37 @@ export async function createUserProfile(
       }
     )
 
+    console.log('Upload-Post create user response:', {
+      status: response.status,
+      data: response.data,
+    })
+
     return response.data
   } catch (error: any) {
-    console.error('Upload-post create user error:', error.response?.data || error.message)
-    throw new Error(
-      error.response?.data?.message || 'Failed to create user profile'
-    )
+    console.error('Upload-post create user error details:', {
+      message: error.message,
+      code: error.code,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      url: error.config?.url,
+      method: error.config?.method,
+    })
+    
+    const errorMessage = error.response?.data?.message || 
+                        error.response?.data?.error ||
+                        error.message || 
+                        'Failed to create user profile'
+    
+    throw new Error(errorMessage)
   }
 }
 
 // Generate JWT for user to link social accounts
 export async function generateUserJWT(userId: string): Promise<string> {
   try {
+    console.log('Generating JWT for user:', userId)
+    
     const response = await axios.post(
       `${UPLOADPOST_API_URL}/uploadposts/users/generate-jwt`,
       {
@@ -94,11 +120,29 @@ export async function generateUserJWT(userId: string): Promise<string> {
       }
     )
 
-    return response.data.jwt || response.data.token
+    console.log('JWT generation response:', {
+      status: response.status,
+      hasJWT: !!(response.data.jwt || response.data.token),
+      dataKeys: Object.keys(response.data || {}),
+    })
+
+    const jwt = response.data.jwt || response.data.token || response.data
+    if (!jwt || typeof jwt !== 'string') {
+      throw new Error('Upload-Post did not return a valid JWT')
+    }
+
+    return jwt
   } catch (error: any) {
-    console.error('Upload-post generate JWT error:', error.response?.data || error.message)
+    console.error('Upload-post generate JWT error details:', {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data,
+      userId,
+    })
     throw new Error(
-      error.response?.data?.message || 'Failed to generate JWT'
+      error.response?.data?.message || 
+      error.response?.data?.error ||
+      'Failed to generate JWT'
     )
   }
 }

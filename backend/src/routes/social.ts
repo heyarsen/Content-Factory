@@ -52,21 +52,63 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
     // Create or get Upload-Post user profile
     if (!uploadPostUserId) {
       try {
+        // Ensure we have at least email or name for user profile
+        const userEmail = user.email || user.user_metadata?.email
+        const userName = user.user_metadata?.full_name || 
+                        user.user_metadata?.name ||
+                        (userEmail ? userEmail.split('@')[0] : undefined)
+
+        if (!userEmail && !userName) {
+          throw new Error('User email or name is required to create Upload-Post profile')
+        }
+
         const uploadPostUser = await createUserProfile({
-          email: user.email,
-          name: user.email?.split('@')[0] || undefined,
+          email: userEmail,
+          name: userName,
         })
+        
         uploadPostUserId = uploadPostUser.id || uploadPostUser.user_id || uploadPostUser.userId
 
         if (!uploadPostUserId) {
+          console.error('Upload-Post response missing user ID:', uploadPostUser)
           throw new Error('Upload-Post did not return a user ID')
         }
+
+        console.log('Created Upload-Post user profile:', uploadPostUserId)
       } catch (createError: any) {
-        console.error('Failed to create Upload-Post user:', createError)
-        return res.status(500).json({
-          error: 'Failed to create Upload-Post profile. Please try again.',
-          details: createError.message,
+        // If profile creation fails, check if it's because user already exists
+        // or if we can proceed without it
+        const errorStatus = createError.response?.status
+        const errorData = createError.response?.data
+
+        console.error('Failed to create Upload-Post user:', {
+          message: createError.message,
+          status: errorStatus,
+          userEmail: user.email,
+          userMetadata: user.user_metadata,
+          errorResponse: errorData,
         })
+
+        // If user already exists (409 or similar), try to extract user ID from error
+        // Or use the Supabase user ID as fallback
+        if (errorStatus === 409 || errorData?.message?.toLowerCase().includes('already exists')) {
+          console.log('Upload-Post user already exists, using fallback ID')
+          // Try using Supabase user ID as Upload-Post user ID
+          uploadPostUserId = userId
+        } else {
+          // For other errors, return error to user
+          return res.status(500).json({
+            error: 'Failed to create Upload-Post profile. Please try again.',
+            details: createError.message,
+            apiError: errorData?.message || errorData?.error,
+            // Include more details in development
+            ...(process.env.NODE_ENV === 'development' && { 
+              stack: createError.stack,
+              userEmail: user.email,
+              fullError: errorData 
+            }),
+          })
+        }
       }
     }
 
