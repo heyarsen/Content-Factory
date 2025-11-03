@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Check, ChevronDown, Users, Video, Calendar, Loader } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 const WorkspaceSwitcher = ({ currentWorkspace, onWorkspaceChange }) => {
+  const { apiCall } = useAuth();
   const [workspaces, setWorkspaces] = useState([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -14,43 +16,41 @@ const WorkspaceSwitcher = ({ currentWorkspace, onWorkspaceChange }) => {
   
   const fetchWorkspaces = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/workspaces', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+      setLoading(true);
+      const response = await apiCall('/api/workspaces');
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setWorkspaces(data.workspaces || []);
         }
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        setWorkspaces(data.workspaces);
       }
     } catch (error) {
       console.error('Failed to fetch workspaces:', error);
+      setError('Failed to load workspaces');
+    } finally {
+      setLoading(false);
     }
   };
   
   const handleWorkspaceSwitch = async (workspaceId) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/workspaces/${workspaceId}/switch`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+      setLoading(true);
+      const response = await apiCall(`/api/workspaces/${workspaceId}/switch`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          localStorage.setItem('currentWorkspace', JSON.stringify(data.workspace));
+          onWorkspaceChange?.(data.workspace);
+          setIsDropdownOpen(false);
         }
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        localStorage.setItem('currentWorkspace', JSON.stringify(data.workspace));
-        onWorkspaceChange(data.workspace);
-        setIsDropdownOpen(false);
       }
     } catch (error) {
       console.error('Failed to switch workspace:', error);
+      setError('Failed to switch workspace');
+    } finally {
+      setLoading(false);
     }
   };
   
@@ -178,6 +178,7 @@ const WorkspaceSwitcher = ({ currentWorkspace, onWorkspaceChange }) => {
 };
 
 const CreateWorkspaceModal = ({ isOpen, onClose, onSuccess }) => {
+  const { apiCall } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -216,18 +217,17 @@ const CreateWorkspaceModal = ({ isOpen, onClose, onSuccess }) => {
     setSlugValidation(prev => ({ ...prev, checking: true }));
     
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/workspaces/check-slug', {
+      const response = await apiCall('/api/workspaces/check-slug', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify({ slug })
       });
       
-      const data = await response.json();
-      setSlugValidation({ available: data.available, checking: false });
+      if (response.ok) {
+        const data = await response.json();
+        setSlugValidation({ available: data.available, checking: false });
+      } else {
+        setSlugValidation({ available: null, checking: false });
+      }
     } catch (error) {
       console.error('Slug check error:', error);
       setSlugValidation({ available: null, checking: false });
@@ -278,13 +278,8 @@ const CreateWorkspaceModal = ({ isOpen, onClose, onSuccess }) => {
     setError('');
     
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/workspaces', {
+      const response = await apiCall('/api/workspaces', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify({
           name: formData.name.trim(),
           description: formData.description.trim(),
@@ -292,12 +287,17 @@ const CreateWorkspaceModal = ({ isOpen, onClose, onSuccess }) => {
         })
       });
       
-      const data = await response.json();
-      
-      if (data.success) {
-        onSuccess(data.workspace);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          onSuccess(data.workspace);
+          setFormData({ name: '', description: '', slug: '' });
+        } else {
+          setError(data.error || 'Failed to create workspace');
+        }
       } else {
-        setError(data.error || 'Failed to create workspace');
+        const errorData = await response.json();
+        setError(errorData.error || 'Failed to create workspace');
       }
     } catch (error) {
       console.error('Create workspace error:', error);

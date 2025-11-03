@@ -1,6 +1,7 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import { validateWorkspaceAccess } from '../middleware/workspace.js';
+import { authenticateToken } from '../middleware/auth.js';
 import fetch from 'node-fetch';
 import Joi from 'joi';
 
@@ -192,7 +193,7 @@ router.get('/workspace/:workspaceId', validateWorkspaceAccess, async (req, res) 
 });
 
 // Generate connection URL for social accounts
-router.post('/connect', async (req, res) => {
+router.post('/connect', authenticateToken, async (req, res) => {
   try {
     const { error, value } = connectAccountSchema.validate(req.body);
     if (error) {
@@ -200,6 +201,10 @@ router.post('/connect', async (req, res) => {
     }
 
     const { workspaceId, platforms, redirectUrl, logoImage } = value;
+
+    if (!workspaceId) {
+      return res.status(400).json({ error: 'Workspace ID is required' });
+    }
 
     // Verify workspace access
     const member = await prisma.workspaceMember.findUnique({
@@ -355,7 +360,7 @@ router.post('/sync/:workspaceId', validateWorkspaceAccess, async (req, res) => {
 });
 
 // Disconnect social account
-router.delete('/:accountId', async (req, res) => {
+router.delete('/:accountId', authenticateToken, async (req, res) => {
   try {
     const { accountId } = req.params;
     

@@ -1,14 +1,19 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Eye, EyeOff, Mail, Lock, Loader2, Sparkles, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, Loader2, Sparkles, AlertCircle, CheckCircle2, ArrowLeft, X } from 'lucide-react';
 
 const Login = ({ onToggleMode }) => {
-  const { login, isLoading } = useAuth();
+  const { login, isLoading, apiCall } = useAuth();
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
+  const [forgotPasswordError, setForgotPasswordError] = useState('');
+  const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState(false);
+  const [isSendingReset, setIsSendingReset] = useState(false);
 
   const stopAll = (e) => {
     if (!e) return;
@@ -59,8 +64,62 @@ const Login = ({ onToggleMode }) => {
     return false;
   };
 
-  const handleSubmit = async (e) => { stopAll(e); await submitCore(); return false; };
-  const handleEnter = async (e) => { if (e.key === 'Enter') { stopAll(e); await submitCore(); } };
+  const handleSubmit = async (e) => { 
+    e.preventDefault();
+    e.stopPropagation();
+    await submitCore(); 
+    return false; 
+  };
+  
+  const handleEnter = async (e) => { 
+    if (e.key === 'Enter') { 
+      e.preventDefault();
+      e.stopPropagation();
+      await submitCore(); 
+    } 
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!forgotPasswordEmail.trim()) {
+      setForgotPasswordError('Email is required');
+      return;
+    }
+    
+    if (!/\S+@\S+\.\S+/.test(forgotPasswordEmail)) {
+      setForgotPasswordError('Please enter a valid email address');
+      return;
+    }
+
+    setIsSendingReset(true);
+    setForgotPasswordError('');
+
+    try {
+      const response = await fetch('/api/password-reset/request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: forgotPasswordEmail }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setForgotPasswordSuccess(true);
+        setForgotPasswordError('');
+      } else {
+        setForgotPasswordError(data.error || 'Failed to send reset email. Please try again.');
+      }
+    } catch (error) {
+      console.error('Password reset error:', error);
+      setForgotPasswordError('Network error. Please check your connection and try again.');
+    } finally {
+      setIsSendingReset(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -111,7 +170,20 @@ const Login = ({ onToggleMode }) => {
               <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">Remember me</label>
             </div>
             <div className="text-sm">
-              <button type="button" className="font-medium text-blue-600 hover:text-blue-500 transition-colors" disabled={isSubmitting || isLoading}>Forgot your password?</button>
+              <button 
+                type="button" 
+                onClick={(e) => {
+                  stopAll(e);
+                  setShowForgotPassword(true);
+                  setForgotPasswordEmail(formData.email);
+                  setForgotPasswordError('');
+                  setForgotPasswordSuccess(false);
+                }}
+                className="font-medium text-blue-600 hover:text-blue-500 transition-colors" 
+                disabled={isSubmitting || isLoading}
+              >
+                Forgot your password?
+              </button>
             </div>
           </div>
 
@@ -137,6 +209,144 @@ const Login = ({ onToggleMode }) => {
           <button onClick={(e)=>{ stopAll(e); setFormData({ email: 'demo@contentfabrica.com', password: 'demo123' }); setErrors({}); }} className="mt-3 w-full text-xs bg-blue-600 text-white py-2 px-3 rounded-lg hover:bg-blue-700 transition-all duration-200 font-medium" disabled={isSubmitting || isLoading}>Fill Demo Credentials</button>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      {showForgotPassword && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={(e) => { if (e.target === e.currentTarget) { setShowForgotPassword(false); setForgotPasswordError(''); setForgotPasswordSuccess(false); } }}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8" onClick={(e) => e.stopPropagation()}>
+            {!forgotPasswordSuccess ? (
+              <>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900">Forgot Password?</h2>
+                  <button
+                    onClick={() => {
+                      setShowForgotPassword(false);
+                      setForgotPasswordError('');
+                      setForgotPasswordSuccess(false);
+                    }}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                
+                <p className="text-gray-600 mb-6">
+                  Enter your email address and we'll send you instructions to reset your password.
+                </p>
+
+                <form onSubmit={handleForgotPassword} className="space-y-4">
+                  {forgotPasswordError && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-2">
+                      <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                      <p className="text-red-700 text-sm">{forgotPasswordError}</p>
+                    </div>
+                  )}
+
+                  <div>
+                    <label htmlFor="forgot-email" className="block text-sm font-medium text-gray-700 mb-2">
+                      Email Address
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Mail className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        id="forgot-email"
+                        type="email"
+                        autoComplete="email"
+                        value={forgotPasswordEmail}
+                        onChange={(e) => {
+                          setForgotPasswordEmail(e.target.value);
+                          setForgotPasswordError('');
+                        }}
+                        className="block w-full pl-10 pr-3 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-200 focus:border-blue-500 transition-all"
+                        placeholder="Enter your email address"
+                        disabled={isSendingReset}
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex space-x-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowForgotPassword(false);
+                        setForgotPasswordError('');
+                        setForgotPasswordSuccess(false);
+                      }}
+                      className="flex-1 px-4 py-3 text-gray-700 bg-gray-100 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                      disabled={isSendingReset}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSendingReset || !forgotPasswordEmail.trim()}
+                      className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center space-x-2"
+                    >
+                      {isSendingReset ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Sending...</span>
+                        </>
+                      ) : (
+                        <span>Send Reset Instructions</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </>
+            ) : (
+              <>
+                <div className="text-center">
+                  <div className="mx-auto w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6">
+                    <CheckCircle2 className="w-10 h-10 text-green-600" />
+                  </div>
+                  
+                  <h2 className="text-2xl font-bold text-gray-900 mb-4">Check Your Email</h2>
+                  
+                  <p className="text-gray-600 mb-6">
+                    We've sent password reset instructions to:
+                  </p>
+                  
+                  <p className="text-lg font-medium text-gray-900 mb-8">
+                    {forgotPasswordEmail}
+                  </p>
+                  
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-500">
+                      Didn't receive the email? Check your spam folder or try again.
+                    </p>
+                    
+                    <div className="flex space-x-3">
+                      <button
+                        onClick={() => {
+                          setShowForgotPassword(false);
+                          setForgotPasswordError('');
+                          setForgotPasswordSuccess(false);
+                        }}
+                        className="flex-1 px-4 py-3 text-gray-700 bg-gray-100 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                      >
+                        Close
+                      </button>
+                      <button
+                        onClick={() => {
+                          setForgotPasswordSuccess(false);
+                          setForgotPasswordError('');
+                        }}
+                        className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:from-blue-700 hover:to-purple-700 transition-all"
+                      >
+                        Try Again
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
