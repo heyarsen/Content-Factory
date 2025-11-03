@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const UPLOADPOST_API_URL = 'https://api.upload-post.com/v1'
+const UPLOADPOST_API_URL = 'https://api.upload-post.com/api'
 
 function getUploadPostKey(): string {
   const key = process.env.UPLOADPOST_KEY
@@ -10,156 +10,161 @@ function getUploadPostKey(): string {
   return key
 }
 
-export interface ConnectAccountRequest {
-  platform: 'instagram' | 'tiktok' | 'youtube' | 'facebook'
-  redirectUri: string
+function getAuthHeader(): string {
+  return `Apikey ${getUploadPostKey()}`
+}
+
+export interface CreateUserProfileRequest {
+  email?: string
+  name?: string
+}
+
+export interface UserProfile {
+  id?: string
+  user_id?: string
+  userId?: string
+  email?: string
+  name?: string
+  jwt?: string
 }
 
 export interface PostVideoRequest {
   videoUrl: string
-  platform: 'instagram' | 'tiktok' | 'youtube' | 'facebook'
+  platforms: string[] // Array of platform names
   caption?: string
   scheduledTime?: string
-  accountId: string
+  userId?: string // Upload-post user profile ID
+  asyncUpload?: boolean
 }
 
 export interface UploadPostResponse {
-  post_id: string
+  upload_id?: string
   status: string
+  results?: Array<{
+    platform: string
+    status: string
+    post_id?: string
+    error?: string
+  }>
   error?: string
 }
 
-export async function initiateOAuthConnection(
-  request: ConnectAccountRequest
-): Promise<{ authUrl: string }> {
+// Create user profile in Upload-Post
+export async function createUserProfile(
+  request: CreateUserProfileRequest
+): Promise<UserProfile> {
   try {
-    const apiKey = getUploadPostKey()
-    console.log('Calling upload-post.com API:', {
-      url: `${UPLOADPOST_API_URL}/oauth/connect`,
-      platform: request.platform,
-      hasApiKey: !!apiKey,
-      apiKeyLength: apiKey?.length || 0,
-    })
-
     const response = await axios.post(
-      `${UPLOADPOST_API_URL}/oauth/connect`,
+      `${UPLOADPOST_API_URL}/uploadposts/users`,
       {
-        platform: request.platform,
-        redirect_uri: request.redirectUri,
+        email: request.email,
+        name: request.name,
       },
       {
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
+          'Authorization': getAuthHeader(),
           'Content-Type': 'application/json',
         },
-        timeout: 10000, // 10 second timeout
+        timeout: 10000,
       }
     )
 
-    console.log('Upload-post API response:', {
-      status: response.status,
-      hasAuthUrl: !!(response.data.auth_url || response.data.url),
-      responseKeys: Object.keys(response.data || {}),
-    })
-
-    const authUrl = response.data.auth_url || response.data.url || response.data.redirect_url
-
-    if (!authUrl) {
-      console.error('No auth URL in response:', response.data)
-      throw new Error('Upload-post API did not return an authentication URL')
-    }
-
-    return { authUrl }
+    return response.data
   } catch (error: any) {
-    console.error('Upload-post API error details:', {
-      message: error.message,
-      code: error.code,
-      response: error.response?.data,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      config: {
-        url: error.config?.url,
-        method: error.config?.method,
-        headers: error.config?.headers ? Object.keys(error.config.headers) : null,
-      },
-    })
-    
-    if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
-      throw new Error(`Cannot connect to upload-post.com API. Please verify the API URL is correct: ${UPLOADPOST_API_URL}`)
-    }
-    
-    if (error.response) {
-      throw new Error(
-        `Upload-post API error (${error.response.status}): ${error.response.data?.message || error.response.statusText || 'Unknown error'}`
-      )
-    }
-    
+    console.error('Upload-post create user error:', error.response?.data || error.message)
     throw new Error(
-      error.message || 'Failed to initiate OAuth connection'
+      error.response?.data?.message || 'Failed to create user profile'
     )
   }
 }
 
-export async function handleOAuthCallback(
-  code: string,
-  platform: string
-): Promise<{
-  accountId: string
-  accessToken: string
-  refreshToken?: string
-}> {
+// Generate JWT for user to link social accounts
+export async function generateUserJWT(userId: string): Promise<string> {
   try {
     const response = await axios.post(
-      `${UPLOADPOST_API_URL}/oauth/callback`,
+      `${UPLOADPOST_API_URL}/uploadposts/users/generate-jwt`,
       {
-        code,
-        platform,
+        user_id: userId,
       },
       {
         headers: {
-          'Authorization': `Bearer ${getUploadPostKey()}`,
+          'Authorization': getAuthHeader(),
           'Content-Type': 'application/json',
         },
       }
     )
 
-    return {
-      accountId: response.data.account_id || response.data.id,
-      accessToken: response.data.access_token,
-      refreshToken: response.data.refresh_token,
-    }
+    return response.data.jwt || response.data.token
   } catch (error: any) {
-    console.error('Upload-post API error:', error.response?.data || error.message)
+    console.error('Upload-post generate JWT error:', error.response?.data || error.message)
     throw new Error(
-      error.response?.data?.message || 'Failed to handle OAuth callback'
+      error.response?.data?.message || 'Failed to generate JWT'
     )
   }
 }
 
+// Get user profile
+export async function getUserProfile(userId: string): Promise<UserProfile> {
+  try {
+    const response = await axios.get(
+      `${UPLOADPOST_API_URL}/uploadposts/users`,
+      {
+        headers: {
+          'Authorization': getAuthHeader(),
+        },
+        params: {
+          user_id: userId,
+        },
+      }
+    )
+
+    return response.data
+  } catch (error: any) {
+    console.error('Upload-post get user error:', error.response?.data || error.message)
+    throw new Error(
+      error.response?.data?.message || 'Failed to get user profile'
+    )
+  }
+}
+
+// Upload video to multiple platforms
 export async function postVideo(
   request: PostVideoRequest
 ): Promise<UploadPostResponse> {
   try {
+    const payload: any = {
+      video_url: request.videoUrl,
+      platforms: request.platforms,
+      async_upload: request.asyncUpload ?? true,
+    }
+
+    if (request.caption) {
+      payload.caption = request.caption
+    }
+
+    if (request.scheduledTime) {
+      payload.scheduled_time = request.scheduledTime
+    }
+
+    if (request.userId) {
+      payload.user_id = request.userId
+    }
+
     const response = await axios.post(
-      `${UPLOADPOST_API_URL}/post/video`,
-      {
-        video_url: request.videoUrl,
-        platform: request.platform,
-        caption: request.caption,
-        scheduled_time: request.scheduledTime,
-        account_id: request.accountId,
-      },
+      `${UPLOADPOST_API_URL}/upload_videos`,
+      payload,
       {
         headers: {
-          'Authorization': `Bearer ${getUploadPostKey()}`,
+          'Authorization': getAuthHeader(),
           'Content-Type': 'application/json',
         },
       }
     )
 
     return {
-      post_id: response.data.post_id || response.data.id,
+      upload_id: response.data.upload_id || response.data.id,
       status: response.data.status || 'pending',
+      results: response.data.results,
       error: response.data.error,
     }
   } catch (error: any) {
@@ -170,26 +175,31 @@ export async function postVideo(
   }
 }
 
-export async function getPostStatus(postId: string): Promise<UploadPostResponse> {
+// Get upload status
+export async function getUploadStatus(uploadId: string): Promise<UploadPostResponse> {
   try {
     const response = await axios.get(
-      `${UPLOADPOST_API_URL}/post/${postId}`,
+      `${UPLOADPOST_API_URL}/uploadposts/status`,
       {
         headers: {
-          'Authorization': `Bearer ${getUploadPostKey()}`,
+          'Authorization': getAuthHeader(),
+        },
+        params: {
+          upload_id: uploadId,
         },
       }
     )
 
     return {
-      post_id: postId,
-      status: response.data.status,
+      upload_id: uploadId,
+      status: response.data.status || 'unknown',
+      results: response.data.results,
       error: response.data.error,
     }
   } catch (error: any) {
     console.error('Upload-post API error:', error.response?.data || error.message)
     throw new Error(
-      error.response?.data?.message || 'Failed to get post status'
+      error.response?.data?.message || 'Failed to get upload status'
     )
   }
 }

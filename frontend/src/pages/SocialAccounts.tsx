@@ -56,11 +56,29 @@ export function SocialAccounts() {
     setConnecting(true)
     try {
       const response = await api.post('/api/social/connect', { platform })
-      // Redirect to OAuth URL
-      window.location.href = response.data.authUrl
+      
+      // Upload-Post uses JWT-based linking
+      // The JWT can be used with Upload-Post's account linking widget/UI
+      const { jwt, uploadPostUserId, message } = response.data
+      
+      // Store JWT for account linking
+      localStorage.setItem(`uploadpost_jwt_${platform}`, jwt)
+      localStorage.setItem(`uploadpost_userid_${platform}`, uploadPostUserId)
+      
+      // For now, show instructions
+      // TODO: Integrate Upload-Post's account linking widget if available
+      alert(
+        `${message}\n\n` +
+        `JWT: ${jwt.substring(0, 20)}...\n` +
+        `Please use this JWT with Upload-Post's account linking system to complete the connection.`
+      )
+      
+      // Reload accounts to show pending status
+      loadAccounts()
     } catch (error: any) {
       console.error('Failed to connect:', error)
-      alert(error.response?.data?.error || 'Failed to initiate connection')
+      alert(error.response?.data?.error || error.response?.data?.details || 'Failed to initiate connection')
+    } finally {
       setConnecting(false)
     }
   }

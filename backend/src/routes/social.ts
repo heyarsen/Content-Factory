@@ -1,7 +1,7 @@
 import { Router, Response } from 'express'
 import { supabase } from '../lib/supabase.js'
 import { authenticate, AuthRequest } from '../middleware/auth.js'
-import { initiateOAuthConnection, handleOAuthCallback } from '../lib/uploadpost.js'
+import { createUserProfile, generateUserJWT, getUserProfile } from '../lib/uploadpost.js'
 
 const router = Router()
 
@@ -28,129 +28,171 @@ router.get('/accounts', authenticate, async (req: AuthRequest, res: Response) =>
   }
 })
 
-// Initiate OAuth connection
+// Get or create Upload-Post user profile and generate JWT for linking accounts
 router.post('/connect', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { platform } = req.body
     const userId = req.userId!
+    const user = req.user!
 
     if (!platform || !['instagram', 'tiktok', 'youtube', 'facebook'].includes(platform)) {
       return res.status(400).json({ error: 'Valid platform is required' })
     }
 
-    const redirectUri = `${process.env.CORS_ORIGIN || 'http://localhost:5173'}/social/callback?platform=${platform}`
+    // Check if user already has an Upload-Post profile ID stored (in any account)
+    // We'll use a consistent Upload-Post user ID across all platforms
+    const { data: existingAccounts } = await supabase
+      .from('social_accounts')
+      .select('platform_account_id')
+      .eq('user_id', userId)
+      .limit(1)
 
-    console.log('Initiating OAuth connection for platform:', platform)
-    console.log('Redirect URI:', redirectUri)
+    let uploadPostUserId = existingAccounts?.[0]?.platform_account_id
 
+    // Create or get Upload-Post user profile
+    if (!uploadPostUserId) {
+      try {
+        const uploadPostUser = await createUserProfile({
+          email: user.email,
+          name: user.email?.split('@')[0] || undefined,
+        })
+        uploadPostUserId = uploadPostUser.id || uploadPostUser.user_id || uploadPostUser.userId
+
+        if (!uploadPostUserId) {
+          throw new Error('Upload-Post did not return a user ID')
+        }
+      } catch (createError: any) {
+        console.error('Failed to create Upload-Post user:', createError)
+        return res.status(500).json({
+          error: 'Failed to create Upload-Post profile. Please try again.',
+          details: createError.message,
+        })
+      }
+    }
+
+    // Generate JWT for linking accounts
     try {
-      const { authUrl } = await initiateOAuthConnection({
-        platform: platform as 'instagram' | 'tiktok' | 'youtube' | 'facebook',
-        redirectUri,
-      })
+      const jwt = await generateUserJWT(uploadPostUserId)
 
-      console.log('OAuth connection initiated successfully, authUrl received')
-      res.json({ authUrl })
-    } catch (apiError: any) {
-      console.error('Upload-post API error details:', {
-        message: apiError.message,
-        response: apiError.response?.data,
-        status: apiError.response?.status,
-        url: apiError.config?.url,
-      })
-      
-      // Provide more helpful error message
-      if (apiError.response?.status === 404 || apiError.code === 'ENOTFOUND') {
-        return res.status(500).json({ 
-          error: 'Upload-post.com API endpoint not found. Please verify the API URL is correct.',
-          details: apiError.message 
-        })
-      }
-      
-      if (apiError.response?.status === 401 || apiError.response?.status === 403) {
-        return res.status(500).json({ 
-          error: 'Invalid API key for upload-post.com. Please check your UPLOADPOST_KEY environment variable.',
-          details: apiError.response?.data?.message || apiError.message 
-        })
+      // Create or update account record
+      const { data: existing } = await supabase
+        .from('social_accounts')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('platform', platform)
+        .single()
+
+      if (existing) {
+        await supabase
+          .from('social_accounts')
+          .update({
+            platform_account_id: uploadPostUserId,
+            status: 'pending', // Will be 'connected' after user links account
+          })
+          .eq('id', existing.id)
+      } else {
+        await supabase
+          .from('social_accounts')
+          .insert({
+            user_id: userId,
+            platform: platform as any,
+            platform_account_id: uploadPostUserId,
+            status: 'pending',
+          })
       }
 
-      throw apiError
+      // Return JWT and instructions for linking
+      // Note: Upload-Post uses JWT-based account linking
+      // The frontend needs to integrate Upload-Post's account linking UI/widget
+      res.json({
+        jwt,
+        uploadPostUserId,
+        message: 'Account linking initiated. Use the JWT to complete account linking through Upload-Post.',
+        linkInstructions: 'Please check Upload-Post documentation for integrating their account linking widget/UI.',
+      })
+    } catch (jwtError: any) {
+      console.error('Failed to generate JWT:', jwtError)
+      return res.status(500).json({
+        error: 'Failed to generate authentication token',
+        details: jwtError.message,
+      })
     }
   } catch (error: any) {
     console.error('Connect account error:', error)
-    res.status(500).json({ 
+    res.status(500).json({
       error: error.message || 'Failed to initiate connection',
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     })
   }
 })
 
-// Handle OAuth callback
+// Handle account connection confirmation (after user links account via Upload-Post UI)
 router.post('/callback', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const { code, platform } = req.body
+    const { platform, uploadPostUserId } = req.body
     const userId = req.userId!
 
-    if (!code || !platform) {
-      return res.status(400).json({ error: 'Code and platform are required' })
+    if (!platform || !uploadPostUserId) {
+      return res.status(400).json({ error: 'Platform and Upload-Post user ID are required' })
     }
 
-    const { accountId, accessToken, refreshToken } = await handleOAuthCallback(
-      code,
-      platform
-    )
-
-    // Check if account already exists
-    const { data: existing } = await supabase
-      .from('social_accounts')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('platform', platform)
-      .single()
-
-    if (existing) {
-      // Update existing account
-      const { error } = await supabase
+    // Verify the Upload-Post user profile exists
+    try {
+      const userProfile = await getUserProfile(uploadPostUserId)
+      
+      // Update account status to connected
+      const { data: existing } = await supabase
         .from('social_accounts')
-        .update({
-          platform_account_id: accountId,
-          access_token: accessToken,
-          refresh_token: refreshToken || null,
-          status: 'connected',
-          connected_at: new Date().toISOString(),
-        })
-        .eq('id', existing.id)
-
-      if (error) {
-        console.error('Update error:', error)
-        return res.status(500).json({ error: 'Failed to update account' })
-      }
-
-      res.json({ message: 'Account updated successfully', accountId: existing.id })
-    } else {
-      // Create new account
-      const { data, error } = await supabase
-        .from('social_accounts')
-        .insert({
-          user_id: userId,
-          platform,
-          platform_account_id: accountId,
-          access_token: accessToken,
-          refresh_token: refreshToken || null,
-          status: 'connected',
-        })
-        .select()
+        .select('*')
+        .eq('user_id', userId)
+        .eq('platform', platform)
         .single()
 
-      if (error) {
-        console.error('Insert error:', error)
-        return res.status(500).json({ error: 'Failed to save account' })
-      }
+      if (existing) {
+        const { error } = await supabase
+          .from('social_accounts')
+          .update({
+            platform_account_id: uploadPostUserId,
+            status: 'connected',
+            connected_at: new Date().toISOString(),
+          })
+          .eq('id', existing.id)
 
-      res.json({ message: 'Account connected successfully', account: data })
+        if (error) {
+          console.error('Update error:', error)
+          return res.status(500).json({ error: 'Failed to update account' })
+        }
+
+        res.json({ message: 'Account connected successfully', account: existing })
+      } else {
+        // Create new account record
+        const { data, error } = await supabase
+          .from('social_accounts')
+          .insert({
+            user_id: userId,
+            platform,
+            platform_account_id: uploadPostUserId,
+            status: 'connected',
+          })
+          .select()
+          .single()
+
+        if (error) {
+          console.error('Insert error:', error)
+          return res.status(500).json({ error: 'Failed to save account' })
+        }
+
+        res.json({ message: 'Account connected successfully', account: data })
+      }
+    } catch (profileError: any) {
+      console.error('Failed to verify Upload-Post profile:', profileError)
+      return res.status(500).json({
+        error: 'Failed to verify account connection',
+        details: profileError.message,
+      })
     }
   } catch (error: any) {
-    console.error('OAuth callback error:', error)
+    console.error('Callback error:', error)
     res.status(500).json({ error: error.message || 'Failed to handle callback' })
   }
 })

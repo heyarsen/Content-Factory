@@ -1,7 +1,7 @@
 import { Router, Response } from 'express'
 import { supabase } from '../lib/supabase.js'
 import { authenticate, AuthRequest } from '../middleware/auth.js'
-import { postVideo, getPostStatus } from '../lib/uploadpost.js'
+import { postVideo, getUploadStatus } from '../lib/uploadpost.js'
 
 const router = Router()
 
@@ -45,48 +45,61 @@ router.post('/schedule', authenticate, async (req: AuthRequest, res: Response) =
 
     const scheduledPosts = []
 
-    // Create scheduled post for each platform
-    for (const account of accounts) {
-      try {
-        // Call upload-post.com API
-        const postResponse = await postVideo({
-          videoUrl: video.video_url,
-          platform: account.platform,
-          caption: caption || video.topic,
-          scheduledTime: scheduled_time || undefined,
-          accountId: account.platform_account_id,
-        })
+    // Group accounts by Upload-Post user ID (platform_account_id stores the Upload-Post user ID)
+    const uploadPostUserId = accounts[0]?.platform_account_id
 
-        // Create scheduled_post record
+    if (!uploadPostUserId) {
+      return res.status(400).json({ error: 'No Upload-Post user ID found. Please connect your social accounts first.' })
+    }
+
+    // Call upload-post.com API once for all platforms
+    try {
+      const postResponse = await postVideo({
+        videoUrl: video.video_url,
+        platforms: platforms, // Array of platform names
+        caption: caption || video.topic,
+        scheduledTime: scheduled_time || undefined,
+        userId: uploadPostUserId,
+        asyncUpload: true, // Use async upload to handle multiple platforms
+      })
+
+      // Create scheduled_post record for each platform
+      for (const platform of platforms) {
+        const platformResult = postResponse.results?.find((r: any) => r.platform === platform)
+        
         const { data: postData, error: postError } = await supabase
           .from('scheduled_posts')
           .insert({
             video_id: video_id,
             user_id: userId,
-            platform: account.platform,
+            platform: platform,
             scheduled_time: scheduled_time || null,
-            status: postResponse.status === 'posted' ? 'posted' : 'pending',
-            upload_post_id: postResponse.post_id,
-            posted_at: postResponse.status === 'posted' ? new Date().toISOString() : null,
+            status: platformResult?.status === 'success' || postResponse.status === 'success' ? 'posted' : 
+                    platformResult?.status === 'failed' ? 'failed' : 'pending',
+            upload_post_id: postResponse.upload_id || platformResult?.post_id,
+            posted_at: platformResult?.status === 'success' ? new Date().toISOString() : null,
+            error_message: platformResult?.error || postResponse.error || null,
           })
           .select()
           .single()
 
         if (postError) {
-          console.error('Database error:', postError)
+          console.error(`Database error for ${platform}:`, postError)
           continue
         }
 
         scheduledPosts.push(postData)
-      } catch (error: any) {
-        console.error(`Error posting to ${account.platform}:`, error)
-        // Still create the record but mark as failed
+      }
+    } catch (error: any) {
+      console.error('Error posting video:', error)
+      // Create failed records for all platforms
+      for (const platform of platforms) {
         const { data: postData } = await supabase
           .from('scheduled_posts')
           .insert({
             video_id: video_id,
             user_id: userId,
-            platform: account.platform,
+            platform: platform,
             scheduled_time: scheduled_time || null,
             status: 'failed',
             error_message: error.message,
@@ -161,10 +174,15 @@ router.get('/:id/status', authenticate, async (req: AuthRequest, res: Response) 
     // If post has upload_post_id and is still pending, check status
     if (post.upload_post_id && (post.status === 'pending' || post.status === 'failed')) {
       try {
-        const uploadPostStatus = await getPostStatus(post.upload_post_id)
+        const uploadPostStatus = await getUploadStatus(post.upload_post_id)
         
-        const status = uploadPostStatus.status === 'posted' ? 'posted' :
-                     uploadPostStatus.status === 'failed' ? 'failed' :
+        // Find the platform-specific result
+        const platformResult = uploadPostStatus.results?.find((r: any) => 
+          r.platform === post.platform
+        )
+
+        const status = platformResult?.status === 'success' || uploadPostStatus.status === 'success' ? 'posted' :
+                     platformResult?.status === 'failed' || uploadPostStatus.status === 'failed' ? 'failed' :
                      'pending'
 
         await supabase
@@ -172,14 +190,14 @@ router.get('/:id/status', authenticate, async (req: AuthRequest, res: Response) 
           .update({
             status,
             posted_at: status === 'posted' ? new Date().toISOString() : post.posted_at,
-            error_message: uploadPostStatus.error || null,
+            error_message: platformResult?.error || uploadPostStatus.error || null,
             updated_at: new Date().toISOString(),
           })
           .eq('id', id)
 
         post.status = status
         post.posted_at = status === 'posted' ? new Date().toISOString() : post.posted_at
-        post.error_message = uploadPostStatus.error || null
+        post.error_message = platformResult?.error || uploadPostStatus.error || null
       } catch (uploadPostError) {
         console.error('Upload-post status check error:', uploadPostError)
       }
