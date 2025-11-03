@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 import { Card } from '../components/ui/Card'
 import { Skeleton } from '../components/ui/Skeleton'
+import { Button } from '../components/ui/Button'
 
 export function SocialCallback() {
   const [searchParams] = useSearchParams()
@@ -77,33 +78,48 @@ export function SocialCallback() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background px-4">
-        <Card className="w-full max-w-md">
-          <div className="flex items-center gap-4">
-            <Skeleton className="w-8 h-8 rounded-full" />
-            <div className="flex-1">
-              <Skeleton className="h-4 w-32 mb-2" />
-              <Skeleton className="h-3 w-48" />
+      <div className="relative min-h-screen overflow-hidden bg-background">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-brand-500/10 blur-3xl" />
+          <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-sky-400/10 blur-3xl" />
+        </div>
+
+        <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 lg:px-8">
+          <Card className="w-full max-w-lg p-8">
+            <div className="flex items-center gap-4">
+              <Skeleton className="h-10 w-10 rounded-2xl" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-3 w-48" />
+              </div>
             </div>
-          </div>
-        </Card>
+            <p className="mt-6 text-sm text-slate-500">Connecting your account. You will be redirected shortly.</p>
+          </Card>
+        </div>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background px-4">
-        <Card className="w-full max-w-md">
-          <h1 className="text-2xl font-bold text-primary mb-4">Connection Failed</h1>
-          <p className="text-sm text-gray-600 mb-6">{error}</p>
-          <button
-            onClick={() => navigate('/social')}
-            className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-          >
-            Back to Social Accounts
-          </button>
-        </Card>
+      <div className="relative min-h-screen overflow-hidden bg-background">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-brand-500/10 blur-3xl" />
+          <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-rose-400/10 blur-3xl" />
+        </div>
+
+        <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 lg:px-8">
+          <Card className="w-full max-w-lg p-8 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-500 to-brand-500 text-white shadow-md">
+              <span className="text-xl font-semibold">!</span>
+            </div>
+            <h1 className="mt-6 text-2xl font-semibold text-primary">Connection failed</h1>
+            <p className="mt-3 text-sm text-slate-500">{error}</p>
+            <Button onClick={() => navigate('/social')} className="mt-8 w-full">
+              Back to social accounts
+            </Button>
+          </Card>
+        </div>
       </div>
     )
   }

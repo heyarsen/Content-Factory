@@ -228,11 +228,11 @@ export function SocialAccounts() {
   if (loading) {
     return (
       <Layout>
-        <div className="space-y-6">
-          <Skeleton className="h-8 w-48" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-8">
+          <Skeleton className="h-28 rounded-[28px]" />
+          <div className="grid gap-6 sm:grid-cols-2">
             {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-32" />
+              <Skeleton key={i} className="h-40 rounded-3xl" />
             ))}
           </div>
         </div>
@@ -242,10 +242,13 @@ export function SocialAccounts() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-primary">Social Accounts</h1>
-          <p className="text-sm text-gray-600 mt-2">Connect your social media accounts to post videos</p>
+      <div className="space-y-10">
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Distribution</p>
+          <h1 className="text-3xl font-semibold text-primary">Social accounts</h1>
+          <p className="text-sm text-slate-500">
+            Connect channels to push finished videos live automatically. Secure OAuth flows keep credentials safe.
+          </p>
         </div>
 
         {accounts.length === 0 && availablePlatforms.length === 0 ? (
@@ -255,58 +258,65 @@ export function SocialAccounts() {
             description="Connect your social media accounts to start posting your videos automatically."
           />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid gap-6 md:grid-cols-2">
             {allPlatforms.map((platform) => {
               const account = accounts.find((a) => a.platform === platform)
               const Icon = platformIcons[platform]
               const isConnected = account?.status === 'connected'
 
               return (
-                <Card key={platform}>
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <Icon className="w-8 h-8 text-purple-600" />
-                      <div>
-                        <h3 className="font-bold text-sm text-primary">{platformNames[platform]}</h3>
+                <Card key={platform} hover className="flex h-full flex-col gap-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
+                        <Icon className="h-6 w-6" />
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-lg font-semibold text-primary">{platformNames[platform]}</h3>
                         {account && getStatusBadge(account.status)}
                       </div>
                     </div>
+                    {isConnected && (
+                      <span className="text-xs font-medium uppercase tracking-wide text-emerald-500/80">Synced</span>
+                    )}
                   </div>
 
                   {account?.status === 'pending' && (
-                    <p className="text-xs text-gray-600 mb-4">
+                    <div className="rounded-2xl border border-amber-200/70 bg-amber-50/70 px-4 py-3 text-xs text-amber-600">
                       Finish linking in the connection portal. If you closed it, click Connect again to reopen or use the saved link.
-                    </p>
+                    </div>
                   )}
 
                   {isConnected && account && (
-                    <p className="text-xs text-gray-600 mb-4">
-                      Connected on {new Date(account.connected_at).toLocaleDateString()}
-                    </p>
+                    <div className="rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-xs text-slate-500">
+                      Connected on {new Date(account.connected_at).toLocaleDateString()}.
+                    </div>
                   )}
 
-                  {isConnected ? (
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => setDisconnectModal(account!.id)}
-                      className="w-full"
-                    >
-                      <X className="w-4 h-4 mr-2" />
-                      Disconnect
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => handleConnect(platform)}
-                      loading={connecting}
-                      className="w-full"
-                    >
-                      <Link2 className="w-4 h-4 mr-2" />
-                      Connect
-                    </Button>
-                  )}
+                  <div className="mt-auto">
+                    {isConnected ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDisconnectModal(account!.id)}
+                        className="w-full border border-rose-200 bg-rose-50/70 text-rose-600 hover:border-rose-300 hover:bg-rose-50"
+                      >
+                        <X className="mr-2 h-4 w-4" />
+                        Disconnect
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => handleConnect(platform)}
+                        loading={connecting}
+                        className="w-full"
+                      >
+                        <Link2 className="mr-2 h-4 w-4" />
+                        Connect
+                      </Button>
+                    )}
+                  </div>
                 </Card>
               )
             })}
@@ -324,17 +334,17 @@ export function SocialAccounts() {
           size="xl"
         >
           {connectPortal && (
-            <div className="space-y-4">
-              <p className="text-sm text-gray-600">
+            <div className="space-y-5">
+              <p className="text-sm text-slate-500">
                 {connectPortal.message ||
                   `Follow the steps below to link your ${platformNames[connectPortal.platform]} account without leaving this tab.`}
               </p>
               {connectPortal.duration && (
-                <div className="text-xs text-gray-500">
+                <div className="text-xs uppercase tracking-wide text-slate-400">
                   Link valid for {connectPortal.duration}.
                 </div>
               )}
-              <div className="border border-gray-200 rounded-lg overflow-hidden h-[540px] bg-gray-50">
+              <div className="h-[540px] overflow-hidden rounded-3xl border border-white/60 bg-slate-50/70">
                 {!portalLoadFailed ? (
                   <iframe
                     key={connectPortal.url}
@@ -346,7 +356,7 @@ export function SocialAccounts() {
                     allow="clipboard-read; clipboard-write; autoplay; encrypted-media"
                   />
                 ) : (
-                  <div className="h-full flex flex-col items-center justify-center text-sm text-gray-600 p-6 space-y-4">
+                  <div className="flex h-full flex-col items-center justify-center space-y-4 p-6 text-sm text-slate-500">
                     <p>The connection portal could not be displayed here.</p>
                     <Button
                       type="button"
@@ -361,7 +371,7 @@ export function SocialAccounts() {
                 )}
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                   Connection URL
                 </label>
                 <div className="flex gap-2">
@@ -369,12 +379,13 @@ export function SocialAccounts() {
                     type="text"
                     readOnly
                     value={connectPortal.url}
-                    className="flex-1 text-xs px-3 py-2 border border-gray-200 rounded-md bg-white truncate"
+                    className="flex-1 truncate rounded-2xl border border-white/60 bg-white/80 px-4 py-3 text-xs text-slate-500"
                   />
                   <Button
                     type="button"
-                    variant="secondary"
+                    variant="ghost"
                     size="sm"
+                    className="border border-white/60 bg-white/70 text-slate-500 hover:border-brand-200 hover:text-brand-600"
                     onClick={handleCopyPortalLink}
                   >
                     {copiedLink ? 'Copied!' : 'Copy'}
@@ -382,9 +393,9 @@ export function SocialAccounts() {
                 </div>
               </div>
               {connectPortal.redirectUrl && (
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-slate-400">
                   When you finish in the portal you should be redirected automatically. If that does not happen, return to{' '}
-                  <span className="font-medium text-gray-700">{connectPortal.redirectUrl}</span>.
+                  <span className="font-medium text-slate-600">{connectPortal.redirectUrl}</span>.
                 </p>
               )}
               <div className="flex flex-wrap justify-end gap-3">
@@ -392,15 +403,17 @@ export function SocialAccounts() {
                   type="button"
                   variant="ghost"
                   size="sm"
+                  className="border border-white/60 bg-white/70 text-brand-600 hover:border-brand-200 hover:bg-white"
                   onClick={() => window.open(connectPortal.url, '_blank', 'noopener')}
                 >
-                  <Link2 className="w-4 h-4 mr-2" />
+                  <Link2 className="mr-2 h-4 w-4" />
                   Open in new tab
                 </Button>
                 <Button
                   type="button"
-                  variant="secondary"
+                  variant="ghost"
                   size="sm"
+                  className="border border-white/60 bg-white/70 text-slate-500 hover:border-slate-200 hover:bg-white"
                   onClick={() => setConnectPortal(null)}
                 >
                   Close
@@ -416,11 +429,15 @@ export function SocialAccounts() {
           title="Disconnect Account"
           size="sm"
         >
-          <p className="text-sm text-gray-600 mb-4">
+          <p className="mb-4 text-sm text-slate-500">
             Are you sure you want to disconnect this account? You won't be able to post to this platform until you reconnect.
           </p>
           <div className="flex gap-3 justify-end">
-            <Button variant="secondary" onClick={() => setDisconnectModal(null)}>
+            <Button
+              variant="ghost"
+              className="border border-white/60 bg-white/70 text-slate-500 hover:border-slate-200 hover:bg-white"
+              onClick={() => setDisconnectModal(null)}
+            >
               Cancel
             </Button>
             <Button

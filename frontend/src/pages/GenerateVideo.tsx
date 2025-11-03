@@ -40,52 +40,58 @@ export function GenerateVideo() {
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-primary">Generate Video</h1>
-          <p className="text-sm text-gray-600 mt-2">Create AI-powered video content</p>
+      <div className="mx-auto w-full max-w-3xl space-y-8">
+        <div className="rounded-[28px] border border-white/40 bg-white/80 p-8 shadow-[0_35px_80px_-50px_rgba(79,70,229,0.6)] backdrop-blur-xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">create</p>
+          <h1 className="mt-3 text-3xl font-semibold text-primary">Generate a new video</h1>
+          <p className="mt-2 max-w-xl text-sm text-slate-500">
+            Guide the AI with a topic, optional script, and tone. We will orchestrate the visuals, audio, and timing for
+            you.
+          </p>
         </div>
 
-        <Card>
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <Card className="p-8">
+          <form onSubmit={handleSubmit} className="space-y-7">
             {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+              <div className="rounded-2xl border border-rose-200/80 bg-rose-50/80 px-4 py-3 text-sm text-rose-600">
                 {error}
               </div>
             )}
 
-            <Input
-              label="Video Topic"
-              placeholder="e.g., Product launch announcement"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              required
-            />
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Input
+                label="Video topic"
+                placeholder="e.g., Product launch announcement"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                required
+              />
+              <Select
+                label="Style"
+                options={[
+                  { value: 'casual', label: 'Casual' },
+                  { value: 'professional', label: 'Professional' },
+                  { value: 'energetic', label: 'Energetic' },
+                  { value: 'educational', label: 'Educational' },
+                ]}
+                value={style}
+                onChange={(e) => setStyle(e.target.value as any)}
+              />
+            </div>
 
             <Textarea
-              label="Script (Optional)"
-              placeholder="Enter a detailed script if you have one..."
-              rows={6}
+              label="Script (optional)"
+              placeholder="Add a detailed script or talking points if you have them - otherwise we'll generate it."
+              rows={8}
               value={script}
               onChange={(e) => setScript(e.target.value)}
             />
 
-            <Select
-              label="Style"
-              options={[
-                { value: 'casual', label: 'Casual' },
-                { value: 'professional', label: 'Professional' },
-                { value: 'energetic', label: 'Energetic' },
-                { value: 'educational', label: 'Educational' },
-              ]}
-              value={style}
-              onChange={(e) => setStyle(e.target.value as any)}
-            />
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Duration: {duration} seconds
-              </label>
+            <div className="rounded-2xl border border-white/60 bg-white/70 px-5 py-6">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-semibold text-primary">Duration</label>
+                <span className="text-xs font-medium uppercase tracking-wide text-slate-400">{duration} seconds</span>
+              </div>
               <input
                 type="range"
                 min="15"
@@ -93,26 +99,26 @@ export function GenerateVideo() {
                 step="15"
                 value={duration}
                 onChange={(e) => setDuration(Number(e.target.value))}
-                className="w-full"
+                className="mt-4 w-full accent-brand-500"
               />
-              <div className="flex justify-between text-xs text-gray-600 mt-1">
+              <div className="mt-2 flex justify-between text-[11px] uppercase tracking-wide text-slate-400">
                 <span>15s</span>
                 <span>180s</span>
               </div>
             </div>
 
-            <div className="flex gap-3 pt-4">
+            <div className="flex flex-col gap-3 pt-2 sm:flex-row">
               <Button
                 type="button"
-                variant="secondary"
+                variant="ghost"
                 onClick={() => navigate('/videos')}
-                className="flex-1"
+                className="w-full border border-white/60 bg-white/70 text-slate-500 hover:border-slate-200 hover:bg-white sm:w-auto"
               >
                 Cancel
               </Button>
-              <Button type="submit" className="flex-1" loading={loading}>
-                <Video className="w-4 h-4 mr-2" />
-                Generate Video
+              <Button type="submit" className="w-full sm:flex-1" loading={loading}>
+                <Video className="mr-2 h-4 w-4" />
+                Generate video
               </Button>
             </div>
           </form>

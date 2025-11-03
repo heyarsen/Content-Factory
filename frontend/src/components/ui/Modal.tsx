@@ -35,26 +35,23 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
       className="fixed inset-0 z-50 overflow-y-auto"
       onClick={onClose}
     >
-      <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+      <div className="flex min-h-screen items-center justify-center px-4 pt-6 pb-10 text-center sm:block sm:p-0">
         <div
-          className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
+          className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm transition-opacity"
           aria-hidden="true"
         ></div>
 
         <div
-          className={`inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle ${sizes[size]} w-full`}
+          className={`inline-block w-full transform overflow-hidden rounded-3xl border border-white/60 bg-white/90 text-left align-bottom shadow-[0_45px_95px_-55px_rgba(15,23,42,0.55)] backdrop-blur-xl transition-all sm:my-12 sm:align-middle ${sizes[size]}`}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-            <h3 className="text-lg font-bold text-gray-900">{title}</h3>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <X className="w-5 h-5" />
+          <div className="flex items-center justify-between border-b border-white/60 px-8 py-5">
+            <h3 className="text-lg font-semibold text-primary">{title}</h3>
+            <button onClick={onClose} className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100/70 hover:text-primary">
+              <X className="h-5 w-5" />
             </button>
           </div>
-          <div className="px-6 py-4">
+          <div className="px-8 py-6">
             {children}
           </div>
         </div>

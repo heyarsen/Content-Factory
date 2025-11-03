@@ -96,11 +96,12 @@ export function Videos() {
   if (loading) {
     return (
       <Layout>
-        <div className="space-y-6">
-          <Skeleton className="h-8 w-48" />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="space-y-8">
+          <Skeleton className="h-32 rounded-[28px]" />
+          <Skeleton className="h-24 rounded-3xl" />
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-64" />
+              <Skeleton key={i} className="h-80 rounded-3xl" />
             ))}
           </div>
         </div>
@@ -110,39 +111,46 @@ export function Videos() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-primary">Videos</h1>
+      <div className="space-y-10">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Library</p>
+            <h1 className="text-3xl font-semibold text-primary">Video library</h1>
+            <p className="text-sm text-slate-500">Search, filter, and orchestrate your AI-generated stories.</p>
+          </div>
           <Link to="/generate">
-            <Button>Generate New Video</Button>
+            <Button className="shadow-[0_20px_45px_-25px_rgba(99,102,241,0.6)]">
+              <Video className="mr-2 h-4 w-4" />
+              Generate new video
+            </Button>
           </Link>
         </div>
 
-        <div className="flex gap-4">
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+        <Card className="border-dashed border-white/40">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
               <Input
-                placeholder="Search videos..."
+                placeholder="Search videos by topic or style..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-10"
+                className="pl-11"
               />
             </div>
+            <Select
+              options={[
+                { value: 'all', label: 'All status' },
+                { value: 'pending', label: 'Pending' },
+                { value: 'generating', label: 'Generating' },
+                { value: 'completed', label: 'Completed' },
+                { value: 'failed', label: 'Failed' },
+              ]}
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full md:w-56"
+            />
           </div>
-          <Select
-            options={[
-              { value: 'all', label: 'All Status' },
-              { value: 'pending', label: 'Pending' },
-              { value: 'generating', label: 'Generating' },
-              { value: 'completed', label: 'Completed' },
-              { value: 'failed', label: 'Failed' },
-            ]}
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-48"
-          />
-        </div>
+        </Card>
 
         {videos.length === 0 ? (
           <EmptyState
@@ -156,72 +164,88 @@ export function Videos() {
             }
           />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {videos.map((video) => (
-              <Card key={video.id} hover>
-                <div className="space-y-4">
-                  <div className="flex items-start justify-between">
-                    <h3 className="font-bold text-sm text-primary line-clamp-2">{video.topic}</h3>
-                    {getStatusBadge(video.status)}
+              <Card key={video.id} hover className="flex h-full flex-col gap-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{video.style}</p>
+                    <h3 className="text-lg font-semibold leading-tight text-primary line-clamp-2">
+                      {video.topic}
+                    </h3>
+                    <p className="text-xs text-slate-400">{new Date(video.created_at).toLocaleString()}</p>
                   </div>
+                  {getStatusBadge(video.status)}
+                </div>
 
-                  <div className="flex items-center gap-4 text-xs text-gray-600">
-                    <span>{video.style}</span>
-                    <span>{video.duration}s</span>
+                {video.status === 'completed' && video.video_url && (
+                  <div className="relative overflow-hidden rounded-2xl border border-white/50 bg-slate-100/70">
+                    <video src={video.video_url} className="h-full w-full rounded-2xl object-cover" controls />
                   </div>
+                )}
 
+                {video.status === 'failed' && video.error_message && (
+                  <div className="rounded-2xl border border-rose-200/70 bg-rose-50/70 px-4 py-3 text-xs text-rose-600">
+                    {video.error_message}
+                  </div>
+                )}
+
+                <div className="mt-auto flex items-center gap-2 border-t border-white/60 pt-4 text-xs text-slate-400">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-2.5 w-2.5 rounded-full bg-brand-300" />
+                    <span>{video.duration}s runtime</span>
+                  </div>
+                  <span className="ml-auto text-slate-300">ID - {video.id.slice(0, 6)}</span>
+                </div>
+
+                <div className="flex items-center gap-2">
                   {video.status === 'completed' && video.video_url && (
-                    <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden">
-                      <video src={video.video_url} className="w-full h-full object-cover" controls />
-                    </div>
-                  )}
-
-                  {video.status === 'failed' && video.error_message && (
-                    <p className="text-xs text-red-600">{video.error_message}</p>
-                  )}
-
-                  <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
-                    {video.status === 'completed' && video.video_url && (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => window.open(video.video_url!, '_blank')}
-                        >
-                          <Play className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            const link = document.createElement('a')
-                            link.href = video.video_url!
-                            link.download = `${video.topic}.mp4`
-                            link.click()
-                          }}
-                        >
-                          <Download className="w-4 h-4" />
-                        </Button>
-                      </>
-                    )}
-                    {video.status === 'failed' && (
+                    <>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleRetry(video.id)}
+                        className="border border-white/60 bg-white/70 text-brand-600 hover:border-brand-200 hover:bg-white"
+                        onClick={() => window.open(video.video_url!, '_blank')}
                       >
-                        <RefreshCw className="w-4 h-4" />
+                        <Play className="mr-2 h-4 w-4" />
+                        Preview
                       </Button>
-                    )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="border border-white/60 bg-white/70 text-brand-600 hover:border-brand-200 hover:bg-white"
+                        onClick={() => {
+                          const link = document.createElement('a')
+                          link.href = video.video_url!
+                          link.download = `${video.topic}.mp4`
+                          link.click()
+                        }}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Download
+                      </Button>
+                    </>
+                  )}
+                  {video.status === 'failed' && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setDeleteModal(video.id)}
-                      className="ml-auto text-red-600 hover:text-red-700"
+                      className="border border-white/60 bg-white/70 text-amber-500 hover:border-amber-200 hover:bg-white"
+                      onClick={() => handleRetry(video.id)}
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Retry
                     </Button>
-                  </div>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="ml-auto border border-rose-100 bg-rose-50/70 text-rose-600 hover:border-rose-200 hover:bg-rose-50"
+                    onClick={() => setDeleteModal(video.id)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Remove
+                  </Button>
                 </div>
               </Card>
             ))}

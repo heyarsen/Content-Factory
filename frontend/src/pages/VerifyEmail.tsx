@@ -61,49 +61,67 @@ export function VerifyEmail() {
   }, [searchParams, navigate])
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md">
-        {status === 'verifying' && (
-          <>
-            <h1 className="text-2xl font-bold text-primary mb-4">Verifying Email</h1>
-            <p className="text-sm text-gray-600 mb-4">Please wait while we verify your email address...</p>
-            <div className="flex justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-600"></div>
+    <div className="relative min-h-screen overflow-hidden bg-background">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-brand-500/10 blur-3xl" />
+        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-emerald-400/10 blur-3xl" />
+      </div>
+
+      <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 lg:px-8">
+        <Card className="w-full max-w-lg p-10 text-center shadow-[0_45px_95px_-65px_rgba(15,23,42,0.7)]">
+          {status === 'verifying' && (
+            <div className="space-y-4">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-indigo-500 text-white shadow-md">
+                <span className="text-xl font-semibold">N</span>
+              </div>
+              <h1 className="text-2xl font-semibold text-primary">Verifying your email</h1>
+              <p className="text-sm text-slate-500">
+                Hang tight while we confirm your access. This should only take a moment.
+              </p>
+              <div className="flex justify-center">
+                <div className="h-10 w-10 animate-spin rounded-full border-2 border-brand-200 border-t-transparent" />
+              </div>
             </div>
-          </>
-        )}
+          )}
 
-        {status === 'success' && (
-          <>
-            <h1 className="text-2xl font-bold text-success mb-4">Email Verified!</h1>
-            <p className="text-sm text-gray-600 mb-6">
-              Your email has been successfully verified. Redirecting to dashboard...
-            </p>
-            <Button onClick={() => navigate('/dashboard')} className="w-full">
-              Go to Dashboard
-            </Button>
-          </>
-        )}
-
-        {status === 'error' && (
-          <>
-            <h1 className="text-2xl font-bold text-error mb-4">Verification Failed</h1>
-            <p className="text-sm text-gray-600 mb-4">{error}</p>
-            <div className="space-y-2">
-              <Button onClick={() => navigate('/login')} className="w-full">
-                Go to Login
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => navigate('/signup')}
-                className="w-full"
-              >
-                Sign Up Again
+          {status === 'success' && (
+            <div className="space-y-5">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-brand-500 text-white shadow-md">
+                <span className="text-xl font-semibold">?</span>
+              </div>
+              <h1 className="text-2xl font-semibold text-primary">Email verified</h1>
+              <p className="text-sm text-slate-500">
+                Your workspace is ready. We&apos;re redirecting you to the dashboard now.
+              </p>
+              <Button onClick={() => navigate('/dashboard')} className="w-full">
+                Go to dashboard
               </Button>
             </div>
-          </>
-        )}
-      </Card>
+          )}
+
+          {status === 'error' && (
+            <div className="space-y-5">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-500 to-brand-500 text-white shadow-md">
+                <span className="text-xl font-semibold">!</span>
+              </div>
+              <h1 className="text-2xl font-semibold text-error">Verification failed</h1>
+              <p className="text-sm text-slate-500">{error}</p>
+              <div className="space-y-3">
+                <Button onClick={() => navigate('/login')} className="w-full">
+                  Go to sign in
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full border border-white/60 bg-white/70 text-slate-500 hover:border-brand-200 hover:text-brand-600"
+                  onClick={() => navigate('/signup')}
+                >
+                  Create a new account
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
+      </div>
     </div>
   )
 }
