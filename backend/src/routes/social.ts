@@ -50,6 +50,7 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
     let uploadPostUserId = existingAccounts?.[0]?.platform_account_id
 
     // Create or get Upload-Post user profile
+    let username: string | undefined // Store username for later use
     if (!uploadPostUserId) {
       try {
         // Ensure we have at least email for user profile (username will be derived from email)
@@ -57,12 +58,20 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
         const userName = user.user_metadata?.full_name || 
                         user.user_metadata?.name ||
                         (userEmail ? userEmail.split('@')[0] : undefined)
-        const username = user.user_metadata?.username || 
-                         (userEmail ? userEmail.split('@')[0] : undefined)
-
-        if (!userEmail && !username) {
-          throw new Error('User email or username is required to create Upload-Post profile')
+        
+        // Extract username from email (part before @) - this will be used for profile creation and JWT
+        if (userEmail) {
+          username = user.user_metadata?.username || userEmail.split('@')[0]
+        } else {
+          // Fallback: use Supabase user ID as username
+          username = userId.substring(0, 20).replace(/-/g, '') // Remove dashes and limit length
         }
+
+        if (!username) {
+          throw new Error('Unable to generate username for Upload-Post profile')
+        }
+
+        console.log('Creating Upload-Post profile with username:', username, 'email:', userEmail)
 
         const uploadPostUser = await createUserProfile({
           email: userEmail,
@@ -135,10 +144,19 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
     try {
       console.log('Generating JWT for Upload-Post user ID:', uploadPostUserId)
       
-      // Get username for JWT generation (use the username we created the profile with)
-      const userEmail = user.email || user.user_metadata?.email
-      const username = user.user_metadata?.username || 
-                     (userEmail ? userEmail.split('@')[0] : uploadPostUserId)
+      // Get username for JWT generation - use the one we created profile with, or extract from email
+      if (!username) {
+        const userEmail = user.email || user.user_metadata?.email
+        username = user.user_metadata?.username || 
+                   (userEmail ? userEmail.split('@')[0] : undefined) ||
+                   uploadPostUserId.substring(0, 20).replace(/-/g, '')
+      }
+      
+      console.log('Using username for JWT generation:', username)
+      
+      if (!username || username.trim() === '') {
+        throw new Error('Username is required for JWT generation but could not be determined')
+      }
       
       const jwt = await generateUserJWT(uploadPostUserId, username)
       console.log('JWT generated successfully, length:', jwt?.length)

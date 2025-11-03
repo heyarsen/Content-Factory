@@ -143,15 +143,25 @@ export async function generateUserJWT(userId: string, username?: string): Promis
     }
     
     // profile_username is required by Upload-Post API
-    if (username) {
-      payload.profile_username = username
-    } else {
+    // Always ensure we have a username - use provided one or extract from userId
+    let profileUsername = username
+    
+    if (!profileUsername || profileUsername.trim() === '') {
       // Extract username from userId if it looks like an email, otherwise use userId
-      const extractedUsername = userId.includes('@') ? userId.split('@')[0] : userId
-      payload.profile_username = extractedUsername
+      profileUsername = userId.includes('@') ? userId.split('@')[0] : userId.substring(0, 20).replace(/-/g, '')
     }
     
-    console.log('JWT generation payload:', payload)
+    if (!profileUsername || profileUsername.trim() === '') {
+      throw new Error('profile_username is required but could not be determined')
+    }
+    
+    payload.profile_username = profileUsername
+    
+    console.log('JWT generation payload:', {
+      user_id: payload.user_id,
+      profile_username: payload.profile_username,
+      hasUsername: !!payload.profile_username,
+    })
     
     const response = await axios.post(
       `${UPLOADPOST_API_URL}/uploadposts/users/generate-jwt`,
