@@ -145,15 +145,34 @@ CREATE POLICY "Users can delete own scheduled posts" ON scheduled_posts FOR DELE
 
 ## Railway Deployment
 
+### Backend Deployment
+
 1. Connect your GitHub repository to Railway
 2. Create a new project in Railway
-3. Add environment variables in Railway dashboard:
+3. **Important**: In Railway project settings, set the **Root Directory** to `backend`
+4. Add environment variables in Railway dashboard:
    - `SUPABASE_URL`
    - `SUPABASE_SERVICE_ROLE_KEY`
    - `HEYGEN_KEY`
    - `UPLOADPOST_KEY`
-   - `CORS_ORIGIN` (your frontend URL)
-4. Railway will automatically deploy using `railway.json` configuration
+   - `CORS_ORIGIN` (your frontend URL - e.g., `https://your-frontend.vercel.app`)
+   - `NODE_ENV=production`
+   - `PORT` (Railway will set this automatically, but you can override if needed)
+5. Railway will automatically detect the Node.js project and deploy using the `nixpacks.toml` configuration
+
+### Alternative: If Root Directory is Not Set
+
+If you can't set the root directory to `backend`, Railway will use the root `nixpacks.toml` which will automatically `cd` into the backend directory for all operations.
+
+### Frontend Deployment (Optional - Vercel/Netlify)
+
+For the frontend, deploy separately to Vercel or Netlify:
+1. Connect the repository
+2. Set root directory to `frontend`
+3. Add environment variables:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+   - `VITE_API_URL` (your Railway backend URL)
 
 ## Features
 
