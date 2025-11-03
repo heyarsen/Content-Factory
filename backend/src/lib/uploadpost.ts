@@ -15,12 +15,13 @@ function getAuthHeader(): string {
 }
 
 export interface CreateUserProfileRequest {
+  username: string
   email?: string
   name?: string
-  username?: string
 }
 
 export interface UserProfile {
+  username?: string
   id?: string
   user_id?: string
   userId?: string
@@ -64,17 +65,14 @@ export async function createUserProfile(
   request: CreateUserProfileRequest
 ): Promise<UserProfile> {
   try {
-    const payload: any = {}
-    
-    // Username is required by Upload-Post API
-    if (!request.username && !request.email) {
-      throw new Error('Username or email is required to create Upload-Post profile')
+    if (!request.username || request.username.trim() === '') {
+      throw new Error('Username is required to create Upload-Post profile')
     }
-    
-    // Username can be derived from email if not provided
-    const username = request.username || (request.email ? request.email.split('@')[0] : undefined)
-    
-    if (username) payload.username = username
+
+    const payload: Record<string, any> = {
+      username: request.username.trim(),
+    }
+
     if (request.email) payload.email = request.email
     if (request.name) payload.name = request.name
 
@@ -105,14 +103,19 @@ export async function createUserProfile(
 
     // Handle different response formats
     const responseData = response.data
-    
-    // Check if response is the user object directly, or wrapped
+
+    if (responseData?.profile && typeof responseData.profile === 'object') {
+      return responseData.profile
+    }
+
     if (typeof responseData === 'object' && responseData !== null) {
       return responseData
     }
-    
-    // If response is a string or other format, return as-is
-    return { id: responseData, user_id: responseData, userId: responseData }
+
+    return {
+      username: request.username,
+      id: typeof responseData === 'string' ? responseData : undefined,
+    }
   } catch (error: any) {
     console.error('Upload-post create user error details:', {
       message: error.message,
@@ -133,37 +136,44 @@ export async function createUserProfile(
   }
 }
 
-// Generate JWT for user to link social accounts
-export async function generateUserJWT(userId: string, username?: string): Promise<string> {
+export interface GenerateUserAccessLinkOptions {
+  redirectUrl?: string
+  logoImage?: string
+  redirectButtonText?: string
+  connectTitle?: string
+  connectDescription?: string
+  platforms?: Array<'tiktok' | 'instagram' | 'linkedin' | 'youtube' | 'facebook' | 'x' | 'threads'>
+}
+
+export interface UploadPostAccessLink {
+  accessUrl: string
+  duration?: string
+  success?: boolean
+  raw?: any
+}
+
+// Generate access URL (JWT-backed) for user to link social accounts
+export async function generateUserAccessLink(
+  username: string,
+  options: GenerateUserAccessLinkOptions = {}
+): Promise<UploadPostAccessLink> {
   try {
-    console.log('Generating JWT for user:', userId, 'username:', username)
-    
-    const payload: any = {
-      user_id: userId,
+    if (!username || username.trim() === '') {
+      throw new Error('Username is required to generate Upload-Post access link')
     }
-    
-    // profile_username is required by Upload-Post API
-    // Always ensure we have a username - use provided one or use userId as fallback
-    let profileUsername = username
-    
-    if (!profileUsername || profileUsername.trim() === '') {
-      // If userId looks like an email, use it as username (full email to avoid conflicts)
-      // Otherwise, use userId as-is (remove dashes if needed)
-      profileUsername = userId.includes('@') ? userId : userId.replace(/-/g, '_')
+    const payload: Record<string, any> = {
+      username: username.trim(),
     }
-    
-    if (!profileUsername || profileUsername.trim() === '') {
-      throw new Error('profile_username is required but could not be determined')
-    }
-    
-    payload.profile_username = profileUsername
-    
-    console.log('JWT generation payload:', {
-      user_id: payload.user_id,
-      profile_username: payload.profile_username,
-      hasUsername: !!payload.profile_username,
-    })
-    
+
+    if (options.redirectUrl) payload.redirect_url = options.redirectUrl
+    if (options.logoImage) payload.logo_image = options.logoImage
+    if (options.redirectButtonText) payload.redirect_button_text = options.redirectButtonText
+    if (options.connectTitle) payload.connect_title = options.connectTitle
+    if (options.connectDescription) payload.connect_description = options.connectDescription
+    if (options.platforms && options.platforms.length > 0) payload.platforms = options.platforms
+
+    console.log('Generating Upload-Post access link with payload:', payload)
+
     const response = await axios.post(
       `${UPLOADPOST_API_URL}/uploadposts/users/generate-jwt`,
       payload,
@@ -175,69 +185,63 @@ export async function generateUserJWT(userId: string, username?: string): Promis
       }
     )
 
-    console.log('JWT generation response:', {
+    const accessUrl = response.data?.access_url || response.data?.accessUrl
+
+    console.log('Access link response:', {
       status: response.status,
-      hasJWT: !!(response.data.jwt || response.data.token),
+      hasAccessUrl: !!accessUrl,
       dataKeys: Object.keys(response.data || {}),
     })
 
-    // Handle different response formats
-    let jwt: string | undefined
-    
-    if (typeof response.data === 'string') {
-      jwt = response.data
-    } else if (typeof response.data === 'object' && response.data !== null) {
-      jwt = response.data.jwt || response.data.token || response.data.access_token
-    }
-    
-    if (!jwt || typeof jwt !== 'string') {
-      console.error('Invalid JWT response format:', {
-        dataType: typeof response.data,
-        data: response.data,
-        dataKeys: response.data ? Object.keys(response.data) : [],
-      })
-      throw new Error(`Upload-Post did not return a valid JWT. Response format: ${typeof response.data}`)
+    if (!accessUrl || typeof accessUrl !== 'string') {
+      throw new Error('Upload-Post did not return a valid access_url')
     }
 
-    return jwt
+    return {
+      accessUrl,
+      duration: response.data?.duration,
+      success: response.data?.success,
+      raw: response.data,
+    }
   } catch (error: any) {
-    console.error('Upload-post generate JWT error details:', {
+    console.error('Upload-post access link error details:', {
       message: error.message,
       status: error.response?.status,
       statusText: error.response?.statusText,
       data: error.response?.data,
-      userId,
       username,
     })
-    
-    // Extract error message from various possible formats
-    const errorMessage = error.response?.data?.message || 
-                        error.response?.data?.error ||
-                        error.response?.data?.detail ||
-                        error.response?.statusText ||
-                        error.message ||
-                        'Failed to generate JWT'
-    
-    throw new Error(errorMessage)
+    throw new Error(
+      error.response?.data?.message || 
+      error.response?.data?.error ||
+      'Failed to generate access link'
+    )
   }
 }
 
 // Get user profile
-export async function getUserProfile(userId: string): Promise<UserProfile> {
+export async function getUserProfile(username: string): Promise<UserProfile> {
   try {
+    if (!username || username.trim() === '') {
+      throw new Error('Username is required to fetch Upload-Post user profile')
+    }
+
     const response = await axios.get(
-      `${UPLOADPOST_API_URL}/uploadposts/users`,
+      `${UPLOADPOST_API_URL}/uploadposts/users/${encodeURIComponent(username.trim())}`,
       {
         headers: {
           'Authorization': getAuthHeader(),
         },
-        params: {
-          user_id: userId,
-        },
       }
     )
 
-    return response.data
+    const responseData = response.data
+
+    if (responseData?.profile && typeof responseData.profile === 'object') {
+      return responseData.profile
+    }
+
+    return responseData
   } catch (error: any) {
     console.error('Upload-post get user error:', error.response?.data || error.message)
     throw new Error(
