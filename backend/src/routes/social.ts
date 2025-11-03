@@ -59,18 +59,20 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
       (userEmail ? userEmail : undefined) ||
       userId.replace(/-/g, '_')
 
+    // Determine the final username to use
+    const finalUsername = uploadPostUsername || derivedUsername || userId.replace(/-/g, '_')
+    
+    if (!finalUsername || finalUsername.trim() === '') {
+      throw new Error('Unable to generate username for Upload-Post profile')
+    }
+
+    // If we don't have an existing username, create the profile
     if (!uploadPostUsername) {
-      if (!derivedUsername) {
-        throw new Error('Unable to generate username for Upload-Post profile')
-      }
-
-      uploadPostUsername = derivedUsername
-
       try {
-        console.log('Creating Upload-Post profile with username:', uploadPostUsername, 'email:', userEmail)
+        console.log('Creating Upload-Post profile with username:', finalUsername, 'email:', userEmail)
 
         const uploadPostProfile = await createUserProfile({
-          username: uploadPostUsername,
+          username: finalUsername,
           email: userEmail,
           name: userName,
         })
@@ -87,6 +89,8 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
 
         if (returnedUsername && typeof returnedUsername === 'string') {
           uploadPostUsername = returnedUsername
+        } else {
+          uploadPostUsername = finalUsername
         }
       } catch (createError: any) {
         const errorStatus = createError.response?.status
@@ -102,7 +106,7 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
 
         if (errorStatus === 409 || errorData?.message?.toLowerCase?.().includes('already exists')) {
           console.log('Upload-Post user already exists, reusing derived username')
-          uploadPostUsername = derivedUsername
+          uploadPostUsername = finalUsername
         } else {
           return res.status(500).json({
             error: 'Failed to create Upload-Post profile. Please try again.',
@@ -118,14 +122,17 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
       }
     }
 
-    if (!uploadPostUsername) {
+    // Use the final username (either existing or newly created)
+    const usernameForLink = uploadPostUsername || finalUsername
+    
+    if (!usernameForLink || usernameForLink.trim() === '') {
       throw new Error('Upload-Post username could not be determined')
     }
 
     try {
-      console.log('Generating Upload-Post access link for username:', uploadPostUsername)
+      console.log('Generating Upload-Post access link for username:', usernameForLink)
 
-      const accessLink = await generateUserAccessLink(uploadPostUsername, {
+      const accessLink = await generateUserAccessLink(usernameForLink, {
         platforms: [platform as 'instagram' | 'tiktok' | 'youtube' | 'facebook'],
       })
 
@@ -145,7 +152,7 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
         const { error: updateError } = await supabase
           .from('social_accounts')
           .update({
-            platform_account_id: uploadPostUsername,
+            platform_account_id: usernameForLink,
             status: 'pending',
           })
           .eq('id', existing.id)
@@ -161,7 +168,7 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
           .insert({
             user_id: userId,
             platform: platform as any,
-            platform_account_id: uploadPostUsername,
+            platform_account_id: usernameForLink,
             status: 'pending',
           })
           .select()
@@ -177,7 +184,7 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
       res.json({
         accessUrl: accessLink.accessUrl,
         duration: accessLink.duration,
-        uploadPostUsername,
+        uploadPostUsername: usernameForLink,
         platform,
         message: 'Account linking initiated. Follow the accessUrl to connect through Upload-Post.',
         success: accessLink.success ?? true,
@@ -186,7 +193,7 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
       console.error('Failed in access link generation or account storage:', {
         message: linkError.message,
         stack: linkError.stack,
-        uploadPostUsername,
+        usernameForLink,
         errorResponse: linkError.response?.data,
       })
       
