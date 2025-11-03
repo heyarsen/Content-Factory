@@ -1,10 +1,13 @@
 import axios from 'axios'
 
 const HEYGEN_API_URL = 'https://api.heygen.com/v1'
-const HEYGEN_KEY = process.env.HEYGEN_KEY
 
-if (!HEYGEN_KEY) {
-  throw new Error('Missing HEYGEN_KEY environment variable')
+function getHeyGenKey(): string {
+  const key = process.env.HEYGEN_KEY
+  if (!key) {
+    throw new Error('Missing HEYGEN_KEY environment variable')
+  }
+  return key
 }
 
 export interface GenerateVideoRequest {
@@ -36,7 +39,7 @@ export async function generateVideo(
       },
       {
         headers: {
-          'Authorization': `Bearer ${HEYGEN_KEY}`,
+          'Authorization': `Bearer ${getHeyGenKey()}`,
           'Content-Type': 'application/json',
         },
       }
@@ -63,7 +66,7 @@ export async function getVideoStatus(
       `${HEYGEN_API_URL}/video/${videoId}`,
       {
         headers: {
-          'Authorization': `Bearer ${HEYGEN_KEY}`,
+          'Authorization': `Bearer ${getHeyGenKey()}`,
         },
       }
     )

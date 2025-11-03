@@ -1,10 +1,13 @@
 import axios from 'axios'
 
 const UPLOADPOST_API_URL = 'https://api.upload-post.com/v1'
-const UPLOADPOST_KEY = process.env.UPLOADPOST_KEY
 
-if (!UPLOADPOST_KEY) {
-  throw new Error('Missing UPLOADPOST_KEY environment variable')
+function getUploadPostKey(): string {
+  const key = process.env.UPLOADPOST_KEY
+  if (!key) {
+    throw new Error('Missing UPLOADPOST_KEY environment variable')
+  }
+  return key
 }
 
 export interface ConnectAccountRequest {
@@ -39,7 +42,7 @@ export async function initiateOAuthConnection(
       },
       {
         headers: {
-          'Authorization': `Bearer ${UPLOADPOST_KEY}`,
+          'Authorization': `Bearer ${getUploadPostKey()}`,
           'Content-Type': 'application/json',
         },
       }
@@ -73,7 +76,7 @@ export async function handleOAuthCallback(
       },
       {
         headers: {
-          'Authorization': `Bearer ${UPLOADPOST_KEY}`,
+          'Authorization': `Bearer ${getUploadPostKey()}`,
           'Content-Type': 'application/json',
         },
       }
@@ -107,7 +110,7 @@ export async function postVideo(
       },
       {
         headers: {
-          'Authorization': `Bearer ${UPLOADPOST_KEY}`,
+          'Authorization': `Bearer ${getUploadPostKey()}`,
           'Content-Type': 'application/json',
         },
       }
@@ -132,7 +135,7 @@ export async function getPostStatus(postId: string): Promise<UploadPostResponse>
       `${UPLOADPOST_API_URL}/post/${postId}`,
       {
         headers: {
-          'Authorization': `Bearer ${UPLOADPOST_KEY}`,
+          'Authorization': `Bearer ${getUploadPostKey()}`,
         },
       }
     )
