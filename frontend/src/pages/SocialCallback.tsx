@@ -11,19 +11,61 @@ export function SocialCallback() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const code = searchParams.get('code')
     const platform = searchParams.get('platform')
+    const errorParam =
+      searchParams.get('error') ||
+      searchParams.get('message') ||
+      searchParams.get('error_description')
+    const statusParam = searchParams.get('status')
 
-    if (!code || !platform) {
-      setError('Missing code or platform parameter')
+    if (!platform) {
+      setError('Missing platform parameter')
+      setLoading(false)
+      return
+    }
+
+    if (statusParam === 'cancelled') {
+      setError('The connection was cancelled. Please try again if you still want to link your account.')
+      setLoading(false)
+      return
+    }
+
+    if (errorParam) {
+      setError(errorParam)
+      setLoading(false)
+      return
+    }
+
+    const resolvedPlatform = platform as string
+
+    const usernameParam =
+      searchParams.get('uploadpost_username') ||
+      searchParams.get('username') ||
+      searchParams.get('user') ||
+      searchParams.get('user_id') ||
+      searchParams.get('profile')
+
+    const storedUsername = localStorage.getItem(`uploadpost_username_${resolvedPlatform}`)
+    const uploadPostUsername = usernameParam || storedUsername
+
+    if (!uploadPostUsername) {
+      setError('Missing Upload-Post username. Please restart the connection flow.')
       setLoading(false)
       return
     }
 
     const handleCallback = async () => {
       try {
-        await api.post('/api/social/callback', { code, platform })
-        navigate('/social')
+        await api.post('/api/social/callback', {
+          platform: resolvedPlatform,
+          uploadPostUsername,
+        })
+
+        localStorage.removeItem(`uploadpost_access_url_${resolvedPlatform}`)
+        localStorage.removeItem(`uploadpost_username_${resolvedPlatform}`)
+        localStorage.removeItem(`uploadpost_redirect_url_${resolvedPlatform}`)
+
+        navigate(`/social?connected=${resolvedPlatform}`)
       } catch (err: any) {
         setError(err.response?.data?.error || 'Failed to connect account')
         setLoading(false)

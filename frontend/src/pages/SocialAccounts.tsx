@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -36,12 +37,9 @@ export function SocialAccounts() {
   const [connecting, setConnecting] = useState(false)
   const [disconnectModal, setDisconnectModal] = useState<string | null>(null)
   const [disconnecting, setDisconnecting] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
 
-  useEffect(() => {
-    loadAccounts()
-  }, [])
-
-  const loadAccounts = async () => {
+  const loadAccounts = useCallback(async () => {
     try {
       const response = await api.get('/api/social/accounts')
       setAccounts(response.data.accounts || [])
@@ -50,18 +48,41 @@ export function SocialAccounts() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  const handleConnect = async (platform: string) => {
+  useEffect(() => {
+    loadAccounts()
+  }, [loadAccounts])
+
+  useEffect(() => {
+    const connectedPlatform = searchParams.get('connected') as SocialAccount['platform'] | null
+
+    if (connectedPlatform) {
+      const platformLabel = platformNames[connectedPlatform] || connectedPlatform
+      alert(`Success! ${platformLabel} connected successfully.`)
+
+      const nextParams = new URLSearchParams(searchParams)
+      nextParams.delete('connected')
+      setSearchParams(nextParams, { replace: true })
+
+      // Refresh accounts to reflect the latest status
+      loadAccounts()
+    }
+  }, [searchParams, setSearchParams, loadAccounts])
+
+  const handleConnect = async (platform: SocialAccount['platform']) => {
     setConnecting(true)
     try {
       const response = await api.post('/api/social/connect', { platform })
-      const { accessUrl, uploadPostUsername, message, duration } = response.data as {
+      const { accessUrl, uploadPostUsername, message, duration, redirectUrl } = response.data as {
         accessUrl?: string
         uploadPostUsername?: string
         message?: string
         duration?: string
+        redirectUrl?: string
       }
+
+      const platformLabel = platformNames[platform] || platform
 
       localStorage.removeItem(`uploadpost_jwt_${platform}`)
       localStorage.removeItem(`uploadpost_userid_${platform}`)
@@ -70,16 +91,34 @@ export function SocialAccounts() {
         localStorage.setItem(`uploadpost_username_${platform}`, uploadPostUsername)
       }
 
+      if (redirectUrl) {
+        localStorage.setItem(`uploadpost_redirect_url_${platform}`, redirectUrl)
+      }
+
       if (accessUrl) {
         localStorage.setItem(`uploadpost_access_url_${platform}`, accessUrl)
+        const buildPlatformUrl = (baseUrl: string) => {
+          try {
+            const url = new URL(baseUrl)
+            if (!url.searchParams.has('platform')) {
+              url.searchParams.set('platform', platform)
+            }
+            return url.toString()
+          } catch (error) {
+            const separator = baseUrl.includes('?') ? '&' : '?'
+            return `${baseUrl}${separator}platform=${platform}`
+          }
+        }
         try {
-          window.open(accessUrl, '_blank', 'noopener')
+          window.open(buildPlatformUrl(accessUrl), '_blank', 'noopener')
         } catch (openError) {
           console.warn('Unable to automatically open Upload-Post link:', openError)
         }
       }
 
-      const alertParts = [message || 'Account linking initiated via Upload-Post.']
+      const alertParts = [
+        message || `Account linking initiated for ${platformLabel}. Complete the steps in the new tab.`,
+      ]
 
       if (duration) {
         alertParts.push(`Link valid for ${duration}.`)
@@ -87,6 +126,12 @@ export function SocialAccounts() {
 
       if (accessUrl) {
         alertParts.push(`If a new tab did not open, copy this URL to finish linking:\n${accessUrl}`)
+      }
+
+      if (redirectUrl) {
+        alertParts.push(
+          `Once finished you will be redirected here automatically. If that does not happen, revisit: ${redirectUrl}`
+        )
       }
 
       alert(alertParts.join('\n\n'))
