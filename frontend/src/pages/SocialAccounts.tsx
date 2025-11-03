@@ -77,7 +77,16 @@ export function SocialAccounts() {
       loadAccounts()
     } catch (error: any) {
       console.error('Failed to connect:', error)
-      alert(error.response?.data?.error || error.response?.data?.details || 'Failed to initiate connection')
+      const errorMessage = error.response?.data?.error || 
+                          error.response?.data?.details || 
+                          error.message || 
+                          'Failed to initiate connection'
+      console.error('Error details:', {
+        message: errorMessage,
+        fullResponse: error.response?.data,
+        status: error.response?.status,
+      })
+      alert(errorMessage)
     } finally {
       setConnecting(false)
     }

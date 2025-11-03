@@ -133,26 +133,39 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
 
     // Generate JWT for linking accounts
     try {
+      console.log('Generating JWT for Upload-Post user ID:', uploadPostUserId)
       const jwt = await generateUserJWT(uploadPostUserId)
+      console.log('JWT generated successfully, length:', jwt?.length)
 
       // Create or update account record
-      const { data: existing } = await supabase
+      const { data: existing, error: findError } = await supabase
         .from('social_accounts')
         .select('*')
         .eq('user_id', userId)
         .eq('platform', platform)
-        .single()
+        .maybeSingle() // Use maybeSingle instead of single to avoid errors if not found
+
+      if (findError && findError.code !== 'PGRST116') { // PGRST116 is "not found" error
+        console.error('Error finding existing account:', findError)
+        throw new Error(`Database error: ${findError.message}`)
+      }
 
       if (existing) {
-        await supabase
+        const { error: updateError } = await supabase
           .from('social_accounts')
           .update({
             platform_account_id: uploadPostUserId,
             status: 'pending', // Will be 'connected' after user links account
           })
           .eq('id', existing.id)
+
+        if (updateError) {
+          console.error('Error updating account:', updateError)
+          throw new Error(`Failed to update account: ${updateError.message}`)
+        }
+        console.log('Updated existing account:', existing.id)
       } else {
-        await supabase
+        const { data: newAccount, error: insertError } = await supabase
           .from('social_accounts')
           .insert({
             user_id: userId,
@@ -160,6 +173,14 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
             platform_account_id: uploadPostUserId,
             status: 'pending',
           })
+          .select()
+          .single()
+
+        if (insertError) {
+          console.error('Error inserting account:', insertError)
+          throw new Error(`Failed to create account: ${insertError.message}`)
+        }
+        console.log('Created new account:', newAccount?.id)
       }
 
       // Return JWT and instructions for linking
@@ -172,10 +193,17 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
         linkInstructions: 'Please check Upload-Post documentation for integrating their account linking widget/UI.',
       })
     } catch (jwtError: any) {
-      console.error('Failed to generate JWT:', jwtError)
+      console.error('Failed in JWT generation or account storage:', {
+        message: jwtError.message,
+        stack: jwtError.stack,
+        uploadPostUserId,
+      })
       return res.status(500).json({
-        error: 'Failed to generate authentication token',
+        error: 'Failed to complete account setup',
         details: jwtError.message,
+        ...(process.env.NODE_ENV === 'development' && {
+          stack: jwtError.stack,
+        }),
       })
     }
   } catch (error: any) {
