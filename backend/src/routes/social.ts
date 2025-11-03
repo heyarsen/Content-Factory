@@ -40,15 +40,48 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
 
     const redirectUri = `${process.env.CORS_ORIGIN || 'http://localhost:5173'}/social/callback?platform=${platform}`
 
-    const { authUrl } = await initiateOAuthConnection({
-      platform: platform as 'instagram' | 'tiktok' | 'youtube' | 'facebook',
-      redirectUri,
-    })
+    console.log('Initiating OAuth connection for platform:', platform)
+    console.log('Redirect URI:', redirectUri)
 
-    res.json({ authUrl })
+    try {
+      const { authUrl } = await initiateOAuthConnection({
+        platform: platform as 'instagram' | 'tiktok' | 'youtube' | 'facebook',
+        redirectUri,
+      })
+
+      console.log('OAuth connection initiated successfully, authUrl received')
+      res.json({ authUrl })
+    } catch (apiError: any) {
+      console.error('Upload-post API error details:', {
+        message: apiError.message,
+        response: apiError.response?.data,
+        status: apiError.response?.status,
+        url: apiError.config?.url,
+      })
+      
+      // Provide more helpful error message
+      if (apiError.response?.status === 404 || apiError.code === 'ENOTFOUND') {
+        return res.status(500).json({ 
+          error: 'Upload-post.com API endpoint not found. Please verify the API URL is correct.',
+          details: apiError.message 
+        })
+      }
+      
+      if (apiError.response?.status === 401 || apiError.response?.status === 403) {
+        return res.status(500).json({ 
+          error: 'Invalid API key for upload-post.com. Please check your UPLOADPOST_KEY environment variable.',
+          details: apiError.response?.data?.message || apiError.message 
+        })
+      }
+
+      throw apiError
+    }
   } catch (error: any) {
     console.error('Connect account error:', error)
-    res.status(500).json({ error: error.message || 'Failed to initiate connection' })
+    res.status(500).json({ 
+      error: error.message || 'Failed to initiate connection',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    })
   }
 })
 
