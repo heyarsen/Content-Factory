@@ -16,19 +16,24 @@ export function Button({
   disabled,
   ...props
 }: ButtonProps) {
-  const baseStyles = 'font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center'
+  const baseStyles =
+    'inline-flex items-center justify-center rounded-2xl font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60'
   
   const variants = {
-    primary: 'bg-purple-600 text-white hover:bg-purple-700 active:bg-purple-800',
-    secondary: 'bg-gray-200 text-gray-900 hover:bg-gray-300 active:bg-gray-400',
-    danger: 'bg-red-600 text-white hover:bg-red-700 active:bg-red-800',
-    ghost: 'bg-transparent text-gray-700 hover:bg-gray-100 active:bg-gray-200',
+    primary:
+      'bg-gradient-to-r from-brand-500 via-brand-500 to-brand-600 text-white shadow-[0_18px_35px_-18px_rgba(79,70,229,0.8)] hover:from-brand-500 hover:via-brand-500 hover:to-brand-500 active:scale-[0.99]',
+    secondary:
+      'border border-slate-200 bg-white/80 text-primary shadow-sm hover:border-brand-200 hover:text-brand-600 hover:shadow-md active:scale-[0.99]',
+    danger:
+      'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-[0_18px_35px_-18px_rgba(220,38,38,0.6)] hover:from-red-500 hover:to-red-500 active:scale-[0.99]',
+    ghost:
+      'border border-transparent bg-transparent text-slate-500 hover:border-slate-200 hover:bg-white/80 hover:text-primary active:scale-[0.99] shadow-none',
   }
   
   const sizes = {
-    sm: 'px-3 py-1.5 text-xs',
-    md: 'px-4 py-2 text-sm',
-    lg: 'px-6 py-3 text-base',
+    sm: 'px-3.5 py-2 text-xs',
+    md: 'px-5 py-2.5 text-sm',
+    lg: 'px-7 py-3 text-base',
   }
 
   return (

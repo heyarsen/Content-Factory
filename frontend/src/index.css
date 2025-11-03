@@ -1,15 +1,33 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  color-scheme: light;
+}
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto',
+    'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #F9FAFB;
+  background: radial-gradient(circle at top left, rgba(99, 102, 241, 0.08), transparent 45%),
+    radial-gradient(circle at bottom right, rgba(56, 189, 248, 0.09), transparent 55%),
+    #F5F7FB;
+  color: #0F172A;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+::selection {
+  background-color: rgba(99, 102, 241, 0.15);
+  color: #111827;
 }
 
 code {
