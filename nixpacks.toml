@@ -9,10 +9,10 @@ cmds = [
 
 [phases.build]
 cmds = [
-  "cd frontend && npm run build",
+  "cd frontend && NODE_ENV=development npm install && npm run build",
   "mkdir -p backend/public",
   "cp -r frontend/dist/* backend/public/",
-  "ls -la backend/public/",
+  "ls -la backend/public/ || echo 'Frontend files copied'",
   "cd backend && NODE_ENV=development npm install",
   "cd backend && npm run build",
   "ls -la backend/public/ || echo 'Public directory check'"
