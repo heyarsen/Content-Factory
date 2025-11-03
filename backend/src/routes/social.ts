@@ -52,19 +52,22 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
     // Create or get Upload-Post user profile
     if (!uploadPostUserId) {
       try {
-        // Ensure we have at least email or name for user profile
+        // Ensure we have at least email for user profile (username will be derived from email)
         const userEmail = user.email || user.user_metadata?.email
         const userName = user.user_metadata?.full_name || 
                         user.user_metadata?.name ||
                         (userEmail ? userEmail.split('@')[0] : undefined)
+        const username = user.user_metadata?.username || 
+                         (userEmail ? userEmail.split('@')[0] : undefined)
 
-        if (!userEmail && !userName) {
-          throw new Error('User email or name is required to create Upload-Post profile')
+        if (!userEmail && !username) {
+          throw new Error('User email or username is required to create Upload-Post profile')
         }
 
         const uploadPostUser = await createUserProfile({
           email: userEmail,
           name: userName,
+          username: username, // Required by Upload-Post API
         })
         
         uploadPostUserId = uploadPostUser.id || uploadPostUser.user_id || uploadPostUser.userId

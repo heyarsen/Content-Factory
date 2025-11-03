@@ -17,6 +17,7 @@ function getAuthHeader(): string {
 export interface CreateUserProfileRequest {
   email?: string
   name?: string
+  username?: string
 }
 
 export interface UserProfile {
@@ -55,6 +56,16 @@ export async function createUserProfile(
 ): Promise<UserProfile> {
   try {
     const payload: any = {}
+    
+    // Username is required by Upload-Post API
+    if (!request.username && !request.email) {
+      throw new Error('Username or email is required to create Upload-Post profile')
+    }
+    
+    // Username can be derived from email if not provided
+    const username = request.username || (request.email ? request.email.split('@')[0] : undefined)
+    
+    if (username) payload.username = username
     if (request.email) payload.email = request.email
     if (request.name) payload.name = request.name
 
