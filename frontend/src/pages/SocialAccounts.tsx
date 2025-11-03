@@ -34,7 +34,7 @@ const platformNames = {
 export function SocialAccounts() {
   const [accounts, setAccounts] = useState<SocialAccount[]>([])
   const [loading, setLoading] = useState(true)
-  const [connecting, setConnecting] = useState(false)
+  const [connectingPlatform, setConnectingPlatform] = useState<SocialAccount['platform'] | null>(null)
   const [disconnectModal, setDisconnectModal] = useState<string | null>(null)
   const [disconnecting, setDisconnecting] = useState(false)
   const [connectPortal, setConnectPortal] = useState<{
@@ -43,6 +43,7 @@ export function SocialAccounts() {
     duration?: string
     redirectUrl?: string
     message?: string
+    embedDisabled?: boolean
   } | null>(null)
   const [portalLoadFailed, setPortalLoadFailed] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
@@ -81,10 +82,10 @@ export function SocialAccounts() {
 
   useEffect(() => {
     if (connectPortal) {
-      setPortalLoadFailed(false)
+      setPortalLoadFailed(connectPortal.embedDisabled ?? false)
       setCopiedLink(false)
     }
-  }, [connectPortal?.url])
+  }, [connectPortal])
 
   useEffect(() => {
     if (!copiedLink) return
@@ -111,8 +112,27 @@ export function SocialAccounts() {
     }
   }, [connectPortal])
 
+  const tryOpenPortalWindow = useCallback((url: string) => {
+    if (typeof window === 'undefined') return false
+
+    try {
+      const newWindow = window.open(url, '_blank', 'noopener,noreferrer')
+      if (newWindow) {
+        newWindow.focus?.()
+        return true
+      }
+    } catch (error) {
+      console.error('Failed to open Upload-Post portal window:', error)
+    }
+
+    return false
+  }, [])
+
   const handleConnect = async (platform: SocialAccount['platform']) => {
-    setConnecting(true)
+    setConnectingPlatform(platform)
+    setConnectPortal(null)
+    setPortalLoadFailed(false)
+    setCopiedLink(false)
     try {
       const response = await api.post('/api/social/connect', { platform })
       const { accessUrl, uploadPostUsername, message, duration, redirectUrl } = response.data as {
@@ -149,32 +169,55 @@ export function SocialAccounts() {
         }
       }
 
+      const defaultMessage =
+        message || `Account linking initiated for ${platformLabel}.`
+
       if (accessUrl) {
         const resolvedAccessUrl = buildPlatformUrl(accessUrl)
         localStorage.setItem(`uploadpost_access_url_${platform}`, resolvedAccessUrl)
-        setConnectPortal({
-          platform,
-          url: resolvedAccessUrl,
-          duration,
-          redirectUrl,
-          message: message || `Account linking initiated for ${platformLabel}.`,
-        })
+        const autoOpened = tryOpenPortalWindow(resolvedAccessUrl)
+
+        if (!autoOpened) {
+          setConnectPortal({
+            platform,
+            url: resolvedAccessUrl,
+            duration,
+            redirectUrl,
+            message: `${defaultMessage} We couldn't automatically open the Upload-Post portal. Use the link below to continue.`,
+            embedDisabled: true,
+          })
+        }
       } else {
-        const fallbackParts = [
-          message || `Account linking initiated for ${platformLabel}.`,
-        ]
+        const fallbackBaseUrl = buildPlatformUrl('https://connect.upload-post.com')
+        localStorage.setItem(`uploadpost_access_url_${platform}`, fallbackBaseUrl)
+        const fallbackOpened = tryOpenPortalWindow(fallbackBaseUrl)
 
-        if (duration) {
-          fallbackParts.push(`Link valid for ${duration}.`)
+        if (!fallbackOpened) {
+          const fallbackParts = [
+            `${defaultMessage} We couldn't automatically open the Upload-Post portal.`,
+          ]
+
+          if (duration) {
+            fallbackParts.push(`Link valid for ${duration}.`)
+          }
+
+          fallbackParts.push(`Use the button below or visit ${fallbackBaseUrl} to continue linking.`)
+
+          if (redirectUrl) {
+            fallbackParts.push(
+              `Once finished you will be redirected automatically. If that does not happen, revisit: ${redirectUrl}`
+            )
+          }
+
+          setConnectPortal({
+            platform,
+            url: fallbackBaseUrl,
+            duration,
+            redirectUrl,
+            message: fallbackParts.join(' '),
+            embedDisabled: true,
+          })
         }
-
-        if (redirectUrl) {
-          fallbackParts.push(
-            `Once finished you will be redirected automatically. If that does not happen, revisit: ${redirectUrl}`
-          )
-        }
-
-        alert(fallbackParts.join('\n\n'))
       }
 
       // Reload accounts to show pending status
@@ -192,7 +235,7 @@ export function SocialAccounts() {
       })
       alert(errorMessage)
     } finally {
-      setConnecting(false)
+      setConnectingPlatform(null)
     }
   }
 
@@ -309,7 +352,7 @@ export function SocialAccounts() {
                         variant="primary"
                         size="sm"
                         onClick={() => handleConnect(platform)}
-                        loading={connecting}
+                        loading={connectingPlatform === platform}
                         className="w-full"
                       >
                         <Link2 className="mr-2 h-4 w-4" />
@@ -345,7 +388,7 @@ export function SocialAccounts() {
                 </div>
               )}
               <div className="h-[540px] overflow-hidden rounded-3xl border border-white/60 bg-slate-50/70">
-                {!portalLoadFailed ? (
+                {!portalLoadFailed && !connectPortal.embedDisabled ? (
                   <iframe
                     key={connectPortal.url}
                     src={connectPortal.url}
@@ -357,12 +400,12 @@ export function SocialAccounts() {
                   />
                 ) : (
                   <div className="flex h-full flex-col items-center justify-center space-y-4 p-6 text-sm text-slate-500">
-                    <p>The connection portal could not be displayed here.</p>
+                    <p>We couldn't display the connection portal here. Use the link below to continue at Upload-Post.</p>
                     <Button
                       type="button"
                       variant="primary"
                       size="sm"
-                      onClick={() => window.open(connectPortal.url, '_blank', 'noopener')}
+                      onClick={() => tryOpenPortalWindow(connectPortal.url)}
                     >
                       <Link2 className="w-4 h-4 mr-2" />
                       Open in new tab
@@ -404,7 +447,7 @@ export function SocialAccounts() {
                   variant="ghost"
                   size="sm"
                   className="border border-white/60 bg-white/70 text-brand-600 hover:border-brand-200 hover:bg-white"
-                  onClick={() => window.open(connectPortal.url, '_blank', 'noopener')}
+                  onClick={() => tryOpenPortalWindow(connectPortal.url)}
                 >
                   <Link2 className="mr-2 h-4 w-4" />
                   Open in new tab
