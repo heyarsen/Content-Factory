@@ -206,6 +206,15 @@ router.post('/connect', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Workspace ID is required' });
     }
 
+    // Check if UploadPost API key is configured
+    if (!process.env.UPLOADPOST_KEY) {
+      console.error('UPLOADPOST_KEY is not configured');
+      return res.status(500).json({ 
+        error: 'Social media integration is not configured. Please contact support.',
+        code: 'UPLOADPOST_KEY_MISSING'
+      });
+    }
+
     // Verify workspace access
     const member = await prisma.workspaceMember.findUnique({
       where: {
@@ -222,40 +231,95 @@ router.post('/connect', authenticateToken, async (req, res) => {
 
     const profileId = generateUploadPostProfileId(req.user.id, workspaceId);
 
-    // Check if profile exists, create if it doesn't
-    let profileExists = await uploadPostAPI.getUserProfile(profileId);
-    if (!profileExists) {
-      await uploadPostAPI.createUserProfile(profileId);
-    }
-
-    // Generate JWT URL for account connection
-    const jwtResponse = await uploadPostAPI.generateJWTUrl(profileId, {
-      redirect_url: redirectUrl,
-      logo_image: logoImage,
-      platforms: platforms,
-      connect_title: 'Connect Your Social Media Accounts',
-      connect_description: 'Link your social media accounts to start publishing content from Content Factory.',
-      redirect_button_text: 'Return to Content Factory'
-    });
-
-    // Create activity log
-    await prisma.activity.create({
-      data: {
-        userId: req.user.id,
-        action: 'SOCIAL_CONNECTION_INITIATED',
-        description: 'Started social media account connection process',
-        metadata: { workspaceId, platforms, profileId }
+    try {
+      // Check if profile exists, create if it doesn't
+      let profileExists = null;
+      try {
+        profileExists = await uploadPostAPI.getUserProfile(profileId);
+      } catch (profileError) {
+        // Profile doesn't exist, we'll create it
+        console.log('Profile does not exist, creating new profile:', profileId);
       }
-    });
 
-    res.json({
-      connectionUrl: jwtResponse.access_url,
-      duration: jwtResponse.duration,
-      profileId
-    });
+      if (!profileExists) {
+        try {
+          await uploadPostAPI.createUserProfile(profileId);
+          console.log('Created new UploadPost profile:', profileId);
+        } catch (createError) {
+          console.error('Failed to create UploadPost profile:', createError);
+          // Continue anyway, profile might already exist
+        }
+      }
+
+      // Generate JWT URL for account connection
+      const jwtResponse = await uploadPostAPI.generateJWTUrl(profileId, {
+        redirect_url: redirectUrl || `${req.protocol}://${req.get('host')}/workspace/${workspaceId}/settings/social-accounts`,
+        logo_image: logoImage || `${req.protocol}://${req.get('host')}/logo.png`,
+        platforms: platforms || [],
+        connect_title: 'Connect Your Social Media Accounts',
+        connect_description: 'Link your social media accounts to start publishing content from Content Factory.',
+        redirect_button_text: 'Return to Content Factory'
+      });
+
+      if (!jwtResponse || !jwtResponse.access_url) {
+        throw new Error('UploadPost API did not return a valid connection URL');
+      }
+
+      // Create activity log
+      try {
+        await prisma.activity.create({
+          data: {
+            userId: req.user.id,
+            action: 'SOCIAL_CONNECTION_INITIATED',
+            description: 'Started social media account connection process',
+            metadata: { workspaceId, platforms, profileId }
+          }
+        });
+      } catch (activityError) {
+        // Log activity error but don't fail the request
+        console.warn('Failed to create activity log:', activityError);
+      }
+
+      return res.json({
+        success: true,
+        connectionUrl: jwtResponse.access_url,
+        duration: jwtResponse.duration,
+        profileId
+      });
+    } catch (uploadPostError) {
+      console.error('UploadPost API error:', uploadPostError);
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to generate connection URL';
+      let statusCode = 500;
+
+      if (uploadPostError.message) {
+        if (uploadPostError.message.includes('401') || uploadPostError.message.includes('Unauthorized')) {
+          errorMessage = 'UploadPost API authentication failed. Please check API key configuration.';
+          statusCode = 500;
+        } else if (uploadPostError.message.includes('403') || uploadPostError.message.includes('Forbidden')) {
+          errorMessage = 'UploadPost API access denied. Please check API permissions.';
+          statusCode = 500;
+        } else if (uploadPostError.message.includes('404')) {
+          errorMessage = 'UploadPost API endpoint not found.';
+          statusCode = 500;
+        } else {
+          errorMessage = uploadPostError.message;
+        }
+      }
+
+      return res.status(statusCode).json({ 
+        error: errorMessage,
+        code: 'UPLOADPOST_API_ERROR',
+        details: process.env.NODE_ENV === 'development' ? uploadPostError.message : undefined
+      });
+    }
   } catch (error) {
     console.error('Connect social accounts error:', error);
-    res.status(500).json({ error: error.message || 'Failed to generate connection URL' });
+    return res.status(500).json({ 
+      error: error.message || 'Failed to generate connection URL',
+      code: 'INTERNAL_ERROR'
+    });
   }
 });
 

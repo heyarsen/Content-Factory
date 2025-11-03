@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Eye, EyeOff, Mail, Lock, Loader2, Sparkles, AlertCircle, CheckCircle2, ArrowLeft, X } from 'lucide-react';
 
@@ -40,17 +40,17 @@ const Login = ({ onToggleMode }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const submitCore = async () => {
-    if (!validateForm()) return false;
-    if (isSubmitting || isLoading) return false;
+  const submitCore = useCallback(async () => {
+    if (!validateForm()) return;
+    if (isSubmitting || isLoading) return;
     setIsSubmitting(true);
     try {
       const result = await login(formData.email, formData.password);
       if (!result.success) {
         const msg = (result.error || '').toLowerCase();
-        if (msg.includes('invalid credentials') || msg.includes('password') || msg.includes('wrong')) {
+        if (msg.includes('invalid credentials') || msg.includes('password') || msg.includes('wrong') || msg.includes('incorrect')) {
           setErrors({ password: 'Wrong password. Please try again.' });
-        } else if (msg.includes('email') || msg.includes('user')) {
+        } else if (msg.includes('email') || msg.includes('user') || msg.includes('account') || msg.includes('not found')) {
           setErrors({ email: 'Account not found with this email address.' });
         } else {
           setErrors({ general: result.error || 'Login failed. Please try again.' });
@@ -61,23 +61,25 @@ const Login = ({ onToggleMode }) => {
     } finally {
       setIsSubmitting(false);
     }
-    return false;
-  };
+  }, [formData.email, formData.password, isSubmitting, isLoading, login]);
 
-  const handleSubmit = async (e) => { 
-    e.preventDefault();
-    e.stopPropagation();
+  const handleSubmit = useCallback(async (e) => { 
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation?.();
+    }
     await submitCore(); 
-    return false; 
-  };
+  }, [submitCore]);
   
-  const handleEnter = async (e) => { 
+  const handleEnter = useCallback(async (e) => { 
     if (e.key === 'Enter') { 
       e.preventDefault();
       e.stopPropagation();
+      e.stopImmediatePropagation?.();
       await submitCore(); 
     } 
-  };
+  }, [submitCore]);
 
   const handleForgotPassword = async (e) => {
     e.preventDefault();
@@ -135,7 +137,13 @@ const Login = ({ onToggleMode }) => {
         </div>
 
         {/* IMPORTANT: noValidate disables browser native validation UI */}
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit} onKeyDown={handleEnter} noValidate>
+        <form 
+          className="mt-8 space-y-6" 
+          onSubmit={handleSubmit} 
+          onKeyDown={handleEnter}
+          noValidate
+          action="javascript:void(0)"
+        >
           {errors.general && (
             <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 flex items-center space-x-3">
               <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
@@ -189,7 +197,16 @@ const Login = ({ onToggleMode }) => {
 
           <div>
             {/* IMPORTANT: Remove any onClick stop here so submit runs */}
-            <button type="submit" disabled={isSubmitting || isLoading} className="group relative w-full flex justify-center py-4 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-4 focus:ring-offset-2 focus:ring-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02]">
+            <button 
+              type="submit" 
+              disabled={isSubmitting || isLoading} 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleSubmit(e);
+              }}
+              className="group relative w-full flex justify-center py-4 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-4 focus:ring-offset-2 focus:ring-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
+            >
               {isSubmitting || isLoading ? (<><Loader2 className="w-5 h-5 mr-2 animate-spin" />Signing in...</>) : ('Sign in to Content Factory')}
             </button>
           </div>

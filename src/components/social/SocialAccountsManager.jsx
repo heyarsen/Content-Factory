@@ -129,19 +129,85 @@ const SocialAccountsManager = ({ workspaceId, onAccountsUpdate }) => {
         })
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setConnectionUrl(data.connectionUrl);
-        // Open connection URL in new tab
-        window.open(data.connectionUrl, '_blank', 'width=600,height=700');
+      if (!response.ok) {
+        let errorMessage = 'Failed to generate connection URL';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+          
+          // Handle specific error codes
+          if (errorData.code === 'UPLOADPOST_KEY_MISSING') {
+            errorMessage = 'Social media integration is not configured. Please contact support or check server configuration.';
+          } else if (errorData.code === 'UPLOADPOST_API_ERROR') {
+            errorMessage = errorData.error || 'UploadPost API error. Please try again later.';
+          }
+        } catch (parseError) {
+          // If response is not JSON, use status text
+          errorMessage = `Server error: ${response.status} ${response.statusText}`;
+        }
+        setError(errorMessage);
+        return;
+      }
+
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        console.error('Failed to parse response:', parseError);
+        setError('Invalid response from server. Please try again.');
+        return;
+      }
+
+      // Validate response data
+      if (!data.connectionUrl) {
+        setError('No connection URL received from server. Please try again.');
+        return;
+      }
+
+      // Store connection URL
+      setConnectionUrl(data.connectionUrl);
+      
+      // Open connection URL in new tab/window
+      try {
+        const popup = window.open(
+          data.connectionUrl, 
+          '_blank', 
+          'width=800,height=700,scrollbars=yes,resizable=yes,location=yes,menubar=no,toolbar=no,status=yes'
+        );
+        
+        if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+          // Popup blocked, show message
+          setError('Popup blocked. Please allow popups for this site and try again.');
+          return;
+        }
+        
         setShowConnectModal(false);
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || 'Failed to generate connection URL');
+        
+        // Optionally set up a listener for when popup closes
+        const checkClosed = setInterval(() => {
+          if (popup.closed) {
+            clearInterval(checkClosed);
+            // Refresh accounts after connection completes
+            setTimeout(() => {
+              fetchSocialAccounts();
+            }, 2000);
+          }
+        }, 1000);
+      } catch (openError) {
+        console.error('Failed to open connection window:', openError);
+        setError('Failed to open connection window. Please check your popup blocker settings.');
       }
     } catch (error) {
       console.error('Error connecting accounts:', error);
-      setError('Failed to connect social accounts');
+      
+      // Provide user-friendly error messages
+      if (error.message && error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
+        setError('Network error. Please check your internet connection and try again.');
+      } else if (error.message && error.message.includes('502')) {
+        setError('Server temporarily unavailable. Please try again in a moment.');
+      } else {
+        setError(error.message || 'Failed to connect social accounts. Please try again.');
+      }
     } finally {
       setIsConnecting(false);
     }
