@@ -24,7 +24,7 @@ export function GenerateVideo() {
     setLoading(true)
 
     try {
-      const response = await api.post('/api/videos/generate', {
+      await api.post('/api/videos/generate', {
         topic,
         script: script || undefined,
         style,

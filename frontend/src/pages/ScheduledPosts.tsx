@@ -9,7 +9,7 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { Modal } from '../components/ui/Modal'
 import { Input } from '../components/ui/Input'
 import { Textarea } from '../components/ui/Textarea'
-import { Calendar, X, Video, Instagram, Youtube, Facebook, Users } from 'lucide-react'
+import { Calendar, X, Instagram, Youtube, Facebook, Users } from 'lucide-react'
 import api from '../lib/api'
 
 interface Post {

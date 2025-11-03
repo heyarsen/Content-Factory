@@ -51,8 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signUp = async (email: string, password: string) => {
-    const { data, error } = await api.post('/api/auth/signup', { email, password })
-    if (error) throw error
+    await api.post('/api/auth/signup', { email, password })
     // User will be confirmed via email verification
   }
 
