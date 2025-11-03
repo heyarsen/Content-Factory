@@ -59,15 +59,15 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
                         user.user_metadata?.name ||
                         (userEmail ? userEmail.split('@')[0] : undefined)
         
-        // Extract username from email (part before @) - this will be used for profile creation and JWT
+        // Use full email as username to avoid conflicts (e.g., heyarsen@icloud.com vs heyarsen@gmail.com)
         if (userEmail) {
-          username = user.user_metadata?.username || userEmail.split('@')[0]
+          username = user.user_metadata?.username || userEmail
         } else {
           // Fallback: use Supabase user ID as username
-          username = userId.substring(0, 20).replace(/-/g, '') // Remove dashes and limit length
+          username = userId.substring(0, 50).replace(/-/g, '') // Remove dashes, allow longer for UUID
         }
 
-        if (!username) {
+        if (!username || username.trim() === '') {
           throw new Error('Unable to generate username for Upload-Post profile')
         }
 
@@ -144,12 +144,12 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
     try {
       console.log('Generating JWT for Upload-Post user ID:', uploadPostUserId)
       
-      // Get username for JWT generation - use the one we created profile with, or extract from email
+      // Get username for JWT generation - use the one we created profile with, or use full email
       if (!username) {
         const userEmail = user.email || user.user_metadata?.email
         username = user.user_metadata?.username || 
-                   (userEmail ? userEmail.split('@')[0] : undefined) ||
-                   uploadPostUserId.substring(0, 20).replace(/-/g, '')
+                   userEmail || // Use full email as username
+                   uploadPostUserId.substring(0, 50).replace(/-/g, '')
       }
       
       console.log('Using username for JWT generation:', username)

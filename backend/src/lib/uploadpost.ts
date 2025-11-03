@@ -143,12 +143,12 @@ export async function generateUserJWT(userId: string, username?: string): Promis
     }
     
     // profile_username is required by Upload-Post API
-    // Always ensure we have a username - use provided one or extract from userId
+    // Always ensure we have a username - use provided one or use userId as fallback
     let profileUsername = username
     
     if (!profileUsername || profileUsername.trim() === '') {
-      // Extract username from userId if it looks like an email, otherwise use userId
-      profileUsername = userId.includes('@') ? userId.split('@')[0] : userId.substring(0, 20).replace(/-/g, '')
+      // If userId looks like an email, use it directly; otherwise use it as-is (remove dashes if needed)
+      profileUsername = userId.includes('@') ? userId : userId.substring(0, 50).replace(/-/g, '')
     }
     
     if (!profileUsername || profileUsername.trim() === '') {
@@ -180,9 +180,22 @@ export async function generateUserJWT(userId: string, username?: string): Promis
       dataKeys: Object.keys(response.data || {}),
     })
 
-    const jwt = response.data.jwt || response.data.token || response.data
+    // Handle different response formats
+    let jwt: string | undefined
+    
+    if (typeof response.data === 'string') {
+      jwt = response.data
+    } else if (typeof response.data === 'object' && response.data !== null) {
+      jwt = response.data.jwt || response.data.token || response.data.access_token
+    }
+    
     if (!jwt || typeof jwt !== 'string') {
-      throw new Error('Upload-Post did not return a valid JWT')
+      console.error('Invalid JWT response format:', {
+        dataType: typeof response.data,
+        data: response.data,
+        dataKeys: response.data ? Object.keys(response.data) : [],
+      })
+      throw new Error(`Upload-Post did not return a valid JWT. Response format: ${typeof response.data}`)
     }
 
     return jwt
@@ -190,14 +203,21 @@ export async function generateUserJWT(userId: string, username?: string): Promis
     console.error('Upload-post generate JWT error details:', {
       message: error.message,
       status: error.response?.status,
+      statusText: error.response?.statusText,
       data: error.response?.data,
       userId,
+      username,
     })
-    throw new Error(
-      error.response?.data?.message || 
-      error.response?.data?.error ||
-      'Failed to generate JWT'
-    )
+    
+    // Extract error message from various possible formats
+    const errorMessage = error.response?.data?.message || 
+                        error.response?.data?.error ||
+                        error.response?.data?.detail ||
+                        error.response?.statusText ||
+                        error.message ||
+                        'Failed to generate JWT'
+    
+    throw new Error(errorMessage)
   }
 }
 
