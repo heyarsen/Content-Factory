@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
+import { AuthHashHandler } from './components/auth/AuthHashHandler'
 import { ToastContainer } from './components/ui/Toast'
 import { useToast } from './hooks/useToast'
 
@@ -9,6 +10,7 @@ import { Login } from './pages/Login'
 import { Signup } from './pages/Signup'
 import { ForgotPassword } from './pages/ForgotPassword'
 import { ResetPassword } from './pages/ResetPassword'
+import { VerifyEmail } from './pages/VerifyEmail'
 import { Dashboard } from './pages/Dashboard'
 import { Videos } from './pages/Videos'
 import { GenerateVideo } from './pages/GenerateVideo'
@@ -21,11 +23,13 @@ function AppContent() {
 
   return (
     <>
+      <AuthHashHandler />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
         
         <Route
           path="/dashboard"

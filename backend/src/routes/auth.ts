@@ -14,9 +14,14 @@ router.post('/signup', authLimiter, async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Email and password are required' })
     }
 
+    const redirectUrl = process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:5173'
+    
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo: `${redirectUrl}/verify-email`,
+      },
     })
 
     if (error) {
@@ -98,9 +103,14 @@ router.post('/verify-email', authLimiter, async (req: Request, res: Response) =>
       return res.status(400).json({ error: 'Email is required' })
     }
 
+    const redirectUrl = process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:5173'
+    
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email,
+      options: {
+        emailRedirectTo: `${redirectUrl}/verify-email`,
+      },
     })
 
     if (error) {
