@@ -12,7 +12,7 @@ import api from '../lib/api'
 interface SocialAccount {
   id: string
   platform: 'instagram' | 'tiktok' | 'youtube' | 'facebook'
-  status: 'connected' | 'disconnected' | 'error'
+  status: 'connected' | 'disconnected' | 'error' | 'pending'
   connected_at: string
 }
 
@@ -56,23 +56,41 @@ export function SocialAccounts() {
     setConnecting(true)
     try {
       const response = await api.post('/api/social/connect', { platform })
-      
-      // Upload-Post uses JWT-based linking
-      // The JWT can be used with Upload-Post's account linking widget/UI
-      const { jwt, uploadPostUserId, message } = response.data
-      
-      // Store JWT for account linking
-      localStorage.setItem(`uploadpost_jwt_${platform}`, jwt)
-      localStorage.setItem(`uploadpost_userid_${platform}`, uploadPostUserId)
-      
-      // For now, show instructions
-      // TODO: Integrate Upload-Post's account linking widget if available
-      alert(
-        `${message}\n\n` +
-        `JWT: ${jwt.substring(0, 20)}...\n` +
-        `Please use this JWT with Upload-Post's account linking system to complete the connection.`
-      )
-      
+      const { accessUrl, uploadPostUsername, message, duration } = response.data as {
+        accessUrl?: string
+        uploadPostUsername?: string
+        message?: string
+        duration?: string
+      }
+
+      localStorage.removeItem(`uploadpost_jwt_${platform}`)
+      localStorage.removeItem(`uploadpost_userid_${platform}`)
+
+      if (uploadPostUsername) {
+        localStorage.setItem(`uploadpost_username_${platform}`, uploadPostUsername)
+      }
+
+      if (accessUrl) {
+        localStorage.setItem(`uploadpost_access_url_${platform}`, accessUrl)
+        try {
+          window.open(accessUrl, '_blank', 'noopener')
+        } catch (openError) {
+          console.warn('Unable to automatically open Upload-Post link:', openError)
+        }
+      }
+
+      const alertParts = [message || 'Account linking initiated via Upload-Post.']
+
+      if (duration) {
+        alertParts.push(`Link valid for ${duration}.`)
+      }
+
+      if (accessUrl) {
+        alertParts.push(`If a new tab did not open, copy this URL to finish linking:\n${accessUrl}`)
+      }
+
+      alert(alertParts.join('\n\n'))
+
       // Reload accounts to show pending status
       loadAccounts()
     } catch (error: any) {
@@ -110,6 +128,7 @@ export function SocialAccounts() {
       connected: 'success',
       disconnected: 'default',
       error: 'error',
+      pending: 'default',
     }
     return <Badge variant={variants[status] || 'default'}>{status}</Badge>
   }
@@ -167,6 +186,12 @@ export function SocialAccounts() {
                       </div>
                     </div>
                   </div>
+
+                  {account?.status === 'pending' && (
+                    <p className="text-xs text-gray-600 mb-4">
+                      Finish linking in the Upload-Post tab we opened. Refresh after completing the connection.
+                    </p>
+                  )}
 
                   {isConnected && account && (
                     <p className="text-xs text-gray-600 mb-4">
