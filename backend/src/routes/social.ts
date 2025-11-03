@@ -1,7 +1,7 @@
 import { Router, Response } from 'express'
 import { supabase } from '../lib/supabase.js'
 import { authenticate, AuthRequest } from '../middleware/auth.js'
-import { createUserProfile, generateUserJWT, getUserProfile } from '../lib/uploadpost.js'
+import { createUserProfile, generateUserAccessLink, getUserProfile } from '../lib/uploadpost.js'
 
 const router = Router()
 
@@ -28,7 +28,7 @@ router.get('/accounts', authenticate, async (req: AuthRequest, res: Response) =>
   }
 })
 
-// Get or create Upload-Post user profile and generate JWT for linking accounts
+// Get or create Upload-Post user profile and generate access link for linking accounts
 router.post('/connect', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { platform } = req.body
@@ -39,137 +39,103 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
       return res.status(400).json({ error: 'Valid platform is required' })
     }
 
-    // Check if user already has an Upload-Post profile ID stored (in any account)
-    // We'll use a consistent Upload-Post user ID across all platforms
     const { data: existingAccounts } = await supabase
       .from('social_accounts')
       .select('platform_account_id')
       .eq('user_id', userId)
+      .not('platform_account_id', 'is', null)
       .limit(1)
 
-    let uploadPostUserId = existingAccounts?.[0]?.platform_account_id
+    let uploadPostUsername: string | undefined = existingAccounts?.[0]?.platform_account_id || undefined
 
-    // Create or get Upload-Post user profile
-    let username: string | undefined // Store username for later use
-    if (!uploadPostUserId) {
+    const userEmail = user.email || user.user_metadata?.email
+    const userName = user.user_metadata?.full_name ||
+      user.user_metadata?.name ||
+      (userEmail ? userEmail.split('@')[0] : undefined)
+
+    // Username used for Upload-Post profile creation and linking
+    const derivedUsername = user.user_metadata?.username ||
+      (userEmail ? userEmail.split('@')[0] : undefined) ||
+      userId.substring(0, 20).replace(/-/g, '')
+
+    if (!uploadPostUsername) {
+      if (!derivedUsername) {
+        throw new Error('Unable to generate username for Upload-Post profile')
+      }
+
+      uploadPostUsername = derivedUsername
+
       try {
-        // Ensure we have at least email for user profile (username will be derived from email)
-        const userEmail = user.email || user.user_metadata?.email
-        const userName = user.user_metadata?.full_name || 
-                        user.user_metadata?.name ||
-                        (userEmail ? userEmail.split('@')[0] : undefined)
-        
-        // Extract username from email (part before @) - this will be used for profile creation and JWT
-        if (userEmail) {
-          username = user.user_metadata?.username || userEmail.split('@')[0]
-        } else {
-          // Fallback: use Supabase user ID as username
-          username = userId.substring(0, 20).replace(/-/g, '') // Remove dashes and limit length
-        }
+        console.log('Creating Upload-Post profile with username:', uploadPostUsername, 'email:', userEmail)
 
-        if (!username) {
-          throw new Error('Unable to generate username for Upload-Post profile')
-        }
-
-        console.log('Creating Upload-Post profile with username:', username, 'email:', userEmail)
-
-        const uploadPostUser = await createUserProfile({
+        const uploadPostProfile = await createUserProfile({
+          username: uploadPostUsername,
           email: userEmail,
           name: userName,
-          username: username, // Required by Upload-Post API
         })
-        
+
         console.log('Upload-Post user response:', {
-          fullResponse: uploadPostUser,
-          id: uploadPostUser?.id,
-          user_id: uploadPostUser?.user_id,
-          userId: uploadPostUser?.userId,
-          allKeys: uploadPostUser ? Object.keys(uploadPostUser) : [],
+          profile: uploadPostProfile,
+          keys: uploadPostProfile ? Object.keys(uploadPostProfile) : [],
         })
-        
-        // Try multiple possible field names for user ID
-        uploadPostUserId = uploadPostUser?.id || 
-                          uploadPostUser?.user_id || 
-                          uploadPostUser?.userId ||
-                          uploadPostUser?.user?.id ||
-                          uploadPostUser?.data?.id ||
-                          (typeof uploadPostUser === 'string' ? uploadPostUser : null)
 
-        if (!uploadPostUserId) {
-          console.error('Upload-Post response missing user ID. Full response:', JSON.stringify(uploadPostUser, null, 2))
-          // If we still don't have a user ID, try using the Supabase user ID as fallback
-          console.log('Using Supabase user ID as fallback:', userId)
-          uploadPostUserId = userId
+        const returnedUsername = uploadPostProfile?.username ||
+          uploadPostProfile?.user_id ||
+          uploadPostProfile?.userId ||
+          uploadPostProfile?.user?.username
+
+        if (returnedUsername && typeof returnedUsername === 'string') {
+          uploadPostUsername = returnedUsername
         }
-
-        console.log('Created Upload-Post user profile:', uploadPostUserId)
       } catch (createError: any) {
-        // If profile creation fails, check if it's because user already exists
-        // or if we can proceed without it
         const errorStatus = createError.response?.status
         const errorData = createError.response?.data
 
         console.error('Failed to create Upload-Post user:', {
           message: createError.message,
           status: errorStatus,
-          userEmail: user.email,
+          userEmail,
           userMetadata: user.user_metadata,
           errorResponse: errorData,
         })
 
-        // If user already exists (409 or similar), try to extract user ID from error
-        // Or use the Supabase user ID as fallback
-        if (errorStatus === 409 || errorData?.message?.toLowerCase().includes('already exists')) {
-          console.log('Upload-Post user already exists, using fallback ID')
-          // Try using Supabase user ID as Upload-Post user ID
-          uploadPostUserId = userId
+        if (errorStatus === 409 || errorData?.message?.toLowerCase?.().includes('already exists')) {
+          console.log('Upload-Post user already exists, reusing derived username')
+          uploadPostUsername = derivedUsername
         } else {
-          // For other errors, return error to user
           return res.status(500).json({
             error: 'Failed to create Upload-Post profile. Please try again.',
             details: createError.message,
             apiError: errorData?.message || errorData?.error,
-            // Include more details in development
-            ...(process.env.NODE_ENV === 'development' && { 
+            ...(process.env.NODE_ENV === 'development' && {
               stack: createError.stack,
-              userEmail: user.email,
-              fullError: errorData 
+              userEmail,
+              fullError: errorData,
             }),
           })
         }
       }
     }
 
-    // Generate JWT for linking accounts
-    try {
-      console.log('Generating JWT for Upload-Post user ID:', uploadPostUserId)
-      
-      // Get username for JWT generation - use the one we created profile with, or extract from email
-      if (!username) {
-        const userEmail = user.email || user.user_metadata?.email
-        username = user.user_metadata?.username || 
-                   (userEmail ? userEmail.split('@')[0] : undefined) ||
-                   uploadPostUserId.substring(0, 20).replace(/-/g, '')
-      }
-      
-      console.log('Using username for JWT generation:', username)
-      
-      if (!username || username.trim() === '') {
-        throw new Error('Username is required for JWT generation but could not be determined')
-      }
-      
-      const jwt = await generateUserJWT(uploadPostUserId, username)
-      console.log('JWT generated successfully, length:', jwt?.length)
+    if (!uploadPostUsername) {
+      throw new Error('Upload-Post username could not be determined')
+    }
 
-      // Create or update account record
+    try {
+      console.log('Generating Upload-Post access link for username:', uploadPostUsername)
+
+      const accessLink = await generateUserAccessLink(uploadPostUsername, {
+        platforms: [platform as 'instagram' | 'tiktok' | 'youtube' | 'facebook'],
+      })
+
       const { data: existing, error: findError } = await supabase
         .from('social_accounts')
         .select('*')
         .eq('user_id', userId)
         .eq('platform', platform)
-        .maybeSingle() // Use maybeSingle instead of single to avoid errors if not found
+        .maybeSingle()
 
-      if (findError && findError.code !== 'PGRST116') { // PGRST116 is "not found" error
+      if (findError && findError.code !== 'PGRST116') {
         console.error('Error finding existing account:', findError)
         throw new Error(`Database error: ${findError.message}`)
       }
@@ -178,8 +144,8 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
         const { error: updateError } = await supabase
           .from('social_accounts')
           .update({
-            platform_account_id: uploadPostUserId,
-            status: 'pending', // Will be 'connected' after user links account
+            platform_account_id: uploadPostUsername,
+            status: 'pending',
           })
           .eq('id', existing.id)
 
@@ -194,7 +160,7 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
           .insert({
             user_id: userId,
             platform: platform as any,
-            platform_account_id: uploadPostUserId,
+            platform_account_id: uploadPostUsername,
             status: 'pending',
           })
           .select()
@@ -207,26 +173,25 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
         console.log('Created new account:', newAccount?.id)
       }
 
-      // Return JWT and instructions for linking
-      // Note: Upload-Post uses JWT-based account linking
-      // The frontend needs to integrate Upload-Post's account linking UI/widget
       res.json({
-        jwt,
-        uploadPostUserId,
-        message: 'Account linking initiated. Use the JWT to complete account linking through Upload-Post.',
-        linkInstructions: 'Please check Upload-Post documentation for integrating their account linking widget/UI.',
+        accessUrl: accessLink.accessUrl,
+        duration: accessLink.duration,
+        uploadPostUsername,
+        platform,
+        message: 'Account linking initiated. Follow the accessUrl to connect through Upload-Post.',
+        success: accessLink.success ?? true,
       })
-    } catch (jwtError: any) {
-      console.error('Failed in JWT generation or account storage:', {
-        message: jwtError.message,
-        stack: jwtError.stack,
-        uploadPostUserId,
+    } catch (linkError: any) {
+      console.error('Failed in access link generation or account storage:', {
+        message: linkError.message,
+        stack: linkError.stack,
+        uploadPostUsername,
       })
       return res.status(500).json({
         error: 'Failed to complete account setup',
-        details: jwtError.message,
+        details: linkError.message,
         ...(process.env.NODE_ENV === 'development' && {
-          stack: jwtError.stack,
+          stack: linkError.stack,
         }),
       })
     }
@@ -242,18 +207,16 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
 // Handle account connection confirmation (after user links account via Upload-Post UI)
 router.post('/callback', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const { platform, uploadPostUserId } = req.body
+    const { platform, uploadPostUsername } = req.body
     const userId = req.userId!
 
-    if (!platform || !uploadPostUserId) {
-      return res.status(400).json({ error: 'Platform and Upload-Post user ID are required' })
+    if (!platform || !uploadPostUsername) {
+      return res.status(400).json({ error: 'Platform and Upload-Post username are required' })
     }
 
-    // Verify the Upload-Post user profile exists
     try {
-      const userProfile = await getUserProfile(uploadPostUserId)
-      
-      // Update account status to connected
+      const userProfile = await getUserProfile(uploadPostUsername)
+
       const { data: existing } = await supabase
         .from('social_accounts')
         .select('*')
@@ -265,7 +228,7 @@ router.post('/callback', authenticate, async (req: AuthRequest, res: Response) =
         const { error } = await supabase
           .from('social_accounts')
           .update({
-            platform_account_id: uploadPostUserId,
+            platform_account_id: uploadPostUsername,
             status: 'connected',
             connected_at: new Date().toISOString(),
           })
@@ -276,15 +239,14 @@ router.post('/callback', authenticate, async (req: AuthRequest, res: Response) =
           return res.status(500).json({ error: 'Failed to update account' })
         }
 
-        res.json({ message: 'Account connected successfully', account: existing })
+        res.json({ message: 'Account connected successfully', account: existing, profile: userProfile })
       } else {
-        // Create new account record
         const { data, error } = await supabase
           .from('social_accounts')
           .insert({
             user_id: userId,
             platform,
-            platform_account_id: uploadPostUserId,
+            platform_account_id: uploadPostUsername,
             status: 'connected',
           })
           .select()
@@ -295,7 +257,7 @@ router.post('/callback', authenticate, async (req: AuthRequest, res: Response) =
           return res.status(500).json({ error: 'Failed to save account' })
         }
 
-        res.json({ message: 'Account connected successfully', account: data })
+        res.json({ message: 'Account connected successfully', account: data, profile: userProfile })
       }
     } catch (profileError: any) {
       console.error('Failed to verify Upload-Post profile:', profileError)
