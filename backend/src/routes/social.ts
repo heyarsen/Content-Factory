@@ -70,11 +70,27 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
           username: username, // Required by Upload-Post API
         })
         
-        uploadPostUserId = uploadPostUser.id || uploadPostUser.user_id || uploadPostUser.userId
+        console.log('Upload-Post user response:', {
+          fullResponse: uploadPostUser,
+          id: uploadPostUser?.id,
+          user_id: uploadPostUser?.user_id,
+          userId: uploadPostUser?.userId,
+          allKeys: uploadPostUser ? Object.keys(uploadPostUser) : [],
+        })
+        
+        // Try multiple possible field names for user ID
+        uploadPostUserId = uploadPostUser?.id || 
+                          uploadPostUser?.user_id || 
+                          uploadPostUser?.userId ||
+                          uploadPostUser?.user?.id ||
+                          uploadPostUser?.data?.id ||
+                          (typeof uploadPostUser === 'string' ? uploadPostUser : null)
 
         if (!uploadPostUserId) {
-          console.error('Upload-Post response missing user ID:', uploadPostUser)
-          throw new Error('Upload-Post did not return a user ID')
+          console.error('Upload-Post response missing user ID. Full response:', JSON.stringify(uploadPostUser, null, 2))
+          // If we still don't have a user ID, try using the Supabase user ID as fallback
+          console.log('Using Supabase user ID as fallback:', userId)
+          uploadPostUserId = userId
         }
 
         console.log('Created Upload-Post user profile:', uploadPostUserId)

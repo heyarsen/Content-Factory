@@ -90,9 +90,20 @@ export async function createUserProfile(
     console.log('Upload-Post create user response:', {
       status: response.status,
       data: response.data,
+      dataType: typeof response.data,
+      dataKeys: response.data ? Object.keys(response.data) : [],
     })
 
-    return response.data
+    // Handle different response formats
+    const responseData = response.data
+    
+    // Check if response is the user object directly, or wrapped
+    if (typeof responseData === 'object' && responseData !== null) {
+      return responseData
+    }
+    
+    // If response is a string or other format, return as-is
+    return { id: responseData, user_id: responseData, userId: responseData }
   } catch (error: any) {
     console.error('Upload-post create user error details:', {
       message: error.message,
