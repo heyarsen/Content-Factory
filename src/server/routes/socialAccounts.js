@@ -24,42 +24,85 @@ class UploadPostAPI {
   }
 
   async createUserProfile(username) {
-    const response = await fetch(`${this.baseURL}/api/uploadposts/users`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `ApiKey ${this.apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ username })
-    });
+    try {
+      const response = await fetch(`${this.baseURL}/api/uploadposts/users`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `ApiKey ${this.apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ username })
+      });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || `Failed to create user profile: ${response.status}`);
+      if (!response.ok) {
+        let errorMessage = `Failed to create user profile: ${response.status}`;
+        try {
+          const error = await response.json();
+          errorMessage = error.message || error.error || errorMessage;
+        } catch (e) {
+          // Response is not JSON, use status text
+          errorMessage = `${errorMessage} - ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      return await response.json();
+    } catch (error) {
+      if (error.name === 'AbortError' || error.message.includes('timeout')) {
+        throw new Error('Request timeout: UploadPost API did not respond in time');
+      }
+      throw error;
     }
-
-    return await response.json();
   }
 
   async generateJWTUrl(username, options = {}) {
-    const response = await fetch(`${this.baseURL}/api/uploadposts/users/generate-jwt`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `ApiKey ${this.apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        username,
-        ...options
-      })
-    });
+    try {
+      console.log('Generating JWT URL for profile:', username);
+      console.log('UploadPost API Key exists:', !!this.apiKey);
+      console.log('UploadPost API Key length:', this.apiKey ? this.apiKey.length : 0);
+      
+      const response = await fetch(`${this.baseURL}/api/uploadposts/users/generate-jwt`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `ApiKey ${this.apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          username,
+          ...options
+        })
+      });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || `Failed to generate JWT URL: ${response.status}`);
+      console.log('UploadPost API response status:', response.status);
+
+      if (!response.ok) {
+        let errorMessage = `Failed to generate JWT URL: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+          console.error('UploadPost API error response:', errorData);
+        } catch (e) {
+          // Response is not JSON
+          const text = await response.text();
+          console.error('UploadPost API error (non-JSON):', text);
+          errorMessage = `${errorMessage} - ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      console.log('UploadPost API success, connection URL received');
+      return data;
+    } catch (error) {
+      console.error('UploadPost generateJWTUrl error:', error);
+      if (error.name === 'AbortError' || error.message.includes('timeout')) {
+        throw new Error('Request timeout: UploadPost API did not respond in time');
+      }
+      if (error.message.includes('ECONNREFUSED') || error.message.includes('ENOTFOUND')) {
+        throw new Error('Cannot connect to UploadPost API. Please check your network connection.');
+      }
+      throw error;
     }
-
-    return await response.json();
   }
 
   async getUserProfiles() {
@@ -79,22 +122,35 @@ class UploadPostAPI {
   }
 
   async getUserProfile(username) {
-    const response = await fetch(`${this.baseURL}/api/uploadposts/users/${username}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `ApiKey ${this.apiKey}`
-      }
-    });
+    try {
+      const response = await fetch(`${this.baseURL}/api/uploadposts/users/${username}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `ApiKey ${this.apiKey}`
+        }
+      });
 
-    if (!response.ok) {
-      if (response.status === 404) {
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null;
+        }
+        let errorMessage = `Failed to get user profile: ${response.status}`;
+        try {
+          const error = await response.json();
+          errorMessage = error.message || error.error || errorMessage;
+        } catch (e) {
+          errorMessage = `${errorMessage} - ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      return await response.json();
+    } catch (error) {
+      if (error.message && error.message.includes('404')) {
         return null;
       }
-      const error = await response.json();
-      throw new Error(error.message || `Failed to get user profile: ${response.status}`);
+      throw error;
     }
-
-    return await response.json();
   }
 
   async deleteUserProfile(username) {
@@ -195,12 +251,18 @@ router.get('/workspace/:workspaceId', validateWorkspaceAccess, async (req, res) 
 // Generate connection URL for social accounts
 router.post('/connect', authenticateToken, async (req, res) => {
   try {
+    console.log('🔗 Connect social accounts request received');
+    console.log('User ID:', req.user?.id);
+    
     const { error, value } = connectAccountSchema.validate(req.body);
     if (error) {
+      console.error('Validation error:', error.details[0].message);
       return res.status(400).json({ error: error.details[0].message });
     }
 
     const { workspaceId, platforms, redirectUrl, logoImage } = value;
+    console.log('Workspace ID:', workspaceId);
+    console.log('Platforms:', platforms);
 
     if (!workspaceId) {
       return res.status(400).json({ error: 'Workspace ID is required' });
@@ -208,12 +270,14 @@ router.post('/connect', authenticateToken, async (req, res) => {
 
     // Check if UploadPost API key is configured
     if (!process.env.UPLOADPOST_KEY) {
-      console.error('UPLOADPOST_KEY is not configured');
+      console.error('❌ UPLOADPOST_KEY is not configured');
       return res.status(500).json({ 
         error: 'Social media integration is not configured. Please contact support.',
         code: 'UPLOADPOST_KEY_MISSING'
       });
     }
+
+    console.log('✅ UPLOADPOST_KEY is configured');
 
     // Verify workspace access
     const member = await prisma.workspaceMember.findUnique({
@@ -316,8 +380,15 @@ router.post('/connect', authenticateToken, async (req, res) => {
     }
   } catch (error) {
     console.error('Connect social accounts error:', error);
-    return res.status(500).json({ 
-      error: error.message || 'Failed to generate connection URL',
+    console.error('Error stack:', error.stack);
+    
+    // Ensure we always return a response
+    const errorMessage = error?.message || 'Failed to generate connection URL';
+    const statusCode = error?.statusCode || 500;
+    
+    return res.status(statusCode).json({ 
+      success: false,
+      error: errorMessage,
       code: 'INTERNAL_ERROR'
     });
   }
