@@ -4,6 +4,7 @@ import {
   CalendarCheck,
   Clapperboard,
   LayoutDashboard,
+  PenSquare,
   Share2,
   Sparkles,
 } from 'lucide-react'
@@ -17,6 +18,7 @@ const navigation = [
   { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
   { label: 'Videos', to: '/videos', icon: Clapperboard },
   { label: 'Generate', to: '/generate', icon: Sparkles },
+  { label: 'Content Factory', to: '/content', icon: PenSquare },
   { label: 'Social Accounts', to: '/social', icon: Share2 },
   { label: 'Scheduled Posts', to: '/posts', icon: CalendarCheck },
 ]

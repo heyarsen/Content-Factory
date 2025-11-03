@@ -10,6 +10,7 @@ import authRoutes from './routes/auth.js'
 import videoRoutes from './routes/videos.js'
 import socialRoutes from './routes/social.js'
 import postRoutes from './routes/posts.js'
+import contentRoutes from './routes/content.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -41,6 +42,7 @@ app.use('/api/auth', authRoutes)
 app.use('/api/videos', videoRoutes)
 app.use('/api/social', socialRoutes)
 app.use('/api/posts', postRoutes)
+app.use('/api/content', contentRoutes)
 
 // Serve static files from frontend build (if exists)
 // Compiled path: backend/dist/server.js -> go up one level to backend/public
