@@ -1,12 +1,18 @@
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import path from 'path'
+import { fileURLToPath } from 'url'
+import { existsSync } from 'fs'
 import { errorHandler } from './middleware/errorHandler.js'
 import { apiLimiter } from './middleware/rateLimiter.js'
 import authRoutes from './routes/auth.js'
 import videoRoutes from './routes/videos.js'
 import socialRoutes from './routes/social.js'
 import postRoutes from './routes/posts.js'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 // Load environment variables
 dotenv.config()
@@ -25,33 +31,64 @@ app.use(cors({
 app.use(express.json())
 app.use(apiLimiter)
 
-// Root route
-app.get('/', (req, res) => {
-  res.json({
-    message: 'AI Video Generation Platform API',
-    version: '1.0.0',
-    endpoints: {
-      health: '/health',
-      auth: '/api/auth',
-      videos: '/api/videos',
-      social: '/api/social',
-      posts: '/api/posts',
-    },
-    timestamp: new Date().toISOString(),
-  })
-})
-
-// Health check
+// Health check (before static files)
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
-// Routes
-
+// API Routes (before static files)
 app.use('/api/auth', authRoutes)
 app.use('/api/videos', videoRoutes)
 app.use('/api/social', socialRoutes)
 app.use('/api/posts', postRoutes)
+
+// Serve static files from frontend build (if exists)
+// Compiled path: dist/src/server.js -> go up two levels to backend/public
+const frontendDist = path.join(__dirname, '../../public')
+const indexHtml = path.join(frontendDist, 'index.html')
+
+console.log('Looking for frontend at:', frontendDist)
+console.log('__dirname is:', __dirname)
+console.log('Frontend exists:', existsSync(frontendDist))
+console.log('Index.html exists:', existsSync(indexHtml))
+
+if (existsSync(frontendDist) && existsSync(indexHtml)) {
+  app.use(express.static(frontendDist))
+  // Handle SPA routing - serve index.html for all non-API routes
+  app.get('*', (req, res, next) => {
+    // Skip API routes and health check
+    if (req.path.startsWith('/api') || req.path === '/health') {
+      return next()
+    }
+    res.sendFile(indexHtml)
+  })
+  console.log('✅ Serving frontend from', frontendDist)
+} else {
+  // Fallback if frontend not built - show API info
+  app.get('/', (req, res) => {
+    res.json({
+      message: 'AI Video Generation Platform API',
+      version: '1.0.0',
+      endpoints: {
+        health: '/health',
+        auth: '/api/auth',
+        videos: '/api/videos',
+        social: '/api/social',
+        posts: '/api/posts',
+      },
+      note: 'Frontend build not found at: ' + frontendDist,
+      debug: {
+        __dirname,
+        frontendDist,
+        exists: existsSync(frontendDist),
+        indexExists: existsSync(indexHtml),
+      },
+      timestamp: new Date().toISOString(),
+    })
+  })
+  console.log('❌ Frontend build not found, serving API only')
+  console.log('Expected path:', frontendDist)
+}
 
 // Error handler
 app.use(errorHandler)

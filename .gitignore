@@ -11,6 +11,9 @@ dist/
 build/
 *.log
 
+# Frontend build in backend
+backend/public/
+
 # Environment variables
 .env
 .env.local

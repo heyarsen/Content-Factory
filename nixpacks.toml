@@ -2,12 +2,20 @@
 nixPkgs = ["nodejs_20"]
 
 [phases.install]
-cmds = ["cd backend && npm install"]
+cmds = [
+  "cd frontend && npm install",
+  "cd backend && npm install"
+]
 
 [phases.build]
 cmds = [
+  "cd frontend && npm run build",
+  "mkdir -p backend/public",
+  "cp -r frontend/dist/* backend/public/",
+  "ls -la backend/public/",
   "cd backend && NODE_ENV=development npm install",
-  "cd backend && npm run build"
+  "cd backend && npm run build",
+  "ls -la backend/public/ || echo 'Public directory check'"
 ]
 
 [start]
