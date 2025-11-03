@@ -98,32 +98,52 @@ ALTER TABLE content_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE prompt_templates ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for videos
+DROP POLICY IF EXISTS "Users can view own videos" ON videos;
 CREATE POLICY "Users can view own videos" ON videos FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert own videos" ON videos;
 CREATE POLICY "Users can insert own videos" ON videos FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own videos" ON videos;
 CREATE POLICY "Users can update own videos" ON videos FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own videos" ON videos;
 CREATE POLICY "Users can delete own videos" ON videos FOR DELETE USING (auth.uid() = user_id);
 
 -- RLS Policies for social_accounts
+DROP POLICY IF EXISTS "Users can view own social accounts" ON social_accounts;
 CREATE POLICY "Users can view own social accounts" ON social_accounts FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert own social accounts" ON social_accounts;
 CREATE POLICY "Users can insert own social accounts" ON social_accounts FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own social accounts" ON social_accounts;
 CREATE POLICY "Users can update own social accounts" ON social_accounts FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own social accounts" ON social_accounts;
 CREATE POLICY "Users can delete own social accounts" ON social_accounts FOR DELETE USING (auth.uid() = user_id);
 
 -- RLS Policies for scheduled_posts
+DROP POLICY IF EXISTS "Users can view own scheduled posts" ON scheduled_posts;
 CREATE POLICY "Users can view own scheduled posts" ON scheduled_posts FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert own scheduled posts" ON scheduled_posts;
 CREATE POLICY "Users can insert own scheduled posts" ON scheduled_posts FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own scheduled posts" ON scheduled_posts;
 CREATE POLICY "Users can update own scheduled posts" ON scheduled_posts FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own scheduled posts" ON scheduled_posts;
 CREATE POLICY "Users can delete own scheduled posts" ON scheduled_posts FOR DELETE USING (auth.uid() = user_id);
 
 -- RLS Policies for content_categories
+DROP POLICY IF EXISTS "Users can view own content categories" ON content_categories;
 CREATE POLICY "Users can view own content categories" ON content_categories FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert own content categories" ON content_categories;
 CREATE POLICY "Users can insert own content categories" ON content_categories FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own content categories" ON content_categories;
 CREATE POLICY "Users can update own content categories" ON content_categories FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own content categories" ON content_categories;
 CREATE POLICY "Users can delete own content categories" ON content_categories FOR DELETE USING (auth.uid() = user_id);
 
 -- RLS Policies for prompt_templates
+DROP POLICY IF EXISTS "Users can view own prompt templates" ON prompt_templates;
 CREATE POLICY "Users can view own prompt templates" ON prompt_templates FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert own prompt templates" ON prompt_templates;
 CREATE POLICY "Users can insert own prompt templates" ON prompt_templates FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own prompt templates" ON prompt_templates;
 CREATE POLICY "Users can update own prompt templates" ON prompt_templates FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own prompt templates" ON prompt_templates;
 CREATE POLICY "Users can delete own prompt templates" ON prompt_templates FOR DELETE USING (auth.uid() = user_id);
 
