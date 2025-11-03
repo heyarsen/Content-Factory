@@ -25,6 +25,18 @@ router.post('/signup', authLimiter, async (req: Request, res: Response) => {
     })
 
     if (error) {
+      // If user already exists, don't automatically resend (could hit rate limits)
+      if (error.message.includes('already registered') || 
+          error.message.includes('already exists') ||
+          error.message.includes('User already registered')) {
+        return res.status(400).json({ 
+          error: 'An account with this email already exists.',
+          message: 'If you need to verify your email, please use the resend verification option.',
+          canLogin: true,
+          email: email,
+        })
+      }
+
       return res.status(400).json({ error: error.message })
     }
 
