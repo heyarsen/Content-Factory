@@ -139,8 +139,21 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
     try {
       console.log('Generating Upload-Post access link for username:', usernameForLink)
 
+      const frontendBaseUrl =
+        process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:5173'
+
+      const normalizedFrontendBase = frontendBaseUrl.endsWith('/')
+        ? frontendBaseUrl.slice(0, -1)
+        : frontendBaseUrl
+
+      const redirectUrl = `${normalizedFrontendBase}/social/callback?platform=${encodeURIComponent(
+        platform
+      )}&uploadpost_username=${encodeURIComponent(usernameForLink)}`
+
       const accessLink = await generateUserAccessLink(usernameForLink, {
         platforms: [platform as 'instagram' | 'tiktok' | 'youtube' | 'facebook'],
+        redirectUrl,
+        redirectButtonText: 'Back to Content Fabrica',
       })
 
       const { data: existing, error: findError } = await supabase
@@ -193,6 +206,7 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
         duration: accessLink.duration,
         uploadPostUsername: usernameForLink,
         platform,
+        redirectUrl,
         message: 'Account linking initiated. Follow the accessUrl to connect through Upload-Post.',
         success: accessLink.success ?? true,
       })
