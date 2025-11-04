@@ -17,6 +17,7 @@ export interface VideoPlan {
   trigger_time?: string | null
   default_platforms?: string[] | null
   auto_approve?: boolean
+  timezone?: string
   created_at: string
   updated_at: string
 }

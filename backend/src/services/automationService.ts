@@ -18,18 +18,31 @@ export class AutomationService {
     if (!plans) return
 
     const now = new Date()
-    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:00`
 
     for (const plan of plans) {
       try {
         // For daily trigger, check if it's time to process
         if (plan.auto_schedule_trigger === 'daily' && plan.trigger_time) {
+          // Convert trigger time to plan's timezone or UTC
+          const planTimezone = plan.timezone || 'UTC'
+          
+          // Get current time in plan's timezone
+          const nowInTimezone = new Date(now.toLocaleString('en-US', { timeZone: planTimezone }))
+          const currentHour = nowInTimezone.getHours()
+          const currentMinute = nowInTimezone.getMinutes()
+          
+          // Parse trigger time
           const [triggerHour, triggerMinute] = plan.trigger_time.split(':').map(Number)
-          const currentHour = now.getHours()
-          const currentMinute = now.getMinutes()
 
-          // Only process if within 15 minutes of trigger time
-          if (Math.abs((currentHour * 60 + currentMinute) - (triggerHour * 60 + triggerMinute)) > 15) {
+          // Only process if within 15 minutes of trigger time (in plan's timezone)
+          const triggerMinutes = triggerHour * 60 + triggerMinute
+          const currentMinutes = currentHour * 60 + currentMinute
+          const timeDiff = Math.abs(currentMinutes - triggerMinutes)
+          
+          // Handle wrap-around (e.g., 23:50 to 00:05)
+          const minutesDiff = Math.min(timeDiff, 1440 - timeDiff)
+          
+          if (minutesDiff > 15) {
             continue
           }
         }

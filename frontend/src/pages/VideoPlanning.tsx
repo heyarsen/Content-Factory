@@ -74,9 +74,27 @@ export function VideoPlanning() {
   const [endDate, setEndDate] = useState('')
   const [autoResearch, setAutoResearch] = useState(true)
   const [autoScheduleTrigger, setAutoScheduleTrigger] = useState<'daily' | 'time_based' | 'manual'>('daily')
-  const [triggerTime, setTriggerTime] = useState('09:00')
+  const [triggerTime, setTriggerTime] = useState(() => {
+    // Default to 9 AM in user's local time
+    const now = new Date()
+    const hours = 9
+    const minutes = 0
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
+  })
   const [defaultPlatforms, setDefaultPlatforms] = useState<string[]>([])
   const [autoApprove, setAutoApprove] = useState(false)
+  const [timezone, setTimezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
+  
+  // Preset times for quick selection
+  const timePresets = [
+    { label: 'Morning (9:00 AM)', value: '09:00' },
+    { label: 'Midday (12:00 PM)', value: '12:00' },
+    { label: 'Afternoon (3:00 PM)', value: '15:00' },
+    { label: 'Evening (6:00 PM)', value: '18:00' },
+  ]
+  
+  // Available platforms
+  const availablePlatforms = ['instagram', 'youtube', 'tiktok', 'twitter']
   const [creating, setCreating] = useState(false)
 
   useEffect(() => {
@@ -543,71 +561,124 @@ export function VideoPlanning() {
             />
 
             {autoScheduleTrigger === 'daily' && (
-              <Input
-                label="Trigger Time"
-                type="time"
-                value={triggerTime}
-                onChange={(e) => setTriggerTime(e.target.value)}
-              />
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-slate-700">
+                  Trigger Time
+                  <span className="ml-2 text-xs text-slate-500">
+                    (Timezone: {timezone})
+                  </span>
+                </label>
+                
+                {/* Quick preset buttons */}
+                <div className="flex flex-wrap gap-2">
+                  {timePresets.map((preset) => (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      onClick={() => setTriggerTime(preset.value)}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                        triggerTime === preset.value
+                          ? 'border-brand-500 bg-brand-50 text-brand-700'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                      }`}
+                    >
+                      {preset.label.split('(')[0].trim()}
+                    </button>
+                  ))}
+                </div>
+                
+                <Input
+                  label="Custom Time"
+                  type="time"
+                  value={triggerTime}
+                  onChange={(e) => setTriggerTime(e.target.value)}
+                  min="00:00"
+                  max="23:59"
+                />
+                <p className="text-xs text-slate-500">
+                  Topics will be generated automatically at this time each day
+                </p>
+              </div>
             )}
 
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <label className="flex items-center gap-3 cursor-pointer">
+            <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-start gap-3">
                 <input
                   type="checkbox"
+                  id="autoResearch"
                   checked={autoResearch}
                   onChange={(e) => setAutoResearch(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-brand-500"
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
                 />
-                <div>
-                  <p className="text-sm font-medium text-primary">Auto-research topics</p>
-                  <p className="text-xs text-slate-500">
-                    Automatically generate and research topics using Perplexity AI
+                <div className="flex-1">
+                  <label htmlFor="autoResearch" className="text-sm font-medium text-slate-700">
+                    Enable automatic research
+                  </label>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Automatically research topics using Perplexity AI when they are generated.
                   </p>
                 </div>
-              </label>
+              </div>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <label className="flex items-center gap-3 cursor-pointer">
+            <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-start gap-3">
                 <input
                   type="checkbox"
+                  id="autoApprove"
                   checked={autoApprove}
                   onChange={(e) => setAutoApprove(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-brand-500"
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
                 />
-                <div>
-                  <p className="text-sm font-medium text-primary">Auto-approve scripts</p>
-                  <p className="text-xs text-slate-500">
-                    Skip manual approval and automatically approve generated scripts
+                <div className="flex-1">
+                  <label htmlFor="autoApprove" className="text-sm font-medium text-slate-700">
+                    Auto-approve scripts
+                  </label>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Automatically approve generated scripts without manual review. 
+                    Recommended for trusted AI outputs.
                   </p>
                 </div>
-              </label>
+              </div>
             </div>
 
-            <div>
-              <label className="mb-2 block text-sm font-medium text-primary">
-                Default Platforms (optional)
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-slate-700">
+                Default Platforms
+                <span className="ml-2 text-xs font-normal text-slate-500">
+                  (for automated posting)
+                </span>
               </label>
               <div className="flex flex-wrap gap-2">
-                {['instagram', 'tiktok', 'youtube', 'facebook', 'linkedin'].map((platform) => (
-                  <label key={platform} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={defaultPlatforms.includes(platform)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setDefaultPlatforms([...defaultPlatforms, platform])
-                        } else {
-                          setDefaultPlatforms(defaultPlatforms.filter((p) => p !== platform))
-                        }
-                      }}
-                      className="h-4 w-4 rounded border-slate-300 text-brand-500"
-                    />
-                    <span className="text-sm capitalize">{platform}</span>
-                  </label>
+                {availablePlatforms.map((platform) => (
+                  <button
+                    key={platform}
+                    type="button"
+                    onClick={() => {
+                      if (defaultPlatforms.includes(platform)) {
+                        setDefaultPlatforms(defaultPlatforms.filter((p) => p !== platform))
+                      } else {
+                        setDefaultPlatforms([...defaultPlatforms, platform])
+                      }
+                    }}
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition ${
+                      defaultPlatforms.includes(platform)
+                        ? 'border-brand-500 bg-brand-50 text-brand-700'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                    }`}
+                  >
+                    {platform}
+                    {defaultPlatforms.includes(platform) && (
+                      <span className="ml-1">✓</span>
+                    )}
+                  </button>
                 ))}
               </div>
+              {defaultPlatforms.length === 0 && (
+                <p className="text-xs text-slate-500">
+                  Select at least one platform to enable automated distribution
+                </p>
+              )}
             </div>
 
             <div className="flex justify-end gap-3 pt-4">

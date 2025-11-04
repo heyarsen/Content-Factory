@@ -23,7 +23,8 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       auto_schedule_trigger,
       trigger_time,
       default_platforms,
-      auto_approve
+      auto_approve,
+      timezone,
     } = req.body
 
     if (!name || !videos_per_day || !start_date) {
@@ -45,6 +46,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
         trigger_time: trigger_time || null,
         default_platforms: default_platforms || null,
         auto_approve: auto_approve === true,
+        timezone: timezone || 'UTC',
       })
       .select()
       .single()
