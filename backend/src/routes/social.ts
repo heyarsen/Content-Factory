@@ -7,7 +7,9 @@ import { createUserProfile, generateUserAccessLink, getUserProfile } from '../li
 const router = Router()
 
 // Helper to determine if Upload-Post profile shows the platform as connected
-// This function is VERY conservative - it only returns true if there's clear evidence of connection
+// According to Upload-Post API docs:
+// - social_accounts[platform] is an object with display_name, username, social_images if connected
+// - social_accounts[platform] is null or empty string if NOT connected
 function isUploadPostPlatformConnected(profile: any, platform: string): boolean {
   if (!profile || !platform) {
     console.log('[Connection Check] No profile or platform provided')
@@ -19,93 +21,57 @@ function isUploadPostPlatformConnected(profile: any, platform: string): boolean 
   // Log the profile structure for debugging
   console.log('[Connection Check] Checking platform:', platform, 'Profile keys:', Object.keys(profile || {}))
   
-  // Pattern 1: connected_platforms array - must contain the platform name exactly
-  if (Array.isArray(profile.connected_platforms) && profile.connected_platforms.length > 0) {
-    const connected = profile.connected_platforms.some((p: any) => {
-      const pStr = String(p).toLowerCase().trim()
-      return pStr === platformLower || pStr === platform
-    })
-    if (connected) {
-      console.log('[Connection Check] ✓ Found in connected_platforms:', profile.connected_platforms)
-      return true
-    }
-  }
-
-  // Pattern 2: platforms array - must contain the platform name exactly
-  if (Array.isArray(profile.platforms) && profile.platforms.length > 0) {
-    const connected = profile.platforms.some((p: any) => {
-      const pStr = String(p).toLowerCase().trim()
-      return pStr === platformLower || pStr === platform
-    })
-    if (connected) {
-      console.log('[Connection Check] ✓ Found in platforms:', profile.platforms)
-      return true
-    }
-  }
-
-  // Pattern 3: platform-specific boolean fields - must be explicitly true
-  const platformFields = [
-    `${platformLower}_connected`,
-    `is_${platformLower}_connected`,
-    `has_${platformLower}_account`,
-  ]
+  // Handle response structure: profile might be nested in a "profile" key
+  const actualProfile = profile.profile || profile
   
-  for (const field of platformFields) {
-    if (profile[field] === true) {
-      console.log('[Connection Check] ✓ Found boolean field:', field, '=', profile[field])
-      return true
-    }
-  }
-
-  // Pattern 4: Check nested accounts/connections object - must have connection data
-  if (profile.accounts && typeof profile.accounts === 'object') {
-    const accountData = profile.accounts[platformLower] || profile.accounts[platform]
-    if (accountData) {
-      // Must have either connected: true, or an id/access_token indicating connection
-      if (accountData.connected === true || 
-          (accountData.id && accountData.id !== '') ||
-          (accountData.access_token && accountData.access_token !== '')) {
-        console.log('[Connection Check] ✓ Found in accounts with connection data:', accountData)
+  // Check social_accounts object - this is the official way according to Upload-Post API
+  if (actualProfile.social_accounts && typeof actualProfile.social_accounts === 'object') {
+    const socialAccounts = actualProfile.social_accounts
+    
+    // Check if the platform exists in social_accounts
+    const platformAccount = socialAccounts[platformLower] || socialAccounts[platform]
+    
+    console.log('[Connection Check] social_accounts for platform:', platform, '=', platformAccount)
+    
+    // If platformAccount is an object (not null, not empty string), it's connected
+    if (platformAccount && typeof platformAccount === 'object') {
+      // Verify it has connection data (display_name, username, etc.)
+      if (platformAccount.display_name || platformAccount.username || Object.keys(platformAccount).length > 0) {
+        console.log('[Connection Check] ✓ Platform is CONNECTED. Account data:', platformAccount)
         return true
       }
     }
-  }
-
-  if (profile.connections && typeof profile.connections === 'object') {
-    const connData = profile.connections[platformLower] || profile.connections[platform]
-    if (connData) {
-      if (connData.connected === true || 
-          (connData.id && connData.id !== '') ||
-          (connData.access_token && connData.access_token !== '')) {
-        console.log('[Connection Check] ✓ Found in connections with connection data:', connData)
-        return true
-      }
-    }
-  }
-
-  // Pattern 5: Check social_accounts array - must have platform match with connection data
-  if (Array.isArray(profile.social_accounts) && profile.social_accounts.length > 0) {
-    const connected = profile.social_accounts.some((acc: any) => {
-      const accPlatform = String(acc.platform || acc.name || acc.type || '').toLowerCase().trim()
-      const platformMatch = accPlatform === platformLower || accPlatform === platform
-      if (platformMatch) {
-        // Must also have connection indicators
-        return acc.connected === true || 
-               (acc.id && acc.id !== '') ||
-               (acc.access_token && acc.access_token !== '') ||
-               (acc.status === 'connected')
-      }
+    
+    // If platformAccount is null, empty string, or undefined, it's NOT connected
+    if (platformAccount === null || platformAccount === '' || platformAccount === undefined) {
+      console.log('[Connection Check] ✗ Platform is NOT connected (null/empty)')
       return false
-    })
-    if (connected) {
-      console.log('[Connection Check] ✓ Found in social_accounts with connection data')
-      return true
+    }
+  }
+  
+  // Fallback: if social_accounts doesn't exist, check if it's in the root profile
+  if (profile.social_accounts && typeof profile.social_accounts === 'object') {
+    const socialAccounts = profile.social_accounts
+    const platformAccount = socialAccounts[platformLower] || socialAccounts[platform]
+    
+    if (platformAccount && typeof platformAccount === 'object') {
+      if (platformAccount.display_name || platformAccount.username || Object.keys(platformAccount).length > 0) {
+        console.log('[Connection Check] ✓ Platform is CONNECTED (root level). Account data:', platformAccount)
+        return true
+      }
+    }
+    
+    if (platformAccount === null || platformAccount === '' || platformAccount === undefined) {
+      console.log('[Connection Check] ✗ Platform is NOT connected (root level, null/empty)')
+      return false
     }
   }
 
-  // If we get here, no clear evidence of connection was found
-  console.log('[Connection Check] ✗ NO connection evidence found. Profile structure (first 1000 chars):', 
-    JSON.stringify(profile, null, 2).substring(0, 1000))
+  // If we get here, social_accounts doesn't exist or platform isn't in it
+  console.log('[Connection Check] ✗ NO connection evidence found. social_accounts:', 
+    actualProfile.social_accounts || profile.social_accounts || 'not found')
+  console.log('[Connection Check] Full profile structure (first 1500 chars):', 
+    JSON.stringify(actualProfile || profile, null, 2).substring(0, 1500))
   return false
 }
 
