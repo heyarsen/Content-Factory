@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { useToast } from '../hooks/useToast'
-import { api } from '../lib/api'
-import { RefreshCw, Star, Trash2, Download, User } from 'lucide-react'
+import api from '../lib/api'
+import { RefreshCw, Star, Trash2, User } from 'lucide-react'
 
 interface Avatar {
   id: string
