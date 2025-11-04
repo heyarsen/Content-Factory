@@ -9,6 +9,7 @@ import {
   Sparkles,
   Shield,
   Zap,
+  Calendar,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -20,6 +21,7 @@ interface SidebarProps {
 const navigation = [
   { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
   { label: 'Create Video', to: '/create', icon: Zap },
+  { label: 'Video Planning', to: '/planning', icon: Calendar },
   { label: 'My Videos', to: '/videos', icon: Clapperboard },
   { label: 'Social Accounts', to: '/social', icon: Share2 },
   { label: 'Scheduled Posts', to: '/posts', icon: CalendarCheck },

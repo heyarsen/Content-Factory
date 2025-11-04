@@ -12,6 +12,7 @@ import socialRoutes from './routes/social.js'
 import postRoutes from './routes/posts.js'
 import contentRoutes from './routes/content.js'
 import reelRoutes from './routes/reels.js'
+import planRoutes from './routes/plans.js'
 import adminRoutes from './routes/admin.js'
 import { initializeScheduler } from './jobs/scheduler.js'
 
@@ -47,6 +48,7 @@ app.use('/api/social', socialRoutes)
 app.use('/api/posts', postRoutes)
 app.use('/api/content', contentRoutes)
 app.use('/api/reels', reelRoutes)
+app.use('/api/plans', planRoutes)
 
 // Serve static files from frontend build (if exists)
 // Compiled path: backend/dist/server.js -> go up one level to backend/public

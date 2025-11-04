@@ -21,6 +21,7 @@ import { SocialCallback } from './pages/SocialCallback'
 import { ContentFactory } from './pages/ContentFactory'
 import { Workflows } from './pages/Workflows'
 import { AdminPanel } from './pages/AdminPanel'
+import { VideoPlanning } from './pages/VideoPlanning'
 
 function AppContent() {
   const { toasts, removeToast } = useToast()
@@ -96,6 +97,14 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <ScheduledPosts />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/planning"
+          element={
+            <ProtectedRoute>
+              <VideoPlanning />
             </ProtectedRoute>
           }
         />
