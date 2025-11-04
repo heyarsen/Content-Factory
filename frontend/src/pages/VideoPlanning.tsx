@@ -106,6 +106,7 @@ export function VideoPlanning() {
   const [defaultPlatforms, setDefaultPlatforms] = useState<string[]>([])
   const [autoApprove, setAutoApprove] = useState(false)
   const [timezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
+  const [videoTimes, setVideoTimes] = useState<string[]>(['09:00', '14:00', '19:00']) // Default times for 3 videos
   
   // Preset times for quick selection
   const timePresets = [
@@ -114,6 +115,16 @@ export function VideoPlanning() {
     { label: 'Afternoon (3:00 PM)', value: '15:00' },
     { label: 'Evening (6:00 PM)', value: '18:00' },
   ]
+  
+  // Update videoTimes when videosPerDay changes
+  useEffect(() => {
+    const defaultTimes = ['09:00', '14:00', '19:00', '10:00', '11:00']
+    if (videoTimes.length !== videosPerDay) {
+      // If we need more times, add defaults. If fewer, keep first N.
+      setVideoTimes(defaultTimes.slice(0, videosPerDay))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videosPerDay])
   
   // Available platforms
   const availablePlatforms = ['instagram', 'youtube', 'tiktok', 'twitter']
@@ -171,6 +182,7 @@ export function VideoPlanning() {
         default_platforms: defaultPlatforms.length > 0 ? defaultPlatforms : null,
         auto_approve: autoApprove,
         timezone: timezone,
+        video_times: videoTimes.map((time: string) => `${time}:00`), // Send custom times
       })
 
       setPlans([response.data.plan, ...plans])
@@ -184,6 +196,7 @@ export function VideoPlanning() {
       setTriggerTime('09:00')
       setDefaultPlatforms([])
       setAutoApprove(false)
+      setVideoTimes(['09:00', '14:00', '19:00'])
     } catch (error: any) {
       alert(error.response?.data?.error || 'Failed to create plan')
     } finally {
@@ -460,12 +473,16 @@ export function VideoPlanning() {
                             </div>
 
                             {editingItem?.id === item.id ? (
-                              <div className="space-y-3">
+                              <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                <div className="flex items-center justify-between">
+                                  <h4 className="font-semibold text-primary">Edit Video Details</h4>
+                                </div>
                                 <Input
-                                  label="Topic"
+                                  label="Topic *"
                                   value={editForm.topic}
                                   onChange={(e) => setEditForm({ ...editForm, topic: e.target.value })}
-                                  placeholder="Enter topic..."
+                                  placeholder="Enter topic (e.g., Best Trading Strategies for 2024)..."
+                                  required
                                 />
                                 <Select
                                   label="Category"
@@ -606,23 +623,47 @@ export function VideoPlanning() {
                               </>
                             ) : (
                               <>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleEditItem(item)}
-                                  leftIcon={<Edit2 className="h-4 w-4" />}
-                                >
-                                  Edit
-                                </Button>
-                                {!item.topic && item.status === 'pending' && (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => handleGenerateTopic(item.id)}
-                                    leftIcon={<Sparkles className="h-4 w-4" />}
-                                  >
-                                    Generate
-                                  </Button>
+                                {!item.topic ? (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleEditItem(item)}
+                                      leftIcon={<Edit2 className="h-4 w-4" />}
+                                    >
+                                      Set Topic
+                                    </Button>
+                                    {item.status === 'pending' && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => handleGenerateTopic(item.id)}
+                                        leftIcon={<Sparkles className="h-4 w-4" />}
+                                      >
+                                        Auto Generate
+                                      </Button>
+                                    )}
+                                  </>
+                                ) : (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleEditItem(item)}
+                                      leftIcon={<Edit2 className="h-4 w-4" />}
+                                    >
+                                      Edit Topic
+                                    </Button>
+                                    {item.status === 'pending' && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => handleGenerateTopic(item.id)}
+                                        leftIcon={<Sparkles className="h-4 w-4" />}
+                                      >
+                                        Regenerate
+                                      </Button>
+                                    )}
+                                  </>
                                 )}
                               </>
                             )}
@@ -745,6 +786,57 @@ export function VideoPlanning() {
                 { value: '5', label: '5 videos per day' },
               ]}
             />
+
+            {/* Posting Times for Each Video */}
+            <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <label className="block text-sm font-medium text-slate-700">
+                Posting Times for Each Video
+                <span className="ml-2 text-xs font-normal text-slate-500">
+                  (Set when each video should be posted)
+                </span>
+              </label>
+              <div className="grid gap-3 md:grid-cols-2">
+                {Array.from({ length: videosPerDay }).map((_, index) => (
+                  <div key={index} className="space-y-2">
+                    <label className="block text-xs font-medium text-slate-600">
+                      Video {index + 1}
+                    </label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="time"
+                        value={videoTimes[index] || ''}
+                        onChange={(e) => {
+                          const newTimes = [...videoTimes]
+                          newTimes[index] = e.target.value
+                          setVideoTimes(newTimes)
+                        }}
+                        className="flex-1"
+                      />
+                      <div className="flex flex-wrap gap-1">
+                        {timePresets.map((preset) => (
+                          <button
+                            key={preset.value}
+                            type="button"
+                            onClick={() => {
+                              const newTimes = [...videoTimes]
+                              newTimes[index] = preset.value
+                              setVideoTimes(newTimes)
+                            }}
+                            className={`rounded border px-2 py-1 text-xs ${
+                              videoTimes[index] === preset.value
+                                ? 'border-brand-500 bg-brand-50 text-brand-700'
+                                : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                            }`}
+                          >
+                            {preset.label.split('(')[0].trim()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
             <Select
               label="Schedule Trigger"

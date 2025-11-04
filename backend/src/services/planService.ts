@@ -115,7 +115,8 @@ export class PlanService {
     planId: string,
     userId: string,
     startDate: string,
-    endDate?: string
+    endDate?: string,
+    customTimes?: string[] // Custom posting times from user
   ): Promise<VideoPlanItem[]> {
     const plan = await this.getPlanById(planId, userId)
     
@@ -125,8 +126,10 @@ export class PlanService {
     const items: VideoPlanItem[] = []
     const currentDate = new Date(start)
     
-    // Generate time slots (e.g., 9am, 2pm, 7pm for 3 videos per day)
-    const timeSlots = this.generateTimeSlots(plan.videos_per_day)
+    // Use custom times if provided, otherwise generate default time slots
+    const timeSlots = customTimes && customTimes.length > 0 
+      ? customTimes.map(t => t.length === 5 ? t : t.substring(0, 5)) // Ensure HH:MM format
+      : this.generateTimeSlots(plan.videos_per_day)
     
     while (currentDate <= end) {
       for (const timeSlot of timeSlots) {

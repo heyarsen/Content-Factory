@@ -25,6 +25,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       default_platforms,
       auto_approve,
       timezone,
+      video_times, // Custom posting times for each video slot
     } = req.body
 
     if (!name || !videos_per_day || !start_date) {
@@ -53,8 +54,14 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
 
     if (planError) throw planError
 
-    // Generate plan items
-    const items = await PlanService.generatePlanItems(plan.id, userId, start_date, end_date || undefined)
+    // Generate plan items with custom times if provided
+    const items = await PlanService.generatePlanItems(
+      plan.id, 
+      userId, 
+      start_date, 
+      end_date || undefined,
+      video_times // Pass custom times
+    )
 
     return res.json({ plan, items })
   } catch (error: any) {
