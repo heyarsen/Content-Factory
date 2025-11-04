@@ -40,13 +40,22 @@ interface VideoPlan {
   created_at: string
 }
 
+interface Category {
+  id: string
+  name: string
+  category_key: string
+  description: string | null
+  status: 'active' | 'inactive'
+  sort_order: number
+}
+
 interface VideoPlanItem {
   id: string
   plan_id: string
   scheduled_date: string
   scheduled_time: string | null
   topic: string | null
-  category: 'Trading' | 'Lifestyle' | 'Fin. Freedom' | null
+  category: string | null
   description: string | null
   why_important: string | null
   useful_tips: string | null
@@ -72,7 +81,7 @@ export function VideoPlanning() {
   const [editingItem, setEditingItem] = useState<VideoPlanItem | null>(null)
   const [editForm, setEditForm] = useState<{
     topic: string
-    category: 'Trading' | 'Lifestyle' | 'Fin. Freedom' | null
+    category: string | null
     scheduled_time: string
     description: string
     why_important: string
@@ -108,7 +117,8 @@ export function VideoPlanning() {
   const [timezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
   const [videoTimes, setVideoTimes] = useState<string[]>(['09:00', '14:00', '19:00']) // Default times for 3 videos
   const [videoTopics, setVideoTopics] = useState<string[]>(['', '', '']) // Topics for each video slot
-  const [videoCategories, setVideoCategories] = useState<Array<'Trading' | 'Lifestyle' | 'Fin. Freedom' | null>>([null, null, null]) // Categories for each slot
+  const [videoCategories, setVideoCategories] = useState<Array<string | null>>([null, null, null]) // Categories for each slot
+  const [categories, setCategories] = useState<Category[]>([]) // User categories from API
   
   // Preset times for quick selection
   const timePresets = [
@@ -136,6 +146,7 @@ export function VideoPlanning() {
 
   useEffect(() => {
     loadPlans()
+    loadCategories()
   }, [])
 
   useEffect(() => {
@@ -143,6 +154,15 @@ export function VideoPlanning() {
       loadPlanItems(selectedPlan.id)
     }
   }, [selectedPlan])
+
+  const loadCategories = async () => {
+    try {
+      const response = await api.get('/api/content')
+      setCategories((response.data.categories || []).filter((c: Category) => c.status === 'active'))
+    } catch (error) {
+      console.error('Failed to load categories:', error)
+    }
+  }
 
   const loadPlans = async () => {
     try {
@@ -351,12 +371,11 @@ export function VideoPlanning() {
   }
 
   const getCategoryColor = (category: string | null) => {
-    const colors: Record<string, string> = {
-      Trading: 'bg-blue-100 text-blue-700',
-      'Fin. Freedom': 'bg-green-100 text-green-700',
-      Lifestyle: 'bg-purple-100 text-purple-700',
-    }
-    return colors[category || ''] || 'bg-slate-100 text-slate-700'
+    // Use a consistent color scheme based on category name hash
+    if (!category) return 'bg-slate-100 text-slate-700'
+    const colors = ['bg-blue-100 text-blue-700', 'bg-green-100 text-green-700', 'bg-purple-100 text-purple-700', 'bg-orange-100 text-orange-700', 'bg-pink-100 text-pink-700']
+    const hash = category.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0)
+    return colors[hash % colors.length] || 'bg-slate-100 text-slate-700'
   }
 
   if (loading) {
@@ -495,12 +514,10 @@ export function VideoPlanning() {
                                 <Select
                                   label="Category"
                                   value={editForm.category || ''}
-                                  onChange={(e) => setEditForm({ ...editForm, category: e.target.value as any || null })}
+                                  onChange={(e) => setEditForm({ ...editForm, category: e.target.value || null })}
                                   options={[
                                     { value: '', label: 'No category' },
-                                    { value: 'Trading', label: 'Trading' },
-                                    { value: 'Lifestyle', label: 'Lifestyle' },
-                                    { value: 'Fin. Freedom', label: 'Fin. Freedom' },
+                                    ...categories.map((cat) => ({ value: cat.name, label: cat.name })),
                                   ]}
                                 />
                                                                  <div className="space-y-3">
@@ -877,14 +894,12 @@ export function VideoPlanning() {
                         value={videoCategories[index] || ''}
                         onChange={(e) => {
                           const newCategories = [...videoCategories]
-                          newCategories[index] = (e.target.value || null) as any
+                          newCategories[index] = e.target.value || null
                           setVideoCategories(newCategories)
                         }}
                         options={[
                           { value: '', label: 'No category (auto-assign)' },
-                          { value: 'Trading', label: 'Trading' },
-                          { value: 'Lifestyle', label: 'Lifestyle' },
-                          { value: 'Fin. Freedom', label: 'Fin. Freedom' },
+                          ...categories.map((cat) => ({ value: cat.name, label: cat.name })),
                         ]}
                       />
                     </div>

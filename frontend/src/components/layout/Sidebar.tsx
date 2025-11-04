@@ -10,6 +10,7 @@ import {
   Shield,
   Zap,
   Calendar,
+  Tag,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -25,6 +26,7 @@ const navigation = [
   { label: 'My Videos', to: '/videos', icon: Clapperboard },
   { label: 'Social Accounts', to: '/social', icon: Share2 },
   { label: 'Scheduled Posts', to: '/posts', icon: CalendarCheck },
+  { label: 'Categories', to: '/categories', icon: Tag },
 ]
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {

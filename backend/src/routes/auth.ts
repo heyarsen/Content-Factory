@@ -184,5 +184,76 @@ router.post('/reset-password/confirm', authLimiter, async (req: Request, res: Re
   }
 })
 
+// Update user profile
+router.patch('/profile', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { email, old_password, new_password } = req.body
+
+    if (!email && !new_password) {
+      return res.status(400).json({ error: 'email or new_password is required' })
+    }
+
+    // Update email if provided
+    if (email) {
+      const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
+        email: email,
+        email_confirm: false, // Require email confirmation
+      })
+
+      if (updateError) {
+        console.error('Update email error:', updateError)
+        return res.status(500).json({ error: 'Failed to update email' })
+      }
+
+      return res.json({ 
+        message: 'Email update initiated. Please check your email to confirm the new address.',
+        email 
+      })
+    }
+
+    // Update password if provided
+    if (new_password) {
+      if (!old_password) {
+        return res.status(400).json({ error: 'old_password is required to change password' })
+      }
+
+      // Verify old password by attempting to sign in
+      const { data: userData } = await supabase.auth.admin.getUserById(userId)
+      
+      if (!userData?.user?.email) {
+        return res.status(404).json({ error: 'User not found' })
+      }
+
+      // Verify old password
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: userData.user.email,
+        password: old_password,
+      })
+
+      if (signInError) {
+        return res.status(401).json({ error: 'Invalid current password' })
+      }
+
+      // Update password
+      const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
+        password: new_password,
+      })
+
+      if (updateError) {
+        console.error('Update password error:', updateError)
+        return res.status(500).json({ error: 'Failed to update password' })
+      }
+
+      return res.json({ message: 'Password updated successfully' })
+    }
+
+    return res.status(400).json({ error: 'Invalid request' })
+  } catch (error: any) {
+    console.error('Update profile exception:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
 export default router
 

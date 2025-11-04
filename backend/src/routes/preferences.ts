@@ -1,0 +1,110 @@
+import { Router, Response } from 'express'
+import { authenticate, AuthRequest } from '../middleware/auth.js'
+import { supabase } from '../lib/supabase.js'
+
+const router = Router()
+
+// Get user preferences
+router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+
+    const { data, error } = await supabase
+      .from('user_preferences')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Get preferences error:', error)
+      return res.status(500).json({ error: 'Failed to load preferences' })
+    }
+
+    // Return default preferences if none exist
+    const preferences = data || {
+      user_id: userId,
+      timezone: 'UTC',
+      default_platforms: [],
+      notifications_enabled: true,
+      auto_research_default: true,
+      auto_approve_default: false,
+    }
+
+    return res.json({ preferences })
+  } catch (error: any) {
+    console.error('Get preferences exception:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// Update user preferences
+router.put('/', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const {
+      timezone,
+      default_platforms,
+      notifications_enabled,
+      auto_research_default,
+      auto_approve_default,
+    } = req.body
+
+    // Check if preferences exist
+    const { data: existing } = await supabase
+      .from('user_preferences')
+      .select('user_id')
+      .eq('user_id', userId)
+      .single()
+
+    const updates: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    }
+
+    if (timezone !== undefined) updates.timezone = timezone
+    if (default_platforms !== undefined) updates.default_platforms = default_platforms
+    if (notifications_enabled !== undefined) updates.notifications_enabled = notifications_enabled
+    if (auto_research_default !== undefined) updates.auto_research_default = auto_research_default
+    if (auto_approve_default !== undefined) updates.auto_approve_default = auto_approve_default
+
+    let data
+    let error
+
+    if (existing) {
+      // Update existing preferences
+      const result = await supabase
+        .from('user_preferences')
+        .update(updates)
+        .eq('user_id', userId)
+        .select()
+        .single()
+
+      data = result.data
+      error = result.error
+    } else {
+      // Insert new preferences
+      const result = await supabase
+        .from('user_preferences')
+        .insert({
+          user_id: userId,
+          ...updates,
+        })
+        .select()
+        .single()
+
+      data = result.data
+      error = result.error
+    }
+
+    if (error) {
+      console.error('Update preferences error:', error)
+      return res.status(500).json({ error: 'Failed to update preferences' })
+    }
+
+    return res.json({ preferences: data })
+  } catch (error: any) {
+    console.error('Update preferences exception:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+export default router

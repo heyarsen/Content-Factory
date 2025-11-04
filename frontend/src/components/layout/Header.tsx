@@ -1,8 +1,8 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { Button } from '../ui/Button'
-import { Bell, LogOut, Menu, Search } from 'lucide-react'
-import { useMemo } from 'react'
+import { Bell, LogOut, Menu, Search, Settings, User, ChevronDown } from 'lucide-react'
+import { useMemo, useState, useRef, useEffect } from 'react'
 
 interface HeaderProps {
   onToggleSidebar: () => void
@@ -11,6 +11,8 @@ interface HeaderProps {
 export function Header({ onToggleSidebar }: HeaderProps) {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   const greetingName = useMemo(() => {
     if (!user?.email) return 'Creator'
@@ -18,9 +20,24 @@ export function Header({ onToggleSidebar }: HeaderProps) {
     return name.charAt(0).toUpperCase() + name.slice(1)
   }, [user?.email])
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false)
+      }
+    }
+
+    if (dropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [dropdownOpen])
+
   const handleSignOut = async () => {
     await signOut()
     navigate('/login')
+    setDropdownOpen(false)
   }
 
   return (
@@ -61,14 +78,58 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             <span className="absolute right-2 top-2 inline-flex h-2.5 w-2.5 rounded-full bg-brand-500" />
           </button>
 
-          <div className="hidden items-center gap-3 rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-slate-500 shadow-sm backdrop-blur md:flex">
-            <div className="hidden flex-col leading-tight sm:flex">
-              <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Account</span>
-              <span className="font-semibold text-primary">{user?.email}</span>
-            </div>
+          {/* User Dropdown */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              type="button"
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+              className="hidden items-center gap-3 rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-slate-500 shadow-sm backdrop-blur transition hover:border-brand-200 hover:text-brand-600 md:flex"
+            >
+              <div className="hidden flex-col leading-tight sm:flex">
+                <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Account</span>
+                <span className="font-semibold text-primary">{user?.email}</span>
+              </div>
+              <ChevronDown className={`h-4 w-4 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {dropdownOpen && (
+              <div className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white shadow-lg">
+                <div className="py-2">
+                  <div className="px-4 py-2 text-xs font-medium text-slate-400">SETTINGS</div>
+                  <button
+                    onClick={() => {
+                      navigate('/profile')
+                      setDropdownOpen(false)
+                    }}
+                    className="flex w-full items-center gap-3 px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-50"
+                  >
+                    <User className="h-4 w-4" />
+                    Profile Settings
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigate('/preferences')
+                      setDropdownOpen(false)
+                    }}
+                    className="flex w-full items-center gap-3 px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-50"
+                  >
+                    <Settings className="h-4 w-4" />
+                    Preferences
+                  </button>
+                  <div className="my-1 border-t border-slate-200" />
+                  <button
+                    onClick={handleSignOut}
+                    className="flex w-full items-center gap-3 px-4 py-2 text-sm text-red-600 transition hover:bg-red-50"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Sign out
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
-          <Button variant="ghost" size="md" onClick={handleSignOut} className="gap-2 rounded-2xl px-4 py-3 text-sm font-semibold">
+          <Button variant="ghost" size="md" onClick={handleSignOut} className="gap-2 rounded-2xl px-4 py-3 text-sm font-semibold md:hidden">
             <LogOut className="h-4 w-4" />
             <span className="hidden sm:inline">Sign out</span>
           </Button>

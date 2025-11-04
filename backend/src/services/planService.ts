@@ -142,7 +142,7 @@ export class PlanService {
         // Determine initial status and topic
         let status: string = 'pending'
         let topic: string | null = null
-        let category: 'Trading' | 'Lifestyle' | 'Fin. Freedom' | null = null
+        let category: string | null = null
         
         // If user provided a topic, set it directly
         if (customTopic) {
@@ -237,7 +237,7 @@ export class PlanService {
       // Research the topic
       const research = await ResearchService.researchTopic(
         availableTopic.Idea,
-        availableTopic.Category as 'Trading' | 'Lifestyle' | 'Fin. Freedom'
+        availableTopic.Category as string
       )
 
       // Update the plan item
@@ -245,7 +245,7 @@ export class PlanService {
         .from('video_plan_items')
         .update({
           topic: research.idea,
-          category: research.category as 'Trading' | 'Lifestyle' | 'Fin. Freedom',
+          category: research.category as string,
           description: research.description,
           why_important: research.whyItMatters,
           useful_tips: research.usefulTips,
