@@ -57,19 +57,27 @@ export function SocialCallback() {
 
     const handleCallback = async () => {
       try {
-        await api.post('/api/social/callback', {
+        const response = await api.post('/api/social/callback', {
           platform: resolvedPlatform,
           uploadPostUsername,
         })
 
-        localStorage.removeItem(`uploadpost_access_url_${resolvedPlatform}`)
-        localStorage.removeItem(`uploadpost_username_${resolvedPlatform}`)
-        localStorage.removeItem(`uploadpost_redirect_url_${resolvedPlatform}`)
+        // Only navigate to success if we got a successful response
+        if (response.status === 200 || response.status === 201) {
+          localStorage.removeItem(`uploadpost_access_url_${resolvedPlatform}`)
+          localStorage.removeItem(`uploadpost_username_${resolvedPlatform}`)
+          localStorage.removeItem(`uploadpost_redirect_url_${resolvedPlatform}`)
 
-        navigate(`/social?connected=${resolvedPlatform}`)
+          navigate(`/social?connected=${resolvedPlatform}`)
+        } else {
+          setError('Connection verification failed. Please try again.')
+          setLoading(false)
+        }
       } catch (err: any) {
-        setError(err.response?.data?.error || 'Failed to connect account')
+        const errorMessage = err.response?.data?.error || err.response?.data?.message || 'Failed to connect account'
+        setError(errorMessage)
         setLoading(false)
+        // Don't navigate - show error instead
       }
     }
 

@@ -7,71 +7,105 @@ import { createUserProfile, generateUserAccessLink, getUserProfile } from '../li
 const router = Router()
 
 // Helper to determine if Upload-Post profile shows the platform as connected
-function matchesPlatformString(value: string, platform: string) {
-  const normalizedTarget = platform.toLowerCase()
-  const simplifiedTarget = normalizedTarget.replace(/[^a-z0-9]/g, '')
-
-  const normalizedValue = value.toLowerCase()
-  if (normalizedValue === normalizedTarget) return true
-  if (normalizedValue.includes(normalizedTarget)) return true
-
-  const simplifiedValue = normalizedValue.replace(/[^a-z0-9]/g, '')
-  if (simplifiedValue === simplifiedTarget) return true
-
-  return false
-}
-
+// This function is VERY conservative - it only returns true if there's clear evidence of connection
 function isUploadPostPlatformConnected(profile: any, platform: string): boolean {
-  if (!profile || !platform) return false
+  if (!profile || !platform) {
+    console.log('[Connection Check] No profile or platform provided')
+    return false
+  }
 
-  const queue: any[] = [profile]
-  const seenObjects = new WeakSet<object>()
-
-  while (queue.length > 0) {
-    const current = queue.shift()
-
-    if (current === null || current === undefined) {
-      continue
+  const platformLower = platform.toLowerCase()
+  
+  // Log the profile structure for debugging
+  console.log('[Connection Check] Checking platform:', platform, 'Profile keys:', Object.keys(profile || {}))
+  
+  // Pattern 1: connected_platforms array - must contain the platform name exactly
+  if (Array.isArray(profile.connected_platforms) && profile.connected_platforms.length > 0) {
+    const connected = profile.connected_platforms.some((p: any) => {
+      const pStr = String(p).toLowerCase().trim()
+      return pStr === platformLower || pStr === platform
+    })
+    if (connected) {
+      console.log('[Connection Check] ✓ Found in connected_platforms:', profile.connected_platforms)
+      return true
     }
+  }
 
-    if (typeof current === 'string') {
-      if (matchesPlatformString(current, platform)) {
+  // Pattern 2: platforms array - must contain the platform name exactly
+  if (Array.isArray(profile.platforms) && profile.platforms.length > 0) {
+    const connected = profile.platforms.some((p: any) => {
+      const pStr = String(p).toLowerCase().trim()
+      return pStr === platformLower || pStr === platform
+    })
+    if (connected) {
+      console.log('[Connection Check] ✓ Found in platforms:', profile.platforms)
+      return true
+    }
+  }
+
+  // Pattern 3: platform-specific boolean fields - must be explicitly true
+  const platformFields = [
+    `${platformLower}_connected`,
+    `is_${platformLower}_connected`,
+    `has_${platformLower}_account`,
+  ]
+  
+  for (const field of platformFields) {
+    if (profile[field] === true) {
+      console.log('[Connection Check] ✓ Found boolean field:', field, '=', profile[field])
+      return true
+    }
+  }
+
+  // Pattern 4: Check nested accounts/connections object - must have connection data
+  if (profile.accounts && typeof profile.accounts === 'object') {
+    const accountData = profile.accounts[platformLower] || profile.accounts[platform]
+    if (accountData) {
+      // Must have either connected: true, or an id/access_token indicating connection
+      if (accountData.connected === true || 
+          (accountData.id && accountData.id !== '') ||
+          (accountData.access_token && accountData.access_token !== '')) {
+        console.log('[Connection Check] ✓ Found in accounts with connection data:', accountData)
         return true
-      }
-      continue
-    }
-
-    if (typeof current === 'number' || typeof current === 'boolean') {
-      if (matchesPlatformString(String(current), platform)) {
-        return true
-      }
-      continue
-    }
-
-    if (Array.isArray(current)) {
-      if (seenObjects.has(current)) {
-        continue
-      }
-      seenObjects.add(current)
-      for (const item of current) {
-        queue.push(item)
-      }
-      continue
-    }
-
-    if (typeof current === 'object') {
-      if (seenObjects.has(current)) {
-        continue
-      }
-      seenObjects.add(current)
-
-      for (const key of Object.keys(current)) {
-        const value = current[key]
-        queue.push(value)
       }
     }
   }
 
+  if (profile.connections && typeof profile.connections === 'object') {
+    const connData = profile.connections[platformLower] || profile.connections[platform]
+    if (connData) {
+      if (connData.connected === true || 
+          (connData.id && connData.id !== '') ||
+          (connData.access_token && connData.access_token !== '')) {
+        console.log('[Connection Check] ✓ Found in connections with connection data:', connData)
+        return true
+      }
+    }
+  }
+
+  // Pattern 5: Check social_accounts array - must have platform match with connection data
+  if (Array.isArray(profile.social_accounts) && profile.social_accounts.length > 0) {
+    const connected = profile.social_accounts.some((acc: any) => {
+      const accPlatform = String(acc.platform || acc.name || acc.type || '').toLowerCase().trim()
+      const platformMatch = accPlatform === platformLower || accPlatform === platform
+      if (platformMatch) {
+        // Must also have connection indicators
+        return acc.connected === true || 
+               (acc.id && acc.id !== '') ||
+               (acc.access_token && acc.access_token !== '') ||
+               (acc.status === 'connected')
+      }
+      return false
+    })
+    if (connected) {
+      console.log('[Connection Check] ✓ Found in social_accounts with connection data')
+      return true
+    }
+  }
+
+  // If we get here, no clear evidence of connection was found
+  console.log('[Connection Check] ✗ NO connection evidence found. Profile structure (first 1000 chars):', 
+    JSON.stringify(profile, null, 2).substring(0, 1000))
   return false
 }
 
@@ -391,6 +425,9 @@ router.post('/callback', authenticate, async (req: AuthRequest, res: Response) =
       const usernameToVerify = uploadPostAccountUsername || uploadPostUsername
       const userProfile = await getUserProfile(usernameToVerify)
 
+      // Log the full profile for debugging
+      console.log('[Callback] Full Upload-Post profile:', JSON.stringify(userProfile, null, 2))
+
       // Use user-specific client for RLS to work properly
       const userSupabase = req.userToken ? getSupabaseClientForUser(req.userToken) : supabase
 
@@ -404,11 +441,17 @@ router.post('/callback', authenticate, async (req: AuthRequest, res: Response) =
       // Use the upload-post account username we created/verified
       const finalUploadPostUsername = uploadPostAccountUsername || uploadPostUsername
 
+      // Check if platform is actually connected - be VERY strict about this
       const platformConnected = isUploadPostPlatformConnected(userProfile, platform)
+      
+      console.log('[Callback] Platform connection check result:', platformConnected, 'for platform:', platform)
 
+      // If platform is NOT connected, update status to pending and return error
       if (!platformConnected) {
+        console.log('[Callback] Platform NOT connected. Setting status to pending.')
+        
         if (existing) {
-          await userSupabase
+          const { error: updateError } = await userSupabase
             .from('social_accounts')
             .update({
               platform_account_id: finalUploadPostUsername,
@@ -416,8 +459,12 @@ router.post('/callback', authenticate, async (req: AuthRequest, res: Response) =
               connected_at: null,
             })
             .eq('id', existing.id)
+            
+          if (updateError) {
+            console.error('[Callback] Error updating to pending:', updateError)
+          }
         } else {
-          await userSupabase
+          const { error: insertError } = await userSupabase
             .from('social_accounts')
             .insert({
               user_id: userId,
@@ -425,12 +472,19 @@ router.post('/callback', authenticate, async (req: AuthRequest, res: Response) =
               platform_account_id: finalUploadPostUsername,
               status: 'pending',
             })
+            
+          if (insertError) {
+            console.error('[Callback] Error inserting pending account:', insertError)
+          }
         }
 
         return res.status(400).json({
-          error: 'We did not detect a connected account yet. Please finish linking the account in Upload-Post.',
+          error: 'Account not connected. Please complete the connection process in Upload-Post and try again.',
+          platformConnected: false,
         })
       }
+      
+      console.log('[Callback] Platform IS connected. Proceeding with connection.')
 
       if (existing) {
         const { error } = await userSupabase
