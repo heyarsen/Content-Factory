@@ -11,16 +11,10 @@ import { Skeleton } from '../components/ui/Skeleton'
 import {
   Calendar,
   Plus,
-  Search,
   Sparkles,
   Video,
   Clock,
-  CheckCircle2,
-  XCircle,
   Loader,
-  Settings,
-  Trash2,
-  Play,
   PenSquare,
   Check,
   X,
@@ -638,7 +632,9 @@ export function VideoPlanning() {
               <div>
                 <h3 className="font-semibold text-primary">{scriptPreviewItem.topic}</h3>
                 {scriptPreviewItem.category && (
-                  <Badge className="mt-1">{scriptPreviewItem.category}</Badge>
+                  <div className="mt-1">
+                    <Badge>{scriptPreviewItem.category}</Badge>
+                  </div>
                 )}
               </div>
               
