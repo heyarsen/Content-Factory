@@ -1,5 +1,6 @@
 import { Router, Response } from 'express'
 import { supabase } from '../lib/supabase.js'
+import { getSupabaseClientForUser } from '../lib/supabase.js'
 import { authenticate, AuthRequest } from '../middleware/auth.js'
 import { createUserProfile, generateUserAccessLink, getUserProfile } from '../lib/uploadpost.js'
 
@@ -9,8 +10,9 @@ const router = Router()
 router.get('/accounts', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
+    const userSupabase = req.userToken ? getSupabaseClientForUser(req.userToken) : supabase
 
-    const { data, error } = await supabase
+    const { data, error } = await userSupabase
       .from('social_accounts')
       .select('*')
       .eq('user_id', userId)
@@ -132,7 +134,10 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
         throw lastError || new Error('Failed to generate access link after retries')
       }
 
-      const { data: existing, error: findError } = await supabase
+      // Use user-specific client for RLS to work properly
+      const userSupabase = req.userToken ? getSupabaseClientForUser(req.userToken) : supabase
+
+      const { data: existing, error: findError } = await userSupabase
         .from('social_accounts')
         .select('*')
         .eq('user_id', userId)
@@ -145,7 +150,7 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
       }
 
       if (existing) {
-        const { error: updateError } = await supabase
+        const { error: updateError } = await userSupabase
           .from('social_accounts')
           .update({
             platform_account_id: usernameForLink,
@@ -159,7 +164,7 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
         }
         console.log('Updated existing account:', existing.id)
       } else {
-        const { data: newAccount, error: insertError } = await supabase
+        const { data: newAccount, error: insertError } = await userSupabase
           .from('social_accounts')
           .insert({
             user_id: userId,
@@ -318,18 +323,21 @@ router.post('/callback', authenticate, async (req: AuthRequest, res: Response) =
       const usernameToVerify = uploadPostAccountUsername || uploadPostUsername
       const userProfile = await getUserProfile(usernameToVerify)
 
-      const { data: existing } = await supabase
+      // Use user-specific client for RLS to work properly
+      const userSupabase = req.userToken ? getSupabaseClientForUser(req.userToken) : supabase
+
+      const { data: existing } = await userSupabase
         .from('social_accounts')
         .select('*')
         .eq('user_id', userId)
         .eq('platform', platform)
-        .single()
+        .maybeSingle()
 
       // Use the upload-post account username we created/verified
       const finalUploadPostUsername = uploadPostAccountUsername || uploadPostUsername
 
       if (existing) {
-        const { error } = await supabase
+        const { error } = await userSupabase
           .from('social_accounts')
           .update({
             platform_account_id: finalUploadPostUsername,
@@ -345,7 +353,7 @@ router.post('/callback', authenticate, async (req: AuthRequest, res: Response) =
 
         res.json({ message: 'Account connected successfully', account: existing, profile: userProfile })
       } else {
-        const { data, error } = await supabase
+        const { data, error } = await userSupabase
           .from('social_accounts')
           .insert({
             user_id: userId,
@@ -382,8 +390,9 @@ router.delete('/accounts/:id', authenticate, async (req: AuthRequest, res: Respo
   try {
     const userId = req.userId!
     const { id } = req.params
+    const userSupabase = req.userToken ? getSupabaseClientForUser(req.userToken) : supabase
 
-    const { error } = await supabase
+    const { error } = await userSupabase
       .from('social_accounts')
       .update({
         status: 'disconnected',
@@ -410,8 +419,9 @@ router.get('/accounts/:id/status', authenticate, async (req: AuthRequest, res: R
   try {
     const userId = req.userId!
     const { id } = req.params
+    const userSupabase = req.userToken ? getSupabaseClientForUser(req.userToken) : supabase
 
-    const { data, error } = await supabase
+    const { data, error } = await userSupabase
       .from('social_accounts')
       .select('*')
       .eq('id', id)

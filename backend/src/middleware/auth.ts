@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase.js'
 export interface AuthRequest extends Request {
   userId?: string
   user?: any
+  userToken?: string // Store the JWT token for RLS
 }
 
 export async function authenticate(
@@ -26,6 +27,7 @@ export async function authenticate(
 
     req.userId = user.id
     req.user = user
+    req.userToken = token // Store token for RLS
     next()
   } catch (error) {
     console.error('Auth error:', error)
