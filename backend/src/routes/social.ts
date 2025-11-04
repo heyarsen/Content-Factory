@@ -66,10 +66,8 @@ function isUploadPostPlatformConnected(profile: any, platform: string): boolean 
       seenObjects.add(current)
 
       for (const key of Object.keys(current)) {
-        if (matchesPlatformString(key, platform)) {
-          return true
-        }
-        queue.push(current[key])
+        const value = current[key]
+        queue.push(value)
       }
     }
   }
