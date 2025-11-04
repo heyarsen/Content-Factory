@@ -7,18 +7,10 @@ import { createUserProfile, generateUserAccessLink, getUserProfile } from '../li
 const router = Router()
 
 // Map our platform names to Upload-Post API platform names
+// Note: We use 'x' internally to match Upload-Post API (no mapping needed)
 function mapPlatformToUploadPost(platform: string): string {
-  const mapping: Record<string, string> = {
-    twitter: 'x', // Upload-Post API uses 'x' instead of 'twitter'
-    instagram: 'instagram',
-    tiktok: 'tiktok',
-    youtube: 'youtube',
-    facebook: 'facebook',
-    linkedin: 'linkedin',
-    pinterest: 'pinterest',
-    threads: 'threads',
-  }
-  return mapping[platform.toLowerCase()] || platform.toLowerCase()
+  // All platforms match Upload-Post API format, just return as-is
+  return platform.toLowerCase()
 }
 
 // Helper to determine if Upload-Post profile shows the platform as connected
@@ -47,12 +39,11 @@ function isUploadPostPlatformConnected(profile: any, platform: string): boolean 
     const uploadPostPlatformName = mapPlatformToUploadPost(platform)
     const uploadPostPlatformLower = uploadPostPlatformName.toLowerCase()
     
-    // Check if the platform exists in social_accounts (try both our name and Upload-Post API name)
+    // Check if the platform exists in social_accounts
     const platformAccount = socialAccounts[platformLower] || 
                            socialAccounts[platform] || 
                            socialAccounts[uploadPostPlatformLower] ||
-                           socialAccounts[uploadPostPlatformName] ||
-                           socialAccounts[platform === 'twitter' ? 'x' : platform]
+                           socialAccounts[uploadPostPlatformName]
     
     console.log('[Connection Check] social_accounts for platform:', platform, '(Upload-Post name:', uploadPostPlatformName, ') =', platformAccount)
     
@@ -129,9 +120,9 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
     const userId = req.userId!
     const user = req.user!
 
-    // Supported platforms according to Upload-Post API: instagram, tiktok, youtube, facebook, twitter (x), linkedin, pinterest, threads
+    // Supported platforms according to Upload-Post API: instagram, tiktok, youtube, facebook, x (Twitter), linkedin, pinterest, threads
     // Note: snapchat is NOT supported by Upload-Post
-    const supportedPlatforms = ['instagram', 'tiktok', 'youtube', 'facebook', 'twitter', 'linkedin', 'pinterest', 'threads']
+    const supportedPlatforms = ['instagram', 'tiktok', 'youtube', 'facebook', 'x', 'linkedin', 'pinterest', 'threads']
     if (!platform || !supportedPlatforms.includes(platform)) {
       return res.status(400).json({ error: 'Valid platform is required' })
     }
@@ -202,7 +193,7 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
           const uploadPostPlatform = mapPlatformToUploadPost(platform)
           accessLink = await generateUserAccessLink(usernameForLink, {
             platforms: [uploadPostPlatform as any],
-            redirectUrl,
+        redirectUrl,
             redirectButtonText: 'Back to Content Factory',
           })
           break

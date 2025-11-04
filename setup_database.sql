@@ -18,12 +18,12 @@ CREATE TABLE IF NOT EXISTS videos (
 );
 
 -- Social accounts table
--- Supported platforms according to Upload-Post API: instagram, tiktok, youtube, facebook, twitter (x), linkedin, pinterest, threads
+-- Supported platforms according to Upload-Post API: instagram, tiktok, youtube, facebook, x (Twitter), linkedin, pinterest, threads
 -- Note: snapchat is NOT supported by Upload-Post API
 CREATE TABLE IF NOT EXISTS social_accounts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  platform TEXT NOT NULL CHECK (platform IN ('instagram', 'tiktok', 'youtube', 'facebook', 'twitter', 'linkedin', 'pinterest', 'threads')),
+  platform TEXT NOT NULL CHECK (platform IN ('instagram', 'tiktok', 'youtube', 'facebook', 'x', 'linkedin', 'pinterest', 'threads')),
   platform_account_id TEXT NOT NULL,
   access_token TEXT,
   refresh_token TEXT,
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS scheduled_posts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   video_id UUID NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  platform TEXT NOT NULL CHECK (platform IN ('instagram', 'tiktok', 'youtube', 'facebook', 'twitter', 'linkedin', 'pinterest', 'threads')),
+  platform TEXT NOT NULL CHECK (platform IN ('instagram', 'tiktok', 'youtube', 'facebook', 'x', 'linkedin', 'pinterest', 'threads')),
   scheduled_time TIMESTAMP WITH TIME ZONE,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'posted', 'failed', 'cancelled')),
   upload_post_id TEXT,

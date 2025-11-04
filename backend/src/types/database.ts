@@ -16,7 +16,7 @@ export interface Video {
 export interface SocialAccount {
   id: string
   user_id: string
-  platform: 'instagram' | 'tiktok' | 'youtube' | 'facebook' | 'twitter' | 'linkedin' | 'pinterest' | 'threads'
+  platform: 'instagram' | 'tiktok' | 'youtube' | 'facebook' | 'x' | 'linkedin' | 'pinterest' | 'threads'
   platform_account_id: string
   access_token: string | null
   refresh_token: string | null
@@ -28,7 +28,7 @@ export interface ScheduledPost {
   id: string
   video_id: string
   user_id: string
-  platform: 'instagram' | 'tiktok' | 'youtube' | 'facebook' | 'twitter' | 'linkedin' | 'pinterest' | 'threads'
+  platform: 'instagram' | 'tiktok' | 'youtube' | 'facebook' | 'x' | 'linkedin' | 'pinterest' | 'threads'
   scheduled_time: string | null
   status: 'pending' | 'posted' | 'failed' | 'cancelled'
   upload_post_id: string | null
