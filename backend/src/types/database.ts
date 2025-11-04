@@ -63,3 +63,61 @@ export interface PromptTemplate {
   updated_at: string
 }
 
+export interface ContentItem {
+  id: string
+  user_id: string
+  topic: string
+  category: 'Trading' | 'Lifestyle' | 'Fin. Freedom'
+  research: Record<string, any> | null
+  done: boolean
+  status: string | null
+  keywords: string[] | null
+  action: string | null
+  start: string | null
+  tone_style: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Reel {
+  id: string
+  content_item_id: string | null
+  user_id: string
+  topic: string
+  category: 'Trading' | 'Lifestyle' | 'Fin. Freedom'
+  description: string | null
+  why_it_matters: string | null
+  useful_tips: string | null
+  script: string | null
+  status: 'pending' | 'approved' | 'rejected'
+  scheduled_time: string | null
+  template: string | null
+  instagram: boolean
+  youtube: boolean
+  pix: string | null
+  video_url: string | null
+  heygen_video_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface BackgroundJob {
+  id: string
+  job_type: string
+  payload: Record<string, any>
+  status: 'pending' | 'processing' | 'completed' | 'failed'
+  scheduled_at: string
+  attempts: number
+  max_attempts: number
+  error_message: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ContentResearch {
+  id: string
+  content_item_id: string
+  research_data: Record<string, any>
+  created_at: string
+}
+

@@ -478,5 +478,120 @@ router.put('/prompts/:id', async (req: AuthRequest, res: Response) => {
   }
 })
 
+// Scout-Research Hunter: Generate topics
+router.post('/generate-topics', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { ResearchService } = await import('../services/researchService.js')
+    const { ContentService } = await import('../services/contentService.js')
+
+    // Generate 3 topics
+    const topics = await ResearchService.generateTopics(userId)
+
+    // Create content items for each topic
+    const createdItems = []
+    for (const topic of topics) {
+      const category = topic.Category === 'Fin. Freedom' ? 'Fin. Freedom' : topic.Category
+      const contentItem = await ContentService.createContentItem(userId, {
+        topic: topic.Idea,
+        category: category as 'Trading' | 'Lifestyle' | 'Fin. Freedom',
+      })
+      createdItems.push(contentItem)
+    }
+
+    return res.json({ topics: createdItems })
+  } catch (error: any) {
+    console.error('Generate topics error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to generate topics' })
+  }
+})
+
+// Research a topic
+router.post('/research', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { topic, category, content_item_id } = req.body
+
+    if (!topic || !category) {
+      return res.status(400).json({ error: 'topic and category are required' })
+    }
+
+    const { ResearchService } = await import('../services/researchService.js')
+    const { ContentService } = await import('../services/contentService.js')
+
+    const research = await ResearchService.researchTopic(
+      topic,
+      category as 'Trading' | 'Lifestyle' | 'Fin. Freedom'
+    )
+
+    // If content_item_id provided, update it with research
+    if (content_item_id) {
+      await ContentService.updateContentResearch(content_item_id, research)
+    }
+
+    return res.json({ research })
+  } catch (error: any) {
+    console.error('Research error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to research topic' })
+  }
+})
+
+// A_Script Creation: Generate script from content item
+router.post('/generate-script', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { content_item_id } = req.body
+
+    if (!content_item_id) {
+      return res.status(400).json({ error: 'content_item_id is required' })
+    }
+
+    const { ContentService } = await import('../services/contentService.js')
+    const { ScriptService } = await import('../services/scriptService.js')
+    const { ReelService } = await import('../services/reelService.js')
+    const { JobService } = await import('../services/jobService.js')
+
+    // Get content item
+    const contentItem = await ContentService.getContentItemById(content_item_id)
+    if (!contentItem) {
+      return res.status(404).json({ error: 'Content item not found' })
+    }
+
+    if (contentItem.user_id !== userId) {
+      return res.status(403).json({ error: 'Unauthorized' })
+    }
+
+    if (!contentItem.research) {
+      return res.status(400).json({ error: 'Content item must have research data' })
+    }
+
+    // Generate script
+    const script = await ScriptService.generateScriptFromContent(contentItem)
+
+    // Create reel with script
+    const research = contentItem.research
+    const reel = await ReelService.createReel(userId, {
+      content_item_id: contentItem.id,
+      topic: research.Idea || contentItem.topic,
+      category: contentItem.category,
+      description: research.Description || null,
+      why_it_matters: research.WhyItMatters || null,
+      useful_tips: research.UsefulTips || null,
+      script,
+    })
+
+    // Mark content item as done
+    await ContentService.markContentDone(contentItem.id)
+
+    // Schedule auto-approval check (already handled by cron, but we can trigger it)
+    await JobService.scheduleJob('auto_approval', { reel_id: reel.id })
+
+    return res.json({ reel, script })
+  } catch (error: any) {
+    console.error('Generate script error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to generate script' })
+  }
+})
+
 export default router
 

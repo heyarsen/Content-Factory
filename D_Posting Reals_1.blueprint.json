@@ -1,0 +1,1875 @@
+{
+    "name": "D_Posting Reals_1",
+    "flow": [
+        {
+            "id": 289,
+            "module": "airtable:ActionSearchRecords",
+            "version": 3,
+            "parameters": {
+                "__IMTCONN__": 11644137
+            },
+            "mapper": {
+                "base": "appPVhgG5w5btA6UB",
+                "table": "tblMBl5Ra3YjiQwVj",
+                "fields": [
+                    "Тема",
+                    "Категория",
+                    "Статус",
+                    "Сценарий / текст рилса"
+                ],
+                "formula": "  {Статус} = 'одобрено'",
+                "maxRecords": "1",
+                "useColumnId": false
+            },
+            "metadata": {
+                "designer": {
+                    "x": 0,
+                    "y": 1200
+                },
+                "restore": {
+                    "expect": {
+                        "base": {
+                            "mode": "chose",
+                            "label": "Content factory \"Soft Techn\""
+                        },
+                        "sort": {
+                            "mode": "chose"
+                        },
+                        "view": {
+                            "mode": "chose"
+                        },
+                        "table": {
+                            "mode": "chose",
+                            "label": "🌐 Соцсети рилсы"
+                        },
+                        "fields": {
+                            "mode": "chose",
+                            "label": [
+                                "Тема",
+                                "Категория",
+                                "Статус",
+                                "Сценарий / текст рилса"
+                            ]
+                        },
+                        "useColumnId": {
+                            "mode": "chose"
+                        }
+                    },
+                    "parameters": {
+                        "__IMTCONN__": {
+                            "data": {
+                                "scoped": "true",
+                                "connection": "airtable3"
+                            },
+                            "label": "My Airtable OAuth connection (User ID: usryO9E9iW5wzluhG)"
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "__IMTCONN__",
+                        "type": "account:airtable3,airtable2",
+                        "label": "Connection",
+                        "required": true
+                    }
+                ],
+                "expect": [
+                    {
+                        "name": "base",
+                        "type": "select",
+                        "label": "Base",
+                        "required": true
+                    },
+                    {
+                        "name": "useColumnId",
+                        "type": "boolean",
+                        "label": "Use Column ID",
+                        "required": true
+                    },
+                    {
+                        "name": "table",
+                        "type": "select",
+                        "label": "Table",
+                        "required": true
+                    },
+                    {
+                        "name": "formula",
+                        "type": "text",
+                        "label": "Formula"
+                    },
+                    {
+                        "name": "maxRecords",
+                        "type": "integer",
+                        "label": "Limit"
+                    },
+                    {
+                        "name": "sort",
+                        "spec": [
+                            {
+                                "name": "field",
+                                "type": "select",
+                                "label": "Field",
+                                "dynamic": true,
+                                "options": []
+                            },
+                            {
+                                "name": "direction",
+                                "type": "select",
+                                "label": "Direction",
+                                "options": [
+                                    {
+                                        "label": "Descending",
+                                        "value": "desc"
+                                    },
+                                    {
+                                        "label": "Ascending",
+                                        "value": "asc"
+                                    }
+                                ]
+                            }
+                        ],
+                        "type": "array",
+                        "label": "Sort"
+                    },
+                    {
+                        "name": "view",
+                        "type": "select",
+                        "label": "View"
+                    },
+                    {
+                        "name": "fields",
+                        "type": "select",
+                        "label": "Output Fields",
+                        "multiple": true
+                    }
+                ],
+                "interface": [
+                    {
+                        "name": "__IMTLENGTH__",
+                        "type": "uinteger",
+                        "label": "Total number of bundles"
+                    },
+                    {
+                        "name": "__IMTINDEX__",
+                        "type": "uinteger",
+                        "label": "Bundle order position"
+                    },
+                    {
+                        "name": "id",
+                        "type": "text",
+                        "label": "ID"
+                    },
+                    {
+                        "name": "createdTime",
+                        "type": "date",
+                        "label": "Created Time"
+                    },
+                    {
+                        "name": "Тема",
+                        "type": "text",
+                        "label": "Тема",
+                        "multiline": true
+                    },
+                    {
+                        "name": "Категория",
+                        "type": "text",
+                        "label": "Категория"
+                    },
+                    {
+                        "name": "Статус",
+                        "type": "text",
+                        "label": "Статус"
+                    },
+                    {
+                        "name": "Сценарий / текст рилса",
+                        "type": "text",
+                        "label": "Сценарий / текст рилса",
+                        "multiline": true
+                    }
+                ]
+            }
+        },
+        {
+            "id": 297,
+            "module": "builtin:BasicRouter",
+            "version": 1,
+            "mapper": null,
+            "metadata": {
+                "designer": {
+                    "x": 300,
+                    "y": 1200
+                }
+            },
+            "routes": [
+                {
+                    "flow": [
+                        {
+                            "id": 330,
+                            "module": "math:EvaluateExpression",
+                            "version": 1,
+                            "parameters": {},
+                            "filter": {
+                                "name": "Trading",
+                                "conditions": [
+                                    [
+                                        {
+                                            "a": "{{289.`Категория`}}",
+                                            "b": "Trading",
+                                            "o": "text:equal"
+                                        }
+                                    ]
+                                ]
+                            },
+                            "mapper": {
+                                "expression": "{{floor(random * 3) + 1}}"
+                            },
+                            "metadata": {
+                                "designer": {
+                                    "x": 600,
+                                    "y": 300
+                                },
+                                "restore": {},
+                                "expect": [
+                                    {
+                                        "name": "expression",
+                                        "type": "text",
+                                        "label": "Expression",
+                                        "required": true
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "id": 331,
+                            "module": "builtin:BasicRouter",
+                            "version": 1,
+                            "mapper": null,
+                            "metadata": {
+                                "designer": {
+                                    "x": 900,
+                                    "y": 300
+                                }
+                            },
+                            "routes": [
+                                {
+                                    "flow": [
+                                        {
+                                            "id": 319,
+                                            "module": "heygen:createAVideoFromTemplate",
+                                            "version": 1,
+                                            "parameters": {
+                                                "__IMTCONN__": 11287651
+                                            },
+                                            "filter": {
+                                                "name": "Daran walking",
+                                                "conditions": [
+                                                    [
+                                                        {
+                                                            "a": "{{330.result}}",
+                                                            "b": "1",
+                                                            "o": "text:equal"
+                                                        }
+                                                    ]
+                                                ]
+                                            },
+                                            "mapper": {
+                                                "title": "Untitled Video",
+                                                "caption": true,
+                                                "dimension": {
+                                                    "width": "720",
+                                                    "height": "1280"
+                                                },
+                                                "parent_id": null,
+                                                "variables": {
+                                                    "script_text1": "{{289.`Сценарий / текст рилса`}}"
+                                                },
+                                                "include_gif": false,
+                                                "template_id": "a237e3542bf84d87846b37d682d2c01c",
+                                                "callback_url": "https://hook.eu2.make.com/5t8ivqyle1brrpprvkfvrbi6y6i6238i",
+                                                "enable_sharing": false
+                                            },
+                                            "metadata": {
+                                                "designer": {
+                                                    "x": 1200,
+                                                    "y": 0
+                                                },
+                                                "restore": {
+                                                    "expect": {
+                                                        "caption": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "parent_id": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "include_gif": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "template_id": {
+                                                            "mode": "chose",
+                                                            "label": "Daran walk",
+                                                            "nested": [
+                                                                {
+                                                                    "name": "variables",
+                                                                    "spec": [
+                                                                        "rpc://heygen/1/getTemplateParams"
+                                                                    ],
+                                                                    "type": "collection",
+                                                                    "label": "Variables",
+                                                                    "required": false
+                                                                }
+                                                            ]
+                                                        },
+                                                        "enable_sharing": {
+                                                            "mode": "chose"
+                                                        }
+                                                    },
+                                                    "parameters": {
+                                                        "__IMTCONN__": {
+                                                            "data": {
+                                                                "scoped": "true",
+                                                                "connection": "heygen2"
+                                                            },
+                                                            "label": "My HeyGen connection (infospolok.office@gmail.com)"
+                                                        }
+                                                    }
+                                                },
+                                                "parameters": [
+                                                    {
+                                                        "name": "__IMTCONN__",
+                                                        "type": "account:heygen2,hey-gen-9e1ue3",
+                                                        "label": "Connection",
+                                                        "required": true
+                                                    }
+                                                ],
+                                                "expect": [
+                                                    {
+                                                        "name": "template_id",
+                                                        "type": "select",
+                                                        "label": "Template ID",
+                                                        "required": true
+                                                    },
+                                                    {
+                                                        "name": "caption",
+                                                        "type": "boolean",
+                                                        "label": "Caption"
+                                                    },
+                                                    {
+                                                        "name": "title",
+                                                        "type": "text",
+                                                        "label": "Title"
+                                                    },
+                                                    {
+                                                        "name": "dimension",
+                                                        "spec": [
+                                                            {
+                                                                "name": "width",
+                                                                "type": "number",
+                                                                "label": "Width"
+                                                            },
+                                                            {
+                                                                "name": "height",
+                                                                "type": "number",
+                                                                "label": "Height"
+                                                            }
+                                                        ],
+                                                        "type": "collection",
+                                                        "label": "Dimension"
+                                                    },
+                                                    {
+                                                        "name": "include_gif",
+                                                        "type": "boolean",
+                                                        "label": "Include GIF"
+                                                    },
+                                                    {
+                                                        "name": "enable_sharing",
+                                                        "type": "boolean",
+                                                        "label": "Enable Sharing"
+                                                    },
+                                                    {
+                                                        "name": "parent_id",
+                                                        "type": "folder",
+                                                        "label": "Folder"
+                                                    },
+                                                    {
+                                                        "name": "brand_voice_id",
+                                                        "type": "text",
+                                                        "label": "Brand Voice ID"
+                                                    },
+                                                    {
+                                                        "name": "callback_url",
+                                                        "type": "text",
+                                                        "label": "Callback URL"
+                                                    },
+                                                    {
+                                                        "name": "variables",
+                                                        "spec": [
+                                                            {
+                                                                "name": "script_text1",
+                                                                "type": "text"
+                                                            }
+                                                        ],
+                                                        "type": "collection",
+                                                        "label": "Variables"
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "flow": [
+                                        {
+                                            "id": 332,
+                                            "module": "heygen:createAVideoFromTemplate",
+                                            "version": 1,
+                                            "parameters": {
+                                                "__IMTCONN__": 11287651
+                                            },
+                                            "filter": {
+                                                "name": "Daran in car",
+                                                "conditions": [
+                                                    [
+                                                        {
+                                                            "a": "{{330.result}}",
+                                                            "b": "2",
+                                                            "o": "text:equal"
+                                                        }
+                                                    ]
+                                                ]
+                                            },
+                                            "mapper": {
+                                                "title": "Untitled Video",
+                                                "caption": true,
+                                                "dimension": {
+                                                    "width": "720",
+                                                    "height": "1280"
+                                                },
+                                                "parent_id": null,
+                                                "variables": {
+                                                    "script_text1": "{{289.`Сценарий / текст рилса`}}"
+                                                },
+                                                "include_gif": false,
+                                                "template_id": "b99820266bee40358230e262ec87c311",
+                                                "callback_url": "https://hook.eu2.make.com/5t8ivqyle1brrpprvkfvrbi6y6i6238i",
+                                                "enable_sharing": false
+                                            },
+                                            "metadata": {
+                                                "designer": {
+                                                    "x": 1200,
+                                                    "y": 300
+                                                },
+                                                "restore": {
+                                                    "expect": {
+                                                        "caption": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "parent_id": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "include_gif": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "template_id": {
+                                                            "mode": "chose",
+                                                            "label": "Daran in car",
+                                                            "nested": [
+                                                                {
+                                                                    "name": "variables",
+                                                                    "spec": [
+                                                                        "rpc://heygen/1/getTemplateParams"
+                                                                    ],
+                                                                    "type": "collection",
+                                                                    "label": "Variables",
+                                                                    "required": false
+                                                                }
+                                                            ]
+                                                        },
+                                                        "enable_sharing": {
+                                                            "mode": "chose"
+                                                        }
+                                                    },
+                                                    "parameters": {
+                                                        "__IMTCONN__": {
+                                                            "data": {
+                                                                "scoped": "true",
+                                                                "connection": "heygen2"
+                                                            },
+                                                            "label": "My HeyGen connection (infospolok.office@gmail.com)"
+                                                        }
+                                                    }
+                                                },
+                                                "parameters": [
+                                                    {
+                                                        "name": "__IMTCONN__",
+                                                        "type": "account:heygen2,hey-gen-9e1ue3",
+                                                        "label": "Connection",
+                                                        "required": true
+                                                    }
+                                                ],
+                                                "expect": [
+                                                    {
+                                                        "name": "template_id",
+                                                        "type": "select",
+                                                        "label": "Template ID",
+                                                        "required": true
+                                                    },
+                                                    {
+                                                        "name": "caption",
+                                                        "type": "boolean",
+                                                        "label": "Caption"
+                                                    },
+                                                    {
+                                                        "name": "title",
+                                                        "type": "text",
+                                                        "label": "Title"
+                                                    },
+                                                    {
+                                                        "name": "dimension",
+                                                        "spec": [
+                                                            {
+                                                                "name": "width",
+                                                                "type": "number",
+                                                                "label": "Width"
+                                                            },
+                                                            {
+                                                                "name": "height",
+                                                                "type": "number",
+                                                                "label": "Height"
+                                                            }
+                                                        ],
+                                                        "type": "collection",
+                                                        "label": "Dimension"
+                                                    },
+                                                    {
+                                                        "name": "include_gif",
+                                                        "type": "boolean",
+                                                        "label": "Include GIF"
+                                                    },
+                                                    {
+                                                        "name": "enable_sharing",
+                                                        "type": "boolean",
+                                                        "label": "Enable Sharing"
+                                                    },
+                                                    {
+                                                        "name": "parent_id",
+                                                        "type": "folder",
+                                                        "label": "Folder"
+                                                    },
+                                                    {
+                                                        "name": "brand_voice_id",
+                                                        "type": "text",
+                                                        "label": "Brand Voice ID"
+                                                    },
+                                                    {
+                                                        "name": "callback_url",
+                                                        "type": "text",
+                                                        "label": "Callback URL"
+                                                    },
+                                                    {
+                                                        "name": "variables",
+                                                        "spec": [
+                                                            {
+                                                                "name": "script_text1",
+                                                                "type": "text"
+                                                            }
+                                                        ],
+                                                        "type": "collection",
+                                                        "label": "Variables"
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "flow": [
+                                        {
+                                            "id": 335,
+                                            "module": "heygen:createAVideoFromTemplate",
+                                            "version": 1,
+                                            "parameters": {
+                                                "__IMTCONN__": 11287651
+                                            },
+                                            "filter": {
+                                                "name": "Daran sitting",
+                                                "conditions": [
+                                                    [
+                                                        {
+                                                            "a": "{{330.result}}",
+                                                            "b": "3",
+                                                            "o": "text:equal"
+                                                        }
+                                                    ]
+                                                ]
+                                            },
+                                            "mapper": {
+                                                "title": "Untitled Video",
+                                                "caption": true,
+                                                "dimension": {
+                                                    "width": "720",
+                                                    "height": "1280"
+                                                },
+                                                "parent_id": null,
+                                                "variables": {
+                                                    "script": "{{289.`Сценарий / текст рилса`}}"
+                                                },
+                                                "include_gif": false,
+                                                "template_id": "e34a91cbd65e4fa3b0128a07ba170d98",
+                                                "callback_url": "https://hook.eu2.make.com/5t8ivqyle1brrpprvkfvrbi6y6i6238i",
+                                                "enable_sharing": false
+                                            },
+                                            "metadata": {
+                                                "designer": {
+                                                    "x": 1200,
+                                                    "y": 600
+                                                },
+                                                "restore": {
+                                                    "expect": {
+                                                        "caption": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "parent_id": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "include_gif": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "template_id": {
+                                                            "mode": "chose",
+                                                            "label": "Duran outside",
+                                                            "nested": [
+                                                                {
+                                                                    "name": "variables",
+                                                                    "spec": [
+                                                                        "rpc://heygen/1/getTemplateParams"
+                                                                    ],
+                                                                    "type": "collection",
+                                                                    "label": "Variables",
+                                                                    "required": false
+                                                                }
+                                                            ]
+                                                        },
+                                                        "enable_sharing": {
+                                                            "mode": "chose"
+                                                        }
+                                                    },
+                                                    "parameters": {
+                                                        "__IMTCONN__": {
+                                                            "data": {
+                                                                "scoped": "true",
+                                                                "connection": "heygen2"
+                                                            },
+                                                            "label": "My HeyGen connection (infospolok.office@gmail.com)"
+                                                        }
+                                                    }
+                                                },
+                                                "parameters": [
+                                                    {
+                                                        "name": "__IMTCONN__",
+                                                        "type": "account:heygen2,hey-gen-9e1ue3",
+                                                        "label": "Connection",
+                                                        "required": true
+                                                    }
+                                                ],
+                                                "expect": [
+                                                    {
+                                                        "name": "template_id",
+                                                        "type": "select",
+                                                        "label": "Template ID",
+                                                        "required": true
+                                                    },
+                                                    {
+                                                        "name": "caption",
+                                                        "type": "boolean",
+                                                        "label": "Caption"
+                                                    },
+                                                    {
+                                                        "name": "title",
+                                                        "type": "text",
+                                                        "label": "Title"
+                                                    },
+                                                    {
+                                                        "name": "dimension",
+                                                        "spec": [
+                                                            {
+                                                                "name": "width",
+                                                                "type": "number",
+                                                                "label": "Width"
+                                                            },
+                                                            {
+                                                                "name": "height",
+                                                                "type": "number",
+                                                                "label": "Height"
+                                                            }
+                                                        ],
+                                                        "type": "collection",
+                                                        "label": "Dimension"
+                                                    },
+                                                    {
+                                                        "name": "include_gif",
+                                                        "type": "boolean",
+                                                        "label": "Include GIF"
+                                                    },
+                                                    {
+                                                        "name": "enable_sharing",
+                                                        "type": "boolean",
+                                                        "label": "Enable Sharing"
+                                                    },
+                                                    {
+                                                        "name": "parent_id",
+                                                        "type": "folder",
+                                                        "label": "Folder"
+                                                    },
+                                                    {
+                                                        "name": "brand_voice_id",
+                                                        "type": "text",
+                                                        "label": "Brand Voice ID"
+                                                    },
+                                                    {
+                                                        "name": "callback_url",
+                                                        "type": "text",
+                                                        "label": "Callback URL"
+                                                    },
+                                                    {
+                                                        "name": "variables",
+                                                        "spec": [
+                                                            {
+                                                                "name": "script",
+                                                                "type": "text"
+                                                            }
+                                                        ],
+                                                        "type": "collection",
+                                                        "label": "Variables"
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "flow": [
+                        {
+                            "id": 338,
+                            "module": "math:EvaluateExpression",
+                            "version": 1,
+                            "parameters": {},
+                            "filter": {
+                                "name": "Life Style",
+                                "conditions": [
+                                    [
+                                        {
+                                            "a": "{{289.`Категория`}}",
+                                            "b": "Lifestyle",
+                                            "o": "text:equal"
+                                        }
+                                    ]
+                                ]
+                            },
+                            "mapper": {
+                                "expression": "{{floor(random * 3) + 1}}"
+                            },
+                            "metadata": {
+                                "designer": {
+                                    "x": 600,
+                                    "y": 1200
+                                },
+                                "restore": {},
+                                "expect": [
+                                    {
+                                        "name": "expression",
+                                        "type": "text",
+                                        "label": "Expression",
+                                        "required": true
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "id": 339,
+                            "module": "builtin:BasicRouter",
+                            "version": 1,
+                            "mapper": null,
+                            "metadata": {
+                                "designer": {
+                                    "x": 900,
+                                    "y": 1200
+                                }
+                            },
+                            "routes": [
+                                {
+                                    "flow": [
+                                        {
+                                            "id": 340,
+                                            "module": "heygen:createAVideoFromTemplate",
+                                            "version": 1,
+                                            "parameters": {
+                                                "__IMTCONN__": 11287651
+                                            },
+                                            "filter": {
+                                                "name": "Car",
+                                                "conditions": [
+                                                    [
+                                                        {
+                                                            "a": "{{338.result}}",
+                                                            "b": "1",
+                                                            "o": "text:equal"
+                                                        }
+                                                    ]
+                                                ]
+                                            },
+                                            "mapper": {
+                                                "title": "Untitled Video",
+                                                "caption": true,
+                                                "dimension": {
+                                                    "width": "720",
+                                                    "height": "1280"
+                                                },
+                                                "parent_id": null,
+                                                "variables": {
+                                                    "script": "{{289.`Сценарий / текст рилса`}}"
+                                                },
+                                                "include_gif": false,
+                                                "template_id": "e9422da4ef744aae824f00fbc4a55400",
+                                                "callback_url": "https://hook.eu2.make.com/5t8ivqyle1brrpprvkfvrbi6y6i6238i",
+                                                "enable_sharing": false
+                                            },
+                                            "metadata": {
+                                                "designer": {
+                                                    "x": 1200,
+                                                    "y": 900
+                                                },
+                                                "restore": {
+                                                    "expect": {
+                                                        "caption": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "parent_id": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "include_gif": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "template_id": {
+                                                            "mode": "chose",
+                                                            "label": "Tonya car",
+                                                            "nested": [
+                                                                {
+                                                                    "name": "variables",
+                                                                    "spec": [
+                                                                        "rpc://heygen/1/getTemplateParams"
+                                                                    ],
+                                                                    "type": "collection",
+                                                                    "label": "Variables",
+                                                                    "required": false
+                                                                }
+                                                            ]
+                                                        },
+                                                        "enable_sharing": {
+                                                            "mode": "chose"
+                                                        }
+                                                    },
+                                                    "parameters": {
+                                                        "__IMTCONN__": {
+                                                            "data": {
+                                                                "scoped": "true",
+                                                                "connection": "heygen2"
+                                                            },
+                                                            "label": "My HeyGen connection (infospolok.office@gmail.com)"
+                                                        }
+                                                    }
+                                                },
+                                                "parameters": [
+                                                    {
+                                                        "name": "__IMTCONN__",
+                                                        "type": "account:heygen2,hey-gen-9e1ue3",
+                                                        "label": "Connection",
+                                                        "required": true
+                                                    }
+                                                ],
+                                                "expect": [
+                                                    {
+                                                        "name": "template_id",
+                                                        "type": "select",
+                                                        "label": "Template ID",
+                                                        "required": true
+                                                    },
+                                                    {
+                                                        "name": "caption",
+                                                        "type": "boolean",
+                                                        "label": "Caption"
+                                                    },
+                                                    {
+                                                        "name": "title",
+                                                        "type": "text",
+                                                        "label": "Title"
+                                                    },
+                                                    {
+                                                        "name": "dimension",
+                                                        "spec": [
+                                                            {
+                                                                "name": "width",
+                                                                "type": "number",
+                                                                "label": "Width"
+                                                            },
+                                                            {
+                                                                "name": "height",
+                                                                "type": "number",
+                                                                "label": "Height"
+                                                            }
+                                                        ],
+                                                        "type": "collection",
+                                                        "label": "Dimension"
+                                                    },
+                                                    {
+                                                        "name": "include_gif",
+                                                        "type": "boolean",
+                                                        "label": "Include GIF"
+                                                    },
+                                                    {
+                                                        "name": "enable_sharing",
+                                                        "type": "boolean",
+                                                        "label": "Enable Sharing"
+                                                    },
+                                                    {
+                                                        "name": "parent_id",
+                                                        "type": "folder",
+                                                        "label": "Folder"
+                                                    },
+                                                    {
+                                                        "name": "brand_voice_id",
+                                                        "type": "text",
+                                                        "label": "Brand Voice ID"
+                                                    },
+                                                    {
+                                                        "name": "callback_url",
+                                                        "type": "text",
+                                                        "label": "Callback URL"
+                                                    },
+                                                    {
+                                                        "name": "variables",
+                                                        "spec": [
+                                                            {
+                                                                "name": "script",
+                                                                "type": "text"
+                                                            }
+                                                        ],
+                                                        "type": "collection",
+                                                        "label": "Variables"
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "flow": [
+                                        {
+                                            "id": 343,
+                                            "module": "heygen:createAVideoFromTemplate",
+                                            "version": 1,
+                                            "parameters": {
+                                                "__IMTCONN__": 11287651
+                                            },
+                                            "filter": {
+                                                "name": "room",
+                                                "conditions": [
+                                                    [
+                                                        {
+                                                            "a": "{{338.result}}",
+                                                            "b": "2",
+                                                            "o": "text:equal"
+                                                        }
+                                                    ]
+                                                ]
+                                            },
+                                            "mapper": {
+                                                "title": "Untitled Video",
+                                                "caption": true,
+                                                "dimension": {
+                                                    "width": "720",
+                                                    "height": "1280"
+                                                },
+                                                "parent_id": null,
+                                                "variables": {
+                                                    "script": "{{289.`Сценарий / текст рилса`}}"
+                                                },
+                                                "include_gif": false,
+                                                "template_id": "dcba1982d86c4624b40266ff074e1712",
+                                                "callback_url": "https://hook.eu2.make.com/5t8ivqyle1brrpprvkfvrbi6y6i6238i",
+                                                "enable_sharing": false
+                                            },
+                                            "metadata": {
+                                                "designer": {
+                                                    "x": 1200,
+                                                    "y": 1200
+                                                },
+                                                "restore": {
+                                                    "expect": {
+                                                        "caption": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "parent_id": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "include_gif": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "template_id": {
+                                                            "mode": "chose",
+                                                            "label": "Tonya room",
+                                                            "nested": [
+                                                                {
+                                                                    "name": "variables",
+                                                                    "spec": [
+                                                                        "rpc://heygen/1/getTemplateParams"
+                                                                    ],
+                                                                    "type": "collection",
+                                                                    "label": "Variables",
+                                                                    "required": false
+                                                                }
+                                                            ]
+                                                        },
+                                                        "enable_sharing": {
+                                                            "mode": "chose"
+                                                        }
+                                                    },
+                                                    "parameters": {
+                                                        "__IMTCONN__": {
+                                                            "data": {
+                                                                "scoped": "true",
+                                                                "connection": "heygen2"
+                                                            },
+                                                            "label": "My HeyGen connection (infospolok.office@gmail.com)"
+                                                        }
+                                                    }
+                                                },
+                                                "parameters": [
+                                                    {
+                                                        "name": "__IMTCONN__",
+                                                        "type": "account:heygen2,hey-gen-9e1ue3",
+                                                        "label": "Connection",
+                                                        "required": true
+                                                    }
+                                                ],
+                                                "expect": [
+                                                    {
+                                                        "name": "template_id",
+                                                        "type": "select",
+                                                        "label": "Template ID",
+                                                        "required": true
+                                                    },
+                                                    {
+                                                        "name": "caption",
+                                                        "type": "boolean",
+                                                        "label": "Caption"
+                                                    },
+                                                    {
+                                                        "name": "title",
+                                                        "type": "text",
+                                                        "label": "Title"
+                                                    },
+                                                    {
+                                                        "name": "dimension",
+                                                        "spec": [
+                                                            {
+                                                                "name": "width",
+                                                                "type": "number",
+                                                                "label": "Width"
+                                                            },
+                                                            {
+                                                                "name": "height",
+                                                                "type": "number",
+                                                                "label": "Height"
+                                                            }
+                                                        ],
+                                                        "type": "collection",
+                                                        "label": "Dimension"
+                                                    },
+                                                    {
+                                                        "name": "include_gif",
+                                                        "type": "boolean",
+                                                        "label": "Include GIF"
+                                                    },
+                                                    {
+                                                        "name": "enable_sharing",
+                                                        "type": "boolean",
+                                                        "label": "Enable Sharing"
+                                                    },
+                                                    {
+                                                        "name": "parent_id",
+                                                        "type": "folder",
+                                                        "label": "Folder"
+                                                    },
+                                                    {
+                                                        "name": "brand_voice_id",
+                                                        "type": "text",
+                                                        "label": "Brand Voice ID"
+                                                    },
+                                                    {
+                                                        "name": "callback_url",
+                                                        "type": "text",
+                                                        "label": "Callback URL"
+                                                    },
+                                                    {
+                                                        "name": "variables",
+                                                        "spec": [
+                                                            {
+                                                                "name": "script",
+                                                                "type": "text"
+                                                            }
+                                                        ],
+                                                        "type": "collection",
+                                                        "label": "Variables"
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "flow": [
+                                        {
+                                            "id": 346,
+                                            "module": "heygen:createAVideoFromTemplate",
+                                            "version": 1,
+                                            "parameters": {
+                                                "__IMTCONN__": 11287651
+                                            },
+                                            "filter": {
+                                                "name": "outside",
+                                                "conditions": [
+                                                    [
+                                                        {
+                                                            "a": "{{338.result}}",
+                                                            "b": "3",
+                                                            "o": "text:equal"
+                                                        }
+                                                    ]
+                                                ]
+                                            },
+                                            "mapper": {
+                                                "title": "Untitled Video",
+                                                "caption": true,
+                                                "dimension": {
+                                                    "width": "720",
+                                                    "height": "1280"
+                                                },
+                                                "parent_id": null,
+                                                "variables": {
+                                                    "script": "{{289.`Сценарий / текст рилса`}}"
+                                                },
+                                                "include_gif": false,
+                                                "template_id": "265a7b0306a34b58bf1be6eeb5bc4aa2",
+                                                "callback_url": "https://hook.eu2.make.com/5t8ivqyle1brrpprvkfvrbi6y6i6238i",
+                                                "enable_sharing": false
+                                            },
+                                            "metadata": {
+                                                "designer": {
+                                                    "x": 1200,
+                                                    "y": 1500
+                                                },
+                                                "restore": {
+                                                    "expect": {
+                                                        "caption": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "parent_id": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "include_gif": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "template_id": {
+                                                            "mode": "chose",
+                                                            "label": "Tonya outside",
+                                                            "nested": [
+                                                                {
+                                                                    "name": "variables",
+                                                                    "spec": [
+                                                                        "rpc://heygen/1/getTemplateParams"
+                                                                    ],
+                                                                    "type": "collection",
+                                                                    "label": "Variables",
+                                                                    "required": false
+                                                                }
+                                                            ]
+                                                        },
+                                                        "enable_sharing": {
+                                                            "mode": "chose"
+                                                        }
+                                                    },
+                                                    "parameters": {
+                                                        "__IMTCONN__": {
+                                                            "data": {
+                                                                "scoped": "true",
+                                                                "connection": "heygen2"
+                                                            },
+                                                            "label": "My HeyGen connection (infospolok.office@gmail.com)"
+                                                        }
+                                                    }
+                                                },
+                                                "parameters": [
+                                                    {
+                                                        "name": "__IMTCONN__",
+                                                        "type": "account:heygen2,hey-gen-9e1ue3",
+                                                        "label": "Connection",
+                                                        "required": true
+                                                    }
+                                                ],
+                                                "expect": [
+                                                    {
+                                                        "name": "template_id",
+                                                        "type": "select",
+                                                        "label": "Template ID",
+                                                        "required": true
+                                                    },
+                                                    {
+                                                        "name": "caption",
+                                                        "type": "boolean",
+                                                        "label": "Caption"
+                                                    },
+                                                    {
+                                                        "name": "title",
+                                                        "type": "text",
+                                                        "label": "Title"
+                                                    },
+                                                    {
+                                                        "name": "dimension",
+                                                        "spec": [
+                                                            {
+                                                                "name": "width",
+                                                                "type": "number",
+                                                                "label": "Width"
+                                                            },
+                                                            {
+                                                                "name": "height",
+                                                                "type": "number",
+                                                                "label": "Height"
+                                                            }
+                                                        ],
+                                                        "type": "collection",
+                                                        "label": "Dimension"
+                                                    },
+                                                    {
+                                                        "name": "include_gif",
+                                                        "type": "boolean",
+                                                        "label": "Include GIF"
+                                                    },
+                                                    {
+                                                        "name": "enable_sharing",
+                                                        "type": "boolean",
+                                                        "label": "Enable Sharing"
+                                                    },
+                                                    {
+                                                        "name": "parent_id",
+                                                        "type": "folder",
+                                                        "label": "Folder"
+                                                    },
+                                                    {
+                                                        "name": "brand_voice_id",
+                                                        "type": "text",
+                                                        "label": "Brand Voice ID"
+                                                    },
+                                                    {
+                                                        "name": "callback_url",
+                                                        "type": "text",
+                                                        "label": "Callback URL"
+                                                    },
+                                                    {
+                                                        "name": "variables",
+                                                        "spec": [
+                                                            {
+                                                                "name": "script",
+                                                                "type": "text"
+                                                            }
+                                                        ],
+                                                        "type": "collection",
+                                                        "label": "Variables"
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "flow": [
+                        {
+                            "id": 349,
+                            "module": "math:EvaluateExpression",
+                            "version": 1,
+                            "parameters": {},
+                            "filter": {
+                                "name": "Fin. Freedom",
+                                "conditions": [
+                                    [
+                                        {
+                                            "a": "{{289.`Категория`}}",
+                                            "b": "Fin. Freedom",
+                                            "o": "text:equal"
+                                        }
+                                    ]
+                                ]
+                            },
+                            "mapper": {
+                                "expression": "{{floor(random * 3) + 1}}"
+                            },
+                            "metadata": {
+                                "designer": {
+                                    "x": 422,
+                                    "y": 2100
+                                },
+                                "restore": {},
+                                "expect": [
+                                    {
+                                        "name": "expression",
+                                        "type": "text",
+                                        "label": "Expression",
+                                        "required": true
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "id": 350,
+                            "module": "builtin:BasicRouter",
+                            "version": 1,
+                            "mapper": null,
+                            "metadata": {
+                                "designer": {
+                                    "x": 900,
+                                    "y": 2100
+                                }
+                            },
+                            "routes": [
+                                {
+                                    "flow": [
+                                        {
+                                            "id": 351,
+                                            "module": "heygen:createAVideoFromTemplate",
+                                            "version": 1,
+                                            "parameters": {
+                                                "__IMTCONN__": 11287651
+                                            },
+                                            "filter": {
+                                                "name": "Tim outside",
+                                                "conditions": [
+                                                    [
+                                                        {
+                                                            "a": "{{349.result}}",
+                                                            "b": "1",
+                                                            "o": "text:equal"
+                                                        }
+                                                    ]
+                                                ]
+                                            },
+                                            "mapper": {
+                                                "title": "Untitled Video",
+                                                "caption": true,
+                                                "dimension": {
+                                                    "width": "720",
+                                                    "height": "1280"
+                                                },
+                                                "parent_id": null,
+                                                "variables": {
+                                                    "script": "{{289.`Сценарий / текст рилса`}}"
+                                                },
+                                                "include_gif": false,
+                                                "template_id": "01eb044dcc5d4c6aa5f2ad7b06d3cdd8",
+                                                "callback_url": "https://hook.eu2.make.com/5t8ivqyle1brrpprvkfvrbi6y6i6238i",
+                                                "enable_sharing": false
+                                            },
+                                            "metadata": {
+                                                "designer": {
+                                                    "x": 1200,
+                                                    "y": 1800
+                                                },
+                                                "restore": {
+                                                    "expect": {
+                                                        "caption": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "parent_id": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "include_gif": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "template_id": {
+                                                            "mode": "chose",
+                                                            "label": "Tim outside",
+                                                            "nested": [
+                                                                {
+                                                                    "name": "variables",
+                                                                    "spec": [
+                                                                        "rpc://heygen/1/getTemplateParams"
+                                                                    ],
+                                                                    "type": "collection",
+                                                                    "label": "Variables",
+                                                                    "required": false
+                                                                }
+                                                            ]
+                                                        },
+                                                        "enable_sharing": {
+                                                            "mode": "chose"
+                                                        }
+                                                    },
+                                                    "parameters": {
+                                                        "__IMTCONN__": {
+                                                            "data": {
+                                                                "scoped": "true",
+                                                                "connection": "heygen2"
+                                                            },
+                                                            "label": "My HeyGen connection (infospolok.office@gmail.com)"
+                                                        }
+                                                    }
+                                                },
+                                                "parameters": [
+                                                    {
+                                                        "name": "__IMTCONN__",
+                                                        "type": "account:heygen2,hey-gen-9e1ue3",
+                                                        "label": "Connection",
+                                                        "required": true
+                                                    }
+                                                ],
+                                                "expect": [
+                                                    {
+                                                        "name": "template_id",
+                                                        "type": "select",
+                                                        "label": "Template ID",
+                                                        "required": true
+                                                    },
+                                                    {
+                                                        "name": "caption",
+                                                        "type": "boolean",
+                                                        "label": "Caption"
+                                                    },
+                                                    {
+                                                        "name": "title",
+                                                        "type": "text",
+                                                        "label": "Title"
+                                                    },
+                                                    {
+                                                        "name": "dimension",
+                                                        "spec": [
+                                                            {
+                                                                "name": "width",
+                                                                "type": "number",
+                                                                "label": "Width"
+                                                            },
+                                                            {
+                                                                "name": "height",
+                                                                "type": "number",
+                                                                "label": "Height"
+                                                            }
+                                                        ],
+                                                        "type": "collection",
+                                                        "label": "Dimension"
+                                                    },
+                                                    {
+                                                        "name": "include_gif",
+                                                        "type": "boolean",
+                                                        "label": "Include GIF"
+                                                    },
+                                                    {
+                                                        "name": "enable_sharing",
+                                                        "type": "boolean",
+                                                        "label": "Enable Sharing"
+                                                    },
+                                                    {
+                                                        "name": "parent_id",
+                                                        "type": "folder",
+                                                        "label": "Folder"
+                                                    },
+                                                    {
+                                                        "name": "brand_voice_id",
+                                                        "type": "text",
+                                                        "label": "Brand Voice ID"
+                                                    },
+                                                    {
+                                                        "name": "callback_url",
+                                                        "type": "text",
+                                                        "label": "Callback URL"
+                                                    },
+                                                    {
+                                                        "name": "variables",
+                                                        "spec": [
+                                                            {
+                                                                "name": "script",
+                                                                "type": "text"
+                                                            }
+                                                        ],
+                                                        "type": "collection",
+                                                        "label": "Variables"
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "flow": [
+                                        {
+                                            "id": 354,
+                                            "module": "heygen:createAVideoFromTemplate",
+                                            "version": 1,
+                                            "parameters": {
+                                                "__IMTCONN__": 11287651
+                                            },
+                                            "filter": {
+                                                "name": "Tim laying",
+                                                "conditions": [
+                                                    [
+                                                        {
+                                                            "a": "{{349.result}}",
+                                                            "b": "2",
+                                                            "o": "text:equal"
+                                                        }
+                                                    ]
+                                                ]
+                                            },
+                                            "mapper": {
+                                                "title": "Untitled Video",
+                                                "caption": true,
+                                                "dimension": {
+                                                    "width": "720",
+                                                    "height": "1280"
+                                                },
+                                                "parent_id": null,
+                                                "variables": {
+                                                    "script": "{{289.`Сценарий / текст рилса`}}"
+                                                },
+                                                "include_gif": false,
+                                                "template_id": "2915dfbaefa046f487acfbef3414d101",
+                                                "callback_url": "https://hook.eu2.make.com/5t8ivqyle1brrpprvkfvrbi6y6i6238i",
+                                                "enable_sharing": false
+                                            },
+                                            "metadata": {
+                                                "designer": {
+                                                    "x": 1200,
+                                                    "y": 2100
+                                                },
+                                                "restore": {
+                                                    "expect": {
+                                                        "caption": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "parent_id": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "include_gif": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "template_id": {
+                                                            "mode": "chose",
+                                                            "label": "Tim lying",
+                                                            "nested": [
+                                                                {
+                                                                    "name": "variables",
+                                                                    "spec": [
+                                                                        "rpc://heygen/1/getTemplateParams"
+                                                                    ],
+                                                                    "type": "collection",
+                                                                    "label": "Variables",
+                                                                    "required": false
+                                                                }
+                                                            ]
+                                                        },
+                                                        "enable_sharing": {
+                                                            "mode": "chose"
+                                                        }
+                                                    },
+                                                    "parameters": {
+                                                        "__IMTCONN__": {
+                                                            "data": {
+                                                                "scoped": "true",
+                                                                "connection": "heygen2"
+                                                            },
+                                                            "label": "My HeyGen connection (infospolok.office@gmail.com)"
+                                                        }
+                                                    }
+                                                },
+                                                "parameters": [
+                                                    {
+                                                        "name": "__IMTCONN__",
+                                                        "type": "account:heygen2,hey-gen-9e1ue3",
+                                                        "label": "Connection",
+                                                        "required": true
+                                                    }
+                                                ],
+                                                "expect": [
+                                                    {
+                                                        "name": "template_id",
+                                                        "type": "select",
+                                                        "label": "Template ID",
+                                                        "required": true
+                                                    },
+                                                    {
+                                                        "name": "caption",
+                                                        "type": "boolean",
+                                                        "label": "Caption"
+                                                    },
+                                                    {
+                                                        "name": "title",
+                                                        "type": "text",
+                                                        "label": "Title"
+                                                    },
+                                                    {
+                                                        "name": "dimension",
+                                                        "spec": [
+                                                            {
+                                                                "name": "width",
+                                                                "type": "number",
+                                                                "label": "Width"
+                                                            },
+                                                            {
+                                                                "name": "height",
+                                                                "type": "number",
+                                                                "label": "Height"
+                                                            }
+                                                        ],
+                                                        "type": "collection",
+                                                        "label": "Dimension"
+                                                    },
+                                                    {
+                                                        "name": "include_gif",
+                                                        "type": "boolean",
+                                                        "label": "Include GIF"
+                                                    },
+                                                    {
+                                                        "name": "enable_sharing",
+                                                        "type": "boolean",
+                                                        "label": "Enable Sharing"
+                                                    },
+                                                    {
+                                                        "name": "parent_id",
+                                                        "type": "folder",
+                                                        "label": "Folder"
+                                                    },
+                                                    {
+                                                        "name": "brand_voice_id",
+                                                        "type": "text",
+                                                        "label": "Brand Voice ID"
+                                                    },
+                                                    {
+                                                        "name": "callback_url",
+                                                        "type": "text",
+                                                        "label": "Callback URL"
+                                                    },
+                                                    {
+                                                        "name": "variables",
+                                                        "spec": [
+                                                            {
+                                                                "name": "script",
+                                                                "type": "text"
+                                                            }
+                                                        ],
+                                                        "type": "collection",
+                                                        "label": "Variables"
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "flow": [
+                                        {
+                                            "id": 357,
+                                            "module": "heygen:createAVideoFromTemplate",
+                                            "version": 1,
+                                            "parameters": {
+                                                "__IMTCONN__": 11287651
+                                            },
+                                            "filter": {
+                                                "name": "3",
+                                                "conditions": [
+                                                    [
+                                                        {
+                                                            "a": "{{349.result}}",
+                                                            "b": "3",
+                                                            "o": "text:equal"
+                                                        }
+                                                    ]
+                                                ]
+                                            },
+                                            "mapper": {
+                                                "title": "Untitled Video",
+                                                "caption": true,
+                                                "dimension": {
+                                                    "width": "720",
+                                                    "height": "1280"
+                                                },
+                                                "parent_id": null,
+                                                "variables": {
+                                                    "script": "{{289.`Сценарий / текст рилса`}}"
+                                                },
+                                                "include_gif": false,
+                                                "template_id": "54c7ee59d7cd4b3b8efc5aca10808bb4",
+                                                "callback_url": "https://hook.eu2.make.com/5t8ivqyle1brrpprvkfvrbi6y6i6238i",
+                                                "enable_sharing": false
+                                            },
+                                            "metadata": {
+                                                "designer": {
+                                                    "x": 1200,
+                                                    "y": 2400
+                                                },
+                                                "restore": {
+                                                    "expect": {
+                                                        "caption": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "parent_id": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "include_gif": {
+                                                            "mode": "chose"
+                                                        },
+                                                        "template_id": {
+                                                            "mode": "chose",
+                                                            "label": "Tim cafe",
+                                                            "nested": [
+                                                                {
+                                                                    "name": "variables",
+                                                                    "spec": [
+                                                                        "rpc://heygen/1/getTemplateParams"
+                                                                    ],
+                                                                    "type": "collection",
+                                                                    "label": "Variables",
+                                                                    "required": false
+                                                                }
+                                                            ]
+                                                        },
+                                                        "enable_sharing": {
+                                                            "mode": "chose"
+                                                        }
+                                                    },
+                                                    "parameters": {
+                                                        "__IMTCONN__": {
+                                                            "data": {
+                                                                "scoped": "true",
+                                                                "connection": "heygen2"
+                                                            },
+                                                            "label": "My HeyGen connection (infospolok.office@gmail.com)"
+                                                        }
+                                                    }
+                                                },
+                                                "parameters": [
+                                                    {
+                                                        "name": "__IMTCONN__",
+                                                        "type": "account:heygen2,hey-gen-9e1ue3",
+                                                        "label": "Connection",
+                                                        "required": true
+                                                    }
+                                                ],
+                                                "expect": [
+                                                    {
+                                                        "name": "template_id",
+                                                        "type": "select",
+                                                        "label": "Template ID",
+                                                        "required": true
+                                                    },
+                                                    {
+                                                        "name": "caption",
+                                                        "type": "boolean",
+                                                        "label": "Caption"
+                                                    },
+                                                    {
+                                                        "name": "title",
+                                                        "type": "text",
+                                                        "label": "Title"
+                                                    },
+                                                    {
+                                                        "name": "dimension",
+                                                        "spec": [
+                                                            {
+                                                                "name": "width",
+                                                                "type": "number",
+                                                                "label": "Width"
+                                                            },
+                                                            {
+                                                                "name": "height",
+                                                                "type": "number",
+                                                                "label": "Height"
+                                                            }
+                                                        ],
+                                                        "type": "collection",
+                                                        "label": "Dimension"
+                                                    },
+                                                    {
+                                                        "name": "include_gif",
+                                                        "type": "boolean",
+                                                        "label": "Include GIF"
+                                                    },
+                                                    {
+                                                        "name": "enable_sharing",
+                                                        "type": "boolean",
+                                                        "label": "Enable Sharing"
+                                                    },
+                                                    {
+                                                        "name": "parent_id",
+                                                        "type": "folder",
+                                                        "label": "Folder"
+                                                    },
+                                                    {
+                                                        "name": "brand_voice_id",
+                                                        "type": "text",
+                                                        "label": "Brand Voice ID"
+                                                    },
+                                                    {
+                                                        "name": "callback_url",
+                                                        "type": "text",
+                                                        "label": "Callback URL"
+                                                    },
+                                                    {
+                                                        "name": "variables",
+                                                        "spec": [
+                                                            {
+                                                                "name": "script",
+                                                                "type": "text"
+                                                            }
+                                                        ],
+                                                        "type": "collection",
+                                                        "label": "Variables"
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "metadata": {
+        "instant": false,
+        "version": 1,
+        "scenario": {
+            "roundtrips": 1,
+            "maxErrors": 3,
+            "autoCommit": true,
+            "autoCommitTriggerLast": true,
+            "sequential": false,
+            "slots": null,
+            "confidential": false,
+            "dataloss": false,
+            "dlq": true,
+            "freshVariables": false
+        },
+        "designer": {
+            "orphans": []
+        },
+        "zone": "eu2.make.com",
+        "notes": []
+    }
+}

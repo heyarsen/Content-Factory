@@ -11,6 +11,8 @@ import videoRoutes from './routes/videos.js'
 import socialRoutes from './routes/social.js'
 import postRoutes from './routes/posts.js'
 import contentRoutes from './routes/content.js'
+import reelRoutes from './routes/reels.js'
+import { initializeScheduler } from './jobs/scheduler.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -43,6 +45,7 @@ app.use('/api/videos', videoRoutes)
 app.use('/api/social', socialRoutes)
 app.use('/api/posts', postRoutes)
 app.use('/api/content', contentRoutes)
+app.use('/api/reels', reelRoutes)
 
 // Serve static files from frontend build (if exists)
 // Compiled path: backend/dist/server.js -> go up one level to backend/public
@@ -95,7 +98,15 @@ if (existsSync(frontendDist) && existsSync(indexHtml)) {
 // Error handler
 app.use(errorHandler)
 
+// Initialize job scheduler (only in production or if explicitly enabled)
+if (process.env.NODE_ENV !== 'test' && process.env.ENABLE_SCHEDULER !== 'false') {
+  initializeScheduler()
+}
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
+  if (process.env.NODE_ENV !== 'test' && process.env.ENABLE_SCHEDULER !== 'false') {
+    console.log('Job scheduler enabled')
+  }
 })
 

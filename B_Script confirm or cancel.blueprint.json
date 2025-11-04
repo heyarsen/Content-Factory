@@ -1,0 +1,924 @@
+{
+    "name": "B_Script confirm or cancel",
+    "flow": [
+        {
+            "id": 1,
+            "module": "telegram:WatchUpdates",
+            "version": 1,
+            "parameters": {
+                "__IMTHOOK__": 3270492
+            },
+            "mapper": {},
+            "metadata": {
+                "designer": {
+                    "x": -428,
+                    "y": -15
+                },
+                "restore": {
+                    "parameters": {
+                        "__IMTHOOK__": {
+                            "data": {
+                                "editable": "false"
+                            },
+                            "label": "My Telegram Bot Updates webhook"
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "__IMTHOOK__",
+                        "type": "hook:telegramapi",
+                        "label": "Webhook",
+                        "required": true
+                    }
+                ]
+            }
+        },
+        {
+            "id": 3,
+            "module": "builtin:BasicRouter",
+            "version": 1,
+            "mapper": null,
+            "metadata": {
+                "designer": {
+                    "x": -22,
+                    "y": -21
+                }
+            },
+            "routes": [
+                {
+                    "flow": [
+                        {
+                            "id": 6,
+                            "module": "airtable:ActionUpdateRecords",
+                            "version": 3,
+                            "parameters": {
+                                "__IMTCONN__": 11644137
+                            },
+                            "filter": {
+                                "name": "Confirm",
+                                "conditions": [
+                                    [
+                                        {
+                                            "a": "{{1.callback_query.data}}",
+                                            "b": "confirm",
+                                            "o": "text:contain"
+                                        }
+                                    ]
+                                ]
+                            },
+                            "mapper": {
+                                "id": "{{get(split(1.callback_query.data; \"|\"); 2)}}",
+                                "base": "appPVhgG5w5btA6UB",
+                                "table": "tblMBl5Ra3YjiQwVj",
+                                "record": {
+                                    "fld6kxDM6hZqHPkYm": "одобрено",
+                                    "fldsodIpBaKP1bbc5": "{{emptystring}}"
+                                },
+                                "typecast": false,
+                                "useColumnId": false
+                            },
+                            "metadata": {
+                                "designer": {
+                                    "x": 370,
+                                    "y": -191
+                                },
+                                "restore": {
+                                    "expect": {
+                                        "base": {
+                                            "label": "Content factory \"Soft Techn\""
+                                        },
+                                        "table": {
+                                            "label": "🌐 Соцсети рилсы"
+                                        },
+                                        "record": {
+                                            "nested": {
+                                                "fld6kxDM6hZqHPkYm": {
+                                                    "mode": "chose",
+                                                    "label": "одобрено"
+                                                },
+                                                "fldExr80UctjokLh0": {
+                                                    "mode": "chose"
+                                                },
+                                                "fldQucwv28f3MlHwJ": {
+                                                    "mode": "edit"
+                                                },
+                                                "fldeBkExaaVnlqv33": {
+                                                    "mode": "chose"
+                                                }
+                                            }
+                                        },
+                                        "typecast": {
+                                            "mode": "chose"
+                                        },
+                                        "useColumnId": {
+                                            "mode": "chose"
+                                        }
+                                    },
+                                    "parameters": {
+                                        "__IMTCONN__": {
+                                            "data": {
+                                                "scoped": "true",
+                                                "connection": "airtable3"
+                                            },
+                                            "label": "My Airtable OAuth connection (User ID: usryO9E9iW5wzluhG)"
+                                        }
+                                    }
+                                },
+                                "parameters": [
+                                    {
+                                        "name": "__IMTCONN__",
+                                        "type": "account:airtable3,airtable2",
+                                        "label": "Connection",
+                                        "required": true
+                                    }
+                                ],
+                                "expect": [
+                                    {
+                                        "name": "base",
+                                        "type": "select",
+                                        "label": "Base",
+                                        "required": true
+                                    },
+                                    {
+                                        "name": "typecast",
+                                        "type": "boolean",
+                                        "label": "Smart links",
+                                        "required": true
+                                    },
+                                    {
+                                        "name": "useColumnId",
+                                        "type": "boolean",
+                                        "label": "Use Column ID",
+                                        "required": true
+                                    },
+                                    {
+                                        "name": "table",
+                                        "type": "select",
+                                        "label": "Table",
+                                        "required": true
+                                    },
+                                    {
+                                        "name": "id",
+                                        "type": "text",
+                                        "label": "Record ID",
+                                        "required": true
+                                    },
+                                    {
+                                        "name": "record",
+                                        "spec": [
+                                            {
+                                                "name": "fldxhhO1Pn3LXRucy",
+                                                "type": "text",
+                                                "label": "Тема"
+                                            },
+                                            {
+                                                "name": "fldy7HaSBvsS6ZmaE",
+                                                "type": "text",
+                                                "label": "Описание"
+                                            },
+                                            {
+                                                "name": "fldcznPvANOHwOAPK",
+                                                "type": "text",
+                                                "label": "Почему интересно?"
+                                            },
+                                            {
+                                                "name": "fldIfbbM2bmPaUbc2",
+                                                "type": "text",
+                                                "label": "Полезные советы"
+                                            },
+                                            {
+                                                "mode": "edit",
+                                                "name": "fld6kxDM6hZqHPkYm",
+                                                "type": "select",
+                                                "label": "Статус"
+                                            },
+                                            {
+                                                "name": "fldsodIpBaKP1bbc5",
+                                                "time": true,
+                                                "type": "date",
+                                                "label": "Публикация в"
+                                            },
+                                            {
+                                                "name": "fldres5s7kmdjzVG1",
+                                                "type": "text",
+                                                "label": "Сценарий рилса"
+                                            },
+                                            {
+                                                "name": "fldZ5PSxBoR6eCXN8",
+                                                "type": "text",
+                                                "label": "Рилс"
+                                            },
+                                            {
+                                                "mode": "edit",
+                                                "name": "fldQucwv28f3MlHwJ",
+                                                "type": "select",
+                                                "label": "Шаблоны"
+                                            },
+                                            {
+                                                "name": "fldeBkExaaVnlqv33",
+                                                "type": "boolean",
+                                                "label": "Instagram"
+                                            },
+                                            {
+                                                "name": "fldExr80UctjokLh0",
+                                                "type": "boolean",
+                                                "label": "Youtube"
+                                            },
+                                            {
+                                                "name": "fldumcQ1BfMLYw0KP",
+                                                "type": "text",
+                                                "label": "Pix"
+                                            }
+                                        ],
+                                        "type": "collection",
+                                        "label": "Record"
+                                    }
+                                ],
+                                "interface": [
+                                    {
+                                        "name": "id",
+                                        "type": "text",
+                                        "label": "ID"
+                                    },
+                                    {
+                                        "name": "createdTime",
+                                        "type": "date",
+                                        "label": "Created Time"
+                                    },
+                                    {
+                                        "name": "Тема",
+                                        "type": "text",
+                                        "label": "Тема",
+                                        "multiline": true
+                                    },
+                                    {
+                                        "name": "Описание",
+                                        "type": "text",
+                                        "label": "Описание",
+                                        "multiline": true
+                                    },
+                                    {
+                                        "name": "Почему интересно?",
+                                        "type": "text",
+                                        "label": "Почему интересно?",
+                                        "multiline": true
+                                    },
+                                    {
+                                        "name": "Полезные советы",
+                                        "type": "text",
+                                        "label": "Полезные советы",
+                                        "multiline": true
+                                    },
+                                    {
+                                        "name": "Статус",
+                                        "type": "text",
+                                        "label": "Статус"
+                                    },
+                                    {
+                                        "name": "Публикация в",
+                                        "time": true,
+                                        "type": "date",
+                                        "label": "Публикация в"
+                                    },
+                                    {
+                                        "name": "Сценарий рилса",
+                                        "type": "text",
+                                        "label": "Сценарий рилса",
+                                        "multiline": true
+                                    },
+                                    {
+                                        "name": "Рилс",
+                                        "type": "text",
+                                        "label": "Рилс"
+                                    },
+                                    {
+                                        "name": "Дата создания",
+                                        "type": "date",
+                                        "label": "Дата создания"
+                                    },
+                                    {
+                                        "name": "Дата изминения",
+                                        "type": "date",
+                                        "label": "Дата изминения"
+                                    },
+                                    {
+                                        "name": "Шаблоны",
+                                        "type": "text",
+                                        "label": "Шаблоны"
+                                    },
+                                    {
+                                        "name": "Instagram",
+                                        "type": "boolean",
+                                        "label": "Instagram"
+                                    },
+                                    {
+                                        "name": "Youtube",
+                                        "type": "boolean",
+                                        "label": "Youtube"
+                                    },
+                                    {
+                                        "name": "Pix",
+                                        "type": "text",
+                                        "label": "Pix"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "id": 11,
+                            "module": "telegram:SendReplyMessage",
+                            "version": 1,
+                            "parameters": {
+                                "__IMTCONN__": 11843044
+                            },
+                            "mapper": {
+                                "text": "✅ Подтверждено. Публикую.",
+                                "chatId": "8248706451",
+                                "parseMode": "",
+                                "replyMarkup": "",
+                                "messageThreadId": "",
+                                "replyToMessageId": "",
+                                "replyMarkupAssembleType": "reply_markup_enter"
+                            },
+                            "metadata": {
+                                "designer": {
+                                    "x": 765,
+                                    "y": -188
+                                },
+                                "restore": {
+                                    "expect": {
+                                        "parseMode": {
+                                            "label": "Empty"
+                                        },
+                                        "disableNotification": {
+                                            "mode": "chose"
+                                        },
+                                        "replyMarkupAssembleType": {
+                                            "label": "Enter the Reply Markup"
+                                        }
+                                    },
+                                    "parameters": {
+                                        "__IMTCONN__": {
+                                            "data": {
+                                                "scoped": "true",
+                                                "connection": "telegram"
+                                            },
+                                            "label": "Content Factory"
+                                        }
+                                    }
+                                },
+                                "parameters": [
+                                    {
+                                        "name": "__IMTCONN__",
+                                        "type": "account:telegram",
+                                        "label": "Connection",
+                                        "required": true
+                                    }
+                                ],
+                                "expect": [
+                                    {
+                                        "name": "chatId",
+                                        "type": "text",
+                                        "label": "Chat ID",
+                                        "required": true
+                                    },
+                                    {
+                                        "name": "text",
+                                        "type": "text",
+                                        "label": "Text",
+                                        "required": true
+                                    },
+                                    {
+                                        "name": "messageThreadId",
+                                        "type": "number",
+                                        "label": "Message Thread ID"
+                                    },
+                                    {
+                                        "name": "parseMode",
+                                        "type": "select",
+                                        "label": "Parse Mode",
+                                        "validate": {
+                                            "enum": [
+                                                "Markdown",
+                                                "HTML"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "name": "disableNotification",
+                                        "type": "boolean",
+                                        "label": "Disable Notifications"
+                                    },
+                                    {
+                                        "name": "disableWebPagePreview",
+                                        "type": "boolean",
+                                        "label": "Disable Link Previews"
+                                    },
+                                    {
+                                        "name": "replyToMessageId",
+                                        "type": "number",
+                                        "label": "Original Message ID"
+                                    },
+                                    {
+                                        "name": "replyMarkupAssembleType",
+                                        "type": "select",
+                                        "label": "Enter/Assemble the Reply Markup Field",
+                                        "validate": {
+                                            "enum": [
+                                                "reply_markup_enter",
+                                                "reply_markup_assemble"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "name": "replyMarkup",
+                                        "type": "text",
+                                        "label": "Reply Markup"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "id": 10,
+                            "module": "make:runScenarioWithInputs",
+                            "version": 1,
+                            "parameters": {
+                                "__IMTCONN__": 11844232
+                            },
+                            "mapper": {
+                                "scenario": "7360543",
+                                "responsive": false
+                            },
+                            "metadata": {
+                                "designer": {
+                                    "x": 1173,
+                                    "y": -178
+                                },
+                                "restore": {
+                                    "expect": {
+                                        "scenario": {
+                                            "rpcSearch": {
+                                                "label": "D_Posting Reals",
+                                                "value": 7360543
+                                            }
+                                        },
+                                        "responsive": {
+                                            "mode": "chose"
+                                        }
+                                    },
+                                    "parameters": {
+                                        "__IMTCONN__": {
+                                            "data": {
+                                                "scoped": "true",
+                                                "connection": "make2"
+                                            },
+                                            "label": "My Make (OAuth2) connection (i.zelikovsky@gmail.com)"
+                                        }
+                                    }
+                                },
+                                "parameters": [
+                                    {
+                                        "name": "__IMTCONN__",
+                                        "type": "account:make2,make",
+                                        "label": "Connection",
+                                        "required": true
+                                    }
+                                ],
+                                "expect": [
+                                    {
+                                        "name": "scenario",
+                                        "type": "text",
+                                        "label": "Scenario ID",
+                                        "required": true
+                                    },
+                                    {
+                                        "name": "responsive",
+                                        "type": "boolean",
+                                        "label": "Wait for the scenario to finish"
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "flow": [
+                        {
+                            "id": 9,
+                            "module": "airtable:ActionUpdateRecords",
+                            "version": 3,
+                            "parameters": {
+                                "__IMTCONN__": 11644137
+                            },
+                            "filter": {
+                                "name": "Cancel",
+                                "conditions": [
+                                    [
+                                        {
+                                            "a": "{{1.callback_query.data}}",
+                                            "b": "cancel",
+                                            "o": "text:contain"
+                                        }
+                                    ]
+                                ]
+                            },
+                            "mapper": {
+                                "id": "{{get(split(1.callback_query.data; \"|\"); 2)}}",
+                                "base": "appPVhgG5w5btA6UB",
+                                "table": "tblMBl5Ra3YjiQwVj",
+                                "record": {
+                                    "fld6kxDM6hZqHPkYm": "отклонено",
+                                    "fldsodIpBaKP1bbc5": "{{emptystring}}"
+                                },
+                                "typecast": false,
+                                "useColumnId": false
+                            },
+                            "metadata": {
+                                "designer": {
+                                    "x": 370,
+                                    "y": 134
+                                },
+                                "restore": {
+                                    "expect": {
+                                        "base": {
+                                            "label": "Content factory \"Soft Techn\""
+                                        },
+                                        "table": {
+                                            "label": "🌐 Соцсети рилсы"
+                                        },
+                                        "record": {
+                                            "nested": {
+                                                "fld6kxDM6hZqHPkYm": {
+                                                    "mode": "chose",
+                                                    "label": "отклонено"
+                                                },
+                                                "fldExr80UctjokLh0": {
+                                                    "mode": "chose"
+                                                },
+                                                "fldQucwv28f3MlHwJ": {
+                                                    "mode": "edit"
+                                                },
+                                                "fldeBkExaaVnlqv33": {
+                                                    "mode": "chose"
+                                                }
+                                            }
+                                        },
+                                        "typecast": {
+                                            "mode": "chose"
+                                        },
+                                        "useColumnId": {
+                                            "mode": "chose"
+                                        }
+                                    },
+                                    "parameters": {
+                                        "__IMTCONN__": {
+                                            "data": {
+                                                "scoped": "true",
+                                                "connection": "airtable3"
+                                            },
+                                            "label": "My Airtable OAuth connection (User ID: usryO9E9iW5wzluhG)"
+                                        }
+                                    }
+                                },
+                                "parameters": [
+                                    {
+                                        "name": "__IMTCONN__",
+                                        "type": "account:airtable3,airtable2",
+                                        "label": "Connection",
+                                        "required": true
+                                    }
+                                ],
+                                "expect": [
+                                    {
+                                        "name": "base",
+                                        "type": "select",
+                                        "label": "Base",
+                                        "required": true
+                                    },
+                                    {
+                                        "name": "typecast",
+                                        "type": "boolean",
+                                        "label": "Smart links",
+                                        "required": true
+                                    },
+                                    {
+                                        "name": "useColumnId",
+                                        "type": "boolean",
+                                        "label": "Use Column ID",
+                                        "required": true
+                                    },
+                                    {
+                                        "name": "table",
+                                        "type": "select",
+                                        "label": "Table",
+                                        "required": true
+                                    },
+                                    {
+                                        "name": "id",
+                                        "type": "text",
+                                        "label": "Record ID",
+                                        "required": true
+                                    },
+                                    {
+                                        "name": "record",
+                                        "spec": [
+                                            {
+                                                "name": "fldxhhO1Pn3LXRucy",
+                                                "type": "text",
+                                                "label": "Тема"
+                                            },
+                                            {
+                                                "name": "fldy7HaSBvsS6ZmaE",
+                                                "type": "text",
+                                                "label": "Описание"
+                                            },
+                                            {
+                                                "name": "fldcznPvANOHwOAPK",
+                                                "type": "text",
+                                                "label": "Почему интересно?"
+                                            },
+                                            {
+                                                "name": "fldIfbbM2bmPaUbc2",
+                                                "type": "text",
+                                                "label": "Полезные советы"
+                                            },
+                                            {
+                                                "mode": "edit",
+                                                "name": "fld6kxDM6hZqHPkYm",
+                                                "type": "select",
+                                                "label": "Статус"
+                                            },
+                                            {
+                                                "name": "fldsodIpBaKP1bbc5",
+                                                "time": true,
+                                                "type": "date",
+                                                "label": "Публикация в"
+                                            },
+                                            {
+                                                "name": "fldres5s7kmdjzVG1",
+                                                "type": "text",
+                                                "label": "Сценарий рилса"
+                                            },
+                                            {
+                                                "name": "fldZ5PSxBoR6eCXN8",
+                                                "type": "text",
+                                                "label": "Рилс"
+                                            },
+                                            {
+                                                "mode": "edit",
+                                                "name": "fldQucwv28f3MlHwJ",
+                                                "type": "select",
+                                                "label": "Шаблоны"
+                                            },
+                                            {
+                                                "name": "fldeBkExaaVnlqv33",
+                                                "type": "boolean",
+                                                "label": "Instagram"
+                                            },
+                                            {
+                                                "name": "fldExr80UctjokLh0",
+                                                "type": "boolean",
+                                                "label": "Youtube"
+                                            },
+                                            {
+                                                "name": "fldumcQ1BfMLYw0KP",
+                                                "type": "text",
+                                                "label": "Pix"
+                                            }
+                                        ],
+                                        "type": "collection",
+                                        "label": "Record"
+                                    }
+                                ],
+                                "interface": [
+                                    {
+                                        "name": "id",
+                                        "type": "text",
+                                        "label": "ID"
+                                    },
+                                    {
+                                        "name": "createdTime",
+                                        "type": "date",
+                                        "label": "Created Time"
+                                    },
+                                    {
+                                        "name": "Тема",
+                                        "type": "text",
+                                        "label": "Тема",
+                                        "multiline": true
+                                    },
+                                    {
+                                        "name": "Описание",
+                                        "type": "text",
+                                        "label": "Описание",
+                                        "multiline": true
+                                    },
+                                    {
+                                        "name": "Почему интересно?",
+                                        "type": "text",
+                                        "label": "Почему интересно?",
+                                        "multiline": true
+                                    },
+                                    {
+                                        "name": "Полезные советы",
+                                        "type": "text",
+                                        "label": "Полезные советы",
+                                        "multiline": true
+                                    },
+                                    {
+                                        "name": "Статус",
+                                        "type": "text",
+                                        "label": "Статус"
+                                    },
+                                    {
+                                        "name": "Публикация в",
+                                        "time": true,
+                                        "type": "date",
+                                        "label": "Публикация в"
+                                    },
+                                    {
+                                        "name": "Сценарий рилса",
+                                        "type": "text",
+                                        "label": "Сценарий рилса",
+                                        "multiline": true
+                                    },
+                                    {
+                                        "name": "Рилс",
+                                        "type": "text",
+                                        "label": "Рилс"
+                                    },
+                                    {
+                                        "name": "Дата создания",
+                                        "type": "date",
+                                        "label": "Дата создания"
+                                    },
+                                    {
+                                        "name": "Дата изминения",
+                                        "type": "date",
+                                        "label": "Дата изминения"
+                                    },
+                                    {
+                                        "name": "Шаблоны",
+                                        "type": "text",
+                                        "label": "Шаблоны"
+                                    },
+                                    {
+                                        "name": "Instagram",
+                                        "type": "boolean",
+                                        "label": "Instagram"
+                                    },
+                                    {
+                                        "name": "Youtube",
+                                        "type": "boolean",
+                                        "label": "Youtube"
+                                    },
+                                    {
+                                        "name": "Pix",
+                                        "type": "text",
+                                        "label": "Pix"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "id": 12,
+                            "module": "telegram:SendReplyMessage",
+                            "version": 1,
+                            "parameters": {
+                                "__IMTCONN__": 11843044
+                            },
+                            "mapper": {
+                                "text": "🚫 Отменено. Публиковать не буду.",
+                                "chatId": "8248706451",
+                                "parseMode": "",
+                                "replyMarkup": "",
+                                "messageThreadId": "",
+                                "replyToMessageId": "",
+                                "replyMarkupAssembleType": "reply_markup_enter"
+                            },
+                            "metadata": {
+                                "designer": {
+                                    "x": 765,
+                                    "y": 142
+                                },
+                                "restore": {
+                                    "expect": {
+                                        "parseMode": {
+                                            "label": "Empty"
+                                        },
+                                        "disableNotification": {
+                                            "mode": "chose"
+                                        },
+                                        "replyMarkupAssembleType": {
+                                            "label": "Enter the Reply Markup"
+                                        }
+                                    },
+                                    "parameters": {
+                                        "__IMTCONN__": {
+                                            "data": {
+                                                "scoped": "true",
+                                                "connection": "telegram"
+                                            },
+                                            "label": "Content Factory"
+                                        }
+                                    }
+                                },
+                                "parameters": [
+                                    {
+                                        "name": "__IMTCONN__",
+                                        "type": "account:telegram",
+                                        "label": "Connection",
+                                        "required": true
+                                    }
+                                ],
+                                "expect": [
+                                    {
+                                        "name": "chatId",
+                                        "type": "text",
+                                        "label": "Chat ID",
+                                        "required": true
+                                    },
+                                    {
+                                        "name": "text",
+                                        "type": "text",
+                                        "label": "Text",
+                                        "required": true
+                                    },
+                                    {
+                                        "name": "messageThreadId",
+                                        "type": "number",
+                                        "label": "Message Thread ID"
+                                    },
+                                    {
+                                        "name": "parseMode",
+                                        "type": "select",
+                                        "label": "Parse Mode",
+                                        "validate": {
+                                            "enum": [
+                                                "Markdown",
+                                                "HTML"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "name": "disableNotification",
+                                        "type": "boolean",
+                                        "label": "Disable Notifications"
+                                    },
+                                    {
+                                        "name": "disableWebPagePreview",
+                                        "type": "boolean",
+                                        "label": "Disable Link Previews"
+                                    },
+                                    {
+                                        "name": "replyToMessageId",
+                                        "type": "number",
+                                        "label": "Original Message ID"
+                                    },
+                                    {
+                                        "name": "replyMarkupAssembleType",
+                                        "type": "select",
+                                        "label": "Enter/Assemble the Reply Markup Field",
+                                        "validate": {
+                                            "enum": [
+                                                "reply_markup_enter",
+                                                "reply_markup_assemble"
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "name": "replyMarkup",
+                                        "type": "text",
+                                        "label": "Reply Markup"
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "metadata": {
+        "instant": true,
+        "version": 1,
+        "scenario": {
+            "roundtrips": 1,
+            "maxErrors": 3,
+            "autoCommit": true,
+            "autoCommitTriggerLast": true,
+            "sequential": false,
+            "slots": null,
+            "confidential": false,
+            "dataloss": false,
+            "dlq": false,
+            "freshVariables": false
+        },
+        "designer": {
+            "orphans": []
+        },
+        "zone": "eu2.make.com",
+        "notes": []
+    }
+}
