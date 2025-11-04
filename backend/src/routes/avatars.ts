@@ -36,8 +36,24 @@ router.post('/sync', async (req: AuthRequest, res: Response) => {
       count: avatars.length,
     })
   } catch (error: any) {
-    console.error('Sync avatars error:', error)
-    return res.status(500).json({ error: error.message || 'Failed to sync avatars' })
+    console.error('Sync avatars error:', {
+      message: error.message,
+      stack: error.stack,
+      response: error.response?.data,
+      status: error.response?.status,
+    })
+    
+    // Provide more helpful error messages
+    let errorMessage = error.message || 'Failed to sync avatars'
+    if (error.message?.includes('HEYGEN_KEY') || error.message?.includes('Missing')) {
+      errorMessage = 'HeyGen API key is not configured. Please set HEYGEN_KEY environment variable.'
+    } else if (error.response?.status === 401) {
+      errorMessage = 'Invalid HeyGen API key. Please check your HEYGEN_KEY environment variable.'
+    } else if (error.response?.status === 404) {
+      errorMessage = 'HeyGen avatar endpoint not found. The API endpoint may have changed. Please check HeyGen API documentation.'
+    }
+    
+    return res.status(500).json({ error: errorMessage })
   }
 })
 

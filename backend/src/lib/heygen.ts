@@ -45,33 +45,77 @@ export interface HeyGenAvatarsResponse {
  */
 export async function listAvatars(): Promise<HeyGenAvatarsResponse> {
   try {
-    const response = await axios.get(
-      `${HEYGEN_API_URL}/avatar`,
-      {
-        headers: {
-          'Authorization': `Bearer ${getHeyGenKey()}`,
-          'Content-Type': 'application/json',
-        },
+    // Based on HeyGen API format (similar to video.generate), try avatar.list first
+    // Try multiple endpoint variations as HeyGen API may use different formats
+    const endpoints = [
+      { method: 'POST', url: `${HEYGEN_API_URL}/avatar.list` },
+      { method: 'POST', url: `${HEYGEN_API_URL}/avatars` },
+      { method: 'GET', url: `${HEYGEN_API_URL}/avatars` },
+      { method: 'POST', url: `${HEYGEN_API_URL}/avatar` },
+      { method: 'GET', url: `${HEYGEN_API_URL}/avatar` },
+    ]
+
+    let lastError: any = null
+    for (const { method, url } of endpoints) {
+      try {
+        const requestConfig = {
+          headers: {
+            'Authorization': `Bearer ${getHeyGenKey()}`,
+            'Content-Type': 'application/json',
+          },
+        }
+
+        const response = method === 'POST'
+          ? await axios.post(url, {}, requestConfig)
+          : await axios.get(url, requestConfig)
+
+        // Handle different response structures
+        if (response.data?.data?.avatars && Array.isArray(response.data.data.avatars)) {
+          console.log(`Successfully fetched avatars from ${url} (${method})`)
+          return { avatars: response.data.data.avatars }
+        }
+        if (response.data?.data && Array.isArray(response.data.data)) {
+          console.log(`Successfully fetched avatars from ${url} (${method})`)
+          return { avatars: response.data.data }
+        }
+        if (response.data?.avatars && Array.isArray(response.data.avatars)) {
+          console.log(`Successfully fetched avatars from ${url} (${method})`)
+          return { avatars: response.data.avatars }
+        }
+        if (Array.isArray(response.data)) {
+          console.log(`Successfully fetched avatars from ${url} (${method})`)
+          return { avatars: response.data }
+        }
+        
+        // Log unexpected structure for debugging
+        console.log(`Unexpected response structure from ${url}:`, {
+          hasData: !!response.data,
+          dataKeys: response.data ? Object.keys(response.data) : [],
+          isArray: Array.isArray(response.data),
+        })
+      } catch (err: any) {
+        // Log but continue trying other endpoints
+        console.log(`Tried ${url} (${method}), got status ${err.response?.status}, trying next...`)
+        lastError = err
       }
+    }
+
+    // If we get here, all endpoints failed
+    console.error('HeyGen API error (listAvatars): All endpoints failed', {
+      lastError: lastError?.response?.data || lastError?.message,
+      status: lastError?.response?.status,
+      statusText: lastError?.response?.statusText,
+    })
+
+    throw new Error(
+      lastError?.response?.data?.message || 
+      lastError?.response?.data?.error?.message ||
+      lastError?.message || 
+      'Failed to list avatars. Please check your HeyGen API key and endpoint. The API may require a different endpoint format.'
     )
-
-    // Handle different response structures
-    if (response.data.data && Array.isArray(response.data.data)) {
-      return { avatars: response.data.data }
-    }
-    if (Array.isArray(response.data)) {
-      return { avatars: response.data }
-    }
-    if (response.data.avatars) {
-      return { avatars: response.data.avatars }
-    }
-
-    return { avatars: [] }
   } catch (error: any) {
     console.error('HeyGen API error (listAvatars):', error.response?.data || error.message)
-    throw new Error(
-      error.response?.data?.message || 'Failed to list avatars'
-    )
+    throw error
   }
 }
 

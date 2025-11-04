@@ -47,10 +47,15 @@ export default function Avatars() {
     try {
       const response = await api.post('/api/avatars/sync')
       setAvatars(response.data.avatars || [])
-      toast.success(`Synced ${response.data.count || 0} avatars from HeyGen`)
+      if (response.data.count === 0) {
+        toast.error('No avatars found. Please check your HeyGen API key and ensure you have avatars in your HeyGen account.')
+      } else {
+        toast.success(`Synced ${response.data.count || 0} avatars from HeyGen`)
+      }
     } catch (error: any) {
       console.error('Failed to sync avatars:', error)
-      toast.error(error.response?.data?.error || 'Failed to sync avatars')
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to sync avatars'
+      toast.error(errorMessage + '. Please check your HEYGEN_KEY environment variable and HeyGen API documentation.')
     } finally {
       setSyncing(false)
     }
