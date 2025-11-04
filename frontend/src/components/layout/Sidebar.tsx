@@ -7,7 +7,6 @@ import {
   PenSquare,
   Share2,
   Sparkles,
-  Workflow,
   Shield,
   Zap,
 } from 'lucide-react'
