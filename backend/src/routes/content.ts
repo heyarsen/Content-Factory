@@ -536,6 +536,20 @@ router.post('/research', async (req: AuthRequest, res: Response) => {
   }
 })
 
+// Get all content items
+router.get('/items', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { ContentService } = await import('../services/contentService.js')
+
+    const items = await ContentService.getAllContentItems(userId)
+    return res.json({ items })
+  } catch (error: any) {
+    console.error('Get content items error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to fetch content items' })
+  }
+})
+
 // A_Script Creation: Generate script from content item
 router.post('/generate-script', async (req: AuthRequest, res: Response) => {
   try {

@@ -18,6 +18,7 @@ import { SocialAccounts } from './pages/SocialAccounts'
 import { ScheduledPosts } from './pages/ScheduledPosts'
 import { SocialCallback } from './pages/SocialCallback'
 import { ContentFactory } from './pages/ContentFactory'
+import { Workflows } from './pages/Workflows'
 
 function AppContent() {
   const { toasts, removeToast } = useToast()
@@ -77,6 +78,14 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <ContentFactory />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/workflows"
+          element={
+            <ProtectedRoute>
+              <Workflows />
             </ProtectedRoute>
           }
         />

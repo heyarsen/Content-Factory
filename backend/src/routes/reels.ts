@@ -3,10 +3,41 @@ import { authenticate, AuthRequest } from '../middleware/auth.js'
 import { ReelService } from '../services/reelService.js'
 import { VideoService } from '../services/videoService.js'
 import { JobService } from '../services/jobService.js'
+import { supabase } from '../lib/supabase.js'
 
 const router = Router()
 
 router.use(authenticate)
+
+// Get all reels for user
+router.get('/', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { status } = req.query
+    
+    let reels
+    if (status === 'pending') {
+      reels = await ReelService.getPendingReels(userId)
+    } else {
+      // Get all reels for user
+      const { data, error } = await supabase
+        .from('reels')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+      
+      if (error) {
+        throw new Error(error.message)
+      }
+      reels = data || []
+    }
+    
+    return res.json({ reels })
+  } catch (error: any) {
+    console.error('Get reels error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to fetch reels' })
+  }
+})
 
 // Get pending reels
 router.get('/pending', async (req: AuthRequest, res: Response) => {

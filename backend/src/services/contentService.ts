@@ -167,5 +167,23 @@ export class ContentService {
 
     return data
   }
+
+  /**
+   * Get all content items for a user
+   */
+  static async getAllContentItems(userId: string): Promise<ContentItem[]> {
+    const { data, error } = await supabase
+      .from('content_items')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching all content items:', error)
+      throw new Error(`Failed to fetch content items: ${error.message}`)
+    }
+
+    return data || []
+  }
 }
 
