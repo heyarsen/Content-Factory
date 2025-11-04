@@ -134,7 +134,7 @@ export class AutomationService {
           .update({ status: 'generating' })
           .eq('id', item.id)
 
-        const video = await VideoService.createVideo(plan.user_id, {
+        const video = await VideoService.requestManualVideo(plan.user_id, {
           topic: item.topic!,
           script: item.script!,
           style: 'professional',
@@ -406,7 +406,7 @@ export class AutomationService {
       .eq('id', itemId)
 
     const plan = item.plan as any
-    const video = await VideoService.createVideo(plan.user_id, {
+    const video = await VideoService.requestManualVideo(plan.user_id, {
       topic: item.topic!,
       script: item.script,
       style: 'professional',

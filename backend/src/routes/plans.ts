@@ -331,7 +331,7 @@ router.post('/items/:id/create-video', authenticate, async (req: AuthRequest, re
     // Create video using existing endpoint logic
     const { VideoService } = await import('../services/videoService.js')
 
-    const video = await VideoService.createVideo(userId, {
+    const video = await VideoService.requestManualVideo(userId, {
       topic: item.topic!,
       script: item.script!,
       style: style || 'professional',
@@ -352,14 +352,17 @@ router.post('/items/:id/create-video', authenticate, async (req: AuthRequest, re
     console.error('Create video from plan error:', error)
     
     // Update status to failed
-    await supabase
-      .from('video_plan_items')
-      .update({
-        status: 'failed',
-        error_message: error.message,
-      })
-      .eq('id', req.params.id)
-      .catch(console.error)
+    try {
+      await supabase
+        .from('video_plan_items')
+        .update({
+          status: 'failed',
+          error_message: error.message,
+        })
+        .eq('id', req.params.id)
+    } catch (updateError) {
+      console.error('Failed to update plan item status:', updateError)
+    }
 
     return res.status(500).json({ error: error.message || 'Failed to create video' })
   }
