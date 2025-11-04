@@ -12,7 +12,6 @@ import {
   Calendar, 
   Shield, 
   ShieldCheck, 
-  TrendingUp,
   BarChart3,
   UserPlus,
   UserMinus
@@ -286,9 +285,9 @@ export function AdminPanel() {
                           <span>Last sign in: {new Date(u.lastSignIn).toLocaleDateString()}</span>
                         )}
                         {u.emailConfirmed ? (
-                          <Badge variant="success" className="text-xs">Verified</Badge>
+                          <Badge variant="success">Verified</Badge>
                         ) : (
-                          <Badge variant="warning" className="text-xs">Unverified</Badge>
+                          <Badge variant="warning">Unverified</Badge>
                         )}
                       </div>
                     </div>

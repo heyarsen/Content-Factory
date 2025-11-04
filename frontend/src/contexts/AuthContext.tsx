@@ -25,7 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  const checkAdminStatus = async (userId: string) => {
+  const checkAdminStatus = async () => {
     try {
       const token = localStorage.getItem('access_token')
       if (!token) return false
@@ -46,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         setUser(session.user as User)
         localStorage.setItem('access_token', session.access_token)
-        const adminStatus = await checkAdminStatus(session.user.id)
+        const adminStatus = await checkAdminStatus()
         setIsAdmin(adminStatus)
       }
       setLoading(false)
@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         setUser(session.user as User)
         localStorage.setItem('access_token', session.access_token)
-        const adminStatus = await checkAdminStatus(session.user.id)
+        const adminStatus = await checkAdminStatus()
         setIsAdmin(adminStatus)
       } else {
         setUser(null)
@@ -89,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       // Check admin status after login
       if (data.user?.id) {
-        const adminStatus = await checkAdminStatus(data.user.id)
+        const adminStatus = await checkAdminStatus()
         setIsAdmin(adminStatus)
       }
     }
