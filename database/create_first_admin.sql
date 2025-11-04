@@ -23,7 +23,7 @@ BEGIN
   
   -- Check if user exists
   IF target_user_id IS NULL THEN
-    RAISE EXCEPTION 'User with email % not found', 'YOUR_USER_EMAIL@example.com';
+    RAISE EXCEPTION 'User with email YOUR_USER_EMAIL@example.com not found';
   END IF;
   
   -- Get admin role ID
@@ -41,7 +41,7 @@ BEGIN
   VALUES (target_user_id, admin_role_id)
   ON CONFLICT (user_id, role_id) DO NOTHING;
   
-  RAISE NOTICE 'Admin role assigned successfully to user: %', target_user_id;
+  RAISE NOTICE 'Admin role assigned successfully';
 END $$;
 
 -- Method 2: Assign admin role by user ID directly
