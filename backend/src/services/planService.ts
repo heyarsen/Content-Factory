@@ -13,6 +13,10 @@ export interface VideoPlan {
   enabled: boolean
   auto_research: boolean
   auto_create: boolean
+  auto_schedule_trigger?: 'daily' | 'time_based' | 'manual'
+  trigger_time?: string | null
+  default_platforms?: string[] | null
+  auto_approve?: boolean
   created_at: string
   updated_at: string
 }
@@ -28,7 +32,11 @@ export interface VideoPlanItem {
   why_important: string | null
   useful_tips: string | null
   research_data: any
-  status: 'pending' | 'researching' | 'ready' | 'generating' | 'completed' | 'failed'
+  script?: string | null
+  script_status?: 'draft' | 'approved' | 'rejected' | null
+  platforms?: string[] | null
+  caption?: string | null
+  status: 'pending' | 'researching' | 'ready' | 'draft' | 'approved' | 'generating' | 'completed' | 'scheduled' | 'posted' | 'failed'
   video_id: string | null
   error_message: string | null
   created_at: string
@@ -294,5 +302,76 @@ export class PlanService {
       .eq('id', planId)
 
     if (error) throw error
+  }
+
+  /**
+   * Get plans that are due for processing based on their trigger criteria
+   */
+  static async getPlansDueForProcessing(): Promise<VideoPlan[]> {
+    const { data } = await supabase
+      .from('video_plans')
+      .select('*')
+      .eq('enabled', true)
+      .in('auto_schedule_trigger', ['daily', 'time_based'])
+
+    return data || []
+  }
+
+  /**
+   * Get items with research but no script
+   */
+  static async getItemsReadyForScriptGeneration(): Promise<VideoPlanItem[]> {
+    const { data } = await supabase
+      .from('video_plan_items')
+      .select('*, plan:video_plans!inner(enabled)')
+      .eq('plan.enabled', true)
+      .eq('status', 'ready')
+      .is('script', null)
+      .not('research_data', 'is', null)
+
+    return data || []
+  }
+
+  /**
+   * Get items with draft scripts awaiting approval
+   */
+  static async getItemsAwaitingApproval(): Promise<VideoPlanItem[]> {
+    const { data } = await supabase
+      .from('video_plan_items')
+      .select('*, plan:video_plans!inner(enabled)')
+      .eq('plan.enabled', true)
+      .eq('script_status', 'draft')
+
+    return data || []
+  }
+
+  /**
+   * Get approved scripts without videos
+   */
+  static async getItemsReadyForVideo(): Promise<VideoPlanItem[]> {
+    const { data } = await supabase
+      .from('video_plan_items')
+      .select('*, plan:video_plans!inner(enabled)')
+      .eq('plan.enabled', true)
+      .eq('status', 'approved')
+      .eq('script_status', 'approved')
+      .is('video_id', null)
+      .not('script', 'is', null)
+
+    return data || []
+  }
+
+  /**
+   * Get completed videos ready for distribution
+   */
+  static async getItemsReadyForDistribution(): Promise<VideoPlanItem[]> {
+    const { data } = await supabase
+      .from('video_plan_items')
+      .select('*, plan:video_plans!inner(enabled), videos(*)')
+      .eq('plan.enabled', true)
+      .eq('status', 'completed')
+      .not('video_id', 'is', null)
+
+    return data || []
   }
 }

@@ -2,6 +2,7 @@ import cron from 'node-cron'
 import { JobService } from '../services/jobService.js'
 import { ContentService } from '../services/contentService.js'
 import { ReelService } from '../services/reelService.js'
+import { AutomationService } from '../services/automationService.js'
 import { processJobQueue } from './processors.js'
 
 /**
@@ -132,6 +133,54 @@ export function initializeScheduler(): void {
       }
     } catch (error: any) {
       console.error('[Job Queue] Error:', error)
+    }
+  })
+
+  // Automation: Process scheduled plans - generate topics (Step 1)
+  // Runs every 15 minutes
+  cron.schedule('*/15 * * * *', async () => {
+    console.log('[Cron] Running automation: process scheduled plans...')
+    try {
+      await AutomationService.processScheduledPlans()
+      console.log('[Automation] Processed scheduled plans')
+    } catch (error: any) {
+      console.error('[Automation] Error processing scheduled plans:', error)
+    }
+  })
+
+  // Automation: Generate scripts for ready items (Step 2)
+  // Runs every 10 minutes
+  cron.schedule('*/10 * * * *', async () => {
+    console.log('[Cron] Running automation: generate scripts...')
+    try {
+      await AutomationService.generateScriptsForReadyItems()
+      console.log('[Automation] Generated scripts for ready items')
+    } catch (error: any) {
+      console.error('[Automation] Error generating scripts:', error)
+    }
+  })
+
+  // Automation: Generate videos for approved scripts (Step 4)
+  // Runs every 5 minutes
+  cron.schedule('*/5 * * * *', async () => {
+    console.log('[Cron] Running automation: generate videos...')
+    try {
+      await AutomationService.generateVideosForApprovedItems()
+      console.log('[Automation] Generated videos for approved items')
+    } catch (error: any) {
+      console.error('[Automation] Error generating videos:', error)
+    }
+  })
+
+  // Automation: Schedule distribution for completed videos (Step 5)
+  // Runs every 5 minutes
+  cron.schedule('*/5 * * * *', async () => {
+    console.log('[Cron] Running automation: schedule distribution...')
+    try {
+      await AutomationService.scheduleDistributionForCompletedVideos()
+      console.log('[Automation] Scheduled distribution for completed videos')
+    } catch (error: any) {
+      console.error('[Automation] Error scheduling distribution:', error)
     }
   })
 

@@ -21,6 +21,9 @@ import {
   Settings,
   Trash2,
   Play,
+  PenSquare,
+  Check,
+  X,
 } from 'lucide-react'
 import api from '../lib/api'
 
@@ -33,6 +36,10 @@ interface VideoPlan {
   enabled: boolean
   auto_research: boolean
   auto_create: boolean
+  auto_schedule_trigger?: 'daily' | 'time_based' | 'manual'
+  trigger_time?: string | null
+  default_platforms?: string[] | null
+  auto_approve?: boolean
   created_at: string
 }
 
@@ -46,7 +53,11 @@ interface VideoPlanItem {
   description: string | null
   why_important: string | null
   useful_tips: string | null
-  status: 'pending' | 'researching' | 'ready' | 'generating' | 'completed' | 'failed'
+  script?: string | null
+  script_status?: 'draft' | 'approved' | 'rejected' | null
+  platforms?: string[] | null
+  caption?: string | null
+  status: 'pending' | 'researching' | 'ready' | 'draft' | 'approved' | 'generating' | 'completed' | 'scheduled' | 'posted' | 'failed'
   video_id: string | null
   error_message: string | null
 }
@@ -60,6 +71,7 @@ export function VideoPlanning() {
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   )
+  const [scriptPreviewItem, setScriptPreviewItem] = useState<VideoPlanItem | null>(null)
 
   // Create plan form
   const [planName, setPlanName] = useState('')
@@ -67,6 +79,10 @@ export function VideoPlanning() {
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0])
   const [endDate, setEndDate] = useState('')
   const [autoResearch, setAutoResearch] = useState(true)
+  const [autoScheduleTrigger, setAutoScheduleTrigger] = useState<'daily' | 'time_based' | 'manual'>('daily')
+  const [triggerTime, setTriggerTime] = useState('09:00')
+  const [defaultPlatforms, setDefaultPlatforms] = useState<string[]>([])
+  const [autoApprove, setAutoApprove] = useState(false)
   const [creating, setCreating] = useState(false)
 
   useEffect(() => {
@@ -116,6 +132,10 @@ export function VideoPlanning() {
         start_date: startDate,
         end_date: endDate || null,
         auto_research: autoResearch,
+        auto_schedule_trigger: autoScheduleTrigger,
+        trigger_time: autoScheduleTrigger === 'daily' ? `${triggerTime}:00` : null,
+        default_platforms: defaultPlatforms.length > 0 ? defaultPlatforms : null,
+        auto_approve: autoApprove,
       })
 
       setPlans([response.data.plan, ...plans])
@@ -125,10 +145,38 @@ export function VideoPlanning() {
       setVideosPerDay(3)
       setStartDate(new Date().toISOString().split('T')[0])
       setEndDate('')
+      setAutoScheduleTrigger('daily')
+      setTriggerTime('09:00')
+      setDefaultPlatforms([])
+      setAutoApprove(false)
     } catch (error: any) {
       alert(error.response?.data?.error || 'Failed to create plan')
     } finally {
       setCreating(false)
+    }
+  }
+
+  const handleApproveScript = async (itemId: string) => {
+    try {
+      await api.post(`/api/plans/items/${itemId}/approve-script`)
+      if (selectedPlan) {
+        loadPlanItems(selectedPlan.id)
+      }
+      setScriptPreviewItem(null)
+    } catch (error: any) {
+      alert(error.response?.data?.error || 'Failed to approve script')
+    }
+  }
+
+  const handleRejectScript = async (itemId: string) => {
+    try {
+      await api.post(`/api/plans/items/${itemId}/reject-script`)
+      if (selectedPlan) {
+        loadPlanItems(selectedPlan.id)
+      }
+      setScriptPreviewItem(null)
+    } catch (error: any) {
+      alert(error.response?.data?.error || 'Failed to reject script')
     }
   }
 
@@ -165,21 +213,37 @@ export function VideoPlanning() {
     return acc
   }, {} as Record<string, VideoPlanItem[]>)
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, scriptStatus?: string | null) => {
+    // Show script status if it's draft or approved
+    if (scriptStatus === 'draft') {
+      return <Badge variant="warning">Draft Script</Badge>
+    }
+    if (scriptStatus === 'approved') {
+      return <Badge variant="info">Approved</Badge>
+    }
+    
     const variants: Record<string, 'default' | 'success' | 'error' | 'warning' | 'info'> = {
       completed: 'success',
+      scheduled: 'success',
+      posted: 'success',
       ready: 'success',
+      approved: 'success',
       generating: 'info',
       researching: 'info',
       pending: 'warning',
+      draft: 'warning',
       failed: 'error',
     }
     const labels: Record<string, string> = {
       pending: 'Pending',
       researching: 'Researching...',
       ready: 'Ready',
+      draft: 'Draft',
+      approved: 'Approved',
       generating: 'Generating...',
       completed: 'Completed',
+      scheduled: 'Scheduled',
+      posted: 'Posted',
       failed: 'Failed',
     }
     return <Badge variant={variants[status] || 'default'}>{labels[status] || status}</Badge>
@@ -321,7 +385,7 @@ export function VideoPlanning() {
                                   {item.category}
                                 </span>
                               )}
-                              {getStatusBadge(item.status)}
+                              {getStatusBadge(item.status, item.script_status)}
                             </div>
 
                             {item.topic ? (
@@ -353,7 +417,34 @@ export function VideoPlanning() {
                                 Generate
                               </Button>
                             )}
-                            {item.status === 'ready' && (
+                            {item.script_status === 'draft' && item.script && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setScriptPreviewItem(item)}
+                                leftIcon={<PenSquare className="h-4 w-4" />}
+                              >
+                                Review Script
+                              </Button>
+                            )}
+                            {item.status === 'ready' && !item.script && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={async () => {
+                                  try {
+                                    await api.post(`/api/plans/items/${item.id}/generate-script`)
+                                    if (selectedPlan) loadPlanItems(selectedPlan.id)
+                                  } catch (error: any) {
+                                    alert(error.response?.data?.error || 'Failed to generate script')
+                                  }
+                                }}
+                                leftIcon={<Sparkles className="h-4 w-4" />}
+                              >
+                                Generate Script
+                              </Button>
+                            )}
+                            {item.status === 'approved' && (
                               <Button
                                 size="sm"
                                 onClick={() => handleCreateVideo(item)}
@@ -446,6 +537,26 @@ export function VideoPlanning() {
               ]}
             />
 
+            <Select
+              label="Schedule Trigger"
+              value={autoScheduleTrigger}
+              onChange={(e) => setAutoScheduleTrigger(e.target.value as 'daily' | 'time_based' | 'manual')}
+              options={[
+                { value: 'daily', label: 'Daily at specific time' },
+                { value: 'time_based', label: 'Based on scheduled post times' },
+                { value: 'manual', label: 'Manual only' },
+              ]}
+            />
+
+            {autoScheduleTrigger === 'daily' && (
+              <Input
+                label="Trigger Time"
+                type="time"
+                value={triggerTime}
+                onChange={(e) => setTriggerTime(e.target.value)}
+              />
+            )}
+
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <label className="flex items-center gap-3 cursor-pointer">
                 <input
@@ -463,6 +574,48 @@ export function VideoPlanning() {
               </label>
             </div>
 
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoApprove}
+                  onChange={(e) => setAutoApprove(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-brand-500"
+                />
+                <div>
+                  <p className="text-sm font-medium text-primary">Auto-approve scripts</p>
+                  <p className="text-xs text-slate-500">
+                    Skip manual approval and automatically approve generated scripts
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-primary">
+                Default Platforms (optional)
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {['instagram', 'tiktok', 'youtube', 'facebook', 'linkedin'].map((platform) => (
+                  <label key={platform} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={defaultPlatforms.includes(platform)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setDefaultPlatforms([...defaultPlatforms, platform])
+                        } else {
+                          setDefaultPlatforms(defaultPlatforms.filter((p) => p !== platform))
+                        }
+                      }}
+                      className="h-4 w-4 rounded border-slate-300 text-brand-500"
+                    />
+                    <span className="text-sm capitalize">{platform}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
             <div className="flex justify-end gap-3 pt-4">
               <Button variant="ghost" onClick={() => setCreateModal(false)}>
                 Cancel
@@ -472,6 +625,46 @@ export function VideoPlanning() {
               </Button>
             </div>
           </div>
+        </Modal>
+
+        {/* Script Preview Modal */}
+        <Modal
+          isOpen={!!scriptPreviewItem}
+          onClose={() => setScriptPreviewItem(null)}
+          title="Review Script"
+        >
+          {scriptPreviewItem && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-semibold text-primary">{scriptPreviewItem.topic}</h3>
+                {scriptPreviewItem.category && (
+                  <Badge className="mt-1">{scriptPreviewItem.category}</Badge>
+                )}
+              </div>
+              
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <p className="whitespace-pre-wrap text-sm text-slate-700">
+                  {scriptPreviewItem.script}
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  variant="ghost"
+                  onClick={() => handleRejectScript(scriptPreviewItem.id)}
+                  leftIcon={<X className="h-4 w-4" />}
+                >
+                  Reject
+                </Button>
+                <Button
+                  onClick={() => handleApproveScript(scriptPreviewItem.id)}
+                  leftIcon={<Check className="h-4 w-4" />}
+                >
+                  Approve
+                </Button>
+              </div>
+            </div>
+          )}
         </Modal>
       </div>
     </Layout>

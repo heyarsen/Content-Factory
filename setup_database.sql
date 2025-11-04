@@ -103,6 +103,10 @@ CREATE TABLE IF NOT EXISTS video_plans (
   enabled BOOLEAN NOT NULL DEFAULT true,
   auto_research BOOLEAN NOT NULL DEFAULT true,
   auto_create BOOLEAN NOT NULL DEFAULT false,
+  auto_schedule_trigger TEXT DEFAULT 'daily' CHECK (auto_schedule_trigger IN ('daily', 'time_based', 'manual')),
+  trigger_time TIME,
+  default_platforms TEXT[],
+  auto_approve BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -119,7 +123,11 @@ CREATE TABLE IF NOT EXISTS video_plan_items (
   why_important TEXT,
   useful_tips TEXT,
   research_data JSONB,
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'researching', 'ready', 'generating', 'completed', 'failed')),
+  script TEXT,
+  script_status TEXT CHECK (script_status IN ('draft', 'approved', 'rejected')),
+  platforms TEXT[],
+  caption TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'researching', 'ready', 'draft', 'approved', 'generating', 'completed', 'scheduled', 'posted', 'failed')),
   video_id UUID REFERENCES videos(id) ON DELETE SET NULL,
   error_message TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
