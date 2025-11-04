@@ -127,8 +127,8 @@ export function QuickCreate() {
       <div className="mx-auto w-full max-w-4xl space-y-8">
         {/* Header */}
         <div className="rounded-[28px] border border-white/40 bg-white/80 p-8 shadow-[0_35px_80px_-50px_rgba(79,70,229,0.6)] backdrop-blur-xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">quick create</p>
-          <h1 className="mt-3 text-3xl font-semibold text-primary">Create video in 3 steps</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">create video</p>
+          <h1 className="mt-3 text-3xl font-semibold text-primary">Create a new video</h1>
           <p className="mt-2 max-w-xl text-sm text-slate-500">
             Describe your idea, let AI write the script, then generate your video. Simple as that.
           </p>

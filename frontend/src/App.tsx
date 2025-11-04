@@ -60,10 +60,26 @@ function AppContent() {
           }
         />
         <Route
-          path="/quick-create"
+          path="/create"
           element={
             <ProtectedRoute>
               <QuickCreate />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/quick-create"
+          element={
+            <ProtectedRoute>
+              <Navigate to="/create" replace />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/generate"
+          element={
+            <ProtectedRoute>
+              <Navigate to="/create" replace />
             </ProtectedRoute>
           }
         />
@@ -116,8 +132,8 @@ function AppContent() {
           }
         />
         
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/" element={<Navigate to="/create" replace />} />
+        <Route path="*" element={<Navigate to="/create" replace />} />
       </Routes>
       <ToastContainer toasts={toasts} onClose={removeToast} />
     </>

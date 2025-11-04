@@ -87,18 +87,17 @@ export function Dashboard() {
           <div className="absolute -right-16 top-8 h-44 w-44 rounded-full bg-cyan-400/30 blur-3xl" />
                  <div className="relative z-10 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
                    <div className="max-w-xl space-y-3">
-                     <p className="text-xs font-semibold uppercase tracking-[0.35em] text-white/70">Command center</p>
-                     <h1 className="text-3xl font-semibold md:text-4xl">Creator Studio Dashboard</h1>
+                     <p className="text-xs font-semibold uppercase tracking-[0.35em] text-white/70">Dashboard</p>
+                     <h1 className="text-3xl font-semibold md:text-4xl">Video Creator</h1>
                      <p className="text-sm text-white/80">
-                       Monitor generation progress, orchestrate your pipelines, and keep distribution running smoothly
-                       across every channel.
+                       Create videos, manage your library, and schedule posts across all your social channels.
                      </p>
                    </div>
                    <div className="flex flex-wrap gap-3 text-sm font-medium">
-                     <Link to="/quick-create">
+                     <Link to="/create">
                        <Button className="border border-white/20 bg-white/20 text-white backdrop-blur hover:bg-white/30 hover:text-white shadow-lg">
                          <Zap className="mr-2 h-4 w-4" />
-                         Quick Create
+                         Create Video
                        </Button>
                      </Link>
                      <Link to="/videos">
@@ -198,15 +197,14 @@ export function Dashboard() {
           <Card className="relative overflow-hidden">
             <div className="absolute inset-x-8 top-0 h-32 rounded-3xl bg-gradient-to-r from-brand-100/70 via-brand-50/50 to-transparent blur-3xl" />
             <div className="relative z-10">
-              <h2 className="text-lg font-semibold text-primary">Quick orchestration</h2>
+              <h2 className="text-lg font-semibold text-primary">Quick actions</h2>
               <p className="mt-2 text-sm text-slate-500">
-                Launch new creative, sync destinations, or orchestrate your campaign pipelines without leaving the
-                canvas.
+                Create new videos, connect social accounts, and schedule posts all from one place.
               </p>
 
               <div className="mt-6 grid gap-4">
                 <Link
-                  to="/quick-create"
+                  to="/create"
                   className="group flex items-center justify-between rounded-2xl border-2 border-brand-200 bg-gradient-to-r from-brand-50/80 to-indigo-50/60 px-5 py-4 transition hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-[0_18px_45px_-30px_rgba(99,102,241,0.45)]"
                 >
                   <div className="flex items-center gap-4">
@@ -214,27 +212,11 @@ export function Dashboard() {
                       <Zap className="h-5 w-5" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-primary">Quick Create</p>
+                      <p className="text-sm font-semibold text-primary">Create Video</p>
                       <p className="text-xs text-slate-400">Create videos in 3 simple steps</p>
                     </div>
                   </div>
                   <span className="text-sm font-semibold text-brand-600 opacity-0 transition group-hover:opacity-100">Start {'->'}</span>
-                </Link>
-
-                <Link
-                  to="/generate"
-                  className="group flex items-center justify-between rounded-2xl border border-white/60 bg-white/70 px-5 py-4 transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-[0_18px_45px_-30px_rgba(99,102,241,0.45)]"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
-                      <Plus className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-primary">Advanced generate</p>
-                      <p className="text-xs text-slate-400">Full control over video creation</p>
-                    </div>
-                  </div>
-                  <span className="text-sm font-semibold text-brand-600 opacity-0 transition group-hover:opacity-100">Launch {'->'}</span>
                 </Link>
 
                 <Link

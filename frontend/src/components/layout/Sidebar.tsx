@@ -20,11 +20,8 @@ interface SidebarProps {
 
 const navigation = [
   { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
-  { label: 'Quick Create', to: '/quick-create', icon: Zap },
-  { label: 'Videos', to: '/videos', icon: Clapperboard },
-  { label: 'Generate', to: '/generate', icon: Sparkles },
-  { label: 'Content Factory', to: '/content', icon: PenSquare },
-  { label: 'Workflows', to: '/workflows', icon: Workflow },
+  { label: 'Create Video', to: '/create', icon: Zap },
+  { label: 'My Videos', to: '/videos', icon: Clapperboard },
   { label: 'Social Accounts', to: '/social', icon: Share2 },
   { label: 'Scheduled Posts', to: '/posts', icon: CalendarCheck },
 ]
@@ -109,40 +106,66 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               )
             })}
             {isAdmin && (
-              <NavLink
-                to="/admin"
-                onClick={onClose}
-                className={`group relative flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
-                  location.pathname.startsWith('/admin')
-                    ? 'bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent text-amber-600'
-                    : 'text-slate-500 hover:bg-white hover:text-primary'
-                }`}
-              >
-                <div
-                  className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-all duration-200 ${
+              <>
+                <div className="my-2 border-t border-slate-200" />
+                <NavLink
+                  to="/admin"
+                  onClick={onClose}
+                  className={`group relative flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
                     location.pathname.startsWith('/admin')
-                      ? 'border-amber-200 bg-white text-amber-600 shadow-sm'
-                      : 'border-transparent bg-slate-100 text-slate-500 group-hover:border-slate-200'
+                      ? 'bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent text-amber-600'
+                      : 'text-slate-500 hover:bg-white hover:text-primary'
                   }`}
                 >
-                  <Shield className="h-4 w-4" />
-                </div>
-                <span>Admin Panel</span>
-                {location.pathname.startsWith('/admin') && (
-                  <span className="absolute inset-y-0 right-0 w-1 rounded-full bg-amber-500" />
-                )}
-              </NavLink>
+                  <div
+                    className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-all duration-200 ${
+                      location.pathname.startsWith('/admin')
+                        ? 'border-amber-200 bg-white text-amber-600 shadow-sm'
+                        : 'border-transparent bg-slate-100 text-slate-500 group-hover:border-slate-200'
+                    }`}
+                  >
+                    <Shield className="h-4 w-4" />
+                  </div>
+                  <span>Admin Panel</span>
+                  {location.pathname.startsWith('/admin') && (
+                    <span className="absolute inset-y-0 right-0 w-1 rounded-full bg-amber-500" />
+                  )}
+                </NavLink>
+                <NavLink
+                  to="/content"
+                  onClick={onClose}
+                  className={`group relative flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
+                    location.pathname.startsWith('/content')
+                      ? 'bg-gradient-to-r from-slate-500/10 via-slate-500/5 to-transparent text-slate-600'
+                      : 'text-slate-500 hover:bg-white hover:text-primary'
+                  }`}
+                >
+                  <div
+                    className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-all duration-200 ${
+                      location.pathname.startsWith('/content')
+                        ? 'border-slate-200 bg-white text-slate-600 shadow-sm'
+                        : 'border-transparent bg-slate-100 text-slate-500 group-hover:border-slate-200'
+                    }`}
+                  >
+                    <PenSquare className="h-4 w-4" />
+                  </div>
+                  <span>Content Settings</span>
+                  {location.pathname.startsWith('/content') && (
+                    <span className="absolute inset-y-0 right-0 w-1 rounded-full bg-slate-500" />
+                  )}
+                </NavLink>
+              </>
             )}
           </nav>
 
           <div className="mt-auto rounded-2xl border border-white/60 bg-white/70 p-5 text-sm text-slate-500 shadow-inner backdrop-blur">
-            <p className="font-semibold text-primary">Need a hand?</p>
-            <p className="mt-1 text-xs text-slate-500">Explore the knowledge center for playbooks and best practices.</p>
+            <p className="font-semibold text-primary">Get started</p>
+            <p className="mt-1 text-xs text-slate-500">Create your first video or view your library.</p>
             <Link
-              to="/videos"
+              to="/create"
               className="mt-4 inline-flex items-center gap-2 text-xs font-semibold text-brand-600 hover:text-brand-700"
             >
-              Go to library
+              Create Video
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 12h14" />
                 <path d="m12 5 7 7-7 7" />

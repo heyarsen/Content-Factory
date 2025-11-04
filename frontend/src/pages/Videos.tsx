@@ -108,14 +108,14 @@ export function Videos() {
       <div className="space-y-10">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Library</p>
-            <h1 className="text-3xl font-semibold text-primary">Video library</h1>
-            <p className="text-sm text-slate-500">Search, filter, and orchestrate your AI-generated stories.</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">My Videos</p>
+            <h1 className="text-3xl font-semibold text-primary">Video Library</h1>
+            <p className="text-sm text-slate-500">View and manage all your videos.</p>
           </div>
-          <Link to="/generate">
+          <Link to="/create">
             <Button className="shadow-[0_20px_45px_-25px_rgba(99,102,241,0.6)]">
               <VideoIcon className="mr-2 h-4 w-4" />
-              Generate new video
+              Create Video
             </Button>
           </Link>
         </div>
@@ -152,8 +152,8 @@ export function Videos() {
             title="No videos found"
             description="Get started by generating your first AI-powered video."
             action={
-              <Link to="/generate">
-                <Button>Generate Video</Button>
+              <Link to="/create">
+                <Button>Create Video</Button>
               </Link>
             }
           />
