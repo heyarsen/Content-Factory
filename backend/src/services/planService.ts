@@ -116,7 +116,9 @@ export class PlanService {
     userId: string,
     startDate: string,
     endDate?: string,
-    customTimes?: string[] // Custom posting times from user
+    customTimes?: string[], // Custom posting times from user
+    customTopics?: string[], // Custom topics for each time slot
+    customCategories?: Array<'Trading' | 'Lifestyle' | 'Fin. Freedom' | null> // Custom categories for each slot
   ): Promise<VideoPlanItem[]> {
     const plan = await this.getPlanById(planId, userId)
     
@@ -132,14 +134,32 @@ export class PlanService {
       : this.generateTimeSlots(plan.videos_per_day)
     
     while (currentDate <= end) {
-      for (const timeSlot of timeSlots) {
+      for (let i = 0; i < timeSlots.length; i++) {
+        const timeSlot = timeSlots[i]
+        const customTopic = customTopics && customTopics[i] ? customTopics[i].trim() : null
+        const customCategory = customCategories && customCategories[i] ? customCategories[i] : null
+        
+        // Determine initial status and topic
+        let status: string = 'pending'
+        let topic: string | null = null
+        let category: 'Trading' | 'Lifestyle' | 'Fin. Freedom' | null = null
+        
+        // If user provided a topic, set it directly
+        if (customTopic) {
+          topic = customTopic
+          category = customCategory
+          status = 'ready' // Ready for script generation since topic is set
+        }
+        
         const { data: item, error } = await supabase
           .from('video_plan_items')
           .insert({
             plan_id: planId,
             scheduled_date: currentDate.toISOString().split('T')[0],
             scheduled_time: timeSlot,
-            status: 'pending',
+            topic: topic,
+            category: category,
+            status: status,
           })
           .select()
           .single()
@@ -147,8 +167,8 @@ export class PlanService {
         if (!error && item) {
           items.push(item)
           
-          // Auto-generate topic if enabled
-          if (plan.auto_research) {
+          // Auto-generate topic if no custom topic provided and auto_research is enabled
+          if (!customTopic && plan.auto_research) {
             this.generateTopicForItem(item.id, userId).catch(console.error)
           }
         }

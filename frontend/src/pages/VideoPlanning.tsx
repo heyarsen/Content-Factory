@@ -107,6 +107,8 @@ export function VideoPlanning() {
   const [autoApprove, setAutoApprove] = useState(false)
   const [timezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
   const [videoTimes, setVideoTimes] = useState<string[]>(['09:00', '14:00', '19:00']) // Default times for 3 videos
+  const [videoTopics, setVideoTopics] = useState<string[]>(['', '', '']) // Topics for each video slot
+  const [videoCategories, setVideoCategories] = useState<Array<'Trading' | 'Lifestyle' | 'Fin. Freedom' | null>>([null, null, null]) // Categories for each slot
   
   // Preset times for quick selection
   const timePresets = [
@@ -116,12 +118,14 @@ export function VideoPlanning() {
     { label: 'Evening (6:00 PM)', value: '18:00' },
   ]
   
-  // Update videoTimes when videosPerDay changes
+  // Update videoTimes and videoTopics when videosPerDay changes
   useEffect(() => {
     const defaultTimes = ['09:00', '14:00', '19:00', '10:00', '11:00']
     if (videoTimes.length !== videosPerDay) {
       // If we need more times, add defaults. If fewer, keep first N.
       setVideoTimes(defaultTimes.slice(0, videosPerDay))
+      setVideoTopics(Array(videosPerDay).fill(''))
+      setVideoCategories(Array(videosPerDay).fill(null))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videosPerDay])
@@ -183,6 +187,8 @@ export function VideoPlanning() {
         auto_approve: autoApprove,
         timezone: timezone,
         video_times: videoTimes.map((time: string) => `${time}:00`), // Send custom times
+        video_topics: videoTopics, // Send topics for each slot
+        video_categories: videoCategories, // Send categories for each slot
       })
 
       setPlans([response.data.plan, ...plans])
@@ -197,6 +203,8 @@ export function VideoPlanning() {
       setDefaultPlatforms([])
       setAutoApprove(false)
       setVideoTimes(['09:00', '14:00', '19:00'])
+      setVideoTopics(['', '', ''])
+      setVideoCategories([null, null, null])
     } catch (error: any) {
       alert(error.response?.data?.error || 'Failed to create plan')
     } finally {
@@ -787,51 +795,98 @@ export function VideoPlanning() {
               ]}
             />
 
-            {/* Posting Times for Each Video */}
-            <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+            {/* Posting Times and Topics for Each Video */}
+            <div className="space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
               <label className="block text-sm font-medium text-slate-700">
-                Posting Times for Each Video
+                Video Slots Configuration
                 <span className="ml-2 text-xs font-normal text-slate-500">
-                  (Set when each video should be posted)
+                  (Set time, topic, and category for each video)
                 </span>
               </label>
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-4">
                 {Array.from({ length: videosPerDay }).map((_, index) => (
-                  <div key={index} className="space-y-2">
-                    <label className="block text-xs font-medium text-slate-600">
-                      Video {index + 1}
-                    </label>
-                    <div className="flex gap-2">
-                      <Input
-                        type="time"
-                        value={videoTimes[index] || ''}
-                        onChange={(e) => {
-                          const newTimes = [...videoTimes]
-                          newTimes[index] = e.target.value
-                          setVideoTimes(newTimes)
-                        }}
-                        className="flex-1"
-                      />
-                      <div className="flex flex-wrap gap-1">
-                        {timePresets.map((preset) => (
-                          <button
-                            key={preset.value}
-                            type="button"
-                            onClick={() => {
-                              const newTimes = [...videoTimes]
-                              newTimes[index] = preset.value
-                              setVideoTimes(newTimes)
-                            }}
-                            className={`rounded border px-2 py-1 text-xs ${
-                              videoTimes[index] === preset.value
-                                ? 'border-brand-500 bg-brand-50 text-brand-700'
-                                : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
-                            }`}
-                          >
-                            {preset.label.split('(')[0].trim()}
-                          </button>
-                        ))}
+                  <div key={index} className="rounded-lg border border-slate-200 bg-white p-4">
+                    <div className="mb-3 flex items-center gap-2">
+                      <span className="rounded-full bg-brand-500 px-2 py-1 text-xs font-semibold text-white">
+                        Video {index + 1}
+                      </span>
+                    </div>
+                    
+                    {/* Time Selection */}
+                    <div className="mb-3 space-y-2">
+                      <label className="block text-xs font-medium text-slate-600">
+                        Posting Time
+                      </label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="time"
+                          value={videoTimes[index] || ''}
+                          onChange={(e) => {
+                            const newTimes = [...videoTimes]
+                            newTimes[index] = e.target.value
+                            setVideoTimes(newTimes)
+                          }}
+                          className="flex-1"
+                        />
+                        <div className="flex flex-wrap gap-1">
+                          {timePresets.map((preset) => (
+                            <button
+                              key={preset.value}
+                              type="button"
+                              onClick={() => {
+                                const newTimes = [...videoTimes]
+                                newTimes[index] = preset.value
+                                setVideoTimes(newTimes)
+                              }}
+                              className={`rounded border px-2 py-1 text-xs ${
+                                videoTimes[index] === preset.value
+                                  ? 'border-brand-500 bg-brand-50 text-brand-700'
+                                  : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                              }`}
+                            >
+                              {preset.label.split('(')[0].trim()}
+                            </button>
+                          ))}
+                        </div>
                       </div>
+                    </div>
+
+                    {/* Topic Input */}
+                    <div className="mb-3 space-y-2">
+                      <label className="block text-xs font-medium text-slate-600">
+                        Topic <span className="text-slate-400">(optional - leave empty to auto-generate)</span>
+                      </label>
+                      <Input
+                        value={videoTopics[index] || ''}
+                        onChange={(e) => {
+                          const newTopics = [...videoTopics]
+                          newTopics[index] = e.target.value
+                          setVideoTopics(newTopics)
+                        }}
+                        placeholder="e.g., Best Trading Strategies for 2024"
+                        className="w-full"
+                      />
+                    </div>
+
+                    {/* Category Selection */}
+                    <div className="space-y-2">
+                      <label className="block text-xs font-medium text-slate-600">
+                        Category <span className="text-slate-400">(optional)</span>
+                      </label>
+                      <Select
+                        value={videoCategories[index] || ''}
+                        onChange={(e) => {
+                          const newCategories = [...videoCategories]
+                          newCategories[index] = (e.target.value || null) as any
+                          setVideoCategories(newCategories)
+                        }}
+                        options={[
+                          { value: '', label: 'No category (auto-assign)' },
+                          { value: 'Trading', label: 'Trading' },
+                          { value: 'Lifestyle', label: 'Lifestyle' },
+                          { value: 'Fin. Freedom', label: 'Fin. Freedom' },
+                        ]}
+                      />
                     </div>
                   </div>
                 ))}
