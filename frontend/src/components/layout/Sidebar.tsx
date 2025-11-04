@@ -4,6 +4,7 @@ import {
   Clapperboard,
   LayoutDashboard,
   Share2,
+  Sparkles,
   Workflow,
 } from 'lucide-react'
 
