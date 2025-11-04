@@ -89,8 +89,6 @@ export function SocialAccounts() {
         redirectUrl?: string
       }
 
-      const platformLabel = platformNames[platform] || platform
-
       localStorage.removeItem(`uploadpost_jwt_${platform}`)
       localStorage.removeItem(`uploadpost_userid_${platform}`)
 
