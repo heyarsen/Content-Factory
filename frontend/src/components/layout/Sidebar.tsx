@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, useEffect } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import {
   CalendarCheck,
@@ -29,7 +29,12 @@ const navigation = [
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation()
-  const { isAdmin } = useAuth()
+  const { isAdmin, refreshAdminStatus } = useAuth()
+  
+  // Debug: Log admin status
+  useEffect(() => {
+    console.log('[Sidebar] Admin status:', isAdmin)
+  }, [isAdmin])
 
   return (
     <Fragment>

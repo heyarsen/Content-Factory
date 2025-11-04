@@ -5,8 +5,9 @@ import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Badge } from '../components/ui/Badge'
-import { Video, Plus, Calendar, Users } from 'lucide-react'
+import { Video, Plus, Calendar, Users, RefreshCw } from 'lucide-react'
 import api from '../lib/api'
+import { useAuth } from '../contexts/AuthContext'
 
 interface VideoStats {
   total: number
@@ -21,6 +22,7 @@ interface PostStats {
 }
 
 export function Dashboard() {
+  const { isAdmin, refreshAdminStatus } = useAuth()
   const [videoStats, setVideoStats] = useState<VideoStats | null>(null)
   const [postStats, setPostStats] = useState<PostStats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -83,33 +85,53 @@ export function Dashboard() {
         <section className="relative overflow-hidden rounded-[32px] border border-white/30 bg-gradient-to-br from-brand-600 via-brand-500 to-indigo-500 p-8 text-white shadow-[0_60px_120px_-70px_rgba(79,70,229,0.9)]">
           <div className="absolute -left-16 top-1/2 h-56 w-56 -translate-y-1/2 rounded-full bg-white/10 blur-3xl" />
           <div className="absolute -right-16 top-8 h-44 w-44 rounded-full bg-cyan-400/30 blur-3xl" />
-          <div className="relative z-10 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-            <div className="max-w-xl space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-white/70">Command center</p>
-              <h1 className="text-3xl font-semibold md:text-4xl">Creator Studio Dashboard</h1>
-              <p className="text-sm text-white/80">
-                Monitor generation progress, orchestrate your pipelines, and keep distribution running smoothly
-                across every channel.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3 text-sm font-medium">
-              <Link to="/generate">
-                <Button className="border border-white/20 bg-white/15 text-white backdrop-blur hover:bg-white/25 hover:text-white">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Generate video
-                </Button>
-              </Link>
-              <Link to="/videos">
-                <Button
-                  variant="ghost"
-                  className="border border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/20 hover:text-white"
-                >
-                  <Video className="mr-2 h-4 w-4" />
-                  Library
-                </Button>
-              </Link>
-            </div>
-          </div>
+                 <div className="relative z-10 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+                   <div className="max-w-xl space-y-3">
+                     <p className="text-xs font-semibold uppercase tracking-[0.35em] text-white/70">Command center</p>
+                     <h1 className="text-3xl font-semibold md:text-4xl">Creator Studio Dashboard</h1>
+                     <p className="text-sm text-white/80">
+                       Monitor generation progress, orchestrate your pipelines, and keep distribution running smoothly
+                       across every channel.
+                     </p>
+                   </div>
+                   <div className="flex flex-wrap gap-3 text-sm font-medium">
+                     <Link to="/generate">
+                       <Button className="border border-white/20 bg-white/15 text-white backdrop-blur hover:bg-white/25 hover:text-white">
+                         <Plus className="mr-2 h-4 w-4" />
+                         Generate video
+                       </Button>
+                     </Link>
+                     <Link to="/videos">
+                       <Button
+                         variant="ghost"
+                         className="border border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/20 hover:text-white"
+                       >
+                         <Video className="mr-2 h-4 w-4" />
+                         Library
+                       </Button>
+                     </Link>
+                     {isAdmin && (
+                       <Link to="/admin">
+                         <Button
+                           variant="ghost"
+                           className="border border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/20 hover:text-white"
+                         >
+                           <Users className="mr-2 h-4 w-4" />
+                           Admin
+                         </Button>
+                       </Link>
+                     )}
+                     <Button
+                       variant="ghost"
+                       size="sm"
+                       onClick={refreshAdminStatus}
+                       className="border border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/20 hover:text-white"
+                       title="Refresh admin status"
+                     >
+                       <RefreshCw className="h-4 w-4" />
+                     </Button>
+                   </div>
+                 </div>
         </section>
 
         <section className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">

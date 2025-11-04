@@ -16,6 +16,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
+  refreshAdminStatus: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -28,15 +29,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const checkAdminStatus = async () => {
     try {
       const token = localStorage.getItem('access_token')
-      if (!token) return false
+      if (!token) {
+        console.log('[Admin Check] No token found')
+        return false
+      }
       
+      console.log('[Admin Check] Checking admin status...')
       const response = await api.get('/api/admin/check', {
         headers: { Authorization: `Bearer ${token}` },
       })
-      return response.data.isAdmin || false
-    } catch (error) {
-      console.error('Failed to check admin status:', error)
+      const isAdmin = response.data.isAdmin || false
+      console.log('[Admin Check] Admin status:', isAdmin, 'Response:', response.data)
+      return isAdmin
+    } catch (error: any) {
+      console.error('[Admin Check] Failed to check admin status:', error)
+      console.error('[Admin Check] Error details:', error.response?.data || error.message)
       return false
+    }
+  }
+
+  const refreshAdminStatus = async () => {
+    if (user) {
+      const adminStatus = await checkAdminStatus()
+      setIsAdmin(adminStatus)
+      console.log('[Admin Refresh] Updated admin status to:', adminStatus)
     }
   }
 
@@ -107,7 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, loading, signUp, signIn, signOut, resetPassword }}>
+    <AuthContext.Provider value={{ user, isAdmin, loading, signUp, signIn, signOut, resetPassword, refreshAdminStatus }}>
       {children}
     </AuthContext.Provider>
   )

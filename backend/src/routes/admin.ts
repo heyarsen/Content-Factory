@@ -1,5 +1,6 @@
 import { Router, Response } from 'express'
 import { supabase } from '../lib/supabase.js'
+import { getSupabaseClientForUser } from '../lib/supabase.js'
 import { authenticate, requireAdmin, AuthRequest } from '../middleware/auth.js'
 
 const router = Router()
@@ -198,7 +199,29 @@ router.post('/users/:userId/remove-admin', requireAdmin, async (req: AuthRequest
 
 // Check if current user is admin
 router.get('/check', authenticate, async (req: AuthRequest, res: Response) => {
-  res.json({ isAdmin: req.isAdmin || false })
+  try {
+    // Double-check admin status using user-specific client
+    const userSupabase = req.userToken ? getSupabaseClientForUser(req.userToken) : supabase
+    
+    const { data: adminCheck, error } = await userSupabase.rpc('is_admin', { 
+      user_uuid: req.userId 
+    })
+    
+    if (error) {
+      console.error('[Admin Check] RPC error:', error)
+      // Fall back to middleware check
+      return res.json({ isAdmin: req.isAdmin || false })
+    }
+    
+    const isAdmin = adminCheck === true
+    console.log('[Admin Check] User:', req.userId, 'Admin status:', isAdmin)
+    
+    res.json({ isAdmin })
+  } catch (error: any) {
+    console.error('[Admin Check] Error:', error)
+    // Fall back to middleware check
+    res.json({ isAdmin: req.isAdmin || false })
+  }
 })
 
 export default router

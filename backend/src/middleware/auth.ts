@@ -30,9 +30,23 @@ export async function authenticate(
     req.user = user
     req.userToken = token // Store token for RLS
     
-    // Check if user is admin
-    const { data: adminCheck } = await supabase.rpc('is_admin', { user_uuid: user.id })
-    req.isAdmin = adminCheck === true
+    // Check if user is admin using user-specific client for RLS
+    try {
+      const { getSupabaseClientForUser } = await import('../lib/supabase.js')
+      const userSupabase = getSupabaseClientForUser(token)
+      const { data: adminCheck, error } = await userSupabase.rpc('is_admin', { user_uuid: user.id })
+      
+      if (error) {
+        console.error('[Auth] Admin check error:', error)
+        req.isAdmin = false
+      } else {
+        req.isAdmin = adminCheck === true
+        console.log('[Auth] User:', user.id, 'Admin status:', req.isAdmin)
+      }
+    } catch (error) {
+      console.error('[Auth] Admin check failed:', error)
+      req.isAdmin = false
+    }
     
     next()
   } catch (error) {
