@@ -6,6 +6,21 @@ import { createUserProfile, generateUserAccessLink, getUserProfile } from '../li
 
 const router = Router()
 
+// Map our platform names to Upload-Post API platform names
+function mapPlatformToUploadPost(platform: string): string {
+  const mapping: Record<string, string> = {
+    twitter: 'x', // Upload-Post API uses 'x' instead of 'twitter'
+    instagram: 'instagram',
+    tiktok: 'tiktok',
+    youtube: 'youtube',
+    facebook: 'facebook',
+    linkedin: 'linkedin',
+    pinterest: 'pinterest',
+    threads: 'threads',
+  }
+  return mapping[platform.toLowerCase()] || platform.toLowerCase()
+}
+
 // Helper to determine if Upload-Post profile shows the platform as connected
 // According to Upload-Post API docs:
 // - social_accounts[platform] is an object with display_name, username, social_images if connected
@@ -28,10 +43,18 @@ function isUploadPostPlatformConnected(profile: any, platform: string): boolean 
   if (actualProfile.social_accounts && typeof actualProfile.social_accounts === 'object') {
     const socialAccounts = actualProfile.social_accounts
     
-    // Check if the platform exists in social_accounts
-    const platformAccount = socialAccounts[platformLower] || socialAccounts[platform]
+    // Map our platform name to Upload-Post API format (e.g., twitter -> x)
+    const uploadPostPlatformName = mapPlatformToUploadPost(platform)
+    const uploadPostPlatformLower = uploadPostPlatformName.toLowerCase()
     
-    console.log('[Connection Check] social_accounts for platform:', platform, '=', platformAccount)
+    // Check if the platform exists in social_accounts (try both our name and Upload-Post API name)
+    const platformAccount = socialAccounts[platformLower] || 
+                           socialAccounts[platform] || 
+                           socialAccounts[uploadPostPlatformLower] ||
+                           socialAccounts[uploadPostPlatformName] ||
+                           socialAccounts[platform === 'twitter' ? 'x' : platform]
+    
+    console.log('[Connection Check] social_accounts for platform:', platform, '(Upload-Post name:', uploadPostPlatformName, ') =', platformAccount)
     
     // If platformAccount is an object (not null, not empty string), it's connected
     if (platformAccount && typeof platformAccount === 'object') {
@@ -106,8 +129,9 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
     const userId = req.userId!
     const user = req.user!
 
-    // Supported platforms: instagram, tiktok, youtube, facebook, twitter, linkedin, pinterest, snapchat
-    const supportedPlatforms = ['instagram', 'tiktok', 'youtube', 'facebook', 'twitter', 'linkedin', 'pinterest', 'snapchat']
+    // Supported platforms according to Upload-Post API: instagram, tiktok, youtube, facebook, twitter (x), linkedin, pinterest, threads
+    // Note: snapchat is NOT supported by Upload-Post
+    const supportedPlatforms = ['instagram', 'tiktok', 'youtube', 'facebook', 'twitter', 'linkedin', 'pinterest', 'threads']
     if (!platform || !supportedPlatforms.includes(platform)) {
       return res.status(400).json({ error: 'Valid platform is required' })
     }
@@ -174,8 +198,10 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
       
       while (retries > 0) {
         try {
+          // Map platform name to Upload-Post API format (e.g., twitter -> x)
+          const uploadPostPlatform = mapPlatformToUploadPost(platform)
           accessLink = await generateUserAccessLink(usernameForLink, {
-            platforms: [platform as any],
+            platforms: [uploadPostPlatform as any],
             redirectUrl,
             redirectButtonText: 'Back to Content Factory',
           })

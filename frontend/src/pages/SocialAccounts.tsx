@@ -12,7 +12,7 @@ import api from '../lib/api'
 
 interface SocialAccount {
   id: string
-  platform: 'instagram' | 'tiktok' | 'youtube' | 'facebook' | 'twitter' | 'linkedin' | 'pinterest' | 'snapchat'
+  platform: 'instagram' | 'tiktok' | 'youtube' | 'facebook' | 'twitter' | 'linkedin' | 'pinterest' | 'threads'
   status: 'connected' | 'disconnected' | 'error' | 'pending'
   connected_at: string
 }
@@ -25,7 +25,7 @@ const platformIcons = {
   twitter: Share2,
   linkedin: Users,
   pinterest: Share2,
-  snapchat: Users,
+  threads: Share2,
 }
 
 const platformNames = {
@@ -33,10 +33,10 @@ const platformNames = {
   tiktok: 'TikTok',
   youtube: 'YouTube',
   facebook: 'Facebook',
-  twitter: 'Twitter',
+  twitter: 'Twitter (X)',
   linkedin: 'LinkedIn',
   pinterest: 'Pinterest',
-  snapchat: 'Snapchat',
+  threads: 'Threads',
 }
 
 export function SocialAccounts() {
@@ -278,7 +278,7 @@ export function SocialAccounts() {
     return <Badge variant={variants[status] || 'default'}>{status}</Badge>
   }
 
-  const allPlatforms = ['instagram', 'tiktok', 'youtube', 'facebook', 'twitter', 'linkedin', 'pinterest', 'snapchat'] as const
+  const allPlatforms = ['instagram', 'tiktok', 'youtube', 'facebook', 'twitter', 'linkedin', 'pinterest', 'threads'] as const
   const connectedPlatforms = accounts
     .filter((a) => a.status === 'connected')
     .map((a) => a.platform)

@@ -142,7 +142,7 @@ export interface GenerateUserAccessLinkOptions {
   redirectButtonText?: string
   connectTitle?: string
   connectDescription?: string
-  platforms?: Array<'tiktok' | 'instagram' | 'linkedin' | 'youtube' | 'facebook' | 'x' | 'threads'>
+  platforms?: Array<'tiktok' | 'instagram' | 'linkedin' | 'youtube' | 'facebook' | 'x' | 'threads' | 'pinterest'>
 }
 
 export interface UploadPostAccessLink {

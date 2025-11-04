@@ -1,13 +1,15 @@
 -- Fix RLS for social_accounts table
 -- Run this SQL in your Supabase SQL Editor
 
--- Update platform CHECK constraint to include all platforms
+-- Update platform CHECK constraint to include all platforms supported by Upload-Post
+-- Supported platforms: instagram, tiktok, youtube, facebook, twitter (x), linkedin, pinterest, threads
+-- Note: snapchat is NOT supported by Upload-Post API
 ALTER TABLE social_accounts 
 DROP CONSTRAINT IF EXISTS social_accounts_platform_check;
 
 ALTER TABLE social_accounts 
 ADD CONSTRAINT social_accounts_platform_check 
-CHECK (platform IN ('instagram', 'tiktok', 'youtube', 'facebook', 'twitter', 'linkedin', 'pinterest', 'snapchat'));
+CHECK (platform IN ('instagram', 'tiktok', 'youtube', 'facebook', 'twitter', 'linkedin', 'pinterest', 'threads'));
 
 -- Update scheduled_posts platform CHECK constraint
 ALTER TABLE scheduled_posts 
@@ -15,7 +17,7 @@ DROP CONSTRAINT IF EXISTS scheduled_posts_platform_check;
 
 ALTER TABLE scheduled_posts 
 ADD CONSTRAINT scheduled_posts_platform_check 
-CHECK (platform IN ('instagram', 'tiktok', 'youtube', 'facebook', 'twitter', 'linkedin', 'pinterest', 'snapchat'));
+CHECK (platform IN ('instagram', 'tiktok', 'youtube', 'facebook', 'twitter', 'linkedin', 'pinterest', 'threads'));
 
 -- Ensure RLS policies are correct (they should already exist, but let's make sure)
 -- Recreate the insert policy to ensure it works correctly
