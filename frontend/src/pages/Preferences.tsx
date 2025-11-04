@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
-import { Input } from '../components/ui/Input'
 import { Select } from '../components/ui/Select'
 import { useToast } from '../hooks/useToast'
 import { Settings, Globe, Bell, Sparkles } from 'lucide-react'
@@ -36,7 +35,7 @@ const timezones = [
 const availablePlatforms = ['instagram', 'youtube', 'tiktok', 'twitter']
 
 export function Preferences() {
-  const { showToast } = useToast()
+  const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [preferences, setPreferences] = useState<Preferences>({
@@ -69,9 +68,9 @@ export function Preferences() {
     setSaving(true)
     try {
       await api.put('/api/preferences', preferences)
-      showToast('Preferences saved successfully', 'success')
+      toast.success('Preferences saved successfully')
     } catch (error: any) {
-      showToast(error.response?.data?.error || 'Failed to save preferences', 'error')
+      toast.error(error.response?.data?.error || 'Failed to save preferences')
     } finally {
       setSaving(false)
     }

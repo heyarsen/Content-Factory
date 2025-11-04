@@ -10,7 +10,7 @@ import api from '../lib/api'
 
 export function ProfileSettings() {
   const { user } = useAuth()
-  const { showToast } = useToast()
+  const { toast } = useToast()
   const [emailForm, setEmailForm] = useState({
     email: '',
   })
@@ -29,7 +29,7 @@ export function ProfileSettings() {
 
   const handleEmailUpdate = async () => {
     if (!emailForm.email || emailForm.email === user?.email) {
-      showToast('Please enter a new email address', 'error')
+      toast.error('Please enter a new email address')
       return
     }
 
@@ -38,9 +38,9 @@ export function ProfileSettings() {
       await api.patch('/api/auth/profile', {
         email: emailForm.email,
       })
-      showToast('Email update initiated. Please check your email to confirm.', 'success')
+      toast.success('Email update initiated. Please check your email to confirm.')
     } catch (error: any) {
-      showToast(error.response?.data?.error || 'Failed to update email', 'error')
+      toast.error(error.response?.data?.error || 'Failed to update email')
     } finally {
       setSaving(false)
     }
@@ -48,17 +48,17 @@ export function ProfileSettings() {
 
   const handlePasswordUpdate = async () => {
     if (!passwordForm.old_password || !passwordForm.new_password) {
-      showToast('Please fill in all password fields', 'error')
+      toast.error('Please fill in all password fields')
       return
     }
 
     if (passwordForm.new_password !== passwordForm.confirm_password) {
-      showToast('New passwords do not match', 'error')
+      toast.error('New passwords do not match')
       return
     }
 
     if (passwordForm.new_password.length < 6) {
-      showToast('Password must be at least 6 characters', 'error')
+      toast.error('Password must be at least 6 characters')
       return
     }
 
@@ -68,14 +68,14 @@ export function ProfileSettings() {
         old_password: passwordForm.old_password,
         new_password: passwordForm.new_password,
       })
-      showToast('Password updated successfully', 'success')
+      toast.success('Password updated successfully')
       setPasswordForm({
         old_password: '',
         new_password: '',
         confirm_password: '',
       })
     } catch (error: any) {
-      showToast(error.response?.data?.error || 'Failed to update password', 'error')
+      toast.error(error.response?.data?.error || 'Failed to update password')
     } finally {
       setSaving(false)
     }

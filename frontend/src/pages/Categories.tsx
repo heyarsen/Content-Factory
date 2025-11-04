@@ -8,7 +8,7 @@ import { Modal } from '../components/ui/Modal'
 import { Badge } from '../components/ui/Badge'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Skeleton } from '../components/ui/Skeleton'
-import { Plus, Edit2, Trash2, Tag, X } from 'lucide-react'
+import { Plus, Edit2, Trash2, Tag } from 'lucide-react'
 import api from '../lib/api'
 
 interface Category {
