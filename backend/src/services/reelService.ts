@@ -166,8 +166,8 @@ export class ReelService {
   static async updateReelVideo(
     reelId: string,
     videoData: {
-      video_url?: string
-      heygen_video_id?: string
+      video_url?: string | null
+      heygen_video_id?: string | null
     }
   ): Promise<void> {
     const { error } = await supabase

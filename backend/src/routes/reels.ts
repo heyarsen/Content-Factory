@@ -108,7 +108,7 @@ router.post('/:id/generate-video', async (req: AuthRequest, res: Response) => {
 
     // Update reel with video information
     await ReelService.updateReelVideo(id, {
-      video_url: videoData.video_url || null,
+      video_url: videoData.video_url ?? null,
       heygen_video_id: videoData.video_id,
     })
 
