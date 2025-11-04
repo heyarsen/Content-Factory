@@ -76,14 +76,13 @@ export function VideoPlanning() {
   const [autoScheduleTrigger, setAutoScheduleTrigger] = useState<'daily' | 'time_based' | 'manual'>('daily')
   const [triggerTime, setTriggerTime] = useState(() => {
     // Default to 9 AM in user's local time
-    const now = new Date()
     const hours = 9
     const minutes = 0
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
   })
   const [defaultPlatforms, setDefaultPlatforms] = useState<string[]>([])
   const [autoApprove, setAutoApprove] = useState(false)
-  const [timezone, setTimezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
+  const [timezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
   
   // Preset times for quick selection
   const timePresets = [
@@ -148,6 +147,7 @@ export function VideoPlanning() {
         trigger_time: autoScheduleTrigger === 'daily' ? `${triggerTime}:00` : null,
         default_platforms: defaultPlatforms.length > 0 ? defaultPlatforms : null,
         auto_approve: autoApprove,
+        timezone: timezone,
       })
 
       setPlans([response.data.plan, ...plans])
