@@ -12,6 +12,7 @@ import socialRoutes from './routes/social.js'
 import postRoutes from './routes/posts.js'
 import contentRoutes from './routes/content.js'
 import reelRoutes from './routes/reels.js'
+import adminRoutes from './routes/admin.js'
 import { initializeScheduler } from './jobs/scheduler.js'
 
 const __filename = fileURLToPath(import.meta.url)

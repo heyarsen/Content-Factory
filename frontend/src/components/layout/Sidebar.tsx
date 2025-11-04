@@ -8,7 +8,9 @@ import {
   Share2,
   Sparkles,
   Workflow,
+  Shield,
 } from 'lucide-react'
+import { useAuth } from '../../contexts/AuthContext'
 
 interface SidebarProps {
   isOpen: boolean
@@ -27,6 +29,7 @@ const navigation = [
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation()
+  const { isAdmin } = useAuth()
 
   return (
     <Fragment>
@@ -98,6 +101,31 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 </NavLink>
               )
             })}
+            {isAdmin && (
+              <NavLink
+                to="/admin"
+                onClick={onClose}
+                className={`group relative flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
+                  location.pathname.startsWith('/admin')
+                    ? 'bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent text-amber-600'
+                    : 'text-slate-500 hover:bg-white hover:text-primary'
+                }`}
+              >
+                <div
+                  className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-all duration-200 ${
+                    location.pathname.startsWith('/admin')
+                      ? 'border-amber-200 bg-white text-amber-600 shadow-sm'
+                      : 'border-transparent bg-slate-100 text-slate-500 group-hover:border-slate-200'
+                  }`}
+                >
+                  <Shield className="h-4 w-4" />
+                </div>
+                <span>Admin Panel</span>
+                {location.pathname.startsWith('/admin') && (
+                  <span className="absolute inset-y-0 right-0 w-1 rounded-full bg-amber-500" />
+                )}
+              </NavLink>
+            )}
           </nav>
 
           <div className="mt-auto rounded-2xl border border-white/60 bg-white/70 p-5 text-sm text-slate-500 shadow-inner backdrop-blur">

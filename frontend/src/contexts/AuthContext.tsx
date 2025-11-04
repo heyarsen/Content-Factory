@@ -10,6 +10,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null
+  isAdmin: boolean
   loading: boolean
   signUp: (email: string, password: string) => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
@@ -21,14 +22,32 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
+
+  const checkAdminStatus = async (userId: string) => {
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) return false
+      
+      const response = await api.get('/api/admin/check', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      return response.data.isAdmin || false
+    } catch (error) {
+      console.error('Failed to check admin status:', error)
+      return false
+    }
+  }
 
   useEffect(() => {
     // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user as User)
         localStorage.setItem('access_token', session.access_token)
+        const adminStatus = await checkAdminStatus(session.user.id)
+        setIsAdmin(adminStatus)
       }
       setLoading(false)
     })
@@ -36,12 +55,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         setUser(session.user as User)
         localStorage.setItem('access_token', session.access_token)
+        const adminStatus = await checkAdminStatus(session.user.id)
+        setIsAdmin(adminStatus)
       } else {
         setUser(null)
+        setIsAdmin(false)
         localStorage.removeItem('access_token')
       }
       setLoading(false)
@@ -65,6 +87,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         access_token: data.access_token,
         refresh_token: data.refresh_token,
       })
+      // Check admin status after login
+      if (data.user?.id) {
+        const adminStatus = await checkAdminStatus(data.user.id)
+        setIsAdmin(adminStatus)
+      }
     }
   }
 
@@ -80,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signUp, signIn, signOut, resetPassword }}>
+    <AuthContext.Provider value={{ user, isAdmin, loading, signUp, signIn, signOut, resetPassword }}>
       {children}
     </AuthContext.Provider>
   )

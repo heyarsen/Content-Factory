@@ -19,6 +19,7 @@ import { ScheduledPosts } from './pages/ScheduledPosts'
 import { SocialCallback } from './pages/SocialCallback'
 import { ContentFactory } from './pages/ContentFactory'
 import { Workflows } from './pages/Workflows'
+import { AdminPanel } from './pages/AdminPanel'
 
 function AppContent() {
   const { toasts, removeToast } = useToast()
@@ -94,6 +95,14 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <SocialCallback />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminPanel />
             </ProtectedRoute>
           }
         />
