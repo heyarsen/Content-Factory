@@ -152,7 +152,7 @@ export function Workflows() {
   const handleGenerateScript = async (contentItemId: string) => {
     setGenerating(contentItemId)
     try {
-      const response = await api.post('/api/content/generate-script', {
+      await api.post('/api/content/generate-script', {
         content_item_id: contentItemId,
       })
       toast.success('Script generated and reel created')
@@ -398,7 +398,7 @@ export function Workflows() {
                       </Button>
                     )}
                     {reel.video_url && (
-                      <Badge variant="success" className="flex items-center gap-1">
+                      <Badge variant="success">
                         <CheckCircle2 className="h-3 w-3" />
                         Video Ready
                       </Badge>
