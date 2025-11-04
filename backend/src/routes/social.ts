@@ -6,6 +6,77 @@ import { createUserProfile, generateUserAccessLink, getUserProfile } from '../li
 
 const router = Router()
 
+// Helper to determine if Upload-Post profile shows the platform as connected
+function matchesPlatformString(value: string, platform: string) {
+  const normalizedTarget = platform.toLowerCase()
+  const simplifiedTarget = normalizedTarget.replace(/[^a-z0-9]/g, '')
+
+  const normalizedValue = value.toLowerCase()
+  if (normalizedValue === normalizedTarget) return true
+  if (normalizedValue.includes(normalizedTarget)) return true
+
+  const simplifiedValue = normalizedValue.replace(/[^a-z0-9]/g, '')
+  if (simplifiedValue === simplifiedTarget) return true
+
+  return false
+}
+
+function isUploadPostPlatformConnected(profile: any, platform: string): boolean {
+  if (!profile || !platform) return false
+
+  const queue: any[] = [profile]
+  const seenObjects = new WeakSet<object>()
+
+  while (queue.length > 0) {
+    const current = queue.shift()
+
+    if (current === null || current === undefined) {
+      continue
+    }
+
+    if (typeof current === 'string') {
+      if (matchesPlatformString(current, platform)) {
+        return true
+      }
+      continue
+    }
+
+    if (typeof current === 'number' || typeof current === 'boolean') {
+      if (matchesPlatformString(String(current), platform)) {
+        return true
+      }
+      continue
+    }
+
+    if (Array.isArray(current)) {
+      if (seenObjects.has(current)) {
+        continue
+      }
+      seenObjects.add(current)
+      for (const item of current) {
+        queue.push(item)
+      }
+      continue
+    }
+
+    if (typeof current === 'object') {
+      if (seenObjects.has(current)) {
+        continue
+      }
+      seenObjects.add(current)
+
+      for (const key of Object.keys(current)) {
+        if (matchesPlatformString(key, platform)) {
+          return true
+        }
+        queue.push(current[key])
+      }
+    }
+  }
+
+  return false
+}
+
 // List connected accounts
 router.get('/accounts', authenticate, async (req: AuthRequest, res: Response) => {
   try {
@@ -319,7 +390,6 @@ router.post('/callback', authenticate, async (req: AuthRequest, res: Response) =
     }
 
     try {
-      // Verify the profile exists (use the upload-post username if we have it, otherwise use the provided one)
       const usernameToVerify = uploadPostAccountUsername || uploadPostUsername
       const userProfile = await getUserProfile(usernameToVerify)
 
@@ -335,6 +405,34 @@ router.post('/callback', authenticate, async (req: AuthRequest, res: Response) =
 
       // Use the upload-post account username we created/verified
       const finalUploadPostUsername = uploadPostAccountUsername || uploadPostUsername
+
+      const platformConnected = isUploadPostPlatformConnected(userProfile, platform)
+
+      if (!platformConnected) {
+        if (existing) {
+          await userSupabase
+            .from('social_accounts')
+            .update({
+              platform_account_id: finalUploadPostUsername,
+              status: 'pending',
+              connected_at: null,
+            })
+            .eq('id', existing.id)
+        } else {
+          await userSupabase
+            .from('social_accounts')
+            .insert({
+              user_id: userId,
+              platform,
+              platform_account_id: finalUploadPostUsername,
+              status: 'pending',
+            })
+        }
+
+        return res.status(400).json({
+          error: 'We did not detect a connected account yet. Please finish linking the account in Upload-Post.',
+        })
+      }
 
       if (existing) {
         const { error } = await userSupabase
