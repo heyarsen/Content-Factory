@@ -35,7 +35,9 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
     const userId = req.userId!
     const user = req.user!
 
-    if (!platform || !['instagram', 'tiktok', 'youtube', 'facebook'].includes(platform)) {
+    // Supported platforms: instagram, tiktok, youtube, facebook, twitter, linkedin, pinterest, snapchat
+    const supportedPlatforms = ['instagram', 'tiktok', 'youtube', 'facebook', 'twitter', 'linkedin', 'pinterest', 'snapchat']
+    if (!platform || !supportedPlatforms.includes(platform)) {
       return res.status(400).json({ error: 'Valid platform is required' })
     }
 
@@ -66,71 +68,15 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
       derivedUsername = userId.replace(/-/g, '_')
     }
 
-    // Determine the final username to use
+    // Determine the final username to use (don't create account yet - only when actually connecting)
     const finalUsername = uploadPostUsername || derivedUsername || userId.replace(/-/g, '_')
     
     if (!finalUsername || finalUsername.trim() === '') {
       throw new Error('Unable to generate username for Upload-Post profile')
     }
 
-    // If we don't have an existing username, create the profile
-    if (!uploadPostUsername) {
-      try {
-        console.log('Creating Upload-Post profile with username:', finalUsername, 'email:', userEmail)
-
-        const uploadPostProfile = await createUserProfile({
-          username: finalUsername,
-          email: userEmail,
-          name: userName,
-        })
-
-        console.log('Upload-Post user response:', {
-          profile: uploadPostProfile,
-          keys: uploadPostProfile ? Object.keys(uploadPostProfile) : [],
-        })
-
-        const returnedUsername = uploadPostProfile?.username ||
-          uploadPostProfile?.user_id ||
-          uploadPostProfile?.userId ||
-          uploadPostProfile?.user?.username
-
-        if (returnedUsername && typeof returnedUsername === 'string') {
-          uploadPostUsername = returnedUsername
-        } else {
-          uploadPostUsername = finalUsername
-        }
-      } catch (createError: any) {
-        const errorStatus = createError.response?.status
-        const errorData = createError.response?.data
-
-        console.error('Failed to create Upload-Post user:', {
-          message: createError.message,
-          status: errorStatus,
-          userEmail,
-          userMetadata: user.user_metadata,
-          errorResponse: errorData,
-        })
-
-        if (errorStatus === 409 || errorData?.message?.toLowerCase?.().includes('already exists')) {
-          console.log('Upload-Post user already exists, reusing derived username')
-          uploadPostUsername = finalUsername
-        } else {
-          return res.status(500).json({
-            error: 'Failed to create Upload-Post profile. Please try again.',
-            details: createError.message,
-            apiError: errorData?.message || errorData?.error,
-            ...(process.env.NODE_ENV === 'development' && {
-              stack: createError.stack,
-              userEmail,
-              fullError: errorData,
-            }),
-          })
-        }
-      }
-    }
-
-    // Use the final username (either existing or newly created)
-    const usernameForLink = uploadPostUsername || finalUsername
+    // Use the derived username for link generation (account will be created in callback when actually connected)
+    const usernameForLink = finalUsername
     
     if (!usernameForLink || usernameForLink.trim() === '') {
       throw new Error('Upload-Post username could not be determined')
@@ -150,11 +96,41 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
         platform
       )}&uploadpost_username=${encodeURIComponent(usernameForLink)}`
 
-      const accessLink = await generateUserAccessLink(usernameForLink, {
-        platforms: [platform as 'instagram' | 'tiktok' | 'youtube' | 'facebook'],
-        redirectUrl,
-        redirectButtonText: 'Back to Content Fabrica',
-      })
+      // Generate access link with retry logic for rate limiting
+      let accessLink
+      let retries = 3
+      let lastError: any = null
+      
+      while (retries > 0) {
+        try {
+          accessLink = await generateUserAccessLink(usernameForLink, {
+            platforms: [platform as any],
+            redirectUrl,
+            redirectButtonText: 'Back to Content Factory',
+          })
+          break
+        } catch (linkError: any) {
+          lastError = linkError
+          const status = linkError.response?.status
+          
+          // If 429 rate limit, wait and retry
+          if (status === 429 && retries > 1) {
+            const retryAfter = linkError.response?.headers?.['retry-after'] || '5'
+            const waitTime = parseInt(retryAfter, 10) * 1000 || 5000
+            console.log(`Rate limited (429), waiting ${waitTime}ms before retry (${retries - 1} retries left)`)
+            await new Promise(resolve => setTimeout(resolve, waitTime))
+            retries--
+            continue
+          }
+          
+          // For other errors or last retry, throw
+          throw linkError
+        }
+      }
+      
+      if (!accessLink) {
+        throw lastError || new Error('Failed to generate access link after retries')
+      }
 
       const { data: existing, error: findError } = await supabase
         .from('social_accounts')
@@ -257,13 +233,90 @@ router.post('/callback', authenticate, async (req: AuthRequest, res: Response) =
   try {
     const { platform, uploadPostUsername } = req.body
     const userId = req.userId!
+    const user = req.user!
 
     if (!platform || !uploadPostUsername) {
       return res.status(400).json({ error: 'Platform and Upload-Post username are required' })
     }
 
+    // Check if user already has an upload-post account
+    const { data: existingAccounts } = await supabase
+      .from('social_accounts')
+      .select('platform_account_id')
+      .eq('user_id', userId)
+      .not('platform_account_id', 'is', null)
+      .limit(1)
+
+    let uploadPostAccountUsername: string | undefined = existingAccounts?.[0]?.platform_account_id || undefined
+
+    // If no upload-post account exists, create it now (when actually connecting)
+    if (!uploadPostAccountUsername) {
+      const userEmail = user.email || user.user_metadata?.email
+      const userName = user.user_metadata?.full_name ||
+        user.user_metadata?.name ||
+        (userEmail ? userEmail.split('@')[0] : undefined)
+
+      let derivedUsername = user.user_metadata?.username
+      if (!derivedUsername && userEmail) {
+        derivedUsername = userEmail.replace(/\./g, '_')
+      }
+      if (!derivedUsername) {
+        derivedUsername = userId.replace(/-/g, '_')
+      }
+
+      const finalUsername = derivedUsername || userId.replace(/-/g, '_')
+
+      try {
+        console.log('Creating Upload-Post profile on account connection:', finalUsername, 'email:', userEmail)
+
+        const uploadPostProfile = await createUserProfile({
+          username: finalUsername,
+          email: userEmail,
+          name: userName,
+        })
+
+        const returnedUsername = uploadPostProfile?.username ||
+          uploadPostProfile?.user_id ||
+          uploadPostProfile?.userId ||
+          uploadPostProfile?.user?.username
+
+        if (returnedUsername && typeof returnedUsername === 'string') {
+          uploadPostAccountUsername = returnedUsername
+        } else {
+          uploadPostAccountUsername = finalUsername
+        }
+
+        console.log('Upload-Post account created:', uploadPostAccountUsername)
+      } catch (createError: any) {
+        const errorStatus = createError.response?.status
+        const errorData = createError.response?.data
+
+        // If 429 rate limit, return a helpful error
+        if (errorStatus === 429) {
+          return res.status(429).json({
+            error: 'Rate limit exceeded. Please wait a few moments and try connecting again.',
+            retryAfter: errorData?.retryAfter || 60,
+          })
+        }
+
+        // If account already exists, use the username
+        if (errorStatus === 409 || errorData?.message?.toLowerCase?.().includes('already exists')) {
+          console.log('Upload-Post user already exists, using derived username')
+          uploadPostAccountUsername = finalUsername
+        } else {
+          console.error('Failed to create Upload-Post account:', createError)
+          return res.status(500).json({
+            error: 'Failed to create Upload-Post account. Please try again.',
+            details: createError.message,
+          })
+        }
+      }
+    }
+
     try {
-      const userProfile = await getUserProfile(uploadPostUsername)
+      // Verify the profile exists (use the upload-post username if we have it, otherwise use the provided one)
+      const usernameToVerify = uploadPostAccountUsername || uploadPostUsername
+      const userProfile = await getUserProfile(usernameToVerify)
 
       const { data: existing } = await supabase
         .from('social_accounts')
@@ -272,11 +325,14 @@ router.post('/callback', authenticate, async (req: AuthRequest, res: Response) =
         .eq('platform', platform)
         .single()
 
+      // Use the upload-post account username we created/verified
+      const finalUploadPostUsername = uploadPostAccountUsername || uploadPostUsername
+
       if (existing) {
         const { error } = await supabase
           .from('social_accounts')
           .update({
-            platform_account_id: uploadPostUsername,
+            platform_account_id: finalUploadPostUsername,
             status: 'connected',
             connected_at: new Date().toISOString(),
           })
@@ -294,8 +350,9 @@ router.post('/callback', authenticate, async (req: AuthRequest, res: Response) =
           .insert({
             user_id: userId,
             platform,
-            platform_account_id: uploadPostUsername,
+            platform_account_id: finalUploadPostUsername,
             status: 'connected',
+            connected_at: new Date().toISOString(),
           })
           .select()
           .single()

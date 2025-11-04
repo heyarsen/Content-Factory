@@ -7,12 +7,12 @@ import { Badge } from '../components/ui/Badge'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Modal } from '../components/ui/Modal'
-import { Users, Link2, X, Instagram, Youtube, Facebook } from 'lucide-react'
+import { Users, Link2, X, Instagram, Youtube, Facebook, Share2 } from 'lucide-react'
 import api from '../lib/api'
 
 interface SocialAccount {
   id: string
-  platform: 'instagram' | 'tiktok' | 'youtube' | 'facebook'
+  platform: 'instagram' | 'tiktok' | 'youtube' | 'facebook' | 'twitter' | 'linkedin' | 'pinterest' | 'snapchat'
   status: 'connected' | 'disconnected' | 'error' | 'pending'
   connected_at: string
 }
@@ -22,6 +22,10 @@ const platformIcons = {
   tiktok: Users,
   youtube: Youtube,
   facebook: Facebook,
+  twitter: Share2,
+  linkedin: Users,
+  pinterest: Share2,
+  snapchat: Users,
 }
 
 const platformNames = {
@@ -29,6 +33,10 @@ const platformNames = {
   tiktok: 'TikTok',
   youtube: 'YouTube',
   facebook: 'Facebook',
+  twitter: 'Twitter',
+  linkedin: 'LinkedIn',
+  pinterest: 'Pinterest',
+  snapchat: 'Snapchat',
 }
 
 export function SocialAccounts() {
@@ -224,10 +232,18 @@ export function SocialAccounts() {
       loadAccounts()
     } catch (error: any) {
       console.error('Failed to connect:', error)
-      const errorMessage = error.response?.data?.error || 
-                          error.response?.data?.details || 
-                          error.message || 
-                          'Failed to initiate connection'
+      const status = error.response?.status
+      let errorMessage = error.response?.data?.error || 
+                        error.response?.data?.details || 
+                        error.message || 
+                        'Failed to initiate connection'
+      
+      // Handle 429 rate limit specifically
+      if (status === 429) {
+        const retryAfter = error.response?.data?.retryAfter || 60
+        errorMessage = `Rate limit exceeded. Please wait ${retryAfter} seconds before trying again.`
+      }
+      
       console.error('Error details:', {
         message: errorMessage,
         fullResponse: error.response?.data,
@@ -262,7 +278,7 @@ export function SocialAccounts() {
     return <Badge variant={variants[status] || 'default'}>{status}</Badge>
   }
 
-  const allPlatforms = ['instagram', 'tiktok', 'youtube', 'facebook'] as const
+  const allPlatforms = ['instagram', 'tiktok', 'youtube', 'facebook', 'twitter', 'linkedin', 'pinterest', 'snapchat'] as const
   const connectedPlatforms = accounts
     .filter((a) => a.status === 'connected')
     .map((a) => a.platform)
