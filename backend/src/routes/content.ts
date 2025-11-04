@@ -607,5 +607,52 @@ router.post('/generate-script', async (req: AuthRequest, res: Response) => {
   }
 })
 
+// Quick Create: Generate script directly from user input
+router.post('/quick-create/generate-script', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { category, topic, description, whyImportant, usefulTips } = req.body
+
+    if (!category || !topic) {
+      return res.status(400).json({ error: 'category and topic are required' })
+    }
+
+    // Map category_key to category name
+    const categoryMap: Record<string, 'Trading' | 'Lifestyle' | 'Fin. Freedom'> = {
+      'trading': 'Trading',
+      'lifestyle': 'Lifestyle',
+      'fin_freedom': 'Fin. Freedom',
+      'fin. freedom': 'Fin. Freedom',
+      'Fin. Freedom': 'Fin. Freedom',
+      'Trading': 'Trading',
+      'Lifestyle': 'Lifestyle',
+    }
+
+    const mappedCategory = categoryMap[category.toLowerCase()] || categoryMap[category]
+    
+    if (!mappedCategory || !['Trading', 'Lifestyle', 'Fin. Freedom'].includes(mappedCategory)) {
+      return res.status(400).json({ 
+        error: 'Invalid category. Must be Trading, Lifestyle, or Fin. Freedom' 
+      })
+    }
+
+    const { ScriptService } = await import('../services/scriptService.js')
+
+    // Generate script using custom data
+    const script = await ScriptService.generateScriptCustom({
+      idea: topic,
+      description: description || '',
+      whyItMatters: whyImportant || '',
+      usefulTips: usefulTips || '',
+      category: mappedCategory,
+    })
+
+    return res.json({ script })
+  } catch (error: any) {
+    console.error('Quick create script generation error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to generate script' })
+  }
+})
+
 export default router
 

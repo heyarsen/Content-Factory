@@ -5,7 +5,7 @@ import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Badge } from '../components/ui/Badge'
-import { Video, Plus, Calendar, Users, RefreshCw } from 'lucide-react'
+import { Video, Plus, Calendar, Users, RefreshCw, Zap } from 'lucide-react'
 import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -95,10 +95,10 @@ export function Dashboard() {
                      </p>
                    </div>
                    <div className="flex flex-wrap gap-3 text-sm font-medium">
-                     <Link to="/generate">
-                       <Button className="border border-white/20 bg-white/15 text-white backdrop-blur hover:bg-white/25 hover:text-white">
-                         <Plus className="mr-2 h-4 w-4" />
-                         Generate video
+                     <Link to="/quick-create">
+                       <Button className="border border-white/20 bg-white/20 text-white backdrop-blur hover:bg-white/30 hover:text-white shadow-lg">
+                         <Zap className="mr-2 h-4 w-4" />
+                         Quick Create
                        </Button>
                      </Link>
                      <Link to="/videos">
@@ -206,6 +206,22 @@ export function Dashboard() {
 
               <div className="mt-6 grid gap-4">
                 <Link
+                  to="/quick-create"
+                  className="group flex items-center justify-between rounded-2xl border-2 border-brand-200 bg-gradient-to-r from-brand-50/80 to-indigo-50/60 px-5 py-4 transition hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-[0_18px_45px_-30px_rgba(99,102,241,0.45)]"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-indigo-500 text-white shadow-md">
+                      <Zap className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-primary">Quick Create</p>
+                      <p className="text-xs text-slate-400">Create videos in 3 simple steps</p>
+                    </div>
+                  </div>
+                  <span className="text-sm font-semibold text-brand-600 opacity-0 transition group-hover:opacity-100">Start {'->'}</span>
+                </Link>
+
+                <Link
                   to="/generate"
                   className="group flex items-center justify-between rounded-2xl border border-white/60 bg-white/70 px-5 py-4 transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-[0_18px_45px_-30px_rgba(99,102,241,0.45)]"
                 >
@@ -214,8 +230,8 @@ export function Dashboard() {
                       <Plus className="h-5 w-5" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-primary">Generate new video</p>
-                      <p className="text-xs text-slate-400">Craft on-brand assets in minutes</p>
+                      <p className="text-sm font-semibold text-primary">Advanced generate</p>
+                      <p className="text-xs text-slate-400">Full control over video creation</p>
                     </div>
                   </div>
                   <span className="text-sm font-semibold text-brand-600 opacity-0 transition group-hover:opacity-100">Launch {'->'}</span>

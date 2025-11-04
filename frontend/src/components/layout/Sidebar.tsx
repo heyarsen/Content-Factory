@@ -9,6 +9,7 @@ import {
   Sparkles,
   Workflow,
   Shield,
+  Zap,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -19,6 +20,7 @@ interface SidebarProps {
 
 const navigation = [
   { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
+  { label: 'Quick Create', to: '/quick-create', icon: Zap },
   { label: 'Videos', to: '/videos', icon: Clapperboard },
   { label: 'Generate', to: '/generate', icon: Sparkles },
   { label: 'Content Factory', to: '/content', icon: PenSquare },

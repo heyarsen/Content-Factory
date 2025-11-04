@@ -14,6 +14,7 @@ import { VerifyEmail } from './pages/VerifyEmail'
 import { Dashboard } from './pages/Dashboard'
 import { Videos } from './pages/Videos'
 import { GenerateVideo } from './pages/GenerateVideo'
+import { QuickCreate } from './pages/QuickCreate'
 import { SocialAccounts } from './pages/SocialAccounts'
 import { ScheduledPosts } from './pages/ScheduledPosts'
 import { SocialCallback } from './pages/SocialCallback'
@@ -55,6 +56,14 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <GenerateVideo />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/quick-create"
+          element={
+            <ProtectedRoute>
+              <QuickCreate />
             </ProtectedRoute>
           }
         />
