@@ -13,9 +13,12 @@ import { ResetPassword } from './pages/ResetPassword'
 import { VerifyEmail } from './pages/VerifyEmail'
 import { Dashboard } from './pages/Dashboard'
 import { Videos } from './pages/Videos'
+import { GenerateVideo } from './pages/GenerateVideo'
+import { SocialAccounts } from './pages/SocialAccounts'
+import { ScheduledPosts } from './pages/ScheduledPosts'
 import { SocialCallback } from './pages/SocialCallback'
+import { ContentFactory } from './pages/ContentFactory'
 import { Workflows } from './pages/Workflows'
-import { Distribution } from './pages/Distribution'
 
 function AppContent() {
   const { toasts, removeToast } = useToast()
@@ -47,18 +50,42 @@ function AppContent() {
           }
         />
         <Route
-          path="/workflows"
+          path="/generate"
           element={
             <ProtectedRoute>
-              <Workflows />
+              <GenerateVideo />
             </ProtectedRoute>
           }
         />
         <Route
-          path="/distribution"
+          path="/social"
           element={
             <ProtectedRoute>
-              <Distribution />
+              <SocialAccounts />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/posts"
+          element={
+            <ProtectedRoute>
+              <ScheduledPosts />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/content"
+          element={
+            <ProtectedRoute>
+              <ContentFactory />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/workflows"
+          element={
+            <ProtectedRoute>
+              <Workflows />
             </ProtectedRoute>
           }
         />

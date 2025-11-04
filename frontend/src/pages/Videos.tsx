@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -8,8 +9,7 @@ import { Select } from '../components/ui/Select'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Modal } from '../components/ui/Modal'
-import { GenerateVideoModal } from '../components/videos/GenerateVideoModal'
-import { Video as VideoIcon, Search, Trash2, RefreshCw, Play, Download, Plus } from 'lucide-react'
+import { Video as VideoIcon, Search, Trash2, RefreshCw, Play, Download } from 'lucide-react'
 import {
   listVideos,
   deleteVideo as deleteVideoRequest,
@@ -25,7 +25,6 @@ export function Videos() {
   const [statusFilter, setStatusFilter] = useState<ListVideosParams['status']>('all')
   const [deleteModal, setDeleteModal] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
-  const [generateModalOpen, setGenerateModalOpen] = useState(false)
 
   const loadVideos = useCallback(async () => {
     try {
@@ -113,10 +112,12 @@ export function Videos() {
             <h1 className="text-3xl font-semibold text-primary">Video library</h1>
             <p className="text-sm text-slate-500">Search, filter, and orchestrate your AI-generated stories.</p>
           </div>
-          <Button onClick={() => setGenerateModalOpen(true)} className="shadow-[0_20px_45px_-25px_rgba(99,102,241,0.6)]">
-            <Plus className="mr-2 h-4 w-4" />
-            Generate new video
-          </Button>
+          <Link to="/generate">
+            <Button className="shadow-[0_20px_45px_-25px_rgba(99,102,241,0.6)]">
+              <VideoIcon className="mr-2 h-4 w-4" />
+              Generate new video
+            </Button>
+          </Link>
         </div>
 
         <Card className="border-dashed border-white/40">
@@ -151,10 +152,9 @@ export function Videos() {
             title="No videos found"
             description="Get started by generating your first AI-powered video."
             action={
-              <Button onClick={() => setGenerateModalOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Generate Video
-              </Button>
+              <Link to="/generate">
+                <Button>Generate Video</Button>
+              </Link>
             }
           />
         ) : (
@@ -268,14 +268,6 @@ export function Videos() {
             </Button>
           </div>
         </Modal>
-
-        <GenerateVideoModal
-          isOpen={generateModalOpen}
-          onClose={() => setGenerateModalOpen(false)}
-          onSuccess={() => {
-            loadVideos()
-          }}
-        />
       </div>
     </Layout>
   )

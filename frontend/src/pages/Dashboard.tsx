@@ -93,7 +93,7 @@ export function Dashboard() {
               </p>
             </div>
             <div className="flex flex-wrap gap-3 text-sm font-medium">
-              <Link to="/videos">
+              <Link to="/generate">
                 <Button className="border border-white/20 bg-white/15 text-white backdrop-blur hover:bg-white/25 hover:text-white">
                   <Plus className="mr-2 h-4 w-4" />
                   Generate video
@@ -184,7 +184,7 @@ export function Dashboard() {
 
               <div className="mt-6 grid gap-4">
                 <Link
-                  to="/videos"
+                  to="/generate"
                   className="group flex items-center justify-between rounded-2xl border border-white/60 bg-white/70 px-5 py-4 transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-[0_18px_45px_-30px_rgba(99,102,241,0.45)]"
                 >
                   <div className="flex items-center gap-4">
@@ -200,7 +200,7 @@ export function Dashboard() {
                 </Link>
 
                 <Link
-                  to="/distribution"
+                  to="/social"
                   className="group flex items-center justify-between rounded-2xl border border-white/60 bg-white/70 px-5 py-4 transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-[0_18px_45px_-30px_rgba(99,102,241,0.45)]"
                 >
                   <div className="flex items-center gap-4">
@@ -208,8 +208,8 @@ export function Dashboard() {
                       <Users className="h-5 w-5" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-primary">Distribution</p>
-                      <p className="text-xs text-slate-400">Connect accounts and schedule posts</p>
+                      <p className="text-sm font-semibold text-primary">Connect social accounts</p>
+                      <p className="text-xs text-slate-400">Sync destinations for automated posting</p>
                     </div>
                   </div>
                   <span className="text-sm font-semibold text-brand-600 opacity-0 transition group-hover:opacity-100">Manage {'->'}</span>

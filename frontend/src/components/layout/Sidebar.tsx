@@ -1,8 +1,10 @@
 import { Fragment } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import {
+  CalendarCheck,
   Clapperboard,
   LayoutDashboard,
+  PenSquare,
   Share2,
   Sparkles,
   Workflow,
@@ -16,8 +18,11 @@ interface SidebarProps {
 const navigation = [
   { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
   { label: 'Videos', to: '/videos', icon: Clapperboard },
+  { label: 'Generate', to: '/generate', icon: Sparkles },
+  { label: 'Content Factory', to: '/content', icon: PenSquare },
   { label: 'Workflows', to: '/workflows', icon: Workflow },
-  { label: 'Distribution', to: '/distribution', icon: Share2 },
+  { label: 'Social Accounts', to: '/social', icon: Share2 },
+  { label: 'Scheduled Posts', to: '/posts', icon: CalendarCheck },
 ]
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
