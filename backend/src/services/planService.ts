@@ -28,7 +28,7 @@ export interface VideoPlanItem {
   scheduled_date: string
   scheduled_time: string | null
   topic: string | null
-  category: 'Trading' | 'Lifestyle' | 'Fin. Freedom' | null
+  category: string | null
   description: string | null
   why_important: string | null
   useful_tips: string | null
@@ -118,7 +118,7 @@ export class PlanService {
     endDate?: string,
     customTimes?: string[], // Custom posting times from user
     customTopics?: string[], // Custom topics for each time slot
-    customCategories?: Array<'Trading' | 'Lifestyle' | 'Fin. Freedom' | null> // Custom categories for each slot
+    customCategories?: Array<string | null> // Custom categories for each slot
   ): Promise<VideoPlanItem[]> {
     const plan = await this.getPlanById(planId, userId)
     

@@ -25,7 +25,7 @@ export interface TopicGenerationResponse {
 
 export interface ResearchRequest {
   topic: string
-  category: 'Trading' | 'Lifestyle' | 'Fin. Freedom'
+  category: string
 }
 
 export interface ResearchResponse {

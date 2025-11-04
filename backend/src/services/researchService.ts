@@ -26,7 +26,7 @@ export class ResearchService {
    */
   static async researchTopic(
     topic: string,
-    category: 'Trading' | 'Lifestyle' | 'Fin. Freedom'
+    category: string
   ): Promise<ResearchResponse> {
     return await researchTopic({ topic, category })
   }
