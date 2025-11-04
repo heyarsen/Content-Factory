@@ -4,6 +4,7 @@ import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { Select } from '../components/ui/Select'
+import { Textarea } from '../components/ui/Textarea'
 import { Badge } from '../components/ui/Badge'
 import { Modal } from '../components/ui/Modal'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -18,6 +19,8 @@ import {
   PenSquare,
   Check,
   X,
+  Edit2,
+  Save,
 } from 'lucide-react'
 import api from '../lib/api'
 
@@ -66,6 +69,26 @@ export function VideoPlanning() {
     new Date().toISOString().split('T')[0]
   )
   const [scriptPreviewItem, setScriptPreviewItem] = useState<VideoPlanItem | null>(null)
+  const [editingItem, setEditingItem] = useState<VideoPlanItem | null>(null)
+  const [editForm, setEditForm] = useState<{
+    topic: string
+    category: 'Trading' | 'Lifestyle' | 'Fin. Freedom' | null
+    scheduled_time: string
+    description: string
+    why_important: string
+    useful_tips: string
+    caption: string
+    platforms: string[]
+  }>({
+    topic: '',
+    category: null,
+    scheduled_time: '',
+    description: '',
+    why_important: '',
+    useful_tips: '',
+    caption: '',
+    platforms: [],
+  })
 
   // Create plan form
   const [planName, setPlanName] = useState('')
@@ -214,6 +237,42 @@ export function VideoPlanning() {
       }
     } catch (error: any) {
       alert(error.response?.data?.error || 'Failed to create video')
+    }
+  }
+
+  const handleEditItem = (item: VideoPlanItem) => {
+    setEditingItem(item)
+    setEditForm({
+      topic: item.topic || '',
+      category: item.category || null,
+      scheduled_time: item.scheduled_time || '',
+      description: item.description || '',
+      why_important: item.why_important || '',
+      useful_tips: item.useful_tips || '',
+      caption: item.caption || '',
+      platforms: item.platforms || [],
+    })
+  }
+
+  const handleSaveItem = async () => {
+    if (!editingItem || !selectedPlan) return
+
+    try {
+      await api.patch(`/api/plans/items/${editingItem.id}`, {
+        topic: editForm.topic || null,
+        category: editForm.category,
+        scheduled_time: editForm.scheduled_time || null,
+        description: editForm.description || null,
+        why_important: editForm.why_important || null,
+        useful_tips: editForm.useful_tips || null,
+        caption: editForm.caption || null,
+        platforms: editForm.platforms.length > 0 ? editForm.platforms : null,
+      })
+      
+      setEditingItem(null)
+      loadPlanItems(selectedPlan.id)
+    } catch (error: any) {
+      alert(error.response?.data?.error || 'Failed to update item')
     }
   }
 
@@ -400,17 +459,125 @@ export function VideoPlanning() {
                               {getStatusBadge(item.status, item.script_status)}
                             </div>
 
-                            {item.topic ? (
-                              <div>
-                                <h3 className="font-semibold text-primary">{item.topic}</h3>
-                                {item.description && (
-                                  <p className="mt-1 text-sm text-slate-600 line-clamp-2">
-                                    {item.description}
-                                  </p>
-                                )}
+                            {editingItem?.id === item.id ? (
+                              <div className="space-y-3">
+                                <Input
+                                  label="Topic"
+                                  value={editForm.topic}
+                                  onChange={(e) => setEditForm({ ...editForm, topic: e.target.value })}
+                                  placeholder="Enter topic..."
+                                />
+                                <Select
+                                  label="Category"
+                                  value={editForm.category || ''}
+                                  onChange={(e) => setEditForm({ ...editForm, category: e.target.value as any || null })}
+                                  options={[
+                                    { value: '', label: 'No category' },
+                                    { value: 'Trading', label: 'Trading' },
+                                    { value: 'Lifestyle', label: 'Lifestyle' },
+                                    { value: 'Fin. Freedom', label: 'Fin. Freedom' },
+                                  ]}
+                                />
+                                                                 <div className="space-y-3">
+                                   <div>
+                                     <label className="mb-2 block text-xs font-medium text-slate-700">
+                                       Posting Time
+                                     </label>
+                                     <Input
+                                       type="time"
+                                       value={editForm.scheduled_time}
+                                       onChange={(e) => setEditForm({ ...editForm, scheduled_time: e.target.value })}
+                                       className="mb-2"
+                                     />
+                                     <div className="flex flex-wrap gap-2">
+                                       {timePresets.map((preset) => (
+                                         <button
+                                           key={preset.value}
+                                           type="button"
+                                           onClick={() => setEditForm({ ...editForm, scheduled_time: preset.value })}
+                                           className={`rounded-lg border px-2 py-1 text-xs font-medium transition ${
+                                             editForm.scheduled_time === preset.value
+                                               ? 'border-brand-500 bg-brand-50 text-brand-700'
+                                               : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                           }`}
+                                         >
+                                           {preset.label.split(' ')[0]}
+                                         </button>
+                                       ))}
+                                     </div>
+                                   </div>
+                                   <div className="space-y-2">
+                                     <label className="block text-xs font-medium text-slate-700">Platforms</label>
+                                     <div className="flex flex-wrap gap-2">
+                                       {availablePlatforms.map((platform) => (
+                                         <button
+                                           key={platform}
+                                           type="button"
+                                           onClick={() => {
+                                             const newPlatforms = editForm.platforms.includes(platform)
+                                               ? editForm.platforms.filter((p) => p !== platform)
+                                               : [...editForm.platforms, platform]
+                                             setEditForm({ ...editForm, platforms: newPlatforms })
+                                           }}
+                                           className={`rounded-lg border px-2 py-1 text-xs font-medium transition ${
+                                             editForm.platforms.includes(platform)
+                                               ? 'border-brand-500 bg-brand-50 text-brand-700'
+                                               : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                           }`}
+                                         >
+                                           {platform}
+                                         </button>
+                                       ))}
+                                     </div>
+                                   </div>
+                                 </div>
+                                <Textarea
+                                  label="Description"
+                                  value={editForm.description}
+                                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                                  placeholder="Video description..."
+                                  rows={2}
+                                />
+                                <Textarea
+                                  label="Caption (for social posts)"
+                                  value={editForm.caption}
+                                  onChange={(e) => setEditForm({ ...editForm, caption: e.target.value })}
+                                  placeholder="Custom caption for social media..."
+                                  rows={2}
+                                />
                               </div>
                             ) : (
-                              <p className="text-sm text-slate-400">No topic yet</p>
+                              <div>
+                                {item.topic ? (
+                                  <>
+                                    <h3 className="font-semibold text-primary">{item.topic}</h3>
+                                    {item.description && (
+                                      <p className="mt-1 text-sm text-slate-600 line-clamp-2">
+                                        {item.description}
+                                      </p>
+                                    )}
+                                    {item.caption && (
+                                      <p className="mt-1 text-xs text-slate-500 italic">
+                                        Caption: {item.caption}
+                                      </p>
+                                    )}
+                                    {item.platforms && item.platforms.length > 0 && (
+                                      <div className="mt-2 flex flex-wrap gap-1">
+                                        {item.platforms.map((platform) => (
+                                          <span
+                                            key={platform}
+                                            className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700"
+                                          >
+                                            {platform}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </>
+                                ) : (
+                                  <p className="text-sm text-slate-400">No topic yet</p>
+                                )}
+                              </div>
                             )}
 
                             {item.error_message && (
@@ -418,16 +585,46 @@ export function VideoPlanning() {
                             )}
                           </div>
 
-                          <div className="flex gap-2">
-                            {!item.topic && item.status === 'pending' && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleGenerateTopic(item.id)}
-                                leftIcon={<Sparkles className="h-4 w-4" />}
-                              >
-                                Generate
-                              </Button>
+                          <div className="flex flex-wrap gap-2">
+                            {editingItem?.id === item.id ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  onClick={handleSaveItem}
+                                  leftIcon={<Save className="h-4 w-4" />}
+                                >
+                                  Save
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setEditingItem(null)}
+                                  leftIcon={<X className="h-4 w-4" />}
+                                >
+                                  Cancel
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleEditItem(item)}
+                                  leftIcon={<Edit2 className="h-4 w-4" />}
+                                >
+                                  Edit
+                                </Button>
+                                {!item.topic && item.status === 'pending' && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleGenerateTopic(item.id)}
+                                    leftIcon={<Sparkles className="h-4 w-4" />}
+                                  >
+                                    Generate
+                                  </Button>
+                                )}
+                              </>
                             )}
                             {item.script_status === 'draft' && item.script && (
                               <Button
