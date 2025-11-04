@@ -31,7 +31,7 @@ const navigation = [
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation()
-  const { isAdmin, refreshAdminStatus } = useAuth()
+  const { isAdmin } = useAuth()
   
   // Debug: Log admin status
   useEffect(() => {

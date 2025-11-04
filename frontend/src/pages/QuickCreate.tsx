@@ -103,7 +103,7 @@ export function QuickCreate() {
     setVideoError('')
 
     try {
-      const response = await api.post('/api/videos/generate', {
+      await api.post('/api/videos/generate', {
         topic,
         script: generatedScript,
         style,
@@ -275,7 +275,7 @@ export function QuickCreate() {
                 <div className="mb-2 flex items-center justify-between">
                   <label className="text-sm font-semibold text-primary">Script Preview</label>
                   {canEditScript && (
-                    <Badge variant="success" className="text-xs">
+                    <Badge variant="success">
                       Editable
                     </Badge>
                   )}
