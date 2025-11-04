@@ -1,0 +1,143 @@
+import { useState } from 'react'
+import { Button } from '../ui/Button'
+import { Input } from '../ui/Input'
+import { Textarea } from '../ui/Textarea'
+import { Select } from '../ui/Select'
+import { Modal } from '../ui/Modal'
+import { Video } from 'lucide-react'
+import { createVideo } from '../../lib/videos'
+
+interface GenerateVideoModalProps {
+  isOpen: boolean
+  onClose: () => void
+  onSuccess: () => void
+}
+
+export function GenerateVideoModal({ isOpen, onClose, onSuccess }: GenerateVideoModalProps) {
+  const [topic, setTopic] = useState('')
+  const [script, setScript] = useState('')
+  const [style, setStyle] = useState<'casual' | 'professional' | 'energetic' | 'educational'>('professional')
+  const [duration, setDuration] = useState(60)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+
+    try {
+      await createVideo({
+        topic,
+        script: script || undefined,
+        style,
+        duration,
+      })
+      // Reset form
+      setTopic('')
+      setScript('')
+      setStyle('professional')
+      setDuration(60)
+      setError('')
+      onSuccess()
+      onClose()
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to generate video')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleClose = () => {
+    if (!loading) {
+      setTopic('')
+      setScript('')
+      setStyle('professional')
+      setDuration(60)
+      setError('')
+      onClose()
+    }
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={handleClose} title="Generate a new video" size="lg">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <p className="text-sm text-slate-500">
+          Guide the AI with a topic, optional script, and tone. We will orchestrate the visuals, audio, and timing for you.
+        </p>
+
+        {error && (
+          <div className="rounded-2xl border border-rose-200/80 bg-rose-50/80 px-4 py-3 text-sm text-rose-600">
+            {error}
+          </div>
+        )}
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Input
+            label="Video topic"
+            placeholder="e.g., Product launch announcement"
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            required
+          />
+          <Select
+            label="Style"
+            options={[
+              { value: 'casual', label: 'Casual' },
+              { value: 'professional', label: 'Professional' },
+              { value: 'energetic', label: 'Energetic' },
+              { value: 'educational', label: 'Educational' },
+            ]}
+            value={style}
+            onChange={(e) => setStyle(e.target.value as any)}
+          />
+        </div>
+
+        <Textarea
+          label="Script (optional)"
+          placeholder="Add a detailed script or talking points if you have them - otherwise we'll generate it."
+          rows={8}
+          value={script}
+          onChange={(e) => setScript(e.target.value)}
+        />
+
+        <div className="rounded-2xl border border-white/60 bg-white/70 px-5 py-6">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-semibold text-primary">Duration</label>
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-400">{duration} seconds</span>
+          </div>
+          <input
+            type="range"
+            min="15"
+            max="180"
+            step="15"
+            value={duration}
+            onChange={(e) => setDuration(Number(e.target.value))}
+            className="mt-4 w-full accent-brand-500"
+          />
+          <div className="mt-2 flex justify-between text-[11px] uppercase tracking-wide text-slate-400">
+            <span>15s</span>
+            <span>180s</span>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handleClose}
+            disabled={loading}
+            className="border border-white/60 bg-white/70 text-slate-500 hover:border-slate-200 hover:bg-white sm:w-auto"
+          >
+            Cancel
+          </Button>
+          <Button type="submit" className="sm:w-auto" loading={loading}>
+            <Video className="mr-2 h-4 w-4" />
+            Generate video
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
