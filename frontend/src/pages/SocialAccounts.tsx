@@ -83,11 +83,9 @@ export function SocialAccounts() {
     setConnectingPlatform(platform)
     try {
       const response = await api.post('/api/social/connect', { platform })
-      const { accessUrl, uploadPostUsername, message, duration, redirectUrl } = response.data as {
+      const { accessUrl, uploadPostUsername, redirectUrl } = response.data as {
         accessUrl?: string
         uploadPostUsername?: string
-        message?: string
-        duration?: string
         redirectUrl?: string
       }
 
@@ -116,9 +114,6 @@ export function SocialAccounts() {
           return `${baseUrl}${separator}platform=${platform}`
         }
       }
-
-      const defaultMessage =
-        message || `Account linking initiated for ${platformLabel}.`
 
       // Redirect directly to Upload-Post connection page instead of popup
       if (accessUrl) {
