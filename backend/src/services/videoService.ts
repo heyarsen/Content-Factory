@@ -18,8 +18,9 @@ type VideoStyle = Video['style']
 export interface ManualVideoInput {
   topic: string
   script?: string
-  style: VideoStyle
-  duration: number
+  style?: VideoStyle
+  duration?: number
+  avatar_id?: string | null
 }
 
 type ServiceError = Error & { status?: number }
