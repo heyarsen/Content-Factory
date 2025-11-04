@@ -9,36 +9,30 @@ import { Select } from '../components/ui/Select'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Modal } from '../components/ui/Modal'
-import { Video, Search, Trash2, RefreshCw, Play, Download } from 'lucide-react'
-import api from '../lib/api'
-
-interface VideoItem {
-  id: string
-  topic: string
-  style: string
-  duration: number
-  status: 'pending' | 'generating' | 'completed' | 'failed'
-  video_url: string | null
-  error_message: string | null
-  created_at: string
-}
+import { Video as VideoIcon, Search, Trash2, RefreshCw, Play, Download } from 'lucide-react'
+import {
+  listVideos,
+  deleteVideo as deleteVideoRequest,
+  retryVideo as retryVideoRequest,
+  type VideoRecord,
+  type ListVideosParams,
+} from '../lib/videos'
 
 export function Videos() {
-  const [videos, setVideos] = useState<VideoItem[]>([])
+  const [videos, setVideos] = useState<VideoRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState<ListVideosParams['status']>('all')
   const [deleteModal, setDeleteModal] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
 
   const loadVideos = useCallback(async () => {
     try {
-      const params: any = {}
-      if (search) params.search = search
-      if (statusFilter !== 'all') params.status = statusFilter
-
-      const response = await api.get('/api/videos', { params })
-      setVideos(response.data.videos || [])
+      const videos = await listVideos({
+        search: search || undefined,
+        status: statusFilter,
+      })
+      setVideos(videos)
     } catch (error) {
       console.error('Failed to load videos:', error)
     } finally {
@@ -64,7 +58,7 @@ export function Videos() {
   const handleDelete = async (id: string) => {
     setDeleting(true)
     try {
-      await api.delete(`/api/videos/${id}`)
+      await deleteVideoRequest(id)
       setVideos(videos.filter((v) => v.id !== id))
       setDeleteModal(null)
     } catch (error) {
@@ -76,14 +70,14 @@ export function Videos() {
 
   const handleRetry = async (id: string) => {
     try {
-      await api.post(`/api/videos/${id}/retry`)
+      await retryVideoRequest(id)
       loadVideos()
     } catch (error) {
       console.error('Failed to retry video:', error)
     }
   }
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: VideoRecord['status']) => {
     const variants: Record<string, 'default' | 'success' | 'error' | 'warning' | 'info'> = {
       completed: 'success',
       generating: 'info',
@@ -120,7 +114,7 @@ export function Videos() {
           </div>
           <Link to="/generate">
             <Button className="shadow-[0_20px_45px_-25px_rgba(99,102,241,0.6)]">
-              <Video className="mr-2 h-4 w-4" />
+              <VideoIcon className="mr-2 h-4 w-4" />
               Generate new video
             </Button>
           </Link>
@@ -145,8 +139,8 @@ export function Videos() {
                 { value: 'completed', label: 'Completed' },
                 { value: 'failed', label: 'Failed' },
               ]}
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              value={statusFilter ?? 'all'}
+              onChange={(e) => setStatusFilter(e.target.value as ListVideosParams['status'])}
               className="w-full md:w-56"
             />
           </div>
@@ -154,7 +148,7 @@ export function Videos() {
 
         {videos.length === 0 ? (
           <EmptyState
-            icon={<Video className="w-16 h-16" />}
+            icon={<VideoIcon className="w-16 h-16" />}
             title="No videos found"
             description="Get started by generating your first AI-powered video."
             action={

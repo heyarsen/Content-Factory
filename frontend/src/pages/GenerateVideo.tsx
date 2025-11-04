@@ -6,8 +6,8 @@ import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { Textarea } from '../components/ui/Textarea'
 import { Select } from '../components/ui/Select'
-import api from '../lib/api'
 import { Video } from 'lucide-react'
+import { createVideo } from '../lib/videos'
 
 export function GenerateVideo() {
   const navigate = useNavigate()
@@ -24,7 +24,7 @@ export function GenerateVideo() {
     setLoading(true)
 
     try {
-      await api.post('/api/videos/generate', {
+      await createVideo({
         topic,
         script: script || undefined,
         style,
