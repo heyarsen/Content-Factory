@@ -101,7 +101,7 @@ export class VideoService {
    */
   static async requestManualVideo(userId: string, input: ManualVideoInput): Promise<Video> {
     // Get default avatar if no avatar_id specified
-    let avatarId = input.avatar_id
+    let avatarId: string | undefined = input.avatar_id || undefined
     let avatarRecordId: string | undefined
     if (!avatarId) {
       const { AvatarService } = await import('./avatarService.js')
@@ -113,7 +113,7 @@ export class VideoService {
     } else {
       // If avatar_id is provided, get the database record ID
       const { AvatarService } = await import('./avatarService.js')
-      const avatar = await AvatarService.getAvatarById(input.avatar_id, userId)
+      const avatar = await AvatarService.getAvatarById(avatarId, userId)
       avatarRecordId = avatar?.id
       if (avatar) {
         avatarId = avatar.heygen_avatar_id
