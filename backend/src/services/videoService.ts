@@ -40,12 +40,13 @@ function mapHeygenStatus(status: string): Video['status'] {
   return 'generating'
 }
 
-function buildHeygenPayload(topic: string, script: string | undefined, style: VideoStyle, duration: number) {
+function buildHeygenPayload(topic: string, script: string | undefined, style: VideoStyle, duration: number, avatarId?: string) {
   return {
     topic,
     script: script || topic,
     style,
     duration,
+    avatar_id: avatarId,
   }
 }
 
@@ -81,10 +82,10 @@ async function applyManualGenerationFailure(videoId: string, error: Error): Prom
   }
 }
 
-async function runHeygenGeneration(video: Video): Promise<void> {
+async function runHeygenGeneration(video: Video, avatarId?: string): Promise<void> {
   try {
     const response = await requestHeygenVideo(
-      buildHeygenPayload(video.topic, video.script || undefined, video.style, video.duration)
+      buildHeygenPayload(video.topic, video.script || undefined, video.style, video.duration, avatarId)
     )
     await applyManualGenerationSuccess(video.id, response)
   } catch (error: any) {
@@ -98,8 +99,28 @@ export class VideoService {
    * Create a manual video request and trigger HeyGen generation asynchronously
    */
   static async requestManualVideo(userId: string, input: ManualVideoInput): Promise<Video> {
-    const video = await this.createVideoRecord(userId, input)
-    void runHeygenGeneration(video)
+    // Get default avatar if no avatar_id specified
+    let avatarId = input.avatar_id
+    let avatarRecordId: string | undefined
+    if (!avatarId) {
+      const { AvatarService } = await import('./avatarService.js')
+      const defaultAvatar = await AvatarService.getDefaultAvatar(userId)
+      if (defaultAvatar) {
+        avatarId = defaultAvatar.heygen_avatar_id
+        avatarRecordId = defaultAvatar.id
+      }
+    } else {
+      // If avatar_id is provided, get the database record ID
+      const { AvatarService } = await import('./avatarService.js')
+      const avatar = await AvatarService.getAvatarById(input.avatar_id, userId)
+      avatarRecordId = avatar?.id
+      if (avatar) {
+        avatarId = avatar.heygen_avatar_id
+      }
+    }
+    
+    const video = await this.createVideoRecord(userId, input, avatarRecordId)
+    void runHeygenGeneration(video, avatarId)
     return video
   }
 
@@ -290,18 +311,19 @@ export class VideoService {
     return CATEGORY_TEMPLATES[category] || CATEGORY_TEMPLATES.Trading
   }
 
-  private static async createVideoRecord(userId: string, input: ManualVideoInput): Promise<Video> {
+  private static async createVideoRecord(userId: string, input: ManualVideoInput, avatarRecordId?: string): Promise<Video> {
     const { data, error } = await supabase
       .from('videos')
       .insert({
         user_id: userId,
         topic: input.topic,
         script: input.script || null,
-        style: input.style,
-        duration: input.duration,
+        style: input.style || DEFAULT_REEL_STYLE,
+        duration: input.duration || DEFAULT_REEL_DURATION,
         status: 'pending',
         heygen_video_id: null,
         video_url: null,
+        avatar_id: avatarRecordId || null,
         error_message: null,
       })
       .select()

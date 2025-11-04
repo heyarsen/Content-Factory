@@ -8,6 +8,7 @@ export interface Video {
   status: 'pending' | 'generating' | 'completed' | 'failed'
   heygen_video_id: string | null
   video_url: string | null
+  avatar_id: string | null
   error_message: string | null
   created_at: string
   updated_at: string

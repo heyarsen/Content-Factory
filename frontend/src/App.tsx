@@ -25,6 +25,7 @@ import { VideoPlanning } from './pages/VideoPlanning'
 import { Categories } from './pages/Categories'
 import { ProfileSettings } from './pages/ProfileSettings'
 import { Preferences } from './pages/Preferences'
+import Avatars from './pages/Avatars'
 
 function AppContent() {
   const { toasts, removeToast } = useToast()
@@ -164,6 +165,14 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <Preferences />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/avatars"
+          element={
+            <ProtectedRoute>
+              <Avatars />
             </ProtectedRoute>
           }
         />

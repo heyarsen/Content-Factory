@@ -27,6 +27,7 @@ const navigation = [
   { label: 'Social Accounts', to: '/social', icon: Share2 },
   { label: 'Scheduled Posts', to: '/posts', icon: CalendarCheck },
   { label: 'Categories', to: '/categories', icon: Tag },
+  { label: 'Avatars', to: '/avatars', icon: User },
 ]
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
