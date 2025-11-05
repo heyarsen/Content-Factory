@@ -297,15 +297,31 @@ export async function createAvatarFromPhoto(
       status,
     }
   } catch (error: any) {
-    console.error('HeyGen API error (createAvatarFromPhoto):', error.response?.data || error.message)
+    console.error('HeyGen API error (createAvatarFromPhoto):', {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      photoUrlLength: photoUrl?.length,
+      photoUrlType: photoUrl?.substring(0, 50),
+    })
     
     let errorMessage = 'Failed to create avatar from photo'
     if (error.response?.data?.message) {
       errorMessage = error.response.data.message
     } else if (error.response?.data?.error?.message) {
       errorMessage = error.response.data.error.message
+    } else if (error.response?.data?.error) {
+      errorMessage = typeof error.response.data.error === 'string' 
+        ? error.response.data.error 
+        : JSON.stringify(error.response.data.error)
     } else if (error.message) {
       errorMessage = error.message
+    }
+    
+    // Check if it's a base64 issue
+    if (photoUrl?.startsWith('data:image')) {
+      errorMessage += '. Note: HeyGen API may require a publicly accessible URL instead of base64 data. Please upload the image to a storage service first.'
     }
     
     throw new Error(errorMessage)

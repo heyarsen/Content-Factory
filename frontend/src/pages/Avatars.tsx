@@ -54,7 +54,10 @@ export default function Avatars() {
   const handleSync = async () => {
     setSyncing(true)
     try {
+      console.log('Syncing avatars from HeyGen...')
       const response = await api.post('/api/avatars/sync')
+      console.log('Sync response:', response.data)
+      
       setAvatars(response.data.avatars || [])
       if (response.data.count === 0) {
         toast.error('No avatars found. Please check your HeyGen API key and ensure you have avatars in your HeyGen account.')
@@ -63,7 +66,18 @@ export default function Avatars() {
       }
     } catch (error: any) {
       console.error('Failed to sync avatars:', error)
-      const errorMessage = error.response?.data?.error || error.message || 'Failed to sync avatars'
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      })
+      
+      const errorMessage = 
+        error.response?.data?.error || 
+        error.response?.data?.message ||
+        error.message || 
+        'Failed to sync avatars'
+      
       toast.error(errorMessage + '. Please check your HEYGEN_KEY environment variable and HeyGen API documentation.')
     } finally {
       setSyncing(false)
@@ -158,25 +172,45 @@ export default function Avatars() {
       console.log('File read, sending to API...')
       
       // Send to API
-      await api.post('/api/avatars/create-from-photo', {
+      console.log('Sending request to API...')
+      const response = await api.post('/api/avatars/create-from-photo', {
         photo_url: base64Data,
         avatar_name: avatarName,
       })
-
-      toast.success('Avatar creation started! It may take a few minutes to train.')
-      setShowCreateModal(false)
-      setAvatarName('')
-      setPhotoFile(null)
-      setPhotoPreview(null)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
       
-      // Reload avatars
-      await loadAvatars()
+      console.log('API response:', response.data)
+
+      if (response.data.avatar) {
+        toast.success('Avatar creation started! It may take a few minutes to train.')
+        setShowCreateModal(false)
+        setAvatarName('')
+        setPhotoFile(null)
+        setPhotoPreview(null)
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ''
+        }
+        
+        // Reload avatars
+        await loadAvatars()
+      } else {
+        throw new Error('No avatar returned from API')
+      }
     } catch (error: any) {
       console.error('Failed to create avatar:', error)
-      toast.error(error.response?.data?.error || 'Failed to create avatar')
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      })
+      
+      const errorMessage = 
+        error.response?.data?.error || 
+        error.response?.data?.message ||
+        error.message || 
+        'Failed to create avatar. Please check console for details.'
+      
+      toast.error(errorMessage)
+      setCreating(false) // Set here too in case finally doesn't run
     } finally {
       setCreating(false)
     }

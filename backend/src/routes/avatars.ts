@@ -155,8 +155,19 @@ router.post('/create-from-photo', async (req: AuthRequest, res: Response) => {
       avatar,
     })
   } catch (error: any) {
-    console.error('Create avatar from photo error:', error)
-    return res.status(500).json({ error: error.message || 'Failed to create avatar from photo' })
+    console.error('Create avatar from photo error:', {
+      message: error.message,
+      stack: error.stack,
+      response: error.response?.data,
+      status: error.response?.status,
+    })
+    
+    const errorMessage = 
+      error.message || 
+      error.response?.data?.message ||
+      'Failed to create avatar from photo'
+    
+    return res.status(500).json({ error: errorMessage })
   }
 })
 
