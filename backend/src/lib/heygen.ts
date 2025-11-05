@@ -349,6 +349,8 @@ export async function generateVideo(
  * 
  * The correct endpoint is: https://upload.heygen.com/v1/asset
  * It expects raw binary image data in the body (not multipart/form-data)
+ * 
+ * Note: HeyGen supports JPEG and PNG, but not WebP. WebP images will be converted to JPEG.
  */
 async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
   const apiKey = getHeyGenKey()
@@ -378,6 +380,62 @@ async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
     }
   } catch (err: any) {
     throw new Error(`Failed to download image: ${err.message}`)
+  }
+  
+  // Convert WebP to JPEG if needed (HeyGen doesn't support WebP)
+  // Supported formats: JPEG, PNG
+  const needsConversion = contentType === 'image/webp' || contentType.includes('webp')
+  
+  if (needsConversion) {
+    try {
+      // Try to use sharp for image conversion
+      const sharp = await import('sharp').catch(() => null)
+      
+      if (sharp && sharp.default) {
+        console.log('Converting WebP image to JPEG for HeyGen compatibility...')
+        imageBuffer = await sharp.default(imageBuffer)
+          .jpeg({ quality: 90 })
+          .toBuffer()
+        contentType = 'image/jpeg'
+        console.log('✅ Successfully converted WebP to JPEG')
+      } else {
+        throw new Error(
+          'WebP format is not supported by HeyGen. Please install "sharp" package to enable automatic conversion: npm install sharp. ' +
+          'Alternatively, upload a JPEG or PNG image instead.'
+        )
+      }
+    } catch (convError: any) {
+      if (convError.message.includes('sharp')) {
+        throw convError // Re-throw the helpful error about installing sharp
+      }
+      throw new Error(
+        `Failed to convert WebP image to JPEG: ${convError.message}. ` +
+        'HeyGen only supports JPEG and PNG formats. Please convert your image to JPEG or PNG before uploading.'
+      )
+    }
+  }
+  
+  // Ensure we're using a supported content type
+  // HeyGen supports: image/jpeg, image/png
+  if (!contentType.includes('jpeg') && !contentType.includes('jpg') && !contentType.includes('png')) {
+    // Try to detect from buffer or convert to JPEG
+    try {
+      const sharp = await import('sharp').catch(() => null)
+      if (sharp && sharp.default) {
+        console.log(`Converting ${contentType} to JPEG for HeyGen compatibility...`)
+        imageBuffer = await sharp.default(imageBuffer)
+          .jpeg({ quality: 90 })
+          .toBuffer()
+        contentType = 'image/jpeg'
+      } else {
+        throw new Error(`Unsupported image format: ${contentType}. HeyGen only supports JPEG and PNG.`)
+      }
+    } catch (convError: any) {
+      throw new Error(
+        `Unsupported image format: ${contentType}. HeyGen only supports JPEG and PNG formats. ` +
+        `Error: ${convError.message}`
+      )
+    }
   }
   
   try {

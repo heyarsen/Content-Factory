@@ -252,15 +252,16 @@ export class AvatarService {
       const result = await createAvatarFromPhoto(photoUrl, avatarName)
 
       // Save to database
+      // Save photoUrl as avatar_url to identify user-created avatars
       const { data, error } = await supabase
         .from('avatars')
         .insert({
           user_id: userId,
           heygen_avatar_id: result.avatar_id,
           avatar_name: avatarName,
-          avatar_url: null,
-          preview_url: null,
-          thumbnail_url: null,
+          avatar_url: photoUrl, // Save the photo URL to identify user-created avatars
+          preview_url: photoUrl,
+          thumbnail_url: photoUrl,
           gender: null,
           status: result.status === 'training' ? 'training' : 'active',
           is_default: false,
@@ -274,5 +275,24 @@ export class AvatarService {
       console.error('Create avatar from photo error:', error)
       throw new Error(`Failed to create avatar from photo: ${error.message}`)
     }
+  }
+
+  /**
+   * Get only user-created avatars (avatars created from uploaded photos)
+   * User-created avatars have avatar_url pointing to Supabase storage
+   */
+  static async getUserCreatedAvatars(userId: string): Promise<Avatar[]> {
+    const { data, error } = await supabase
+      .from('avatars')
+      .select('*')
+      .eq('user_id', userId)
+      .not('avatar_url', 'is', null) // avatar_url must be set
+      .like('avatar_url', '%supabase.co/storage%') // Must point to our storage
+      .in('status', ['active', 'training', 'pending'])
+      .order('is_default', { ascending: false })
+      .order('avatar_name', { ascending: true })
+
+    if (error) throw error
+    return data || []
   }
 }

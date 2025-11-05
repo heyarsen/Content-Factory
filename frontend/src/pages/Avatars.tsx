@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -31,16 +31,15 @@ export default function Avatars() {
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const [onlyCreated, setOnlyCreated] = useState(true) // Default to showing only user-created avatars
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
-  useEffect(() => {
-    loadAvatars()
-  }, [])
-
-  const loadAvatars = async () => {
+  const loadAvatars = useCallback(async () => {
     try {
-      const response = await api.get('/api/avatars')
+      setLoading(true)
+      const params = onlyCreated ? { created: 'true' } : {}
+      const response = await api.get('/api/avatars', { params })
       setAvatars(response.data.avatars || [])
       setDefaultAvatarId(response.data.default_avatar_id || null)
     } catch (error: any) {
@@ -49,7 +48,11 @@ export default function Avatars() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [onlyCreated, toast])
+
+  useEffect(() => {
+    loadAvatars()
+  }, [loadAvatars])
 
   const handleSync = async () => {
     setSyncing(true)
@@ -58,12 +61,14 @@ export default function Avatars() {
       const response = await api.post('/api/avatars/sync')
       console.log('Sync response:', response.data)
       
-      setAvatars(response.data.avatars || [])
       if (response.data.count === 0) {
         toast.error('No avatars found. Please check your HeyGen API key and ensure you have avatars in your HeyGen account.')
       } else {
         toast.success(`Synced ${response.data.count || 0} avatars from HeyGen`)
       }
+      
+      // Reload avatars with current filter
+      await loadAvatars()
     } catch (error: any) {
       console.error('Failed to sync avatars:', error)
       console.error('Error details:', {
@@ -294,6 +299,14 @@ export default function Avatars() {
           </div>
           <div className="flex gap-3">
             <Button
+              variant={onlyCreated ? "default" : "secondary"}
+              onClick={() => setOnlyCreated(!onlyCreated)}
+              className="flex items-center gap-2"
+            >
+              {onlyCreated ? '✓ ' : ''}
+              {onlyCreated ? 'My Avatars' : 'All Avatars'}
+            </Button>
+            <Button
               variant="secondary"
               onClick={(e) => {
                 e.preventDefault()
@@ -321,15 +334,37 @@ export default function Avatars() {
           <Card className="p-12 text-center">
             <User className="h-16 w-16 mx-auto text-slate-400 mb-4" />
             <h3 className="text-lg font-semibold text-slate-900 mb-2">
-              No avatars found
+              {onlyCreated ? 'No avatars created yet' : 'No avatars found'}
             </h3>
             <p className="text-slate-600 mb-6">
-              Sync avatars from HeyGen to get started
+              {onlyCreated 
+                ? 'Create an avatar from a photo to get started'
+                : 'Sync avatars from HeyGen or create one from a photo to get started'}
             </p>
-            <Button onClick={handleSync} disabled={syncing}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-              Sync from HeyGen
-            </Button>
+            <div className="flex gap-3 justify-center">
+              <Button
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setShowCreateModal(true)
+                }}
+                className="flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Create from Photo
+              </Button>
+              {onlyCreated && (
+                <Button onClick={() => setOnlyCreated(false)} variant="secondary">
+                  Show All Avatars
+                </Button>
+              )}
+              {!onlyCreated && (
+                <Button onClick={handleSync} disabled={syncing} variant="secondary">
+                  <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+                  Sync from HeyGen
+                </Button>
+              )}
+            </div>
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

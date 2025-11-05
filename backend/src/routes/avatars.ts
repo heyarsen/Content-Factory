@@ -18,15 +18,23 @@ const router = Router()
 router.use(authenticate)
 
 // Get all avatars for the current user
+// Query parameter: ?created=true to show only user-created avatars
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
-    const avatars = await AvatarService.getUserAvatars(userId)
+    const onlyCreated = req.query.created === 'true'
+    
+    // If onlyCreated is true, return only user-created avatars
+    const avatars = onlyCreated 
+      ? await AvatarService.getUserCreatedAvatars(userId)
+      : await AvatarService.getUserAvatars(userId)
+    
     const defaultAvatar = await AvatarService.getDefaultAvatar(userId)
 
     return res.json({
       avatars,
       default_avatar_id: defaultAvatar?.id || null,
+      only_created: onlyCreated,
     })
   } catch (error: any) {
     console.error('Get avatars error:', error)
