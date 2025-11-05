@@ -384,7 +384,9 @@ async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
     { url: `${HEYGEN_V2_API_URL}/upload`, method: 'multipart' },
   ]
   
-  // Try uploading to HeyGen
+  // Try uploading to HeyGen with timeout
+  const uploadTimeout = 10000 // 10 seconds per endpoint
+  
   for (const endpoint of uploadEndpoints) {
     try {
       console.log(`Trying to upload image to ${endpoint.url} (method: ${endpoint.method})...`)
@@ -399,6 +401,7 @@ async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
               'X-Api-Key': apiKey,
               'Content-Type': 'application/json',
             },
+            timeout: uploadTimeout,
           }
         )
         
@@ -428,6 +431,7 @@ async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
           },
           maxContentLength: Infinity,
           maxBodyLength: Infinity,
+          timeout: uploadTimeout,
         })
         
         // Extract image_key from response
@@ -442,11 +446,22 @@ async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
         }
       }
     } catch (err: any) {
+      const isTimeout = err.code === 'ECONNABORTED' || err.message?.includes('timeout')
+      const is404 = err.response?.status === 404
+      
       console.log(`Upload to ${endpoint.url} (${endpoint.method}) failed:`, {
         status: err.response?.status,
         statusText: err.response?.statusText,
         error: err.response?.data?.error || err.message,
+        isTimeout,
+        is404,
       })
+      
+      // If we get 404 on first endpoint, others will likely fail too - fail fast
+      if (is404 && endpoint === uploadEndpoints[0]) {
+        console.log('Got 404 on first endpoint, skipping remaining upload attempts')
+        break
+      }
       
       // Continue to next endpoint
       continue
@@ -487,6 +502,7 @@ export async function createAvatarFromPhoto(
     console.log('Step 2: Creating avatar group...')
     let createGroupResponse: any
     let lastError: any = null
+    const createTimeout = 15000 // 15 seconds timeout
     
     // Try with image_key if we have it
     if (imageKey) {
@@ -502,6 +518,7 @@ export async function createAvatarFromPhoto(
               'X-Api-Key': apiKey,
               'Content-Type': 'application/json',
             },
+            timeout: createTimeout,
           }
         )
         console.log('Avatar group created successfully with image_key')
@@ -527,6 +544,7 @@ export async function createAvatarFromPhoto(
               'X-Api-Key': apiKey,
               'Content-Type': 'application/json',
             },
+            timeout: createTimeout,
           }
         )
         console.log('Avatar group created successfully with photo_url')
@@ -534,24 +552,27 @@ export async function createAvatarFromPhoto(
         console.log('Creating with photo_url also failed:', err.response?.status, err.response?.data)
         lastError = err
         
-        // Try alternative endpoint format
-        try {
-          createGroupResponse = await axios.post(
-            `${HEYGEN_V2_API_URL}/avatar_group.create`,
-            {
-              name: avatarName,
-              photo_url: photoUrl,
-            },
-            {
-              headers: {
-                'X-Api-Key': apiKey,
-                'Content-Type': 'application/json',
+        // Only try one alternative endpoint, then give up
+        if (err.response?.status !== 404) {
+          try {
+            createGroupResponse = await axios.post(
+              `${HEYGEN_V2_API_URL}/avatar_group.create`,
+              {
+                name: avatarName,
+                photo_url: photoUrl,
               },
-            }
-          )
-          console.log('Avatar group created with alternative endpoint')
-        } catch (altErr: any) {
-          lastError = altErr
+              {
+                headers: {
+                  'X-Api-Key': apiKey,
+                  'Content-Type': 'application/json',
+                },
+                timeout: createTimeout,
+              }
+            )
+            console.log('Avatar group created with alternative endpoint')
+          } catch (altErr: any) {
+            lastError = altErr
+          }
         }
       }
     }

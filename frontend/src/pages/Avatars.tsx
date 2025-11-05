@@ -173,10 +173,29 @@ export default function Avatars() {
       
       // Send to API - upload photo and create avatar
       console.log('Uploading photo and creating avatar...')
-      const response = await api.post('/api/avatars/upload-photo', {
-        photo_data: base64Data,
-        avatar_name: avatarName,
-      })
+      
+      // Add timeout handling
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 120000) // 2 minutes
+      
+      let response
+      try {
+        response = await api.post('/api/avatars/upload-photo', {
+          photo_data: base64Data,
+          avatar_name: avatarName,
+        }, {
+          signal: controller.signal,
+        })
+        
+        clearTimeout(timeoutId)
+      } catch (error: any) {
+        clearTimeout(timeoutId)
+        
+        if (error.name === 'AbortError' || error.code === 'ECONNABORTED') {
+          throw new Error('Request timed out. The avatar creation is taking longer than expected. Your photo may have been saved - please check your avatars list.')
+        }
+        throw error
+      }
       
       console.log('API response:', response.data)
 
