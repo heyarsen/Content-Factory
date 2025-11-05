@@ -16,6 +16,7 @@ export interface GenerateVideoRequest {
   style: 'casual' | 'professional' | 'energetic' | 'educational'
   duration: number
   avatar_id?: string
+  talking_photo_id?: string // For photo avatars
   template_id?: string
 }
 
@@ -227,9 +228,54 @@ export async function generateVideo(
   request: GenerateVideoRequest
 ): Promise<HeyGenVideoResponse> {
   try {
+    const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
+    const apiKey = getHeyGenKey()
+    
     // Build payload based on HeyGen API requirements
-    // HeyGen typically uses either avatar_id or template_id for video generation
+    // For v2 API, we use video_inputs array format
+    // https://docs.heygen.com/docs/create-videos-with-photo-avatars
     const payload: any = {
+      video_inputs: [
+        {
+          character: {},
+          voice: {
+            type: 'text',
+            input_text: request.script || request.topic,
+            voice_id: 'd7bbcdd6964c47bdaae26decade4a933', // Default voice
+          },
+        },
+      ],
+    }
+
+    // Check if this is a photo avatar (talking_photo_id) or regular avatar
+    // Photo avatars use talking_photo_id, regular avatars use avatar_id
+    if (request.talking_photo_id) {
+      // Photo avatar - use v2 API
+      payload.video_inputs[0].character = {
+        type: 'talking_photo',
+        talking_photo_id: request.talking_photo_id,
+      }
+      
+      const response = await axios.post(
+        `${HEYGEN_V2_API_URL}/video/generate`,
+        payload,
+        {
+          headers: {
+            'X-Api-Key': apiKey,
+            'Content-Type': 'application/json',
+          },
+        }
+      )
+
+      const data = response.data?.data || response.data
+      return {
+        video_id: data.video_id || data.id || data.videoId,
+        status: data.status || 'generating',
+        video_url: data.video_url || data.videoUrl || data.url,
+      }
+    } else {
+      // Regular avatar - use v1 API
+      const v1Payload: any = {
       script: {
         type: 'text',
         input: request.script || request.topic,
@@ -241,31 +287,29 @@ export async function generateVideo(
       aspect_ratio: '16:9',
     }
 
-    // Use avatar_id if provided, otherwise fall back to template-based approach
     if (request.avatar_id) {
-      payload.avatar_id = request.avatar_id
+        v1Payload.avatar_id = request.avatar_id
     } else if (request.template_id) {
-      payload.template_id = request.template_id
+        v1Payload.template_id = request.template_id
     }
 
     const response = await axios.post(
       `${HEYGEN_API_URL}/video.generate`,
-      payload,
+        v1Payload,
       {
         headers: {
-          'Authorization': `Bearer ${getHeyGenKey()}`,
+            'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
       }
     )
 
-    // Handle different response structures
     const data = response.data.data || response.data
-
     return {
       video_id: data.video_id || data.id || data.videoId,
       status: data.status || 'generating',
       video_url: data.video_url || data.videoUrl || data.url,
+      }
     }
   } catch (error: any) {
     console.error('HeyGen API error (generateVideo):', error.response?.data || error.message)
@@ -424,34 +468,103 @@ export async function createAvatarFromPhoto(
     const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
     const apiKey = getHeyGenKey()
     
-    // Step 1: Upload image to HeyGen and get image_key
-    console.log('Step 1: Uploading image to HeyGen...')
-    let imageKey: string
+    // Step 1: Try to upload image to HeyGen and get image_key
+    // If upload fails, we'll try using the public URL directly
+    console.log('Step 1: Attempting to upload image to HeyGen...')
+    let imageKey: string | null = null
+    
     try {
       imageKey = await uploadImageToHeyGen(photoUrl)
+      console.log('Successfully uploaded image to HeyGen, got image_key:', imageKey)
     } catch (uploadError: any) {
-      throw new Error(
-        `Failed to upload image to HeyGen: ${uploadError.message}. ` +
-        `Please ensure the image URL is publicly accessible or try uploading manually in the HeyGen dashboard.`
-      )
+      console.log('Image upload failed, will try using public URL directly:', uploadError.message)
+      // Continue without image_key - we'll try using the URL directly
     }
     
-    // Step 2: Create avatar group using image_key
+    // Step 2: Create avatar group
     // Based on https://docs.heygen.com/docs/create-and-train-photo-avatar-groups
-    console.log('Step 2: Creating avatar group with image_key...')
-    const createGroupResponse = await axios.post(
-      `${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/create`,
-      {
-        name: avatarName,
-        image_key: imageKey,
-      },
-      {
-        headers: {
-          'X-Api-Key': apiKey,
-          'Content-Type': 'application/json',
-        },
+    // Try with image_key first, then fallback to URL if needed
+    console.log('Step 2: Creating avatar group...')
+    let createGroupResponse: any
+    let lastError: any = null
+    
+    // Try with image_key if we have it
+    if (imageKey) {
+      try {
+        createGroupResponse = await axios.post(
+          `${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/create`,
+          {
+            name: avatarName,
+            image_key: imageKey,
+          },
+          {
+            headers: {
+              'X-Api-Key': apiKey,
+              'Content-Type': 'application/json',
+            },
+          }
+        )
+        console.log('Avatar group created successfully with image_key')
+      } catch (err: any) {
+        console.log('Creating with image_key failed, trying with URL:', err.response?.status)
+        lastError = err
+        // Continue to try with URL
       }
-    )
+    }
+    
+    // If image_key approach didn't work, try with photo_url (if HeyGen supports it)
+    if (!createGroupResponse && photoUrl) {
+      try {
+        console.log('Trying to create avatar group with photo_url...')
+        createGroupResponse = await axios.post(
+          `${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/create`,
+          {
+            name: avatarName,
+            photo_url: photoUrl, // Some APIs accept URLs directly
+          },
+          {
+            headers: {
+              'X-Api-Key': apiKey,
+              'Content-Type': 'application/json',
+            },
+          }
+        )
+        console.log('Avatar group created successfully with photo_url')
+      } catch (err: any) {
+        console.log('Creating with photo_url also failed:', err.response?.status, err.response?.data)
+        lastError = err
+        
+        // Try alternative endpoint format
+        try {
+          createGroupResponse = await axios.post(
+            `${HEYGEN_V2_API_URL}/avatar_group.create`,
+            {
+              name: avatarName,
+              photo_url: photoUrl,
+            },
+            {
+              headers: {
+                'X-Api-Key': apiKey,
+                'Content-Type': 'application/json',
+              },
+            }
+          )
+          console.log('Avatar group created with alternative endpoint')
+        } catch (altErr: any) {
+          lastError = altErr
+        }
+      }
+    }
+    
+    if (!createGroupResponse) {
+      // All attempts failed - throw helpful error
+      const errorMsg = lastError?.response?.data?.error || lastError?.message || 'Unknown error'
+      throw new Error(
+        `Unable to create avatar group. HeyGen API may require uploading the image through their dashboard first. ` +
+        `Please upload your photo to HeyGen dashboard and sync avatars, or use the "Generate AI Avatar" feature. ` +
+        `Error: ${errorMsg}`
+      )
+    }
     
     console.log('Avatar group creation response:', createGroupResponse.data)
     
@@ -514,6 +627,219 @@ export async function createAvatarFromPhoto(
     }
     
     throw new Error(errorMessage)
+  }
+}
+
+/**
+ * Generate AI Avatar Photo
+ * Based on https://docs.heygen.com/docs/generate-ai-avatar-photos
+ */
+export interface GenerateAIAvatarRequest {
+  name: string
+  age: 'Young Adult' | 'Adult' | 'Middle Aged' | 'Senior'
+  gender: 'Man' | 'Woman'
+  ethnicity: string
+  orientation: 'horizontal' | 'vertical' | 'square'
+  pose: 'half_body' | 'full_body' | 'close_up'
+  style: 'Realistic' | 'Cartoon' | 'Anime'
+  appearance: string
+}
+
+export interface GenerateAIAvatarResponse {
+  generation_id: string
+}
+
+export async function generateAIAvatar(
+  request: GenerateAIAvatarRequest
+): Promise<GenerateAIAvatarResponse> {
+  try {
+    const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
+    const apiKey = getHeyGenKey()
+
+    const response = await axios.post(
+      `${HEYGEN_V2_API_URL}/photo_avatar/photo/generate`,
+      request,
+      {
+        headers: {
+          'X-Api-Key': apiKey,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
+
+    return {
+      generation_id: response.data?.data?.generation_id || response.data?.generation_id,
+    }
+  } catch (error: any) {
+    console.error('HeyGen API error (generateAIAvatar):', error.response?.data || error.message)
+    throw error
+  }
+}
+
+/**
+ * Check generation status for AI avatar or look generation
+ */
+export interface GenerationStatus {
+  id: string
+  status: 'in_progress' | 'success' | 'failed'
+  msg?: string | null
+  image_url_list?: string[]
+  image_key_list?: string[]
+}
+
+export async function checkGenerationStatus(
+  generationId: string
+): Promise<GenerationStatus> {
+  try {
+    const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
+    const apiKey = getHeyGenKey()
+
+    const response = await axios.get(
+      `${HEYGEN_V2_API_URL}/photo_avatar/generation/${generationId}`,
+      {
+        headers: {
+          'X-Api-Key': apiKey,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
+
+    const data = response.data?.data || response.data
+    return {
+      id: data.id || generationId,
+      status: data.status || 'in_progress',
+      msg: data.msg || null,
+      image_url_list: data.image_url_list || [],
+      image_key_list: data.image_key_list || [],
+    }
+  } catch (error: any) {
+    console.error('HeyGen API error (checkGenerationStatus):', error.response?.data || error.message)
+    throw error
+  }
+}
+
+/**
+ * Add looks to avatar group
+ * Based on https://docs.heygen.com/docs/create-and-train-photo-avatar-groups
+ */
+export interface AddLooksRequest {
+  group_id: string
+  image_keys: string[]
+  name?: string
+}
+
+export interface AddLooksResponse {
+  photo_avatar_list: Array<{
+    id: string
+    image_url: string
+    name: string
+    status: string
+    group_id: string
+  }>
+}
+
+export async function addLooksToAvatarGroup(
+  request: AddLooksRequest
+): Promise<AddLooksResponse> {
+  try {
+    const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
+    const apiKey = getHeyGenKey()
+
+    const response = await axios.post(
+      `${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/add`,
+      request,
+      {
+        headers: {
+          'X-Api-Key': apiKey,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
+
+    return {
+      photo_avatar_list: response.data?.data?.photo_avatar_list || response.data?.photo_avatar_list || [],
+    }
+  } catch (error: any) {
+    console.error('HeyGen API error (addLooksToAvatarGroup):', error.response?.data || error.message)
+    throw error
+  }
+}
+
+/**
+ * Check training status for avatar group
+ */
+export interface TrainingStatus {
+  status: 'pending' | 'training' | 'ready' | 'failed'
+  error_msg?: string | null
+  created_at?: number
+  updated_at?: number | null
+}
+
+export async function checkTrainingStatus(
+  groupId: string
+): Promise<TrainingStatus> {
+  try {
+    const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
+    const apiKey = getHeyGenKey()
+
+    const response = await axios.get(
+      `${HEYGEN_V2_API_URL}/photo_avatar/train/status/${groupId}`,
+      {
+        headers: {
+          'X-Api-Key': apiKey,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
+
+    const data = response.data?.data || response.data
+    return {
+      status: data.status || 'pending',
+      error_msg: data.error_msg || null,
+      created_at: data.created_at,
+      updated_at: data.updated_at || null,
+    }
+  } catch (error: any) {
+    console.error('HeyGen API error (checkTrainingStatus):', error.response?.data || error.message)
+    throw error
+  }
+}
+
+/**
+ * Generate additional looks for avatar group
+ */
+export interface GenerateLookRequest {
+  group_id: string
+  prompt: string
+  orientation: 'horizontal' | 'vertical' | 'square'
+  pose: 'half_body' | 'full_body' | 'close_up'
+  style: 'Realistic' | 'Cartoon' | 'Anime'
+}
+
+export async function generateAvatarLook(
+  request: GenerateLookRequest
+): Promise<{ generation_id: string }> {
+  try {
+    const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
+    const apiKey = getHeyGenKey()
+
+    const response = await axios.post(
+      `${HEYGEN_V2_API_URL}/photo_avatar/look/generate`,
+      request,
+      {
+        headers: {
+          'X-Api-Key': apiKey,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
+
+    return {
+      generation_id: response.data?.data?.generation_id || response.data?.generation_id,
+    }
+  } catch (error: any) {
+    console.error('HeyGen API error (generateAvatarLook):', error.response?.data || error.message)
+    throw error
   }
 }
 

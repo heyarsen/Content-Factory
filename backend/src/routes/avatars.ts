@@ -1,6 +1,16 @@
 import { Router, Response } from 'express'
 import { authenticate, AuthRequest } from '../middleware/auth.js'
 import { AvatarService } from '../services/avatarService.js'
+import {
+  generateAIAvatar,
+  checkGenerationStatus,
+  addLooksToAvatarGroup,
+  checkTrainingStatus,
+  generateAvatarLook,
+  type GenerateAIAvatarRequest,
+  type AddLooksRequest,
+  type GenerateLookRequest,
+} from '../lib/heygen.js'
 
 const router = Router()
 
@@ -239,8 +249,13 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
     } catch (heygenError: any) {
       console.error('HeyGen avatar creation failed:', heygenError)
       
-      // Check if it's a 404 (API not available) vs other errors
-      if (heygenError.response?.status === 404 || heygenError.message?.includes('404')) {
+      // Check if it's a 404 or upload-related error
+      const isUploadError = heygenError.message?.includes('upload') || 
+                           heygenError.message?.includes('Upload') ||
+                           heygenError.message?.includes('endpoint') ||
+                           heygenError.response?.status === 404
+      
+      if (isUploadError) {
         heygenApiUnavailable = true
       }
       
@@ -269,13 +284,13 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
       
       avatar = savedAvatar
       
-      // If HeyGen API is unavailable, return success but with a warning
+      // If HeyGen API is unavailable, return success but with a helpful message
       if (heygenApiUnavailable) {
         return res.status(201).json({
-          message: `Photo uploaded successfully! However, HeyGen API doesn't support creating avatars from photos via API. Please create the avatar manually in the HeyGen dashboard, then sync using the "Sync from HeyGen" button.`,
+          message: `Photo uploaded successfully! However, HeyGen's upload API endpoint is not publicly available. Your photo has been saved. You can: 1) Use the "Generate AI Avatar" feature to create avatars, 2) Manually create the avatar in HeyGen dashboard and sync, or 3) Try again later as HeyGen may update their API.`,
           avatar,
           photo_url: publicUrl,
-          warning: 'HeyGen API unavailable - avatar needs to be created manually in HeyGen dashboard',
+          warning: 'HeyGen upload API not available - use Generate AI Avatar or create manually in dashboard',
         })
       }
       
@@ -361,6 +376,117 @@ router.post('/create-from-photo', async (req: AuthRequest, res: Response) => {
       'Failed to create avatar from photo'
     
     return res.status(500).json({ error: errorMessage })
+  }
+})
+
+// Generate AI Avatar
+router.post('/generate-ai', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const request: GenerateAIAvatarRequest = req.body
+
+    if (!request.name || !request.age || !request.gender || !request.ethnicity || !request.orientation || !request.pose || !request.style || !request.appearance) {
+      return res.status(400).json({ error: 'All fields are required for AI avatar generation' })
+    }
+
+    const result = await generateAIAvatar(request)
+
+    // Save generation_id to database for tracking
+    const { supabase } = await import('../lib/supabase.js')
+    await supabase
+      .from('avatars')
+      .insert({
+        user_id: userId,
+        heygen_avatar_id: result.generation_id,
+        avatar_name: request.name,
+        avatar_url: null,
+        preview_url: null,
+        thumbnail_url: null,
+        gender: request.gender,
+        status: 'generating',
+        is_default: false,
+      })
+
+    return res.json({
+      message: 'AI avatar generation started',
+      generation_id: result.generation_id,
+    })
+  } catch (error: any) {
+    console.error('Generate AI avatar error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to generate AI avatar' })
+  }
+})
+
+// Check generation status
+router.get('/generation-status/:generationId', async (req: AuthRequest, res: Response) => {
+  try {
+    const { generationId } = req.params
+    const status = await checkGenerationStatus(generationId)
+
+    return res.json(status)
+  } catch (error: any) {
+    console.error('Check generation status error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to check generation status' })
+  }
+})
+
+// Check training status
+router.get('/training-status/:groupId', async (req: AuthRequest, res: Response) => {
+  try {
+    const { groupId } = req.params
+    const status = await checkTrainingStatus(groupId)
+
+    return res.json(status)
+  } catch (error: any) {
+    console.error('Check training status error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to check training status' })
+  }
+})
+
+// Add looks to avatar group
+router.post('/add-looks', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const request: AddLooksRequest = req.body
+
+    if (!request.group_id || !request.image_keys || !Array.isArray(request.image_keys) || request.image_keys.length === 0) {
+      return res.status(400).json({ error: 'group_id and image_keys array are required' })
+    }
+
+    const result = await addLooksToAvatarGroup(request)
+
+    // Sync the new looks to database
+    await AvatarService.syncAvatarsFromHeyGen(userId)
+
+    return res.json({
+      message: 'Looks added successfully',
+      photo_avatar_list: result.photo_avatar_list,
+    })
+  } catch (error: any) {
+    console.error('Add looks error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to add looks' })
+  }
+})
+
+// Generate additional look for avatar group
+router.post('/generate-look', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const request: GenerateLookRequest = req.body
+
+    if (!request.group_id || !request.prompt || !request.orientation || !request.pose || !request.style) {
+      return res.status(400).json({ error: 'All fields are required for look generation' })
+    }
+
+    const result = await generateAvatarLook(request)
+
+    return res.json({
+      message: 'Look generation started',
+      generation_id: result.generation_id,
+    })
+  } catch (error: any) {
+    console.error('Generate look error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to generate look' })
   }
 })
 
