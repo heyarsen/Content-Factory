@@ -149,13 +149,38 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
     }
 
     // Convert base64 data URL to buffer
-    const base64Data = photo_data.replace(/^data:image\/\w+;base64,/, '')
+    let base64Data: string
+    let mimeType: string
+    
+    if (photo_data.startsWith('data:')) {
+      const match = photo_data.match(/^data:([^;]+);base64,(.+)$/)
+      if (!match) {
+        throw new Error('Invalid base64 data URL format')
+      }
+      mimeType = match[1]
+      base64Data = match[2]
+    } else {
+      // Assume it's already base64 without data URL prefix
+      base64Data = photo_data
+      mimeType = 'image/jpeg'
+    }
+    
     const buffer = Buffer.from(base64Data, 'base64')
     
-    // Determine file extension from data URL
-    const mimeMatch = photo_data.match(/data:image\/(\w+);base64/)
-    const extension = mimeMatch ? mimeMatch[1] : 'jpg'
+    // Determine file extension from mime type
+    let extension = 'jpg'
+    if (mimeType.includes('png')) extension = 'png'
+    else if (mimeType.includes('webp')) extension = 'webp'
+    else if (mimeType.includes('gif')) extension = 'gif'
+    
     const fileName = `avatars/${userId}/${Date.now()}-${avatar_name.replace(/[^a-z0-9]/gi, '_')}.${extension}`
+    
+    console.log('Processing image upload:', {
+      fileName,
+      mimeType,
+      bufferSize: buffer.length,
+      extension,
+    })
     
     // Upload to Supabase Storage
     const { supabase } = await import('../lib/supabase.js')
@@ -178,8 +203,9 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('avatars')
       .upload(fileName, buffer, {
-        contentType: `image/${extension}`,
+        contentType: mimeType || `image/${extension}`,
         upsert: false,
+        cacheControl: '3600',
       })
 
     if (uploadError) {
@@ -218,14 +244,40 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
       stack: error.stack,
       response: error.response?.data,
       status: error.response?.status,
+      statusText: error.response?.statusText,
+      name: error.name,
     })
     
-    const errorMessage = 
-      error.message || 
-      error.response?.data?.message ||
-      'Failed to upload photo and create avatar'
+    // Extract detailed error message
+    let errorMessage = 'Failed to upload photo and create avatar'
     
-    return res.status(500).json({ error: errorMessage })
+    if (error.response?.data?.error) {
+      errorMessage = error.response.data.error
+    } else if (error.response?.data?.message) {
+      errorMessage = error.response.data.message
+    } else if (error.message) {
+      errorMessage = error.message
+    }
+    
+    // Add more context if available
+    if (error.response?.status) {
+      if (error.response.status === 404) {
+        if (errorMessage.includes('bucket') || errorMessage.includes('Bucket')) {
+          errorMessage = 'Storage bucket "avatars" not found. Please create it in Supabase Dashboard > Storage with public access.'
+        } else {
+          errorMessage = `HeyGen API endpoint not found (404). Error: ${errorMessage}`
+        }
+      } else if (error.response.status === 401) {
+        errorMessage = 'HeyGen API authentication failed. Please check your HEYGEN_KEY environment variable.'
+      } else if (error.response.status === 403) {
+        errorMessage = 'Access denied. Please check your HeyGen API key permissions.'
+      }
+    }
+    
+    return res.status(500).json({ 
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    })
   }
 })
 

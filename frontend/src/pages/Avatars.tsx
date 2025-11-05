@@ -201,6 +201,7 @@ export default function Avatars() {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status,
+        fullError: error,
       })
       
       let errorMessage = 
@@ -212,6 +213,11 @@ export default function Avatars() {
       // If it's a storage bucket error, make it more user-friendly
       if (errorMessage.includes('bucket') || errorMessage.includes('Bucket')) {
         errorMessage = 'Storage bucket not configured. Please contact support to set up avatar storage, or create the "avatars" bucket in Supabase Dashboard > Storage with public access.'
+      }
+      
+      // Show full error in console for debugging
+      if (error.response?.data) {
+        console.error('Full API error response:', JSON.stringify(error.response.data, null, 2))
       }
       
       toast.error(errorMessage)
