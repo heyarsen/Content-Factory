@@ -51,6 +51,12 @@ export default function Avatars() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const statusCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const { toast } = useToast()
+  const toastRef = useRef(toast)
+  
+  // Update ref when toast changes
+  useEffect(() => {
+    toastRef.current = toast
+  }, [toast])
 
   const loadAvatars = useCallback(async () => {
     try {
@@ -61,11 +67,11 @@ export default function Avatars() {
       setDefaultAvatarId(response.data.default_avatar_id || null)
     } catch (error: any) {
       console.error('Failed to load avatars:', error)
-      toast.error(error.response?.data?.error || 'Failed to load avatars')
+      toastRef.current.error(error.response?.data?.error || 'Failed to load avatars')
     } finally {
       setLoading(false)
     }
-  }, [onlyCreated, toast])
+  }, [onlyCreated])
 
   useEffect(() => {
     loadAvatars()
