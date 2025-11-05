@@ -12,8 +12,14 @@ VALUES (
 )
 ON CONFLICT (id) DO NOTHING;
 
+-- Drop existing policies if they exist (to allow re-running this migration)
+DROP POLICY IF EXISTS "Users can upload own avatar photos" ON storage.objects;
+DROP POLICY IF EXISTS "Public avatar access" ON storage.objects;
+DROP POLICY IF EXISTS "Users can delete own avatar photos" ON storage.objects;
+DROP POLICY IF EXISTS "Users can update own avatar photos" ON storage.objects;
+
 -- Allow authenticated users to upload their own avatar photos
-CREATE POLICY IF NOT EXISTS "Users can upload own avatar photos"
+CREATE POLICY "Users can upload own avatar photos"
 ON storage.objects FOR INSERT
 WITH CHECK (
   bucket_id = 'avatars' AND
@@ -22,12 +28,12 @@ WITH CHECK (
 );
 
 -- Allow public read access to avatar photos
-CREATE POLICY IF NOT EXISTS "Public avatar access"
+CREATE POLICY "Public avatar access"
 ON storage.objects FOR SELECT
 USING (bucket_id = 'avatars');
 
 -- Allow users to delete their own avatar photos
-CREATE POLICY IF NOT EXISTS "Users can delete own avatar photos"
+CREATE POLICY "Users can delete own avatar photos"
 ON storage.objects FOR DELETE
 USING (
   bucket_id = 'avatars' AND
@@ -36,7 +42,7 @@ USING (
 );
 
 -- Allow users to update their own avatar photos
-CREATE POLICY IF NOT EXISTS "Users can update own avatar photos"
+CREATE POLICY "Users can update own avatar photos"
 ON storage.objects FOR UPDATE
 USING (
   bucket_id = 'avatars' AND
