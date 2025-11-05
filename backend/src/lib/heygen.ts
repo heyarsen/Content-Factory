@@ -377,19 +377,34 @@ async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
     throw new Error(`Failed to download image: ${err.message}`)
   }
   
-  // Try different upload endpoints
+  // Try different upload endpoints with various formats and field names
   const uploadEndpoints = [
-    { url: `${HEYGEN_V2_API_URL}/asset/upload`, method: 'multipart' },
+    // Standard REST patterns with different field names
+    { url: `${HEYGEN_V2_API_URL}/asset/upload`, method: 'multipart', fieldName: 'file' },
+    { url: `${HEYGEN_V2_API_URL}/asset/upload`, method: 'multipart', fieldName: 'image' },
+    { url: `${HEYGEN_V2_API_URL}/asset/upload`, method: 'multipart', fieldName: 'asset' },
+    { url: `${HEYGEN_V2_API_URL}/assets/upload`, method: 'multipart', fieldName: 'file' },
+    { url: `${HEYGEN_V2_API_URL}/asset.upload`, method: 'multipart', fieldName: 'file' },
+    { url: `${HEYGEN_V2_API_URL}/assets.upload`, method: 'multipart', fieldName: 'file' },
+    { url: `${HEYGEN_V2_API_URL}/upload`, method: 'multipart', fieldName: 'file' },
+    { url: `${HEYGEN_V2_API_URL}/upload/asset`, method: 'multipart', fieldName: 'file' },
+    { url: `${HEYGEN_V2_API_URL}/upload/image`, method: 'multipart', fieldName: 'file' },
+    // URL-based uploads
     { url: `${HEYGEN_V2_API_URL}/asset/upload`, method: 'url' },
-    { url: `${HEYGEN_V2_API_URL}/upload`, method: 'multipart' },
+    { url: `${HEYGEN_V2_API_URL}/assets/upload`, method: 'url' },
+    { url: `${HEYGEN_V2_API_URL}/asset.upload`, method: 'url' },
   ]
   
   // Try uploading to HeyGen with timeout
   const uploadTimeout = 10000 // 10 seconds per endpoint
+  const attemptedEndpoints: string[] = []
   
   for (const endpoint of uploadEndpoints) {
+    const endpointKey = `${endpoint.url} (${endpoint.method}${endpoint.fieldName ? `, field: ${endpoint.fieldName}` : ''})`
+    attemptedEndpoints.push(endpointKey)
+    
     try {
-      console.log(`Trying to upload image to ${endpoint.url} (method: ${endpoint.method})...`)
+      console.log(`Trying to upload image to ${endpointKey}...`)
       
       if (endpoint.method === 'url') {
         // Try URL-based upload (if HeyGen accepts URLs)
@@ -405,21 +420,31 @@ async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
           }
         )
         
+        // Log response structure for debugging
+        console.log(`Response from ${endpointKey}:`, {
+          status: urlUploadResponse.status,
+          dataKeys: Object.keys(urlUploadResponse.data || {}),
+          data: urlUploadResponse.data,
+        })
+        
         const imageKey = urlUploadResponse.data?.data?.image_key || 
                         urlUploadResponse.data?.image_key ||
                         urlUploadResponse.data?.data?.key ||
-                        urlUploadResponse.data?.key
+                        urlUploadResponse.data?.key ||
+                        urlUploadResponse.data?.data?.asset_key ||
+                        urlUploadResponse.data?.asset_key
         
         if (imageKey) {
-          console.log(`Successfully uploaded image via URL, got image_key: ${imageKey}`)
+          console.log(`✅ Successfully uploaded image via URL, got image_key: ${imageKey}`)
           return imageKey
+        } else {
+          console.log(`⚠️  Endpoint ${endpointKey} responded but no image_key found in response`)
         }
       } else {
         // Try multipart/form-data upload using FormData
-        // Since we're in Node.js, we'll use a simple approach with axios
         const FormData = (await import('form-data')).default
         const form = new FormData()
-        form.append('file', imageBuffer, {
+        form.append(endpoint.fieldName || 'file', imageBuffer, {
           filename: 'avatar.jpg',
           contentType: contentType,
         })
@@ -434,44 +459,52 @@ async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
           timeout: uploadTimeout,
         })
         
-        // Extract image_key from response
+        // Log response structure for debugging
+        console.log(`Response from ${endpointKey}:`, {
+          status: uploadResponse.status,
+          dataKeys: Object.keys(uploadResponse.data || {}),
+          data: uploadResponse.data,
+        })
+        
+        // Extract image_key from response - check multiple possible paths
         const imageKey = uploadResponse.data?.data?.image_key || 
                         uploadResponse.data?.image_key ||
                         uploadResponse.data?.data?.key ||
-                        uploadResponse.data?.key
+                        uploadResponse.data?.key ||
+                        uploadResponse.data?.data?.asset_key ||
+                        uploadResponse.data?.asset_key
         
         if (imageKey) {
-          console.log(`Successfully uploaded image, got image_key: ${imageKey}`)
+          console.log(`✅ Successfully uploaded image, got image_key: ${imageKey}`)
           return imageKey
+        } else {
+          console.log(`⚠️  Endpoint ${endpointKey} responded but no image_key found in response`)
         }
       }
     } catch (err: any) {
       const isTimeout = err.code === 'ECONNABORTED' || err.message?.includes('timeout')
       const is404 = err.response?.status === 404
       
-      console.log(`Upload to ${endpoint.url} (${endpoint.method}) failed:`, {
+      // Log detailed error for debugging
+      console.log(`❌ Upload to ${endpointKey} failed:`, {
         status: err.response?.status,
         statusText: err.response?.statusText,
         error: err.response?.data?.error || err.message,
+        responseData: err.response?.data,
         isTimeout,
         is404,
       })
       
-      // If we get 404 on first endpoint, others will likely fail too - fail fast
-      if (is404 && endpoint === uploadEndpoints[0]) {
-        console.log('Got 404 on first endpoint, skipping remaining upload attempts')
-        break
-      }
-      
-      // Continue to next endpoint
+      // Continue to next endpoint (don't fail fast - different endpoints may work)
       continue
     }
   }
   
   throw new Error(
-    'Failed to upload image to HeyGen. All upload endpoints failed. ' +
-    'Please ensure the image URL is publicly accessible. ' +
-    'You may need to check HeyGen API documentation for the correct Upload Asset endpoint.'
+    `Failed to upload image to HeyGen. All ${attemptedEndpoints.length} upload endpoints failed. ` +
+    `Attempted endpoints: ${attemptedEndpoints.join(', ')}. ` +
+    `The Upload Assets API endpoint may not be publicly documented or may require special access. ` +
+    `Please check HeyGen API documentation or contact HeyGen support for the correct endpoint.`
   )
 }
 
@@ -580,7 +613,7 @@ export async function createAvatarFromPhoto(
     if (!createGroupResponse) {
       // All attempts failed - throw helpful error
       const errorMsg = lastError?.response?.data?.error || lastError?.message || 'Unknown error'
-      throw new Error(
+    throw new Error(
         `Unable to create avatar group. HeyGen API may require uploading the image through their dashboard first. ` +
         `Please upload your photo to HeyGen dashboard and sync avatars, or use the "Generate AI Avatar" feature. ` +
         `Error: ${errorMsg}`
