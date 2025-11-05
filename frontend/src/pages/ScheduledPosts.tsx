@@ -56,7 +56,11 @@ export function ScheduledPosts() {
   
   // Calendar state
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [selectedDate, setSelectedDate] = useState<string | null>(() => {
+    // Auto-select today's date if it has posts
+    const today = new Date().toISOString().split('T')[0]
+    return today
+  })
 
   useEffect(() => {
     loadPosts()
@@ -212,46 +216,43 @@ export function ScheduledPosts() {
 
   return (
     <Layout>
-      <div className="space-y-10">
+      <div className="space-y-6 sm:space-y-8">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Automation</p>
-            <h1 className="text-3xl font-semibold text-primary">Scheduled posts</h1>
-            <p className="text-sm text-slate-500">Activate multi-channel distribution and keep audiences warm.</p>
+            <h1 className="text-3xl font-semibold text-primary">Calendar</h1>
+            <p className="text-sm text-slate-500">View and manage your scheduled posts.</p>
           </div>
-          <Button onClick={() => setScheduleModal(true)} className="shadow-[0_20px_45px_-25px_rgba(99,102,241,0.5)]">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Card className="border-dashed border-white/40 p-0">
+              <Select
+                options={[
+                  { value: 'all', label: 'All status' },
+                  { value: 'pending', label: 'Pending' },
+                  { value: 'posted', label: 'Posted' },
+                  { value: 'failed', label: 'Failed' },
+                  { value: 'cancelled', label: 'Cancelled' },
+                ]}
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              />
+            </Card>
+          <Button 
+            onClick={() => {
+              setScheduledTime('')
+              setScheduleModal(true)
+            }} 
+            className="shadow-[0_20px_45px_-25px_rgba(99,102,241,0.5)]"
+          >
             <Calendar className="mr-2 h-4 w-4" />
             Schedule post
           </Button>
+          </div>
         </div>
 
-        <Card className="max-w-sm border-dashed border-white/40">
-          <Select
-            options={[
-              { value: 'all', label: 'All status' },
-              { value: 'pending', label: 'Pending' },
-              { value: 'posted', label: 'Posted' },
-              { value: 'failed', label: 'Failed' },
-              { value: 'cancelled', label: 'Cancelled' },
-            ]}
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          />
-        </Card>
-
-        {posts.length === 0 ? (
-          <EmptyState
-            icon={<Calendar className="w-16 h-16" />}
-            title="No scheduled posts"
-            description="Schedule your completed videos to be posted on social media."
-            action={
-              <Button onClick={() => setScheduleModal(true)}>Schedule Post</Button>
-            }
-          />
-        ) : (
-          <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
-            {/* Calendar */}
-            <Card className="lg:col-span-2 p-4 sm:p-6">
+        <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+          {/* Calendar - Always visible */}
+          <Card className="lg:col-span-2 p-4 sm:p-6">
               <div className="mb-6 flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-primary">
                   {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
@@ -356,9 +357,30 @@ export function ScheduledPosts() {
                   : 'Select a date'}
               </h3>
               {selectedDatePosts.length === 0 ? (
-                <p className="text-sm text-slate-500">
-                  {selectedDate ? 'No posts scheduled for this date' : 'Click on a date to see scheduled posts'}
-                </p>
+                <div className="space-y-4">
+                  <p className="text-sm text-slate-500">
+                    {selectedDate ? 'No posts scheduled for this date' : 'Click on a date to see scheduled posts'}
+                  </p>
+                  {selectedDate && (
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        // Pre-fill the selected date in the schedule modal
+                        const dateTime = new Date(selectedDate)
+                        dateTime.setHours(12, 0, 0, 0) // Set to noon
+                        const localDateTime = new Date(dateTime.getTime() - dateTime.getTimezoneOffset() * 60000)
+                          .toISOString()
+                          .slice(0, 16)
+                        setScheduledTime(localDateTime)
+                        setScheduleModal(true)
+                      }}
+                      className="w-full"
+                    >
+                      <Calendar className="mr-2 h-4 w-4" />
+                      Schedule post for this date
+                    </Button>
+                  )}
+                </div>
               ) : (
                 <div className="space-y-3">
                   {selectedDatePosts.map((post) => {
@@ -401,7 +423,6 @@ export function ScheduledPosts() {
               )}
             </Card>
           </div>
-        )}
 
         <Modal
           isOpen={scheduleModal}

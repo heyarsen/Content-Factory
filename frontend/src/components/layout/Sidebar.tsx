@@ -28,7 +28,7 @@ const navigation = [
   { label: 'Video Planning', to: '/planning', icon: Calendar },
   { label: 'My Videos', to: '/videos', icon: Clapperboard },
   { label: 'Social Accounts', to: '/social', icon: Share2 },
-  { label: 'Scheduled Posts', to: '/posts', icon: CalendarCheck },
+  { label: 'Calendar', to: '/posts', icon: CalendarCheck },
   { label: 'Categories', to: '/categories', icon: Tag },
   { label: 'Avatars', to: '/avatars', icon: User },
   { label: 'Preferences', to: '/preferences', icon: Settings },
