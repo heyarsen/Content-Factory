@@ -142,7 +142,7 @@ export default function Avatars() {
         
         // For now, we'll send the base64 data URL directly
         // In production, you might want to upload to a storage service first
-        const response = await api.post('/api/avatars/create-from-photo', {
+        await api.post('/api/avatars/create-from-photo', {
           photo_url: base64Data,
           avatar_name: avatarName,
         })
