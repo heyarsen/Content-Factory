@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
@@ -186,7 +186,7 @@ export function Videos() {
                 key={video.id} 
                 hover 
                 className="flex h-full flex-col gap-5 cursor-pointer"
-                onClick={(e) => handleCardClick(video.id, e)}
+                onClick={(e: React.MouseEvent<HTMLDivElement>) => handleCardClick(video.id, e)}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-2">

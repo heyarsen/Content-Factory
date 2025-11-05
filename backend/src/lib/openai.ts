@@ -36,8 +36,8 @@ Input fields you will always receive:
 	•	UsefulTips
 
 Rules:
-	1.	Start with a Hook (2–3 sec) – a bold claim, surprising fact, or short question.
-	2.	Give the Insight (12–15 sec) – summarize key point from Description/WhyItMatters/UsefulTips.
+	1.	Start with a Hook (2–3 sec) – a bold claim, surprising fact, or short question based on the Idea.
+	2.	Give the Insight (12–15 sec) – synthesize and incorporate key points from ALL provided fields: Description, WhyItMatters, and UsefulTips. You MUST use information from all these fields if they contain content. Do not ignore any field with actual content.
 	3.	End with Call to Action (5–7 sec) – always invite to subscribe or follow, and always add: "Follow for daily tips, and for deeper insights, use the link in our profile."
 
 Constraints:
@@ -66,8 +66,8 @@ Input fields you will always receive:
 	•	UsefulTips
 
 Rules:
-	1.	Start with a Hook (2–3 sec) – a bold claim, surprising fact, or short question.
-	2.	Give the Insight (12–15 sec) – summarize key point from Description/WhyItMatters/UsefulTips.
+	1.	Start with a Hook (2–3 sec) – a bold claim, surprising fact, or short question based on the Idea.
+	2.	Give the Insight (12–15 sec) – synthesize and incorporate key points from ALL provided fields: Description, WhyItMatters, and UsefulTips. You MUST use information from all these fields if they contain content. Do not ignore any field with actual content.
 	3.	End with Call to Action (5–7 sec) – always invite to subscribe or follow, and always add: "Follow for daily tips, and for deeper insights, use the link in our profile."
 
 Constraints:
@@ -94,8 +94,8 @@ Input fields you will always receive:
 	•	UsefulTips
 
 Rules:
-	1.	Start with a Hook (3–4 sec) – a bold claim, surprising fact, or short question.
-	2.	Give the Insight (15–18 sec) – summarize key point from Description/WhyItMatters/UsefulTips.
+	1.	Start with a Hook (3–4 sec) – a bold claim, surprising fact, or short question based on the Idea.
+	2.	Give the Insight (15–18 sec) – synthesize and incorporate key points from ALL provided fields: Description, WhyItMatters, and UsefulTips. You MUST use information from all these fields if they contain content. Do not ignore any field with actual content.
 	3.	End with Call to Action (7–8 sec) – always invite to subscribe or follow, and always add: "Follow for daily tips, and for deeper insights, use the link in our profile."
 
 Constraints:
@@ -128,8 +128,8 @@ Input fields you will always receive:
 	•	UsefulTips
 
 Rules:
-	1.	Start with a Hook (2–3 sec) – a bold claim, surprising fact, or short question.
-	2.	Give the Insight (12–15 sec) – summarize key point from Description/WhyItMatters/UsefulTips.
+	1.	Start with a Hook (2–3 sec) – a bold claim, surprising fact, or short question based on the Idea.
+	2.	Give the Insight (12–15 sec) – synthesize and incorporate key points from ALL provided fields: Description, WhyItMatters, and UsefulTips. You MUST use information from all these fields if they contain content. Do not ignore any field with actual content.
 	3.	End with Call to Action (5–7 sec) – always invite to subscribe or follow, and always add: "Follow for daily tips, and for deeper insights, use the link in our profile."
 
 Constraints:
@@ -150,13 +150,17 @@ Moderation & Safety Criteria (must always be followed):
 	•	Call-to-action must be generic and safe: only "Follow for daily tips, and for deeper insights, use the link in our profile."`
 
   const systemPrompt = systemPrompts[data.category as keyof typeof systemPrompts] || defaultPrompt
-  const userPrompt = `Вот данные:
+  
+  // Build comprehensive user prompt that emphasizes using ALL information
+  const userPrompt = `Create a script using ALL the following information provided:
 
-Idea: ${data.idea}
-Description: ${data.description}
-WhyItMatters: ${data.whyItMatters}
-UsefulTips: ${data.usefulTips}
-Category: ${data.category}`
+Topic/Idea: ${data.idea || '(not provided)'}
+Description: ${data.description || '(not provided)'}
+Why It Matters: ${data.whyItMatters || '(not provided)'}
+Useful Tips: ${data.usefulTips || '(not provided)'}
+Category: ${data.category}
+
+IMPORTANT: You MUST incorporate information from ALL provided fields (Description, Why It Matters, and Useful Tips) into your script. If a field contains "(not provided)", focus on the fields that have actual content. Do not ignore any field that has actual content. The script should synthesize insights from all available fields to create a comprehensive and informative video script.`
 
   try {
     const completion = await openai.chat.completions.create({
