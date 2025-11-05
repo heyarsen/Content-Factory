@@ -85,13 +85,38 @@ async function applyManualGenerationFailure(videoId: string, error: Error): Prom
 
 async function runHeygenGeneration(video: Video, avatarId?: string): Promise<void> {
   try {
+    if (!avatarId) {
+      throw new Error('No avatar available. Please configure an avatar in your settings.')
+    }
+    
     const response = await requestHeygenVideo(
       buildHeygenPayload(video.topic, video.script || undefined, video.style, video.duration, avatarId)
     )
     await applyManualGenerationSuccess(video.id, response)
   } catch (error: any) {
     console.error('HeyGen generation error:', error)
-    await applyManualGenerationFailure(video.id, error)
+    
+    // Extract detailed error message
+    let errorMessage = error?.message || 'Failed to generate video'
+    
+    if (error?.response?.data?.message) {
+      errorMessage = error.response.data.message
+    } else if (error?.response?.data?.error?.message) {
+      errorMessage = error.response.data.error.message
+    } else if (error?.response?.data?.error) {
+      errorMessage = typeof error.response.data.error === 'string' 
+        ? error.response.data.error 
+        : JSON.stringify(error.response.data.error)
+    } else if (error?.response?.status === 401) {
+      errorMessage = 'HeyGen API authentication failed. Please check your API key configuration.'
+    } else if (error?.response?.status === 429) {
+      errorMessage = 'HeyGen API rate limit exceeded. Please try again later.'
+    } else if (error?.response?.status >= 500) {
+      errorMessage = 'HeyGen API server error. Please try again later.'
+    }
+    
+    const enhancedError = new Error(errorMessage)
+    await applyManualGenerationFailure(video.id, enhancedError)
   }
 }
 
@@ -118,6 +143,11 @@ export class VideoService {
       if (avatar) {
         avatarId = avatar.heygen_avatar_id
       }
+    }
+    
+    // Validate avatar before creating video record
+    if (!avatarId) {
+      throw new Error('No avatar configured. Please set up an avatar in your settings before generating videos.')
     }
     
     const video = await this.createVideoRecord(userId, input, avatarRecordId)

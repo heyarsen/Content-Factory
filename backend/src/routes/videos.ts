@@ -18,7 +18,16 @@ function handleServiceError(res: Response, error: any, fallbackMessage: string) 
   }
 
   console.error(fallbackMessage, error)
-  return res.status(500).json({ error: 'Internal server error' })
+  
+  // Extract meaningful error message
+  const errorMessage = 
+    error?.message || 
+    error?.response?.data?.message || 
+    error?.response?.data?.error?.message ||
+    error?.response?.data?.error ||
+    (typeof error === 'string' ? error : 'Internal server error')
+  
+  return res.status(500).json({ error: errorMessage })
 }
 
 // Generate video

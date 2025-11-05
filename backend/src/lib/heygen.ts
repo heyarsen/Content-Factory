@@ -193,9 +193,29 @@ export async function generateVideo(
     }
   } catch (error: any) {
     console.error('HeyGen API error (generateVideo):', error.response?.data || error.message)
-    throw new Error(
-      error.response?.data?.message || error.response?.data?.error?.message || 'Failed to generate video'
-    )
+    
+    // Extract detailed error message
+    let errorMessage = 'Failed to generate video'
+    
+    if (error.response?.data?.message) {
+      errorMessage = error.response.data.message
+    } else if (error.response?.data?.error?.message) {
+      errorMessage = error.response.data.error.message
+    } else if (error.response?.data?.error) {
+      errorMessage = typeof error.response.data.error === 'string' 
+        ? error.response.data.error 
+        : JSON.stringify(error.response.data.error)
+    } else if (error.response?.status === 401) {
+      errorMessage = 'HeyGen API authentication failed. Please check your API key configuration.'
+    } else if (error.response?.status === 429) {
+      errorMessage = 'HeyGen API rate limit exceeded. Please try again later.'
+    } else if (error.response?.status >= 500) {
+      errorMessage = 'HeyGen API server error. Please try again later.'
+    } else if (error.message) {
+      errorMessage = error.message
+    }
+    
+    throw new Error(errorMessage)
   }
 }
 

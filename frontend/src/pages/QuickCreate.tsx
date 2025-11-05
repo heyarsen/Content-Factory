@@ -184,7 +184,16 @@ export function QuickCreate() {
         setStep('complete')
       }
     } catch (error: any) {
-      setVideoError(error.response?.data?.error || 'Failed to generate video')
+      console.error('Video generation error:', error)
+      
+      // Extract detailed error message
+      const errorMessage = 
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to generate video. Please check your avatar configuration and try again.'
+      
+      setVideoError(errorMessage)
     } finally {
       setGeneratingVideo(false)
     }
