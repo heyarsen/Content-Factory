@@ -193,6 +193,12 @@ export function QuickCreate() {
               <h2 className="text-xl font-semibold text-primary">Step 1: Your Idea</h2>
             </div>
 
+            {scriptError && (
+              <div className="mb-6 rounded-2xl border border-rose-200/80 bg-rose-50/80 px-4 py-3 text-sm text-rose-600">
+                {scriptError}
+              </div>
+            )}
+
             <div className="space-y-6">
               <Select
                 label="Category"

@@ -608,7 +608,7 @@ router.post('/generate-script', async (req: AuthRequest, res: Response) => {
 })
 
 // Quick Create: Generate script directly from user input
-router.post('/quick-create/generate-script', async (req: AuthRequest, res: Response) => {
+router.post('/quick-create/generate-script', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { category, topic, description, whyImportant, usefulTips } = req.body
@@ -622,17 +622,21 @@ router.post('/quick-create/generate-script', async (req: AuthRequest, res: Respo
       'trading': 'Trading',
       'lifestyle': 'Lifestyle',
       'fin_freedom': 'Fin. Freedom',
+      'financial_freedom': 'Fin. Freedom',
       'fin. freedom': 'Fin. Freedom',
       'Fin. Freedom': 'Fin. Freedom',
+      'Financial Freedom': 'Fin. Freedom',
       'Trading': 'Trading',
       'Lifestyle': 'Lifestyle',
     }
 
-    const mappedCategory = categoryMap[category.toLowerCase()] || categoryMap[category]
+    // Normalize the category key
+    const normalizedCategory = category.toLowerCase().trim().replace(/\s+/g, '_')
+    const mappedCategory = categoryMap[normalizedCategory] || categoryMap[category] || categoryMap[category.toLowerCase()]
     
     if (!mappedCategory || !['Trading', 'Lifestyle', 'Fin. Freedom'].includes(mappedCategory)) {
       return res.status(400).json({ 
-        error: 'Invalid category. Must be Trading, Lifestyle, or Fin. Freedom' 
+        error: `Invalid category "${category}". Must be Trading, Lifestyle, or Fin. Freedom` 
       })
     }
 
