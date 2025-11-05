@@ -6,7 +6,9 @@ import { Input } from '../components/ui/Input'
 import { Modal } from '../components/ui/Modal'
 import { useToast } from '../hooks/useToast'
 import api from '../lib/api'
-import { RefreshCw, Star, Trash2, User, Upload, Plus } from 'lucide-react'
+import { RefreshCw, Star, Trash2, User, Upload, Plus, Sparkles } from 'lucide-react'
+import { Select } from '../components/ui/Select'
+import { Textarea } from '../components/ui/Textarea'
 
 interface Avatar {
   id: string
@@ -32,7 +34,23 @@ export default function Avatars() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [onlyCreated, setOnlyCreated] = useState(true) // Default to showing only user-created avatars
+  const [showGenerateAIModal, setShowGenerateAIModal] = useState(false)
+  const [generatingAI, setGeneratingAI] = useState(false)
+  const [generationId, setGenerationId] = useState<string | null>(null)
+  const [checkingStatus, setCheckingStatus] = useState(false)
+  
+  // AI Generation form fields
+  const [aiName, setAiName] = useState('')
+  const [aiAge, setAiAge] = useState<'Young Adult' | 'Adult' | 'Middle Aged' | 'Senior'>('Adult')
+  const [aiGender, setAiGender] = useState<'Man' | 'Woman'>('Man')
+  const [aiEthnicity, setAiEthnicity] = useState('')
+  const [aiOrientation, setAiOrientation] = useState<'horizontal' | 'vertical' | 'square'>('square')
+  const [aiPose, setAiPose] = useState<'half_body' | 'full_body' | 'close_up'>('close_up')
+  const [aiStyle, setAiStyle] = useState<'Realistic' | 'Cartoon' | 'Anime'>('Realistic')
+  const [aiAppearance, setAiAppearance] = useState('')
+  
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const statusCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const { toast } = useToast()
 
   const loadAvatars = useCallback(async () => {
@@ -53,6 +71,15 @@ export default function Avatars() {
   useEffect(() => {
     loadAvatars()
   }, [loadAvatars])
+
+  // Cleanup status check interval on unmount
+  useEffect(() => {
+    return () => {
+      if (statusCheckIntervalRef.current) {
+        clearInterval(statusCheckIntervalRef.current)
+      }
+    }
+  }, [])
 
   const handleSync = async () => {
     setSyncing(true)
@@ -269,6 +296,116 @@ export default function Avatars() {
     }
   }
 
+  const handleGenerateAI = async () => {
+    if (!aiName.trim() || !aiEthnicity.trim() || !aiAppearance.trim()) {
+      toast.error('Please fill in all required fields')
+      return
+    }
+
+    setGeneratingAI(true)
+    try {
+      const response = await api.post('/api/avatars/generate-ai', {
+        name: aiName,
+        age: aiAge,
+        gender: aiGender,
+        ethnicity: aiEthnicity,
+        orientation: aiOrientation,
+        pose: aiPose,
+        style: aiStyle,
+        appearance: aiAppearance,
+      })
+
+      const genId = response.data.generation_id
+      setGenerationId(genId)
+      toast.success('AI avatar generation started! This may take a few minutes.')
+      
+      // Start polling for status
+      startStatusCheck(genId)
+    } catch (error: any) {
+      console.error('Failed to generate AI avatar:', error)
+      toast.error(error.response?.data?.error || 'Failed to generate AI avatar')
+      setGeneratingAI(false)
+    }
+  }
+
+  const startStatusCheck = (genId: string) => {
+    setCheckingStatus(true)
+    
+    // Check status every 5 seconds
+    statusCheckIntervalRef.current = setInterval(async () => {
+      try {
+        const response = await api.get(`/api/avatars/generation-status/${genId}`)
+        const status = response.data
+        
+        if (status.status === 'success') {
+          // Generation complete - create avatar group
+          if (statusCheckIntervalRef.current) {
+            clearInterval(statusCheckIntervalRef.current)
+            statusCheckIntervalRef.current = null
+          }
+          
+          if (status.image_key_list && status.image_key_list.length > 0) {
+            try {
+              await api.post('/api/avatars/complete-ai-generation', {
+                generation_id: genId,
+                image_keys: status.image_key_list,
+                avatar_name: aiName,
+              })
+              
+              toast.success('AI avatar created successfully!')
+              setShowGenerateAIModal(false)
+              resetAIGenerationForm()
+              await loadAvatars()
+            } catch (err: any) {
+              console.error('Failed to complete AI avatar:', err)
+              toast.error(err.response?.data?.error || 'Failed to create avatar from generated images')
+            }
+          } else {
+            toast.error('No images were generated')
+          }
+          
+          setCheckingStatus(false)
+          setGeneratingAI(false)
+        } else if (status.status === 'failed') {
+          if (statusCheckIntervalRef.current) {
+            clearInterval(statusCheckIntervalRef.current)
+            statusCheckIntervalRef.current = null
+          }
+          toast.error(status.msg || 'Avatar generation failed')
+          setCheckingStatus(false)
+          setGeneratingAI(false)
+        }
+        // If still in_progress, continue polling
+      } catch (error: any) {
+        console.error('Failed to check generation status:', error)
+        // Don't stop polling on error - might be temporary
+      }
+    }, 5000)
+  }
+
+  const resetAIGenerationForm = () => {
+    setAiName('')
+    setAiAge('Adult')
+    setAiGender('Man')
+    setAiEthnicity('')
+    setAiOrientation('square')
+    setAiPose('close_up')
+    setAiStyle('Realistic')
+    setAiAppearance('')
+    setGenerationId(null)
+  }
+
+  const handleCloseGenerateAIModal = () => {
+    if (!generatingAI && !checkingStatus) {
+      if (statusCheckIntervalRef.current) {
+        clearInterval(statusCheckIntervalRef.current)
+        statusCheckIntervalRef.current = null
+      }
+      setShowGenerateAIModal(false)
+      resetAIGenerationForm()
+    }
+  }
+
   if (loading) {
     return (
       <Layout>
@@ -305,6 +442,18 @@ export default function Avatars() {
             >
               {onlyCreated ? '✓ ' : ''}
               {onlyCreated ? 'My Avatars' : 'All Avatars'}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setShowGenerateAIModal(true)
+              }}
+              className="flex items-center gap-2"
+            >
+              <Sparkles className="h-4 w-4" />
+              Generate AI Avatar
             </Button>
             <Button
               variant="secondary"
@@ -532,6 +681,140 @@ export default function Avatars() {
                 {creating ? 'Creating...' : 'Create Avatar'}
               </Button>
             </div>
+          </div>
+        </Modal>
+
+        {/* Generate AI Avatar Modal */}
+        <Modal
+          isOpen={showGenerateAIModal}
+          onClose={handleCloseGenerateAIModal}
+          title="Generate AI Avatar"
+          size="lg"
+        >
+          <div className="space-y-6">
+            {checkingStatus ? (
+              <div className="text-center py-8">
+                <RefreshCw className="h-12 w-12 mx-auto text-brand-500 animate-spin mb-4" />
+                <p className="text-lg font-semibold text-slate-900 mb-2">
+                  Generating your avatar...
+                </p>
+                <p className="text-sm text-slate-600">
+                  This may take a few minutes. Please don't close this window.
+                </p>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-slate-600">
+                  Describe the avatar you want to generate. AI will create a unique avatar based on your description.
+                </p>
+
+                <div className="grid gap-6 md:grid-cols-2">
+                  <Input
+                    label="Avatar Name *"
+                    value={aiName}
+                    onChange={(e) => setAiName(e.target.value)}
+                    placeholder="e.g., Professional Business Person"
+                    disabled={generatingAI}
+                  />
+                  
+                  <Select
+                    label="Age *"
+                    value={aiAge}
+                    onChange={(e) => setAiAge(e.target.value as any)}
+                    options={[
+                      { value: 'Young Adult', label: 'Young Adult' },
+                      { value: 'Adult', label: 'Adult' },
+                      { value: 'Middle Aged', label: 'Middle Aged' },
+                      { value: 'Senior', label: 'Senior' },
+                    ]}
+                    disabled={generatingAI}
+                  />
+
+                  <Select
+                    label="Gender *"
+                    value={aiGender}
+                    onChange={(e) => setAiGender(e.target.value as any)}
+                    options={[
+                      { value: 'Man', label: 'Man' },
+                      { value: 'Woman', label: 'Woman' },
+                    ]}
+                    disabled={generatingAI}
+                  />
+
+                  <Input
+                    label="Ethnicity *"
+                    value={aiEthnicity}
+                    onChange={(e) => setAiEthnicity(e.target.value)}
+                    placeholder="e.g., Asian, Caucasian, Hispanic"
+                    disabled={generatingAI}
+                  />
+
+                  <Select
+                    label="Orientation *"
+                    value={aiOrientation}
+                    onChange={(e) => setAiOrientation(e.target.value as any)}
+                    options={[
+                      { value: 'horizontal', label: 'Horizontal' },
+                      { value: 'vertical', label: 'Vertical' },
+                      { value: 'square', label: 'Square' },
+                    ]}
+                    disabled={generatingAI}
+                  />
+
+                  <Select
+                    label="Pose *"
+                    value={aiPose}
+                    onChange={(e) => setAiPose(e.target.value as any)}
+                    options={[
+                      { value: 'close_up', label: 'Close Up' },
+                      { value: 'half_body', label: 'Half Body' },
+                      { value: 'full_body', label: 'Full Body' },
+                    ]}
+                    disabled={generatingAI}
+                  />
+
+                  <Select
+                    label="Style *"
+                    value={aiStyle}
+                    onChange={(e) => setAiStyle(e.target.value as any)}
+                    options={[
+                      { value: 'Realistic', label: 'Realistic' },
+                      { value: 'Cartoon', label: 'Cartoon' },
+                      { value: 'Anime', label: 'Anime' },
+                    ]}
+                    disabled={generatingAI}
+                  />
+                </div>
+
+                <Textarea
+                  label="Appearance Description *"
+                  value={aiAppearance}
+                  onChange={(e) => setAiAppearance(e.target.value)}
+                  placeholder="Describe the appearance in detail: hair color, clothing, expression, etc. e.g., 'Brown hair, professional business suit, friendly smile'"
+                  rows={4}
+                  disabled={generatingAI}
+                />
+
+                <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
+                  <Button
+                    variant="ghost"
+                    onClick={handleCloseGenerateAIModal}
+                    disabled={generatingAI}
+                    type="button"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleGenerateAI}
+                    disabled={generatingAI || !aiName.trim() || !aiEthnicity.trim() || !aiAppearance.trim()}
+                    loading={generatingAI}
+                    type="button"
+                  >
+                    {generatingAI ? 'Generating...' : 'Generate Avatar'}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </Modal>
       </div>

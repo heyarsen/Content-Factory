@@ -395,6 +395,33 @@ router.get('/generation-status/:generationId', async (req: AuthRequest, res: Res
   }
 })
 
+// Complete AI avatar generation (create avatar group from generated images)
+router.post('/complete-ai-generation', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { generation_id, image_keys, avatar_name } = req.body
+
+    if (!generation_id || !image_keys || !Array.isArray(image_keys) || image_keys.length === 0 || !avatar_name) {
+      return res.status(400).json({ error: 'generation_id, image_keys array, and avatar_name are required' })
+    }
+
+    const avatar = await AvatarService.completeAIAvatarGeneration(
+      userId,
+      generation_id,
+      image_keys,
+      avatar_name
+    )
+
+    return res.json({
+      message: 'AI avatar created successfully',
+      avatar,
+    })
+  } catch (error: any) {
+    console.error('Complete AI generation error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to complete AI avatar generation' })
+  }
+})
+
 // Check training status
 router.get('/training-status/:groupId', async (req: AuthRequest, res: Response) => {
   try {

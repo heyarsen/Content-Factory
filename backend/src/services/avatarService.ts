@@ -295,4 +295,117 @@ export class AvatarService {
     if (error) throw error
     return data || []
   }
+
+  /**
+   * Complete AI avatar generation by creating avatar group from generated images
+   */
+  static async completeAIAvatarGeneration(
+    userId: string,
+    generationId: string,
+    imageKeys: string[],
+    avatarName: string
+  ): Promise<Avatar> {
+    try {
+      if (!imageKeys || imageKeys.length === 0) {
+        throw new Error('No image keys provided for avatar creation')
+      }
+
+      const { addLooksToAvatarGroup } = await import('../lib/heygen.js')
+      const axios = (await import('axios')).default
+      
+      // Create avatar group using the first image_key
+      const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
+      
+      // Get API key from environment
+      const apiKey = process.env.HEYGEN_KEY
+      if (!apiKey) {
+        throw new Error('Missing HEYGEN_KEY environment variable')
+      }
+      
+      // Create avatar group with the first image
+      const createGroupResponse = await axios.post(
+        `${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/create`,
+        {
+          name: avatarName,
+          image_key: imageKeys[0],
+        },
+        {
+          headers: {
+            'X-Api-Key': apiKey,
+            'Content-Type': 'application/json',
+          },
+        }
+      )
+
+      const groupId = createGroupResponse.data?.data?.id || 
+                     createGroupResponse.data?.data?.group_id ||
+                     createGroupResponse.data?.id ||
+                     createGroupResponse.data?.group_id
+
+      if (!groupId) {
+        throw new Error('Failed to get group_id from avatar group creation response')
+      }
+
+      // Add additional images as looks if there are more
+      if (imageKeys.length > 1) {
+        try {
+          await addLooksToAvatarGroup({
+            group_id: groupId,
+            image_keys: imageKeys.slice(1),
+            name: avatarName,
+          })
+        } catch (err: any) {
+          console.log('Failed to add additional looks (continuing anyway):', err.message)
+        }
+      }
+
+      // Update the avatar record in database
+      const { data: existingAvatar } = await supabase
+        .from('avatars')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('heygen_avatar_id', generationId)
+        .single()
+
+      if (existingAvatar) {
+        // Update existing record
+        const { data, error } = await supabase
+          .from('avatars')
+          .update({
+            heygen_avatar_id: groupId,
+            status: 'active',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingAvatar.id)
+          .select()
+          .single()
+
+        if (error) throw error
+        return data
+      } else {
+        // Create new record
+        const { data, error } = await supabase
+          .from('avatars')
+          .insert({
+            user_id: userId,
+            heygen_avatar_id: groupId,
+            avatar_name: avatarName,
+            avatar_url: null,
+            preview_url: null,
+            thumbnail_url: null,
+            gender: null,
+            status: 'active',
+            is_default: false,
+          })
+          .select()
+          .single()
+
+        if (error) throw error
+        return data
+      }
+    } catch (error: any) {
+      console.error('Complete AI avatar generation error:', error)
+      throw new Error(`Failed to complete AI avatar generation: ${error.message}`)
+    }
+  }
 }
