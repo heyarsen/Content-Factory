@@ -211,7 +211,12 @@ export default function Avatars() {
           <div className="flex gap-3">
             <Button
               variant="secondary"
-              onClick={() => setShowCreateModal(true)}
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                console.log('Create avatar button clicked')
+                setShowCreateModal(true)
+              }}
               className="flex items-center gap-2"
             >
               <Plus className="h-4 w-4" />

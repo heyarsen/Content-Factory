@@ -33,7 +33,7 @@ function handleServiceError(res: Response, error: any, fallbackMessage: string) 
 // Generate video
 router.post('/generate', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const { topic, script, style, duration } = req.body
+    const { topic, script, style, duration, avatar_id } = req.body
     const userId = req.userId!
 
     if (!topic || !style || !duration) {
@@ -49,6 +49,7 @@ router.post('/generate', authenticate, async (req: AuthRequest, res: Response) =
       script: script || undefined,
       style,
       duration,
+      avatar_id: avatar_id || undefined,
     })
 
     res.json({ video })

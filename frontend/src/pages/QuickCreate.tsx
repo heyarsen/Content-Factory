@@ -64,6 +64,8 @@ export function QuickCreate() {
   // Step 3: Generate Video
   const [style, setStyle] = useState<'casual' | 'professional' | 'energetic' | 'educational'>('professional')
   const [duration, setDuration] = useState(30)
+  const [avatars, setAvatars] = useState<Array<{ id: string; heygen_avatar_id: string; avatar_name: string; thumbnail_url: string | null; preview_url: string | null; is_default: boolean }>>([])
+  const [selectedAvatarId, setSelectedAvatarId] = useState<string>('')
   const [generatingVideo, setGeneratingVideo] = useState(false)
   const [videoError, setVideoError] = useState('')
   const [videoId, setVideoId] = useState<string | null>(null)
@@ -79,7 +81,24 @@ export function QuickCreate() {
   useEffect(() => {
     loadCategories()
     loadSocialAccounts()
+    loadAvatars()
   }, [])
+
+  const loadAvatars = async () => {
+    try {
+      const response = await api.get('/api/avatars')
+      setAvatars(response.data.avatars || [])
+      // Set default avatar if available
+      const defaultAvatar = response.data.avatars?.find((a: any) => a.is_default)
+      if (defaultAvatar) {
+        setSelectedAvatarId(defaultAvatar.heygen_avatar_id)
+      } else if (response.data.avatars?.length > 0) {
+        setSelectedAvatarId(response.data.avatars[0].heygen_avatar_id)
+      }
+    } catch (error: any) {
+      console.error('Failed to load avatars:', error)
+    }
+  }
 
   // Poll for video status when video is generating
   useEffect(() => {
@@ -174,6 +193,7 @@ export function QuickCreate() {
         style,
         duration,
         category: selectedCategory,
+        avatar_id: selectedAvatarId || undefined,
       })
 
       setVideoId(response.data.video.id)
@@ -541,6 +561,49 @@ export function QuickCreate() {
                     </div>
                   </div>
                 </div>
+
+                {/* Avatar Selection */}
+                {avatars.length > 0 && (
+                  <div className="rounded-2xl border border-white/60 bg-white/70 p-6">
+                    <label className="block text-sm font-semibold text-primary mb-4">
+                      Choose Avatar
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                      {avatars.map((avatar) => (
+                        <button
+                          key={avatar.id}
+                          type="button"
+                          onClick={() => setSelectedAvatarId(avatar.heygen_avatar_id)}
+                          className={`relative rounded-xl border-2 p-2 transition-all ${
+                            selectedAvatarId === avatar.heygen_avatar_id
+                              ? 'border-brand-500 bg-brand-50'
+                              : 'border-slate-200 hover:border-brand-300'
+                          }`}
+                        >
+                          {avatar.thumbnail_url || avatar.preview_url ? (
+                            <img
+                              src={avatar.thumbnail_url || avatar.preview_url || ''}
+                              alt={avatar.avatar_name}
+                              className="w-full h-24 object-cover rounded-lg"
+                            />
+                          ) : (
+                            <div className="w-full h-24 bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center">
+                              <Users className="h-8 w-8 text-white opacity-50" />
+                            </div>
+                          )}
+                          <p className="mt-2 text-xs font-medium text-slate-700 truncate">
+                            {avatar.avatar_name}
+                          </p>
+                          {selectedAvatarId === avatar.heygen_avatar_id && (
+                            <div className="absolute top-2 right-2 bg-brand-500 text-white rounded-full p-1">
+                              <CheckCircle2 className="h-3 w-3" />
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex justify-between gap-3 pt-4">
                   <Button
