@@ -41,12 +41,12 @@ export function Header({ onToggleSidebar }: HeaderProps) {
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/60 bg-white/70 backdrop-blur-xl">
-      <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 sm:px-8 lg:px-12">
+      <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6 sm:px-8 lg:px-12">
         <div className="flex items-center gap-4">
           <button
             type="button"
             onClick={onToggleSidebar}
-            className="flex h-12 w-12 min-w-[48px] min-h-[48px] items-center justify-center rounded-2xl border border-white/60 bg-white/70 text-slate-600 shadow-sm backdrop-blur transition hover:border-brand-200 hover:text-brand-600 lg:hidden touch-manipulation"
+            className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/60 bg-white/70 text-slate-600 shadow-sm backdrop-blur transition hover:border-brand-200 hover:text-brand-600 lg:hidden"
             aria-label="Open navigation"
           >
             <Menu className="h-5 w-5" />
@@ -64,7 +64,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             <button
               type="button"
               onClick={() => setNotificationsOpen(!notificationsOpen)}
-              className="relative flex h-12 w-12 min-w-[48px] min-h-[48px] items-center justify-center rounded-2xl border border-white/60 bg-white/70 text-slate-400 shadow-sm backdrop-blur transition hover:border-brand-200 hover:text-brand-600 touch-manipulation"
+              className="relative flex h-12 w-12 min-h-[44px] min-w-[44px] items-center justify-center rounded-2xl border border-white/60 bg-white/70 text-slate-400 shadow-sm backdrop-blur transition hover:border-brand-200 hover:text-brand-600 touch-manipulation"
               aria-label="Notifications"
             >
               <Bell className="h-5 w-5" />
@@ -72,7 +72,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             </button>
 
             {notificationsOpen && (
-              <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-80 rounded-xl border border-slate-200 bg-white shadow-lg z-50 sm:w-80">
+              <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-80 sm:max-w-80 rounded-xl border border-slate-200 bg-white shadow-lg z-50">
                 <div className="p-4">
                   <div className="mb-2 text-sm font-semibold text-slate-900">Notifications</div>
                   <div className="text-sm text-slate-500">
@@ -87,8 +87,8 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           <button
             type="button"
             onClick={() => navigate('/profile')}
-            className="flex h-12 w-12 min-w-[48px] min-h-[48px] items-center justify-center rounded-2xl border border-white/60 bg-white/70 text-slate-500 shadow-sm backdrop-blur transition hover:border-brand-200 hover:text-brand-600 md:hidden touch-manipulation"
-            aria-label="Profile Settings"
+            className="flex h-12 w-12 min-h-[44px] min-w-[44px] items-center justify-center rounded-2xl border border-white/60 bg-white/70 text-slate-500 shadow-sm backdrop-blur transition hover:border-brand-200 hover:text-brand-600 touch-manipulation md:hidden"
+            aria-label="Account"
           >
             <User className="h-5 w-5" />
           </button>
@@ -97,7 +97,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           <button
             type="button"
             onClick={() => navigate('/profile')}
-            className="hidden items-center gap-3 rounded-2xl border border-white/60 bg-white/70 px-4 py-3 min-h-[48px] text-sm text-slate-500 shadow-sm backdrop-blur transition hover:border-brand-200 hover:text-brand-600 md:flex touch-manipulation"
+            className="hidden items-center gap-3 rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-slate-500 shadow-sm backdrop-blur transition hover:border-brand-200 hover:text-brand-600 md:flex min-h-[44px] touch-manipulation"
           >
             <div className="hidden flex-col leading-tight sm:flex">
               <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Account</span>
@@ -106,12 +106,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             <User className="h-4 w-4" />
           </button>
 
-          <Button 
-            variant="ghost" 
-            size="md" 
-            onClick={handleSignOut} 
-            className="hidden gap-2 rounded-2xl px-4 py-3 min-h-[48px] text-sm font-semibold md:flex touch-manipulation"
-          >
+          <Button variant="ghost" size="md" onClick={handleSignOut} className="hidden gap-2 rounded-2xl px-4 py-3 text-sm font-semibold md:flex min-h-[44px]">
             <LogOut className="h-4 w-4" />
             <span className="hidden sm:inline">Sign out</span>
           </Button>

@@ -236,16 +236,16 @@ export function QuickCreate() {
   }
 
   const togglePlatform = (platform: string) => {
-    setSelectedPlatforms((prev: string[]) =>
+    setSelectedPlatforms(prev =>
       prev.includes(platform)
-        ? prev.filter((p: string) => p !== platform)
+        ? prev.filter(p => p !== platform)
         : [...prev, platform]
     )
   }
 
   const canProceedToScript = topic.trim().length > 0 && selectedCategory.length > 0
   const canProceedToVideo = generatedScript.trim().length > 0
-  const connectedPlatforms = socialAccounts.filter((acc: SocialAccount) => acc.status === 'connected').map((acc: SocialAccount) => acc.platform)
+  const connectedPlatforms = socialAccounts.filter(acc => acc.status === 'connected').map(acc => acc.platform)
 
   return (
     <Layout>
@@ -261,49 +261,49 @@ export function QuickCreate() {
 
         {/* Progress Steps */}
         <Card className="p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
-            <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0">
-              <div className={`flex items-center gap-2 sm:gap-3 flex-shrink-0 ${step === 'idea' ? 'text-brand-600' : ['script', 'generate', 'complete'].includes(step) ? 'text-emerald-600' : 'text-slate-400'}`}>
-                <div className={`flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full border-2 flex-shrink-0 ${
+          <div className="flex items-center justify-between overflow-x-auto">
+            <div className="flex items-center gap-2 sm:gap-4 min-w-max">
+              <div className={`flex items-center gap-3 ${step === 'idea' ? 'text-brand-600' : ['script', 'generate', 'complete'].includes(step) ? 'text-emerald-600' : 'text-slate-400'}`}>
+                <div className={`flex h-10 w-10 items-center justify-center rounded-full border-2 ${
                   step === 'idea' ? 'border-brand-500 bg-brand-50' : 
                   ['script', 'generate', 'complete'].includes(step) ? 'border-emerald-500 bg-emerald-50' : 
                   'border-slate-300 bg-white'
                 }`}>
-                  {['script', 'generate', 'complete'].includes(step) ? <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" /> : <span className="text-xs sm:text-sm font-semibold">1</span>}
+                  {['script', 'generate', 'complete'].includes(step) ? <CheckCircle2 className="h-5 w-5" /> : <span className="text-sm font-semibold">1</span>}
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs sm:text-sm font-semibold whitespace-nowrap">Idea</p>
-                  <p className="text-[10px] sm:text-xs text-slate-500 whitespace-nowrap">Describe topic</p>
+                <div>
+                  <p className="text-sm font-semibold">Idea</p>
+                  <p className="text-xs text-slate-500">Describe your topic</p>
                 </div>
               </div>
 
-              <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 text-slate-300 flex-shrink-0" />
+              <ArrowRight className="h-5 w-5 text-slate-300" />
 
-              <div className={`flex items-center gap-2 sm:gap-3 flex-shrink-0 ${step === 'script' ? 'text-brand-600' : ['generate', 'complete'].includes(step) ? 'text-emerald-600' : 'text-slate-400'}`}>
-                <div className={`flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full border-2 flex-shrink-0 ${
+              <div className={`flex items-center gap-3 ${step === 'script' ? 'text-brand-600' : ['generate', 'complete'].includes(step) ? 'text-emerald-600' : 'text-slate-400'}`}>
+                <div className={`flex h-10 w-10 items-center justify-center rounded-full border-2 ${
                   step === 'script' ? 'border-brand-500 bg-brand-50' : 
                   ['generate', 'complete'].includes(step) ? 'border-emerald-500 bg-emerald-50' : 
                   'border-slate-300 bg-white'
                 }`}>
-                  {['generate', 'complete'].includes(step) ? <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" /> : step === 'script' ? <Loader className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" /> : <span className="text-xs sm:text-sm font-semibold">2</span>}
+                  {['generate', 'complete'].includes(step) ? <CheckCircle2 className="h-5 w-5" /> : step === 'script' ? <Loader className="h-5 w-5 animate-spin" /> : <span className="text-sm font-semibold">2</span>}
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs sm:text-sm font-semibold whitespace-nowrap">Script</p>
-                  <p className="text-[10px] sm:text-xs text-slate-500 whitespace-nowrap">AI writes</p>
+                <div>
+                  <p className="text-sm font-semibold">Script</p>
+                  <p className="text-xs text-slate-500">AI writes for you</p>
                 </div>
               </div>
 
-              <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 text-slate-300 flex-shrink-0" />
+              <ArrowRight className="h-5 w-5 text-slate-300" />
 
-              <div className={`flex items-center gap-2 sm:gap-3 flex-shrink-0 ${step === 'generate' ? 'text-brand-600' : step === 'complete' ? 'text-emerald-600' : 'text-slate-400'}`}>
-                <div className={`flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full border-2 flex-shrink-0 ${
+              <div className={`flex items-center gap-3 ${step === 'generate' ? 'text-brand-600' : step === 'complete' ? 'text-emerald-600' : 'text-slate-400'}`}>
+                <div className={`flex h-10 w-10 items-center justify-center rounded-full border-2 ${
                   step === 'generate' ? 'border-brand-500 bg-brand-50' : step === 'complete' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-300 bg-white'
                 }`}>
-                  {step === 'complete' ? <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" /> : step === 'generate' ? <Loader className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" /> : <span className="text-xs sm:text-sm font-semibold">3</span>}
+                  {step === 'complete' ? <CheckCircle2 className="h-5 w-5" /> : step === 'generate' ? <Loader className="h-5 w-5 animate-spin" /> : <span className="text-sm font-semibold">3</span>}
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs sm:text-sm font-semibold whitespace-nowrap">Generate</p>
-                  <p className="text-[10px] sm:text-xs text-slate-500 whitespace-nowrap">Create video</p>
+                <div>
+                  <p className="text-sm font-semibold">Generate</p>
+                  <p className="text-xs text-slate-500">Create video</p>
                 </div>
               </div>
             </div>
@@ -313,30 +313,30 @@ export function QuickCreate() {
         {/* Step 1: Idea */}
         {step === 'idea' && (
           <Card className="p-4 sm:p-6 lg:p-8">
-            <div className="mb-4 sm:mb-6 flex items-center gap-3">
-              <Sparkles className="h-5 w-5 text-brand-500 flex-shrink-0" />
-              <h2 className="text-lg sm:text-xl font-semibold text-primary">Step 1: Your Idea</h2>
+            <div className="mb-6 flex items-center gap-3">
+              <Sparkles className="h-5 w-5 text-brand-500" />
+              <h2 className="text-xl font-semibold text-primary">Step 1: Your Idea</h2>
             </div>
 
             {scriptError && (
-              <div className="mb-4 sm:mb-6 rounded-2xl border border-rose-200/80 bg-rose-50/80 px-4 py-3 text-sm text-rose-600">
+              <div className="mb-6 rounded-2xl border border-rose-200/80 bg-rose-50/80 px-4 py-3 text-sm text-rose-600">
                 {scriptError}
               </div>
             )}
 
             {connectedPlatforms.length > 0 && (
-              <div className="mb-4 sm:mb-6 rounded-2xl border border-blue-200/60 bg-blue-50/40 p-3 sm:p-4">
-                <p className="mb-2 text-xs sm:text-sm font-semibold text-blue-700">Connected Social Media</p>
+              <div className="mb-6 rounded-2xl border border-blue-200/60 bg-blue-50/40 p-4">
+                <p className="mb-2 text-sm font-semibold text-blue-700">Connected Social Media</p>
                 <div className="flex flex-wrap gap-2">
                   {connectedPlatforms.map((platform) => {
                     const Icon = platformIcons[platform] || Share2
                     return (
                       <div
                         key={platform}
-                        className="flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-2 sm:px-3 py-1 sm:py-1.5"
+                        className="flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-1.5"
                       >
-                        <Icon className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
-                        <span className="text-[10px] sm:text-xs font-medium text-blue-700">
+                        <Icon className="h-4 w-4 text-blue-600" />
+                        <span className="text-xs font-medium text-blue-700">
                           {platformNames[platform] || platform}
                         </span>
                       </div>
@@ -346,7 +346,7 @@ export function QuickCreate() {
               </div>
             )}
 
-            <div className="space-y-4 sm:space-y-6">
+            <div className="space-y-6">
               <Select
                 label="Category"
                 value={selectedCategory}
@@ -412,18 +412,18 @@ export function QuickCreate() {
         {/* Step 2: Script */}
         {step === 'script' && (
           <Card className="p-4 sm:p-6 lg:p-8">
-            <div className="mb-4 sm:mb-6 flex items-center gap-3">
-              <FileText className="h-5 w-5 text-brand-500 flex-shrink-0" />
-              <h2 className="text-lg sm:text-xl font-semibold text-primary">Step 2: AI-Generated Script</h2>
+            <div className="mb-6 flex items-center gap-3">
+              <FileText className="h-5 w-5 text-brand-500" />
+              <h2 className="text-xl font-semibold text-primary">Step 2: AI-Generated Script</h2>
             </div>
 
             {scriptError && (
-              <div className="mb-4 sm:mb-6 rounded-2xl border border-rose-200/80 bg-rose-50/80 px-4 py-3 text-sm text-rose-600">
+              <div className="mb-6 rounded-2xl border border-rose-200/80 bg-rose-50/80 px-4 py-3 text-sm text-rose-600">
                 {scriptError}
               </div>
             )}
 
-            <div className="space-y-4 sm:space-y-6">
+            <div className="space-y-6">
               <div>
                 <div className="mb-2 flex items-center justify-between">
                   <label className="text-sm font-semibold text-primary">Script Preview</label>
@@ -481,19 +481,19 @@ export function QuickCreate() {
         {/* Step 3: Generate Video */}
         {step === 'generate' && (
           <Card className="p-4 sm:p-6 lg:p-8">
-            <div className="mb-4 sm:mb-6 flex items-center gap-3">
-              <Video className="h-5 w-5 text-brand-500 flex-shrink-0" />
-              <h2 className="text-lg sm:text-xl font-semibold text-primary">Step 3: Generate Video</h2>
+            <div className="mb-6 flex items-center gap-3">
+              <Video className="h-5 w-5 text-brand-500" />
+              <h2 className="text-xl font-semibold text-primary">Step 3: Generate Video</h2>
             </div>
 
             {videoError && (
-              <div className="mb-4 sm:mb-6 rounded-2xl border border-rose-200/80 bg-rose-50/80 px-4 py-3 text-sm text-rose-600">
+              <div className="mb-6 rounded-2xl border border-rose-200/80 bg-rose-50/80 px-4 py-3 text-sm text-rose-600">
                 {videoError}
               </div>
             )}
 
             {videoStatus === 'pending' || videoStatus === 'generating' ? (
-              <div className="space-y-4 sm:space-y-6">
+              <div className="space-y-6">
                 <div className="rounded-2xl border border-white/60 bg-white/70 p-6">
                   <h3 className="mb-4 text-sm font-semibold text-primary">Script Preview</h3>
                   <p className="whitespace-pre-wrap text-sm text-slate-600">{generatedScript}</p>
@@ -563,9 +563,9 @@ export function QuickCreate() {
 
         {/* Step 4: Post-Generation */}
         {step === 'complete' && videoUrl && (
-          <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
+          <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
             {/* Left: Video Preview */}
-            <Card className="p-6">
+            <Card className="p-4 sm:p-6">
               <div className="mb-4 flex items-center gap-3">
                 <Video className="h-5 w-5 text-brand-500" />
                 <h2 className="text-xl font-semibold text-primary">Your Video</h2>
@@ -588,8 +588,8 @@ export function QuickCreate() {
             </Card>
 
             {/* Right: Description and Social */}
-            <div className="space-y-6">
-              <Card className="p-6">
+            <div className="space-y-4 sm:space-y-6">
+              <Card className="p-4 sm:p-6">
                 <div className="mb-4 flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-primary">Social Media Description</h3>
                   <Button
@@ -610,8 +610,8 @@ export function QuickCreate() {
                 />
               </Card>
 
-              <Card className="p-6">
-                <h3 className="mb-4 text-lg font-semibold text-primary">Post to Social Media</h3>
+              <Card className="p-4 sm:p-6">
+                <h3 className="mb-4 text-base sm:text-lg font-semibold text-primary">Post to Social Media</h3>
                 <div className="space-y-4">
                   <div className="flex flex-wrap gap-2">
                     {connectedPlatforms.map((platform) => {
@@ -622,7 +622,7 @@ export function QuickCreate() {
                           key={platform}
                           type="button"
                           onClick={() => togglePlatform(platform)}
-                          className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition ${
+                          className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition touch-manipulation min-h-[44px] ${
                             isSelected
                               ? 'border-brand-500 bg-brand-50 text-brand-700'
                               : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
