@@ -9,7 +9,7 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { Modal } from '../components/ui/Modal'
 import { Input } from '../components/ui/Input'
 import { Textarea } from '../components/ui/Textarea'
-import { Calendar, X, Instagram, Youtube, Facebook, Users } from 'lucide-react'
+import { Calendar, X, Instagram, Youtube, Facebook, Users, ChevronLeft, ChevronRight } from 'lucide-react'
 import api from '../lib/api'
 
 interface Post {
@@ -53,6 +53,10 @@ export function ScheduledPosts() {
   const [scheduling, setScheduling] = useState(false)
   const [cancelModal, setCancelModal] = useState<string | null>(null)
   const [cancelling, setCancelling] = useState(false)
+  
+  // Calendar state
+  const [currentDate, setCurrentDate] = useState(new Date())
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
   useEffect(() => {
     loadPosts()
@@ -62,7 +66,7 @@ export function ScheduledPosts() {
   useEffect(() => {
     // Poll for status updates
     const interval = setInterval(() => {
-      const pending = posts.filter((p) => p.status === 'pending')
+      const pending = posts.filter((p: Post) => p.status === 'pending')
       if (pending.length > 0) {
         loadPosts()
       }
@@ -125,7 +129,7 @@ export function ScheduledPosts() {
     setCancelling(true)
     try {
       await api.delete(`/api/posts/${id}`)
-      setPosts(posts.filter((p) => p.id !== id))
+      setPosts(posts.filter((p: Post) => p.id !== id))
       setCancelModal(null)
     } catch (error) {
       console.error('Failed to cancel post:', error)
@@ -145,24 +149,62 @@ export function ScheduledPosts() {
   }
 
   const togglePlatform = (platform: string) => {
-    setSelectedPlatforms((prev) =>
+    setSelectedPlatforms((prev: string[]) =>
       prev.includes(platform)
-        ? prev.filter((p) => p !== platform)
+        ? prev.filter((p: string) => p !== platform)
         : [...prev, platform]
     )
   }
+
+  // Group posts by date
+  const postsByDate: Record<string, Post[]> = {}
+  posts.forEach((post: Post) => {
+    const dateKey = post.scheduled_time
+      ? new Date(post.scheduled_time).toISOString().split('T')[0]
+      : post.posted_at
+      ? new Date(post.posted_at).toISOString().split('T')[0]
+      : new Date().toISOString().split('T')[0]
+    if (!postsByDate[dateKey]) {
+      postsByDate[dateKey] = []
+    }
+    postsByDate[dateKey].push(post)
+  })
+
+  // Calendar utilities
+  const year = currentDate.getFullYear()
+  const month = currentDate.getMonth()
+  
+  const firstDayOfMonth = new Date(year, month, 1)
+  const lastDayOfMonth = new Date(year, month + 1, 0)
+  const daysInMonth = lastDayOfMonth.getDate()
+  const startingDayOfWeek = firstDayOfMonth.getDay()
+
+  const previousMonth = () => {
+    setCurrentDate(new Date(year, month - 1, 1))
+  }
+
+  const nextMonth = () => {
+    setCurrentDate(new Date(year, month + 1, 1))
+  }
+
+  const getPostsForDate = (date: Date): Post[] => {
+    const dateKey = date.toISOString().split('T')[0]
+    return postsByDate[dateKey] || []
+  }
+
+  const formatDateKey = (day: number): string => {
+    const date = new Date(year, month, day)
+    return date.toISOString().split('T')[0]
+  }
+
+  const selectedDatePosts = selectedDate ? postsByDate[selectedDate] || [] : []
 
   if (loading) {
     return (
       <Layout>
         <div className="space-y-8">
           <Skeleton className="h-28 rounded-[28px]" />
-          <Skeleton className="h-20 rounded-3xl" />
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-28 rounded-3xl" />
-            ))}
-          </div>
+          <Skeleton className="h-96 rounded-3xl" />
         </div>
       </Layout>
     )
@@ -207,59 +249,160 @@ export function ScheduledPosts() {
             }
           />
         ) : (
-          <div className="space-y-4">
-            {posts.map((post) => {
-              const Icon = platformIcons[post.platform]
-              return (
-                <Card key={post.id} hover className="flex flex-col gap-4">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="flex flex-1 items-start gap-4">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
-                        <Icon className="h-5 w-5" />
+          <div className="grid gap-6 lg:grid-cols-3">
+            {/* Calendar */}
+            <Card className="lg:col-span-2 p-6">
+              <div className="mb-6 flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-primary">
+                  {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </h2>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={previousMonth}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCurrentDate(new Date())}
+                    className="h-8 px-3"
+                  >
+                    Today
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={nextMonth}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-7 gap-2">
+                {/* Day headers */}
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                  <div key={day} className="text-center text-xs font-semibold uppercase tracking-wide text-slate-400 py-2">
+                    {day}
+                  </div>
+                ))}
+
+                {/* Empty cells for days before month starts */}
+                {Array.from({ length: startingDayOfWeek }).map((_, i) => (
+                  <div key={`empty-${i}`} className="aspect-square" />
+                ))}
+
+                {/* Calendar days */}
+                {Array.from({ length: daysInMonth }).map((_, i) => {
+                  const day = i + 1
+                  const dateKey = formatDateKey(day)
+                  const dayPosts = getPostsForDate(new Date(year, month, day))
+                  const isToday = dateKey === new Date().toISOString().split('T')[0]
+                  const isSelected = selectedDate === dateKey
+
+                  return (
+                    <button
+                      key={day}
+                      type="button"
+                      onClick={() => setSelectedDate(isSelected ? null : dateKey)}
+                      className={`aspect-square rounded-xl border-2 p-2 text-left transition ${
+                        isSelected
+                          ? 'border-brand-500 bg-brand-50'
+                          : isToday
+                          ? 'border-brand-300 bg-brand-50/50'
+                          : dayPosts.length > 0
+                          ? 'border-blue-200 bg-blue-50/50 hover:border-blue-300'
+                          : 'border-transparent hover:border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className={`text-sm font-semibold ${isToday ? 'text-brand-600' : 'text-slate-700'}`}>
+                        {day}
                       </div>
-                      <div className="flex-1 space-y-2">
-                        <div className="flex flex-wrap items-center gap-3">
-                          <h3 className="text-lg font-semibold text-primary">
+                      {dayPosts.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {dayPosts.slice(0, 2).map((post) => {
+                            const Icon = platformIcons[post.platform]
+                            return (
+                              <div
+                                key={post.id}
+                                className="h-1.5 w-1.5 rounded-full bg-brand-500"
+                                title={platformNames[post.platform]}
+                              />
+                            )
+                          })}
+                          {dayPosts.length > 2 && (
+                            <div className="text-[10px] text-slate-500">+{dayPosts.length - 2}</div>
+                          )}
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </Card>
+
+            {/* Selected Date Posts */}
+            <Card className="p-6">
+              <h3 className="mb-4 text-lg font-semibold text-primary">
+                {selectedDate
+                  ? new Date(selectedDate).toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      month: 'long',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })
+                  : 'Select a date'}
+              </h3>
+              {selectedDatePosts.length === 0 ? (
+                <p className="text-sm text-slate-500">
+                  {selectedDate ? 'No posts scheduled for this date' : 'Click on a date to see scheduled posts'}
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {selectedDatePosts.map((post) => {
+                    const Icon = platformIcons[post.platform]
+                    return (
+                      <div
+                        key={post.id}
+                        className="rounded-xl border border-slate-200 bg-white p-3"
+                      >
+                        <div className="mb-2 flex items-center gap-2">
+                          <Icon className="h-4 w-4 text-slate-500" />
+                          <span className="text-sm font-semibold text-primary">
                             {platformNames[post.platform]}
-                          </h3>
+                          </span>
                           {getStatusBadge(post.status)}
                         </div>
-                        <p className="text-sm text-slate-500">{post.videos.topic}</p>
-                        <div className="space-y-1 text-xs text-slate-400">
-                          {post.scheduled_time && (
-                            <p>Scheduled - {new Date(post.scheduled_time).toLocaleString()}</p>
-                          )}
-                          {post.posted_at && (
-                            <p>Posted - {new Date(post.posted_at).toLocaleString()}</p>
-                          )}
-                        </div>
-                        {post.error_message && (
-                          <div className="rounded-2xl border border-rose-200/70 bg-rose-50/70 px-4 py-2 text-xs text-rose-600">
-                            {post.error_message}
-                          </div>
+                        <p className="mb-2 text-xs text-slate-600">{post.videos.topic}</p>
+                        {post.scheduled_time && (
+                          <p className="text-[10px] text-slate-400">
+                            {new Date(post.scheduled_time).toLocaleTimeString('en-US', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </p>
+                        )}
+                        {post.status === 'pending' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="mt-2 h-6 text-xs text-red-600 hover:bg-red-50"
+                            onClick={() => setCancelModal(post.id)}
+                          >
+                            Cancel
+                          </Button>
                         )}
                       </div>
-                    </div>
-                    {post.status === 'pending' && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="border border-white/60 bg-white/70 text-slate-500 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
-                        onClick={() => setCancelModal(post.id)}
-                      >
-                        <X className="mr-2 h-4 w-4" />
-                        Cancel
-                      </Button>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 border-t border-white/60 pt-4 text-[11px] uppercase tracking-wide text-slate-400">
-                    <span>ID - {post.id.slice(0, 8)}</span>
-                    <span className="inline-flex h-2.5 w-2.5 rounded-full bg-brand-300" />
-                    <span>{post.status}</span>
-                  </div>
-                </Card>
-              )
-            })}
+                    )
+                  })}
+                </div>
+              )}
+            </Card>
           </div>
         )}
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { useToast } from '../hooks/useToast'
@@ -96,8 +97,8 @@ export default function Avatars() {
 
   if (loading) {
     return (
-      <div className="p-6">
-        <div className="max-w-7xl mx-auto">
+      <Layout>
+        <div className="space-y-8">
           <div className="animate-pulse space-y-4">
             <div className="h-8 bg-slate-200 rounded w-1/4"></div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -107,17 +108,18 @@ export default function Avatars() {
             </div>
           </div>
         </div>
-      </div>
+      </Layout>
     )
   }
 
   return (
-    <div className="p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
+    <Layout>
+      <div className="space-y-8">
+        <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Avatars</h1>
-            <p className="text-slate-600 mt-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Settings</p>
+            <h1 className="mt-2 text-3xl font-semibold text-primary">Avatars</h1>
+            <p className="mt-1 text-sm text-slate-500">
               Manage your HeyGen avatars for video generation
             </p>
           </div>
@@ -204,6 +206,6 @@ export default function Avatars() {
           </div>
         )}
       </div>
-    </div>
+    </Layout>
   )
 }

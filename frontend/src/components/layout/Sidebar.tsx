@@ -1,4 +1,4 @@
-import { Fragment, useEffect } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import {
   CalendarCheck,
@@ -15,6 +15,7 @@ import {
   Settings,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
+import api from '../../lib/api'
 
 interface SidebarProps {
   isOpen: boolean
@@ -36,11 +37,26 @@ const navigation = [
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation()
   const { isAdmin } = useAuth()
+  const [hasVideos, setHasVideos] = useState<boolean | null>(null) // null = loading
   
   // Debug: Log admin status
   useEffect(() => {
     console.log('[Sidebar] Admin status:', isAdmin)
   }, [isAdmin])
+
+  // Check if user has videos
+  useEffect(() => {
+    const checkVideos = async () => {
+      try {
+        const response = await api.get('/api/videos', { params: { limit: 1 } })
+        setHasVideos((response.data.videos || []).length > 0)
+      } catch (error) {
+        console.error('Failed to check videos:', error)
+        setHasVideos(false) // Default to showing get started on error
+      }
+    }
+    checkVideos()
+  }, [])
 
   return (
     <Fragment>
@@ -82,7 +98,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </button>
           </div>
 
-          <nav className="mt-10 flex flex-1 flex-col gap-2">
+          <nav className="mt-10 flex flex-1 flex-col gap-2 overflow-y-auto">
             {navigation.map(({ label, to, icon: Icon }) => {
               const isActive = location.pathname.startsWith(to)
               return (
@@ -165,20 +181,23 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             )}
           </nav>
 
-          <div className="mt-auto rounded-2xl border border-white/60 bg-white/70 p-5 text-sm text-slate-500 shadow-inner backdrop-blur">
-            <p className="font-semibold text-primary">Get started</p>
-            <p className="mt-1 text-xs text-slate-500">Create your first video or view your library.</p>
-            <Link
-              to="/create"
-              className="mt-4 inline-flex items-center gap-2 text-xs font-semibold text-brand-600 hover:text-brand-700"
-            >
-              Create Video
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 12h14" />
-                <path d="m12 5 7 7-7 7" />
-              </svg>
-            </Link>
-          </div>
+          {hasVideos === false && (
+            <div className="mt-auto rounded-2xl border border-white/60 bg-white/70 p-5 text-sm text-slate-500 shadow-inner backdrop-blur">
+              <p className="font-semibold text-primary">Get started</p>
+              <p className="mt-1 text-xs text-slate-500">Create your first video or view your library.</p>
+              <Link
+                to="/create"
+                onClick={onClose}
+                className="mt-4 inline-flex items-center gap-2 text-xs font-semibold text-brand-600 hover:text-brand-700"
+              >
+                Create Video
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 12h14" />
+                  <path d="m12 5 7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
+          )}
         </div>
       </aside>
     </Fragment>

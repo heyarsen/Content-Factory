@@ -37,6 +37,47 @@ export interface ResearchResponse {
 }
 
 /**
+ * Retry function with exponential backoff for handling rate limits
+ */
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  initialDelay: number = 1000
+): Promise<T> {
+  let lastError: any
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn()
+    } catch (error: any) {
+      lastError = error
+      const status = error.response?.status
+
+      // Only retry on 429 (rate limit) or 5xx errors
+      if (status === 429 || (status >= 500 && status < 600)) {
+        if (attempt < maxRetries - 1) {
+          // Calculate delay with exponential backoff
+          const delay = initialDelay * Math.pow(2, attempt)
+          
+          // If 429, try to use retry-after header
+          const retryAfter = error.response?.headers?.['retry-after']
+          const waitTime = retryAfter ? parseInt(retryAfter, 10) * 1000 : delay
+          
+          console.log(`Rate limit or server error (${status}), retrying in ${waitTime}ms (attempt ${attempt + 1}/${maxRetries})`)
+          await new Promise(resolve => setTimeout(resolve, waitTime))
+          continue
+        }
+      }
+      
+      // For other errors or last retry, throw immediately
+      throw error
+    }
+  }
+
+  throw lastError || new Error('Max retries exceeded')
+}
+
+/**
  * Generate 3 topics using Perplexity AI (Scout-Research Hunter)
  */
 export async function generateTopics(
@@ -89,26 +130,28 @@ Output strictly as a JSON array with objects in the form {"Idea": "...", "Catego
 Categories and order are fixed: Trading, Fin. Freedom, Lifestyle.`
 
   try {
-    const response = await axios.post(
-      PERPLEXITY_API_URL,
-      {
-        model: 'sonar-pro',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.5,
-        web_search_options: {
-          search_context_size: 'medium',
+    const response = await retryWithBackoff(async () => {
+      return await axios.post(
+        PERPLEXITY_API_URL,
+        {
+          model: 'sonar-pro',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          temperature: 0.5,
+          web_search_options: {
+            search_context_size: 'medium',
+          },
         },
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${PERPLEXITY_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    )
+        {
+          headers: {
+            Authorization: `Bearer ${PERPLEXITY_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      )
+    })
 
     const content = response.data.choices[0]?.message?.content || ''
     
@@ -127,6 +170,10 @@ Categories and order are fixed: Trading, Fin. Freedom, Lifestyle.`
     return { topics }
   } catch (error: any) {
     console.error('Perplexity API error:', error.response?.data || error.message)
+    const status = error.response?.status
+    if (status === 429) {
+      throw new Error('Rate limit exceeded. Please wait a moment and try again.')
+    }
     throw new Error(`Failed to generate topics: ${error.message}`)
   }
 }
@@ -187,26 +234,28 @@ ${request.topic}, category ${request.category}
 Return strictly in JSON array with fields "Idea", "Description", "WhyItMatters", "UsefulTips", "Category".`
 
   try {
-    const response = await axios.post(
-      PERPLEXITY_API_URL,
-      {
-        model: 'sonar-pro',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.5,
-        web_search_options: {
-          search_context_size: 'medium',
+    const response = await retryWithBackoff(async () => {
+      return await axios.post(
+        PERPLEXITY_API_URL,
+        {
+          model: 'sonar-pro',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          temperature: 0.5,
+          web_search_options: {
+            search_context_size: 'medium',
+          },
         },
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${PERPLEXITY_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    )
+        {
+          headers: {
+            Authorization: `Bearer ${PERPLEXITY_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      )
+    })
 
     const content = response.data.choices[0]?.message?.content || ''
     
@@ -225,6 +274,10 @@ Return strictly in JSON array with fields "Idea", "Description", "WhyItMatters",
     return researchArray[0]
   } catch (error: any) {
     console.error('Perplexity API error:', error.response?.data || error.message)
+    const status = error.response?.status
+    if (status === 429) {
+      throw new Error('Rate limit exceeded. Please wait a moment and try again.')
+    }
     throw new Error(`Failed to research topic: ${error.message}`)
   }
 }

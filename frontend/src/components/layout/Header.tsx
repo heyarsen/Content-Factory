@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { Button } from '../ui/Button'
-import { Bell, LogOut, Menu, Search, Settings, User, ChevronDown } from 'lucide-react'
+import { Bell, LogOut, Menu, User } from 'lucide-react'
 import { useMemo, useState, useRef, useEffect } from 'react'
 
 interface HeaderProps {
@@ -11,8 +11,8 @@ interface HeaderProps {
 export function Header({ onToggleSidebar }: HeaderProps) {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
-  const [dropdownOpen, setDropdownOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const notificationRef = useRef<HTMLDivElement>(null)
 
   const greetingName = useMemo(() => {
     if (!user?.email) return 'Creator'
@@ -20,24 +20,23 @@ export function Header({ onToggleSidebar }: HeaderProps) {
     return name.charAt(0).toUpperCase() + name.slice(1)
   }, [user?.email])
 
-  // Close dropdown when clicking outside
+  // Close notification dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setDropdownOpen(false)
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setNotificationsOpen(false)
       }
     }
 
-    if (dropdownOpen) {
+    if (notificationsOpen) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [dropdownOpen])
+  }, [notificationsOpen])
 
   const handleSignOut = async () => {
     await signOut()
     navigate('/login')
-    setDropdownOpen(false)
   }
 
   return (
@@ -60,74 +59,42 @@ export function Header({ onToggleSidebar }: HeaderProps) {
         </div>
 
         <div className="flex flex-1 items-center justify-end gap-3 md:gap-5">
-          <div className="relative hidden flex-1 max-w-md items-center lg:flex">
-            <Search className="pointer-events-none absolute left-4 h-4 w-4 text-slate-300" />
-            <input
-              type="text"
-              placeholder="Quick search (Cmd+K)"
-              className="w-full rounded-2xl border border-transparent bg-white/80 py-3 pl-11 pr-4 text-sm text-slate-600 shadow-inner outline-none transition focus:border-brand-200 focus:ring-2 focus:ring-brand-200"
-            />
-          </div>
-
-          <button
-            type="button"
-            className="relative hidden h-12 w-12 items-center justify-center rounded-2xl border border-white/60 bg-white/70 text-slate-400 shadow-sm backdrop-blur transition hover:border-brand-200 hover:text-brand-600 sm:flex"
-            aria-label="Notifications"
-          >
-            <Bell className="h-5 w-5" />
-            <span className="absolute right-2 top-2 inline-flex h-2.5 w-2.5 rounded-full bg-brand-500" />
-          </button>
-
-          {/* User Dropdown */}
-          <div className="relative" ref={dropdownRef}>
+          {/* Notifications */}
+          <div className="relative" ref={notificationRef}>
             <button
               type="button"
-              onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="hidden items-center gap-3 rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-slate-500 shadow-sm backdrop-blur transition hover:border-brand-200 hover:text-brand-600 md:flex"
+              onClick={() => setNotificationsOpen(!notificationsOpen)}
+              className="relative flex h-12 w-12 items-center justify-center rounded-2xl border border-white/60 bg-white/70 text-slate-400 shadow-sm backdrop-blur transition hover:border-brand-200 hover:text-brand-600"
+              aria-label="Notifications"
             >
-              <div className="hidden flex-col leading-tight sm:flex">
-                <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Account</span>
-                <span className="font-semibold text-primary">{user?.email}</span>
-              </div>
-              <ChevronDown className={`h-4 w-4 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
+              <Bell className="h-5 w-5" />
+              <span className="absolute right-2 top-2 inline-flex h-2.5 w-2.5 rounded-full bg-brand-500" />
             </button>
 
-            {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white shadow-lg">
-                <div className="py-2">
-                  <div className="px-4 py-2 text-xs font-medium text-slate-400">SETTINGS</div>
-                  <button
-                    onClick={() => {
-                      navigate('/profile')
-                      setDropdownOpen(false)
-                    }}
-                    className="flex w-full items-center gap-3 px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-50"
-                  >
-                    <User className="h-4 w-4" />
-                    Profile Settings
-                  </button>
-                  <button
-                    onClick={() => {
-                      navigate('/preferences')
-                      setDropdownOpen(false)
-                    }}
-                    className="flex w-full items-center gap-3 px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-50"
-                  >
-                    <Settings className="h-4 w-4" />
-                    Preferences
-                  </button>
-                  <div className="my-1 border-t border-slate-200" />
-                  <button
-                    onClick={handleSignOut}
-                    className="flex w-full items-center gap-3 px-4 py-2 text-sm text-red-600 transition hover:bg-red-50"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Sign out
-                  </button>
+            {notificationsOpen && (
+              <div className="absolute right-0 mt-2 w-80 rounded-xl border border-slate-200 bg-white shadow-lg">
+                <div className="p-4">
+                  <div className="mb-2 text-sm font-semibold text-slate-900">Notifications</div>
+                  <div className="text-sm text-slate-500">
+                    No new notifications
+                  </div>
                 </div>
               </div>
             )}
           </div>
+
+          {/* Account Button - Direct Navigation */}
+          <button
+            type="button"
+            onClick={() => navigate('/profile')}
+            className="hidden items-center gap-3 rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-slate-500 shadow-sm backdrop-blur transition hover:border-brand-200 hover:text-brand-600 md:flex"
+          >
+            <div className="hidden flex-col leading-tight sm:flex">
+              <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Account</span>
+              <span className="font-semibold text-primary">{user?.email}</span>
+            </div>
+            <User className="h-4 w-4" />
+          </button>
 
           <Button variant="ghost" size="md" onClick={handleSignOut} className="gap-2 rounded-2xl px-4 py-3 text-sm font-semibold md:hidden">
             <LogOut className="h-4 w-4" />
