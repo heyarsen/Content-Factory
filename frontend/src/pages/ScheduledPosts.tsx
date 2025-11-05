@@ -9,7 +9,7 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { Modal } from '../components/ui/Modal'
 import { Input } from '../components/ui/Input'
 import { Textarea } from '../components/ui/Textarea'
-import { Calendar, X, Instagram, Youtube, Facebook, Users, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Calendar, Instagram, Youtube, Facebook, Users, ChevronLeft, ChevronRight } from 'lucide-react'
 import api from '../lib/api'
 
 interface Post {
@@ -325,16 +325,13 @@ export function ScheduledPosts() {
                       </div>
                       {dayPosts.length > 0 && (
                         <div className="mt-1 flex flex-wrap gap-1">
-                          {dayPosts.slice(0, 2).map((post) => {
-                            const Icon = platformIcons[post.platform]
-                            return (
-                              <div
-                                key={post.id}
-                                className="h-1.5 w-1.5 rounded-full bg-brand-500"
-                                title={platformNames[post.platform]}
-                              />
-                            )
-                          })}
+                          {dayPosts.slice(0, 2).map((post) => (
+                            <div
+                              key={post.id}
+                              className="h-1.5 w-1.5 rounded-full bg-brand-500"
+                              title={platformNames[post.platform]}
+                            />
+                          ))}
                           {dayPosts.length > 2 && (
                             <div className="text-[10px] text-slate-500">+{dayPosts.length - 2}</div>
                           )}

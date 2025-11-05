@@ -28,8 +28,8 @@ function getAllTimezones() {
   try {
     // Use Intl.supportedValuesOf if available (modern browsers)
     if (typeof Intl !== 'undefined' && 'supportedValuesOf' in Intl) {
-      const timezones = Intl.supportedValuesOf('timeZone')
-      return timezones.map(tz => {
+      const timezones = (Intl as any).supportedValuesOf('timeZone') as string[]
+      return timezones.map((tz: string) => {
         // Format timezone name for display
         const parts = tz.split('/')
         const name = parts[parts.length - 1].replace(/_/g, ' ')
@@ -37,7 +37,7 @@ function getAllTimezones() {
           value: tz,
           label: `${tz} - ${name}`,
         }
-      }).sort((a, b) => a.label.localeCompare(b.label))
+      }).sort((a: { value: string; label: string }, b: { value: string; label: string }) => a.label.localeCompare(b.label))
     }
   } catch (e) {
     console.warn('Intl.supportedValuesOf not available, using fallback list')
