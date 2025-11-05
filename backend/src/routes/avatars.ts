@@ -138,7 +138,74 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
   }
 })
 
-// Create avatar from photo
+// Upload photo to storage and create avatar
+router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { photo_data, avatar_name } = req.body // photo_data is base64 data URL
+
+    if (!photo_data || !avatar_name) {
+      return res.status(400).json({ error: 'photo_data and avatar_name are required' })
+    }
+
+    // Convert base64 data URL to buffer
+    const base64Data = photo_data.replace(/^data:image\/\w+;base64,/, '')
+    const buffer = Buffer.from(base64Data, 'base64')
+    
+    // Determine file extension from data URL
+    const mimeMatch = photo_data.match(/data:image\/(\w+);base64/)
+    const extension = mimeMatch ? mimeMatch[1] : 'jpg'
+    const fileName = `avatars/${userId}/${Date.now()}-${avatar_name.replace(/[^a-z0-9]/gi, '_')}.${extension}`
+    
+    // Upload to Supabase Storage
+    const { supabase } = await import('../lib/supabase.js')
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(fileName, buffer, {
+        contentType: `image/${extension}`,
+        upsert: false,
+      })
+
+    if (uploadError) {
+      console.error('Supabase storage upload error:', uploadError)
+      throw new Error(`Failed to upload image: ${uploadError.message}`)
+    }
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(fileName)
+
+    if (!publicUrl) {
+      throw new Error('Failed to get public URL for uploaded image')
+    }
+
+    // Create avatar using the public URL
+    const avatar = await AvatarService.createAvatarFromPhoto(userId, publicUrl, avatar_name)
+
+    return res.status(201).json({
+      message: 'Avatar creation started. It may take a few minutes to train.',
+      avatar,
+      photo_url: publicUrl,
+    })
+  } catch (error: any) {
+    console.error('Upload photo and create avatar error:', {
+      message: error.message,
+      stack: error.stack,
+      response: error.response?.data,
+      status: error.response?.status,
+    })
+    
+    const errorMessage = 
+      error.message || 
+      error.response?.data?.message ||
+      'Failed to upload photo and create avatar'
+    
+    return res.status(500).json({ error: errorMessage })
+  }
+})
+
+// Create avatar from photo (legacy - accepts photo_url)
 router.post('/create-from-photo', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!

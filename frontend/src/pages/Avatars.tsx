@@ -171,10 +171,10 @@ export default function Avatars() {
       
       console.log('File read, sending to API...')
       
-      // Send to API
-      console.log('Sending request to API...')
-      const response = await api.post('/api/avatars/create-from-photo', {
-        photo_url: base64Data,
+      // Send to API - upload photo and create avatar
+      console.log('Uploading photo and creating avatar...')
+      const response = await api.post('/api/avatars/upload-photo', {
+        photo_data: base64Data,
         avatar_name: avatarName,
       })
       
