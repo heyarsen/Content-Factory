@@ -32,9 +32,27 @@ function handleServiceError(res: Response, error: any, fallbackMessage: string) 
 
 // Generate video
 router.post('/generate', authenticate, async (req: AuthRequest, res: Response) => {
+  console.log('✅ Video generation endpoint hit!', {
+    method: req.method,
+    path: req.path,
+    originalUrl: req.originalUrl,
+    userId: req.userId,
+    bodyKeys: Object.keys(req.body || {}),
+  })
+  
   try {
     const { topic, script, style, duration, avatar_id } = req.body
     const userId = req.userId!
+    
+    console.log('Video generation request:', {
+      userId,
+      hasTopic: !!topic,
+      hasScript: !!script,
+      scriptLength: script?.length,
+      style,
+      duration,
+      avatar_id,
+    })
 
     if (!topic || !style || !duration) {
       return res.status(400).json({ error: 'Topic, style, and duration are required' })

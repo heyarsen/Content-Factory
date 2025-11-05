@@ -187,6 +187,17 @@ export function QuickCreate() {
     setVideoError('')
 
     try {
+      console.log('Sending video generation request to:', '/api/videos/generate')
+      console.log('Request payload:', {
+        topic,
+        hasScript: !!generatedScript,
+        scriptLength: generatedScript?.length,
+        style,
+        duration,
+        category: selectedCategory,
+        avatar_id: selectedAvatarId || undefined,
+      })
+      
       const response = await api.post('/api/videos/generate', {
         topic,
         script: generatedScript,
@@ -196,6 +207,7 @@ export function QuickCreate() {
         avatar_id: selectedAvatarId || undefined,
       })
 
+      console.log('Video generation response:', response.data)
       setVideoId(response.data.video.id)
       setVideoStatus(response.data.video.status)
       // If video is already completed (unlikely), go to complete step
@@ -204,14 +216,32 @@ export function QuickCreate() {
         setStep('complete')
       }
     } catch (error: any) {
-      console.error('Video generation error:', error)
+      console.error('Video generation error - Full error:', {
+        message: error.message,
+        response: error.response,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          baseURL: error.config?.baseURL,
+        },
+      })
       
       // Extract detailed error message
-      const errorMessage = 
-        error.response?.data?.error ||
-        error.response?.data?.message ||
-        error.message ||
-        'Failed to generate video. Please check your avatar configuration and try again.'
+      let errorMessage = 'Failed to generate video'
+      
+      if (error.response?.status === 404) {
+        errorMessage = error.response?.data?.error || 
+          'Video generation endpoint not found (404). Please check if the feature is available.'
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message
+      } else if (error.message) {
+        errorMessage = error.message
+      }
       
       setVideoError(errorMessage)
     } finally {
