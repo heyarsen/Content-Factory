@@ -94,7 +94,7 @@ export class AvatarService {
       .from('avatars')
       .select('*')
       .eq('user_id', userId)
-      .eq('status', 'active')
+      .in('status', ['active', 'training'])
       .order('is_default', { ascending: false })
       .order('avatar_name', { ascending: true })
 
@@ -237,5 +237,42 @@ export class AvatarService {
       .eq('user_id', userId)
 
     if (error) throw error
+  }
+
+  /**
+   * Create avatar from photo using HeyGen v2 API
+   */
+  static async createAvatarFromPhoto(
+    userId: string,
+    photoUrl: string,
+    avatarName: string
+  ): Promise<Avatar> {
+    try {
+      const { createAvatarFromPhoto } = await import('../lib/heygen.js')
+      const result = await createAvatarFromPhoto(photoUrl, avatarName)
+
+      // Save to database
+      const { data, error } = await supabase
+        .from('avatars')
+        .insert({
+          user_id: userId,
+          heygen_avatar_id: result.avatar_id,
+          avatar_name: avatarName,
+          avatar_url: null,
+          preview_url: null,
+          thumbnail_url: null,
+          gender: null,
+          status: result.status === 'training' ? 'training' : 'active',
+          is_default: false,
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+      return data
+    } catch (error: any) {
+      console.error('Create avatar from photo error:', error)
+      throw new Error(`Failed to create avatar from photo: ${error.message}`)
+    }
   }
 }

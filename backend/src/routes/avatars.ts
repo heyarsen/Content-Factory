@@ -138,4 +138,26 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
   }
 })
 
+// Create avatar from photo
+router.post('/create-from-photo', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { photo_url, avatar_name } = req.body
+
+    if (!photo_url || !avatar_name) {
+      return res.status(400).json({ error: 'photo_url and avatar_name are required' })
+    }
+
+    const avatar = await AvatarService.createAvatarFromPhoto(userId, photo_url, avatar_name)
+
+    return res.status(201).json({
+      message: 'Avatar creation started. It may take a few minutes to train.',
+      avatar,
+    })
+  } catch (error: any) {
+    console.error('Create avatar from photo error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to create avatar from photo' })
+  }
+})
+
 export default router

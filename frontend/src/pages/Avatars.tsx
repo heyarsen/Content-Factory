@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
+import { Input } from '../components/ui/Input'
+import { Modal } from '../components/ui/Modal'
 import { useToast } from '../hooks/useToast'
 import api from '../lib/api'
-import { RefreshCw, Star, Trash2, User } from 'lucide-react'
+import { RefreshCw, Star, Trash2, User, Upload, Plus } from 'lucide-react'
 
 interface Avatar {
   id: string
@@ -24,6 +26,12 @@ export default function Avatars() {
   const [defaultAvatarId, setDefaultAvatarId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [avatarName, setAvatarName] = useState('')
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -95,6 +103,83 @@ export default function Avatars() {
     }
   }
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select an image file')
+        return
+      }
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        toast.error('Image size must be less than 10MB')
+        return
+      }
+      setPhotoFile(file)
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleCreateAvatar = async () => {
+    if (!avatarName.trim()) {
+      toast.error('Please enter an avatar name')
+      return
+    }
+    if (!photoFile) {
+      toast.error('Please select a photo')
+      return
+    }
+
+    setCreating(true)
+    try {
+      // Convert file to base64 data URL
+      const reader = new FileReader()
+      reader.onloadend = async () => {
+        const base64Data = reader.result as string
+        
+        // For now, we'll send the base64 data URL directly
+        // In production, you might want to upload to a storage service first
+        const response = await api.post('/api/avatars/create-from-photo', {
+          photo_url: base64Data,
+          avatar_name: avatarName,
+        })
+
+        toast.success('Avatar creation started! It may take a few minutes to train.')
+        setShowCreateModal(false)
+        setAvatarName('')
+        setPhotoFile(null)
+        setPhotoPreview(null)
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ''
+        }
+        
+        // Reload avatars
+        await loadAvatars()
+      }
+      reader.readAsDataURL(photoFile)
+    } catch (error: any) {
+      console.error('Failed to create avatar:', error)
+      toast.error(error.response?.data?.error || 'Failed to create avatar')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleCloseCreateModal = () => {
+    if (!creating) {
+      setShowCreateModal(false)
+      setAvatarName('')
+      setPhotoFile(null)
+      setPhotoPreview(null)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
   if (loading) {
     return (
       <Layout>
@@ -115,7 +200,7 @@ export default function Avatars() {
   return (
     <Layout>
       <div className="space-y-8">
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center flex-wrap gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Settings</p>
             <h1 className="mt-2 text-3xl font-semibold text-primary">Avatars</h1>
@@ -123,14 +208,24 @@ export default function Avatars() {
               Manage your HeyGen avatars for video generation
             </p>
           </div>
-          <Button
-            onClick={handleSync}
-            disabled={syncing}
-            className="flex items-center gap-2"
-          >
-            <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-            {syncing ? 'Syncing...' : 'Sync from HeyGen'}
-          </Button>
+          <div className="flex gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Create from Photo
+            </Button>
+            <Button
+              onClick={handleSync}
+              disabled={syncing}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing...' : 'Sync from HeyGen'}
+            </Button>
+          </div>
         </div>
 
         {avatars.length === 0 ? (
@@ -205,6 +300,97 @@ export default function Avatars() {
             ))}
           </div>
         )}
+
+        {/* Create Avatar Modal */}
+        <Modal
+          isOpen={showCreateModal}
+          onClose={handleCloseCreateModal}
+          title="Create Avatar from Photo"
+          size="lg"
+        >
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Avatar Name
+              </label>
+              <Input
+                value={avatarName}
+                onChange={(e) => setAvatarName(e.target.value)}
+                placeholder="Enter avatar name"
+                disabled={creating}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Photo
+              </label>
+              {photoPreview ? (
+                <div className="space-y-3">
+                  <div className="relative w-full h-64 rounded-lg overflow-hidden border-2 border-slate-200">
+                    <img
+                      src={photoPreview}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setPhotoFile(null)
+                      setPhotoPreview(null)
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = ''
+                      }
+                    }}
+                    disabled={creating}
+                  >
+                    Change Photo
+                  </Button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center cursor-pointer hover:border-brand-500 transition-colors"
+                >
+                  <Upload className="h-12 w-12 mx-auto text-slate-400 mb-3" />
+                  <p className="text-sm text-slate-600 mb-1">
+                    Click to upload a photo
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    PNG, JPG up to 10MB. Front-facing photo recommended.
+                  </p>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    disabled={creating}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
+              <Button
+                variant="ghost"
+                onClick={handleCloseCreateModal}
+                disabled={creating}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateAvatar}
+                disabled={creating || !avatarName.trim() || !photoFile}
+                loading={creating}
+              >
+                {creating ? 'Creating...' : 'Create Avatar'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
       </div>
     </Layout>
   )

@@ -45,14 +45,13 @@ export interface HeyGenAvatarsResponse {
  */
 export async function listAvatars(): Promise<HeyGenAvatarsResponse> {
   try {
-    // Based on HeyGen API format (similar to video.generate), try avatar.list first
-    // Try multiple endpoint variations as HeyGen API may use different formats
+    // Try HeyGen v1 API endpoints first (most common)
     const endpoints = [
       { method: 'POST', url: `${HEYGEN_API_URL}/avatar.list` },
-      { method: 'POST', url: `${HEYGEN_API_URL}/avatars` },
       { method: 'GET', url: `${HEYGEN_API_URL}/avatars` },
-      { method: 'POST', url: `${HEYGEN_API_URL}/avatar` },
+      { method: 'POST', url: `${HEYGEN_API_URL}/avatars` },
       { method: 'GET', url: `${HEYGEN_API_URL}/avatar` },
+      { method: 'POST', url: `${HEYGEN_API_URL}/avatar` },
     ]
 
     let lastError: any = null
@@ -69,33 +68,49 @@ export async function listAvatars(): Promise<HeyGenAvatarsResponse> {
           ? await axios.post(url, {}, requestConfig)
           : await axios.get(url, requestConfig)
 
-        // Handle different response structures
+        console.log(`HeyGen API response from ${url} (${method}):`, {
+          status: response.status,
+          dataKeys: response.data ? Object.keys(response.data) : [],
+          hasData: !!response.data?.data,
+          hasAvatars: !!response.data?.avatars,
+          isArray: Array.isArray(response.data),
+        })
+
+        // Handle different response structures - HeyGen API can return data in various formats
+        let avatars: any[] = []
+        
         if (response.data?.data?.avatars && Array.isArray(response.data.data.avatars)) {
-          console.log(`Successfully fetched avatars from ${url} (${method})`)
-          return { avatars: response.data.data.avatars }
+          avatars = response.data.data.avatars
+        } else if (response.data?.data?.data?.avatars && Array.isArray(response.data.data.data.avatars)) {
+          avatars = response.data.data.data.avatars
+        } else if (response.data?.data && Array.isArray(response.data.data)) {
+          avatars = response.data.data
+        } else if (response.data?.avatars && Array.isArray(response.data.avatars)) {
+          avatars = response.data.avatars
+        } else if (Array.isArray(response.data)) {
+          avatars = response.data
         }
-        if (response.data?.data && Array.isArray(response.data.data)) {
-          console.log(`Successfully fetched avatars from ${url} (${method})`)
-          return { avatars: response.data.data }
-        }
-        if (response.data?.avatars && Array.isArray(response.data.avatars)) {
-          console.log(`Successfully fetched avatars from ${url} (${method})`)
-          return { avatars: response.data.avatars }
-        }
-        if (Array.isArray(response.data)) {
-          console.log(`Successfully fetched avatars from ${url} (${method})`)
-          return { avatars: response.data }
+
+        if (avatars.length > 0) {
+          console.log(`Successfully fetched ${avatars.length} avatars from ${url} (${method})`)
+          // Normalize avatar data structure
+          const normalizedAvatars = avatars.map((avatar: any) => ({
+            avatar_id: avatar.avatar_id || avatar.id || avatar.avatarId,
+            avatar_name: avatar.avatar_name || avatar.name || avatar.avatarName || 'Unnamed Avatar',
+            avatar_url: avatar.avatar_url || avatar.url || avatar.avatarUrl,
+            preview_url: avatar.preview_url || avatar.previewUrl || avatar.preview,
+            thumbnail_url: avatar.thumbnail_url || avatar.thumbnailUrl || avatar.thumbnail,
+            gender: avatar.gender,
+            status: avatar.status || 'active',
+          }))
+          return { avatars: normalizedAvatars }
         }
         
         // Log unexpected structure for debugging
-        console.log(`Unexpected response structure from ${url}:`, {
-          hasData: !!response.data,
-          dataKeys: response.data ? Object.keys(response.data) : [],
-          isArray: Array.isArray(response.data),
-        })
+        console.log(`Unexpected response structure from ${url}:`, JSON.stringify(response.data, null, 2).substring(0, 500))
       } catch (err: any) {
         // Log but continue trying other endpoints
-        console.log(`Tried ${url} (${method}), got status ${err.response?.status}, trying next...`)
+        console.log(`Tried ${url} (${method}), got status ${err.response?.status}:`, err.response?.data || err.message)
         lastError = err
       }
     }
@@ -211,6 +226,84 @@ export async function generateVideo(
       errorMessage = 'HeyGen API rate limit exceeded. Please try again later.'
     } else if (error.response?.status >= 500) {
       errorMessage = 'HeyGen API server error. Please try again later.'
+    } else if (error.message) {
+      errorMessage = error.message
+    }
+    
+    throw new Error(errorMessage)
+  }
+}
+
+/**
+ * Create avatar from photo using HeyGen v2 API
+ */
+export async function createAvatarFromPhoto(
+  photoUrl: string,
+  avatarName: string
+): Promise<{ avatar_id: string; status: string }> {
+  try {
+    const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
+    
+    // Step 1: Create avatar group
+    const groupResponse = await axios.post(
+      `${HEYGEN_V2_API_URL}/avatar_group.create`,
+      {
+        name: avatarName,
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${getHeyGenKey()}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
+
+    const groupId = groupResponse.data?.data?.group_id || groupResponse.data?.group_id
+    if (!groupId) {
+      throw new Error('Failed to create avatar group: No group ID returned')
+    }
+
+    // Step 2: Upload photo to the group
+    await axios.post(
+      `${HEYGEN_V2_API_URL}/avatar_group/${groupId}/photos`,
+      {
+        photo_url: photoUrl,
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${getHeyGenKey()}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
+
+    // Step 3: Start training
+    const trainResponse = await axios.post(
+      `${HEYGEN_V2_API_URL}/avatar_group/${groupId}/train`,
+      {},
+      {
+        headers: {
+          'Authorization': `Bearer ${getHeyGenKey()}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
+
+    const avatarId = trainResponse.data?.data?.avatar_id || trainResponse.data?.avatar_id
+    const status = trainResponse.data?.data?.status || trainResponse.data?.status || 'training'
+
+    return {
+      avatar_id: avatarId || groupId, // Use groupId as fallback
+      status,
+    }
+  } catch (error: any) {
+    console.error('HeyGen API error (createAvatarFromPhoto):', error.response?.data || error.message)
+    
+    let errorMessage = 'Failed to create avatar from photo'
+    if (error.response?.data?.message) {
+      errorMessage = error.response.data.message
+    } else if (error.response?.data?.error?.message) {
+      errorMessage = error.response.data.error.message
     } else if (error.message) {
       errorMessage = error.message
     }
