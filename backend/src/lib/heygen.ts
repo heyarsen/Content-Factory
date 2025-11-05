@@ -395,9 +395,11 @@ async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
     { url: `${HEYGEN_V2_API_URL}/asset.upload`, method: 'url' },
   ]
   
-  // Try uploading to HeyGen with timeout
-  const uploadTimeout = 10000 // 10 seconds per endpoint
+  // Try uploading to HeyGen with reduced timeout for faster failure
+  const uploadTimeout = 5000 // 5 seconds per endpoint (reduced from 10 for faster failure)
   const attemptedEndpoints: string[] = []
+  let consecutive404s = 0
+  const maxConsecutive404s = 3 // Fail fast if we get 3 consecutive 404s
   
   for (const endpoint of uploadEndpoints) {
     const endpointKey = `${endpoint.url} (${endpoint.method}${endpoint.fieldName ? `, field: ${endpoint.fieldName}` : ''})`
@@ -419,6 +421,8 @@ async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
             timeout: uploadTimeout,
           }
         )
+        
+        consecutive404s = 0 // Reset counter on any response
         
         // Log response structure for debugging
         console.log(`Response from ${endpointKey}:`, {
@@ -459,6 +463,8 @@ async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
           timeout: uploadTimeout,
         })
         
+        consecutive404s = 0 // Reset counter on any response
+        
         // Log response structure for debugging
         console.log(`Response from ${endpointKey}:`, {
           status: uploadResponse.status,
@@ -485,6 +491,13 @@ async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
       const isTimeout = err.code === 'ECONNABORTED' || err.message?.includes('timeout')
       const is404 = err.response?.status === 404
       
+      // Track consecutive 404s for fail-fast logic
+      if (is404) {
+        consecutive404s++
+      } else {
+        consecutive404s = 0 // Reset on non-404 errors
+      }
+      
       // Log detailed error for debugging
       console.log(`❌ Upload to ${endpointKey} failed:`, {
         status: err.response?.status,
@@ -493,9 +506,16 @@ async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
         responseData: err.response?.data,
         isTimeout,
         is404,
+        consecutive404s,
       })
       
-      // Continue to next endpoint (don't fail fast - different endpoints may work)
+      // Fail fast if we get too many consecutive 404s (likely all endpoints don't exist)
+      if (consecutive404s >= maxConsecutive404s) {
+        console.log(`⚠️  Got ${consecutive404s} consecutive 404s, likely all upload endpoints are unavailable. Skipping remaining attempts.`)
+        break
+      }
+      
+      // Continue to next endpoint
       continue
     }
   }
