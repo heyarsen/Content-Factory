@@ -35,7 +35,9 @@ app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   credentials: true,
 }))
-app.use(express.json())
+// Increase JSON payload size limit to 50MB for large image uploads (base64 encoded images can be large)
+app.use(express.json({ limit: '50mb' }))
+app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 app.use(apiLimiter)
 
 // Health check (before static files)
