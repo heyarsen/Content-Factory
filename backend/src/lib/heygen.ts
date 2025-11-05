@@ -249,21 +249,25 @@ export async function createAvatarFromPhoto(
     let groupId: string | null = null
     let lastError: any = null
     
-    // Step 1: Try to create avatar group (try v2 first, then v1)
+    // Step 1: Try to create avatar - try multiple endpoint formats
     const endpoints = [
-      { url: `${HEYGEN_V2_API_URL}/avatar_group.create`, version: 'v2' },
-      { url: `${HEYGEN_V1_API_URL}/avatar.create`, version: 'v1' },
+      // Try v2 API formats
+      { url: `${HEYGEN_V2_API_URL}/avatar_group.create`, method: 'POST', payload: { name: avatarName }, version: 'v2-avatar_group.create' },
+      { url: `${HEYGEN_V2_API_URL}/avatar_groups`, method: 'POST', payload: { name: avatarName }, version: 'v2-avatar_groups' },
+      { url: `${HEYGEN_V2_API_URL}/avatar/create`, method: 'POST', payload: { name: avatarName, photo_url: photoUrl }, version: 'v2-avatar/create' },
+      { url: `${HEYGEN_V2_API_URL}/avatars`, method: 'POST', payload: { name: avatarName, photo_url: photoUrl }, version: 'v2-avatars' },
+      // Try v1 API formats
+      { url: `${HEYGEN_V1_API_URL}/avatar.create`, method: 'POST', payload: { name: avatarName, photo_url: photoUrl }, version: 'v1-avatar.create' },
+      { url: `${HEYGEN_V1_API_URL}/avatar/create`, method: 'POST', payload: { name: avatarName, photo_url: photoUrl }, version: 'v1-avatar/create' },
+      { url: `${HEYGEN_V1_API_URL}/avatars`, method: 'POST', payload: { name: avatarName, photo_url: photoUrl }, version: 'v1-avatars' },
     ]
     
     for (const endpoint of endpoints) {
       try {
-        console.log(`Trying to create avatar group with ${endpoint.version} API...`)
+        console.log(`Trying endpoint: ${endpoint.url} (${endpoint.version})...`)
         const groupResponse = await axios.post(
           endpoint.url,
-          {
-            name: avatarName,
-            ...(endpoint.version === 'v1' ? { photo_url: photoUrl } : {}),
-          },
+          endpoint.payload,
           {
             headers: {
               'Authorization': `Bearer ${getHeyGenKey()}`,
@@ -272,24 +276,46 @@ export async function createAvatarFromPhoto(
           }
         )
 
+        console.log(`Response from ${endpoint.version}:`, {
+          status: groupResponse.status,
+          dataKeys: Object.keys(groupResponse.data || {}),
+          data: groupResponse.data,
+        })
+
         groupId = groupResponse.data?.data?.group_id || 
                   groupResponse.data?.group_id ||
                   groupResponse.data?.data?.id ||
-                  groupResponse.data?.id
+                  groupResponse.data?.id ||
+                  groupResponse.data?.data?.avatar_id ||
+                  groupResponse.data?.avatar_id
                   
         if (groupId) {
           console.log(`Successfully created avatar group with ${endpoint.version} API:`, groupId)
           break
         }
       } catch (err: any) {
-        console.log(`${endpoint.version} API failed:`, err.response?.status, err.response?.data)
+        console.log(`${endpoint.version} failed:`, {
+          status: err.response?.status,
+          statusText: err.response?.statusText,
+          data: err.response?.data,
+          message: err.message,
+        })
         lastError = err
         continue
       }
     }
 
     if (!groupId) {
-      throw new Error(`Failed to create avatar group. All API endpoints failed. Last error: ${lastError?.response?.status} - ${lastError?.response?.data?.message || lastError?.message}`)
+      const lastErrorMsg = lastError?.response?.data?.message || 
+                          lastError?.response?.data?.error?.message ||
+                          lastError?.message || 
+                          'Unknown error'
+      const lastErrorStatus = lastError?.response?.status || 'N/A'
+      throw new Error(
+        `HeyGen API does not support creating avatars from photos via API, or the endpoints have changed. ` +
+        `All endpoints returned 404. Please create avatars manually in the HeyGen dashboard and sync them using the "Sync from HeyGen" button. ` +
+        `Last error: ${lastErrorStatus} - ${lastErrorMsg}`
+      )
     }
 
     // Step 2: Upload photo to the group (only for v2 API)

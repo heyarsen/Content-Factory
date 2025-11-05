@@ -228,10 +228,60 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
     
     console.log('Image uploaded successfully, public URL:', publicUrl)
 
-    // Create avatar using the public URL
-    console.log('Creating avatar with HeyGen using URL:', publicUrl)
-    const avatar = await AvatarService.createAvatarFromPhoto(userId, publicUrl, avatar_name)
-    console.log('Avatar created successfully:', avatar.id)
+    // Try to create avatar using HeyGen API
+    // If it fails, we'll save the photo info anyway so user can use it later
+    let avatar
+    let heygenApiUnavailable = false
+    try {
+      console.log('Creating avatar with HeyGen using URL:', publicUrl)
+      avatar = await AvatarService.createAvatarFromPhoto(userId, publicUrl, avatar_name)
+      console.log('Avatar created successfully with HeyGen:', avatar.id)
+    } catch (heygenError: any) {
+      console.error('HeyGen avatar creation failed:', heygenError)
+      
+      // Check if it's a 404 (API not available) vs other errors
+      if (heygenError.response?.status === 404 || heygenError.message?.includes('404')) {
+        heygenApiUnavailable = true
+      }
+      
+      // Save the photo info to database even if HeyGen API fails
+      // User can manually create avatar in HeyGen dashboard and link it later
+      const { supabase } = await import('../lib/supabase.js')
+      const { data: savedAvatar, error: saveError } = await supabase
+        .from('avatars')
+        .insert({
+          user_id: userId,
+          heygen_avatar_id: `photo_${Date.now()}`, // Temporary ID until linked to HeyGen
+          avatar_name: avatar_name,
+          avatar_url: publicUrl,
+          preview_url: publicUrl,
+          thumbnail_url: publicUrl,
+          gender: null,
+          status: 'pending', // Mark as pending since HeyGen creation failed
+          is_default: false,
+        })
+        .select()
+        .single()
+      
+      if (saveError) {
+        throw new Error(`Failed to save avatar info: ${saveError.message}`)
+      }
+      
+      avatar = savedAvatar
+      
+      // If HeyGen API is unavailable, return success but with a warning
+      if (heygenApiUnavailable) {
+        return res.status(201).json({
+          message: `Photo uploaded successfully! However, HeyGen API doesn't support creating avatars from photos via API. Please create the avatar manually in the HeyGen dashboard, then sync using the "Sync from HeyGen" button.`,
+          avatar,
+          photo_url: publicUrl,
+          warning: 'HeyGen API unavailable - avatar needs to be created manually in HeyGen dashboard',
+        })
+      }
+      
+      // For other errors, throw the original error
+      throw heygenError
+    }
 
     return res.status(201).json({
       message: 'Avatar creation started. It may take a few minutes to train.',

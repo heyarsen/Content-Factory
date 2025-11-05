@@ -181,7 +181,13 @@ export default function Avatars() {
       console.log('API response:', response.data)
 
       if (response.data.avatar) {
-        toast.success('Avatar creation started! It may take a few minutes to train.')
+        if (response.data.warning) {
+          // Show warning message if HeyGen API is unavailable
+          toast.warning(response.data.message || response.data.warning)
+        } else {
+          toast.success(response.data.message || 'Avatar creation started! It may take a few minutes to train.')
+        }
+        
         setShowCreateModal(false)
         setAvatarName('')
         setPhotoFile(null)
