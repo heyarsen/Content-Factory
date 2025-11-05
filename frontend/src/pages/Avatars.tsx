@@ -299,7 +299,7 @@ export default function Avatars() {
           </div>
           <div className="flex gap-3">
             <Button
-              variant={onlyCreated ? "default" : "secondary"}
+              variant={onlyCreated ? "primary" : "secondary"}
               onClick={() => setOnlyCreated(!onlyCreated)}
               className="flex items-center gap-2"
             >
