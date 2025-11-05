@@ -104,6 +104,14 @@ if (existsSync(frontendDist) && existsSync(indexHtml)) {
   console.log('Expected path:', frontendDist)
 }
 
+// Debug: Log all API requests (in development)
+if (process.env.NODE_ENV === 'development') {
+  app.use('/api', (req, res, next) => {
+    console.log(`[API Request] ${req.method} ${req.path}`)
+    next()
+  })
+}
+
 // Error handler
 app.use(errorHandler)
 

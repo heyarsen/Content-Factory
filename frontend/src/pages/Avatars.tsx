@@ -309,6 +309,18 @@ export default function Avatars() {
 
     setGeneratingAI(true)
     try {
+      console.log('Sending AI avatar generation request to:', '/api/avatars/generate-ai')
+      console.log('Request payload:', {
+        name: aiName,
+        age: aiAge,
+        gender: aiGender,
+        ethnicity: aiEthnicity,
+        orientation: aiOrientation,
+        pose: aiPose,
+        style: aiStyle,
+        appearance: aiAppearance,
+      })
+      
       const response = await api.post('/api/avatars/generate-ai', {
         name: aiName,
         age: aiAge,
@@ -320,14 +332,38 @@ export default function Avatars() {
         appearance: aiAppearance,
       })
 
+      console.log('AI avatar generation response:', response.data)
       const genId = response.data.generation_id
       toast.success('AI avatar generation started! This may take a few minutes.')
       
       // Start polling for status
       startStatusCheck(genId)
     } catch (error: any) {
-      console.error('Failed to generate AI avatar:', error)
-      toast.error(error.response?.data?.error || 'Failed to generate AI avatar')
+      console.error('Failed to generate AI avatar - Full error:', {
+        message: error.message,
+        response: error.response,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          baseURL: error.config?.baseURL,
+        },
+      })
+      
+      let errorMessage = 'Failed to generate AI avatar'
+      
+      if (error.response?.status === 404) {
+        errorMessage = error.response?.data?.error || 
+          'AI avatar generation endpoint not found (404). Please check if the feature is available.'
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
+      toast.error(errorMessage)
       setGeneratingAI(false)
     }
   }

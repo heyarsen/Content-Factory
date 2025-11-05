@@ -374,6 +374,13 @@ router.post('/create-from-photo', async (req: AuthRequest, res: Response) => {
 
 // Generate AI Avatar
 router.post('/generate-ai', async (req: AuthRequest, res: Response) => {
+  console.log('✅ Generate AI avatar endpoint hit!', {
+    method: req.method,
+    path: req.path,
+    userId: req.userId,
+    bodyKeys: Object.keys(req.body || {}),
+  })
+  
   try {
     const userId = req.userId!
     const request: GenerateAIAvatarRequest = req.body
