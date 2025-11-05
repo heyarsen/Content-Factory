@@ -123,7 +123,12 @@ export default function Avatars() {
     }
   }
 
-  const handleCreateAvatar = async () => {
+  const handleCreateAvatar = async (e?: React.MouseEvent) => {
+    e?.preventDefault()
+    e?.stopPropagation()
+    
+    console.log('handleCreateAvatar called', { avatarName, photoFile: !!photoFile })
+    
     if (!avatarName.trim()) {
       toast.error('Please enter an avatar name')
       return
@@ -134,32 +139,41 @@ export default function Avatars() {
     }
 
     setCreating(true)
+    
     try {
       // Convert file to base64 data URL
-      const reader = new FileReader()
-      reader.onloadend = async () => {
-        const base64Data = reader.result as string
-        
-        // For now, we'll send the base64 data URL directly
-        // In production, you might want to upload to a storage service first
-        await api.post('/api/avatars/create-from-photo', {
-          photo_url: base64Data,
-          avatar_name: avatarName,
-        })
-
-        toast.success('Avatar creation started! It may take a few minutes to train.')
-        setShowCreateModal(false)
-        setAvatarName('')
-        setPhotoFile(null)
-        setPhotoPreview(null)
-        if (fileInputRef.current) {
-          fileInputRef.current.value = ''
+      const base64Data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          if (reader.result && typeof reader.result === 'string') {
+            resolve(reader.result)
+          } else {
+            reject(new Error('Failed to read file'))
+          }
         }
-        
-        // Reload avatars
-        await loadAvatars()
+        reader.onerror = () => reject(new Error('Failed to read file'))
+        reader.readAsDataURL(photoFile)
+      })
+      
+      console.log('File read, sending to API...')
+      
+      // Send to API
+      await api.post('/api/avatars/create-from-photo', {
+        photo_url: base64Data,
+        avatar_name: avatarName,
+      })
+
+      toast.success('Avatar creation started! It may take a few minutes to train.')
+      setShowCreateModal(false)
+      setAvatarName('')
+      setPhotoFile(null)
+      setPhotoPreview(null)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
       }
-      reader.readAsDataURL(photoFile)
+      
+      // Reload avatars
+      await loadAvatars()
     } catch (error: any) {
       console.error('Failed to create avatar:', error)
       toast.error(error.response?.data?.error || 'Failed to create avatar')
@@ -381,15 +395,34 @@ export default function Avatars() {
             <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
               <Button
                 variant="ghost"
-                onClick={handleCloseCreateModal}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  handleCloseCreateModal()
+                }}
                 disabled={creating}
+                type="button"
               >
                 Cancel
               </Button>
               <Button
-                onClick={handleCreateAvatar}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  console.log('Create Avatar button clicked', { 
+                    creating, 
+                    hasName: !!avatarName.trim(), 
+                    hasFile: !!photoFile,
+                    avatarName,
+                    photoFileName: photoFile?.name
+                  })
+                  handleCreateAvatar(e).catch((err) => {
+                    console.error('Error in handleCreateAvatar:', err)
+                  })
+                }}
                 disabled={creating || !avatarName.trim() || !photoFile}
                 loading={creating}
+                type="button"
               >
                 {creating ? 'Creating...' : 'Create Avatar'}
               </Button>
