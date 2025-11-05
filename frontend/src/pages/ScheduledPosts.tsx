@@ -249,19 +249,19 @@ export function ScheduledPosts() {
             }
           />
         ) : (
-          <div className="grid gap-6 lg:grid-cols-3">
+          <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
             {/* Calendar */}
-            <Card className="lg:col-span-2 p-6">
-              <div className="mb-6 flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-primary">
+            <Card className="lg:col-span-2 p-4 sm:p-6">
+              <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+                <h2 className="text-lg sm:text-xl font-semibold text-primary">
                   {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                 </h2>
-                <div className="flex gap-2">
+                <div className="flex gap-2 w-full sm:w-auto">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={previousMonth}
-                    className="h-8 w-8 p-0"
+                    className="flex-1 sm:flex-initial h-8 w-8 p-0"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
@@ -269,7 +269,7 @@ export function ScheduledPosts() {
                     variant="ghost"
                     size="sm"
                     onClick={() => setCurrentDate(new Date())}
-                    className="h-8 px-3"
+                    className="flex-1 sm:flex-initial h-8 px-3"
                   >
                     Today
                   </Button>
@@ -277,17 +277,17 @@ export function ScheduledPosts() {
                     variant="ghost"
                     size="sm"
                     onClick={nextMonth}
-                    className="h-8 w-8 p-0"
+                    className="flex-1 sm:flex-initial h-8 w-8 p-0"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-7 gap-2">
+              <div className="grid grid-cols-7 gap-1 sm:gap-2">
                 {/* Day headers */}
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                  <div key={day} className="text-center text-xs font-semibold uppercase tracking-wide text-slate-400 py-2">
+                  <div key={day} className="text-center text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-slate-400 py-1 sm:py-2">
                     {day}
                   </div>
                 ))}
@@ -310,7 +310,7 @@ export function ScheduledPosts() {
                       key={day}
                       type="button"
                       onClick={() => setSelectedDate(isSelected ? null : dateKey)}
-                      className={`aspect-square rounded-xl border-2 p-2 text-left transition ${
+                      className={`aspect-square rounded-lg sm:rounded-xl border-2 p-1 sm:p-2 text-left transition touch-manipulation min-h-[44px] ${
                         isSelected
                           ? 'border-brand-500 bg-brand-50'
                           : isToday
@@ -320,20 +320,20 @@ export function ScheduledPosts() {
                           : 'border-transparent hover:border-slate-200 hover:bg-slate-50'
                       }`}
                     >
-                      <div className={`text-sm font-semibold ${isToday ? 'text-brand-600' : 'text-slate-700'}`}>
+                      <div className={`text-xs sm:text-sm font-semibold ${isToday ? 'text-brand-600' : 'text-slate-700'}`}>
                         {day}
                       </div>
                       {dayPosts.length > 0 && (
-                        <div className="mt-1 flex flex-wrap gap-1">
+                        <div className="mt-0.5 sm:mt-1 flex flex-wrap gap-0.5 sm:gap-1">
                           {dayPosts.slice(0, 2).map((post) => (
                             <div
                               key={post.id}
-                              className="h-1.5 w-1.5 rounded-full bg-brand-500"
+                              className="h-1 w-1 sm:h-1.5 sm:w-1.5 rounded-full bg-brand-500"
                               title={platformNames[post.platform]}
                             />
                           ))}
                           {dayPosts.length > 2 && (
-                            <div className="text-[10px] text-slate-500">+{dayPosts.length - 2}</div>
+                            <div className="text-[8px] sm:text-[10px] text-slate-500">+{dayPosts.length - 2}</div>
                           )}
                         </div>
                       )}
@@ -344,8 +344,8 @@ export function ScheduledPosts() {
             </Card>
 
             {/* Selected Date Posts */}
-            <Card className="p-6">
-              <h3 className="mb-4 text-lg font-semibold text-primary">
+            <Card className="p-4 sm:p-6">
+              <h3 className="mb-4 text-base sm:text-lg font-semibold text-primary">
                 {selectedDate
                   ? new Date(selectedDate).toLocaleDateString('en-US', {
                       weekday: 'long',
@@ -356,28 +356,28 @@ export function ScheduledPosts() {
                   : 'Select a date'}
               </h3>
               {selectedDatePosts.length === 0 ? (
-                <p className="text-sm text-slate-500">
+                <p className="text-xs sm:text-sm text-slate-500">
                   {selectedDate ? 'No posts scheduled for this date' : 'Click on a date to see scheduled posts'}
                 </p>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2 sm:space-y-3">
                   {selectedDatePosts.map((post) => {
                     const Icon = platformIcons[post.platform]
                     return (
                       <div
                         key={post.id}
-                        className="rounded-xl border border-slate-200 bg-white p-3"
+                        className="rounded-xl border border-slate-200 bg-white p-2 sm:p-3"
                       >
                         <div className="mb-2 flex items-center gap-2">
-                          <Icon className="h-4 w-4 text-slate-500" />
-                          <span className="text-sm font-semibold text-primary">
+                          <Icon className="h-4 w-4 text-slate-500 flex-shrink-0" />
+                          <span className="text-xs sm:text-sm font-semibold text-primary">
                             {platformNames[post.platform]}
                           </span>
                           {getStatusBadge(post.status)}
                         </div>
-                        <p className="mb-2 text-xs text-slate-600">{post.videos.topic}</p>
+                        <p className="mb-2 text-[10px] sm:text-xs text-slate-600">{post.videos.topic}</p>
                         {post.scheduled_time && (
-                          <p className="text-[10px] text-slate-400">
+                          <p className="text-[9px] sm:text-[10px] text-slate-400">
                             {new Date(post.scheduled_time).toLocaleTimeString('en-US', {
                               hour: '2-digit',
                               minute: '2-digit',
@@ -388,7 +388,7 @@ export function ScheduledPosts() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="mt-2 h-6 text-xs text-red-600 hover:bg-red-50"
+                            className="mt-2 h-6 text-[10px] sm:text-xs text-red-600 hover:bg-red-50"
                             onClick={() => setCancelModal(post.id)}
                           >
                             Cancel
