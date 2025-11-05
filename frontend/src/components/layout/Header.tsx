@@ -1,7 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { Button } from '../ui/Button'
-import { Bell, LogOut, Menu, User } from 'lucide-react'
+import { Bell, Menu, User } from 'lucide-react'
 import { useMemo, useState, useRef, useEffect } from 'react'
 
 interface HeaderProps {
@@ -9,7 +8,7 @@ interface HeaderProps {
 }
 
 export function Header({ onToggleSidebar }: HeaderProps) {
-  const { user, signOut } = useAuth()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const notificationRef = useRef<HTMLDivElement>(null)
@@ -33,11 +32,6 @@ export function Header({ onToggleSidebar }: HeaderProps) {
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [notificationsOpen])
-
-  const handleSignOut = async () => {
-    await signOut()
-    navigate('/login')
-  }
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/60 bg-white/70 backdrop-blur-xl">
@@ -105,11 +99,6 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             </div>
             <User className="h-4 w-4" />
           </button>
-
-          <Button variant="ghost" size="md" onClick={handleSignOut} className="hidden gap-2 rounded-2xl px-4 py-3 text-sm font-semibold md:flex min-h-[44px]">
-            <LogOut className="h-4 w-4" />
-            <span className="hidden sm:inline">Sign out</span>
-          </Button>
         </div>
       </div>
     </header>
