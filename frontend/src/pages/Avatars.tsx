@@ -36,7 +36,6 @@ export default function Avatars() {
   const [onlyCreated, setOnlyCreated] = useState(true) // Default to showing only user-created avatars
   const [showGenerateAIModal, setShowGenerateAIModal] = useState(false)
   const [generatingAI, setGeneratingAI] = useState(false)
-  const [generationId, setGenerationId] = useState<string | null>(null)
   const [checkingStatus, setCheckingStatus] = useState(false)
   
   // AI Generation form fields
@@ -316,7 +315,6 @@ export default function Avatars() {
       })
 
       const genId = response.data.generation_id
-      setGenerationId(genId)
       toast.success('AI avatar generation started! This may take a few minutes.')
       
       // Start polling for status
@@ -392,7 +390,6 @@ export default function Avatars() {
     setAiPose('close_up')
     setAiStyle('Realistic')
     setAiAppearance('')
-    setGenerationId(null)
   }
 
   const handleCloseGenerateAIModal = () => {
