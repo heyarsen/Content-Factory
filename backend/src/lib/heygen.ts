@@ -45,44 +45,105 @@ export interface HeyGenAvatarsResponse {
  */
 export async function listAvatars(): Promise<HeyGenAvatarsResponse> {
   try {
-    // Try HeyGen v1 API endpoints first (most common)
+    const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
+    const apiKey = getHeyGenKey()
+    
+    // Try v2 API first (photo avatars) - based on official docs
+    // https://docs.heygen.com/docs/create-videos-with-photo-avatars
     const endpoints = [
-      { method: 'POST', url: `${HEYGEN_API_URL}/avatar.list` },
-      { method: 'GET', url: `${HEYGEN_API_URL}/avatars` },
-      { method: 'POST', url: `${HEYGEN_API_URL}/avatars` },
-      { method: 'GET', url: `${HEYGEN_API_URL}/avatar` },
-      { method: 'POST', url: `${HEYGEN_API_URL}/avatar` },
+      // v2 API - List avatar groups, then get avatars from each group
+      { 
+        type: 'v2-groups',
+        method: 'GET' as const, 
+        url: `${HEYGEN_V2_API_URL}/avatar_group.list`,
+        useXApiKey: true,
+      },
+      // Fallback to v1 API endpoints
+      { 
+        type: 'v1-list',
+        method: 'POST' as const, 
+        url: `${HEYGEN_API_URL}/avatar.list`,
+        useXApiKey: false,
+      },
+      { 
+        type: 'v1-get',
+        method: 'GET' as const, 
+        url: `${HEYGEN_API_URL}/avatars`,
+        useXApiKey: false,
+      },
     ]
 
     let lastError: any = null
-    for (const { method, url } of endpoints) {
+    for (const endpoint of endpoints) {
       try {
-        const requestConfig = {
-          headers: {
-            'Authorization': `Bearer ${getHeyGenKey()}`,
+        const headers: Record<string, string> = {
             'Content-Type': 'application/json',
-          },
+        }
+        
+        // Use X-Api-Key header for v2 API, Bearer for v1
+        if (endpoint.useXApiKey) {
+          headers['X-Api-Key'] = apiKey
+        } else {
+          headers['Authorization'] = `Bearer ${apiKey}`
         }
 
-        const response = method === 'POST'
-          ? await axios.post(url, {}, requestConfig)
-          : await axios.get(url, requestConfig)
+        const requestConfig = { headers }
 
-        console.log(`HeyGen API response from ${url} (${method}):`, {
+        const response = endpoint.method === 'POST'
+          ? await axios.post(endpoint.url, {}, requestConfig)
+          : await axios.get(endpoint.url, requestConfig)
+
+        console.log(`HeyGen API response from ${endpoint.url} (${endpoint.type}):`, {
           status: response.status,
           dataKeys: response.data ? Object.keys(response.data) : [],
           hasData: !!response.data?.data,
-          hasAvatars: !!response.data?.avatars,
-          isArray: Array.isArray(response.data),
+          hasAvatarGroupList: !!response.data?.data?.avatar_group_list,
         })
 
-        // Handle different response structures - HeyGen API can return data in various formats
+        // Handle v2 API response structure (avatar groups)
+        if (endpoint.type === 'v2-groups' && response.data?.data?.avatar_group_list) {
+          const groups = response.data.data.avatar_group_list
+          console.log(`Found ${groups.length} avatar groups`)
+          
+          // Fetch avatars from each group
+          const allAvatars: any[] = []
+          for (const group of groups) {
+            try {
+              const avatarsResponse = await axios.get(
+                `${HEYGEN_V2_API_URL}/avatar_group/${group.id}/avatars`,
+                { headers: { 'X-Api-Key': apiKey, 'Content-Type': 'application/json' } }
+              )
+              
+              if (avatarsResponse.data?.data?.avatar_list) {
+                const groupAvatars = avatarsResponse.data.data.avatar_list.map((avatar: any) => ({
+                  avatar_id: avatar.id,
+                  avatar_name: avatar.name || group.name || 'Unnamed Avatar',
+                  avatar_url: avatar.image_url,
+                  preview_url: avatar.image_url,
+                  thumbnail_url: avatar.image_url,
+                  gender: null,
+                  status: avatar.status === 'completed' ? 'active' : avatar.status || 'active',
+                  group_id: group.id,
+                  group_name: group.name,
+                }))
+                allAvatars.push(...groupAvatars)
+              }
+            } catch (groupErr: any) {
+              console.log(`Failed to fetch avatars from group ${group.id}:`, groupErr.response?.status)
+            }
+          }
+          
+          if (allAvatars.length > 0) {
+            console.log(`Successfully fetched ${allAvatars.length} avatars from v2 API`)
+            return { avatars: allAvatars }
+          }
+        }
+
+        // Handle v1 API response structures
         let avatars: any[] = []
         
         if (response.data?.data?.avatars && Array.isArray(response.data.data.avatars)) {
           avatars = response.data.data.avatars
-        } else if (response.data?.data?.data?.avatars && Array.isArray(response.data.data.data.avatars)) {
-          avatars = response.data.data.data.avatars
         } else if (response.data?.data && Array.isArray(response.data.data)) {
           avatars = response.data.data
         } else if (response.data?.avatars && Array.isArray(response.data.avatars)) {
@@ -92,14 +153,14 @@ export async function listAvatars(): Promise<HeyGenAvatarsResponse> {
         }
 
         if (avatars.length > 0) {
-          console.log(`Successfully fetched ${avatars.length} avatars from ${url} (${method})`)
+          console.log(`Successfully fetched ${avatars.length} avatars from ${endpoint.url} (${endpoint.type})`)
           // Normalize avatar data structure
           const normalizedAvatars = avatars.map((avatar: any) => ({
             avatar_id: avatar.avatar_id || avatar.id || avatar.avatarId,
             avatar_name: avatar.avatar_name || avatar.name || avatar.avatarName || 'Unnamed Avatar',
-            avatar_url: avatar.avatar_url || avatar.url || avatar.avatarUrl,
-            preview_url: avatar.preview_url || avatar.previewUrl || avatar.preview,
-            thumbnail_url: avatar.thumbnail_url || avatar.thumbnailUrl || avatar.thumbnail,
+            avatar_url: avatar.avatar_url || avatar.url || avatar.avatarUrl || avatar.image_url,
+            preview_url: avatar.preview_url || avatar.previewUrl || avatar.preview || avatar.image_url,
+            thumbnail_url: avatar.thumbnail_url || avatar.thumbnailUrl || avatar.thumbnail || avatar.image_url,
             gender: avatar.gender,
             status: avatar.status || 'active',
           }))
@@ -107,10 +168,10 @@ export async function listAvatars(): Promise<HeyGenAvatarsResponse> {
         }
         
         // Log unexpected structure for debugging
-        console.log(`Unexpected response structure from ${url}:`, JSON.stringify(response.data, null, 2).substring(0, 500))
+        console.log(`Unexpected response structure from ${endpoint.url}:`, JSON.stringify(response.data, null, 2).substring(0, 500))
       } catch (err: any) {
         // Log but continue trying other endpoints
-        console.log(`Tried ${url} (${method}), got status ${err.response?.status}:`, err.response?.data || err.message)
+        console.log(`Tried ${endpoint.url} (${endpoint.type}), got status ${err.response?.status}:`, err.response?.data || err.message)
         lastError = err
       }
     }
@@ -249,31 +310,40 @@ export async function createAvatarFromPhoto(
     let groupId: string | null = null
     let lastError: any = null
     
+    const apiKey = getHeyGenKey()
+    
     // Step 1: Try to create avatar - try multiple endpoint formats
+    // Note: Based on HeyGen docs, creating avatars from photos may require dashboard setup
+    // But we'll try the API endpoints anyway
     const endpoints = [
-      // Try v2 API formats
-      { url: `${HEYGEN_V2_API_URL}/avatar_group.create`, method: 'POST', payload: { name: avatarName }, version: 'v2-avatar_group.create' },
-      { url: `${HEYGEN_V2_API_URL}/avatar_groups`, method: 'POST', payload: { name: avatarName }, version: 'v2-avatar_groups' },
-      { url: `${HEYGEN_V2_API_URL}/avatar/create`, method: 'POST', payload: { name: avatarName, photo_url: photoUrl }, version: 'v2-avatar/create' },
-      { url: `${HEYGEN_V2_API_URL}/avatars`, method: 'POST', payload: { name: avatarName, photo_url: photoUrl }, version: 'v2-avatars' },
-      // Try v1 API formats
-      { url: `${HEYGEN_V1_API_URL}/avatar.create`, method: 'POST', payload: { name: avatarName, photo_url: photoUrl }, version: 'v1-avatar.create' },
-      { url: `${HEYGEN_V1_API_URL}/avatar/create`, method: 'POST', payload: { name: avatarName, photo_url: photoUrl }, version: 'v1-avatar/create' },
-      { url: `${HEYGEN_V1_API_URL}/avatars`, method: 'POST', payload: { name: avatarName, photo_url: photoUrl }, version: 'v1-avatars' },
+      // Try v2 API formats (use X-Api-Key header)
+      { url: `${HEYGEN_V2_API_URL}/avatar_group.create`, payload: { name: avatarName }, version: 'v2-avatar_group.create', useXApiKey: true },
+      { url: `${HEYGEN_V2_API_URL}/avatar_groups`, payload: { name: avatarName }, version: 'v2-avatar_groups', useXApiKey: true },
+      { url: `${HEYGEN_V2_API_URL}/avatar_groups`, payload: { name: avatarName, photo_url: photoUrl }, version: 'v2-avatar_groups-with-photo', useXApiKey: true },
+      // Try v1 API formats (use Bearer token)
+      { url: `${HEYGEN_V1_API_URL}/avatar.create`, payload: { name: avatarName, photo_url: photoUrl }, version: 'v1-avatar.create', useXApiKey: false },
+      { url: `${HEYGEN_V1_API_URL}/avatar/create`, payload: { name: avatarName, photo_url: photoUrl }, version: 'v1-avatar/create', useXApiKey: false },
+      { url: `${HEYGEN_V1_API_URL}/avatars`, payload: { name: avatarName, photo_url: photoUrl }, version: 'v1-avatars', useXApiKey: false },
     ]
     
     for (const endpoint of endpoints) {
       try {
         console.log(`Trying endpoint: ${endpoint.url} (${endpoint.version})...`)
+        
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        }
+        
+        if (endpoint.useXApiKey) {
+          headers['X-Api-Key'] = apiKey
+        } else {
+          headers['Authorization'] = `Bearer ${apiKey}`
+        }
+        
         const groupResponse = await axios.post(
           endpoint.url,
           endpoint.payload,
-          {
-            headers: {
-              'Authorization': `Bearer ${getHeyGenKey()}`,
-              'Content-Type': 'application/json',
-            },
-          }
+          { headers }
         )
 
         console.log(`Response from ${endpoint.version}:`, {
@@ -311,7 +381,7 @@ export async function createAvatarFromPhoto(
                           lastError?.message || 
                           'Unknown error'
       const lastErrorStatus = lastError?.response?.status || 'N/A'
-      throw new Error(
+    throw new Error(
         `HeyGen API does not support creating avatars from photos via API, or the endpoints have changed. ` +
         `All endpoints returned 404. Please create avatars manually in the HeyGen dashboard and sync them using the "Sync from HeyGen" button. ` +
         `Last error: ${lastErrorStatus} - ${lastErrorMsg}`
@@ -328,7 +398,7 @@ export async function createAvatarFromPhoto(
         },
         {
           headers: {
-            'Authorization': `Bearer ${getHeyGenKey()}`,
+            'X-Api-Key': apiKey,
             'Content-Type': 'application/json',
           },
         }
@@ -348,22 +418,28 @@ export async function createAvatarFromPhoto(
     let status = 'training'
     
     const trainEndpoints = [
-      { url: `${HEYGEN_V2_API_URL}/avatar_group/${groupId}/train`, version: 'v2' },
-      { url: `${HEYGEN_V1_API_URL}/avatar/${groupId}/train`, version: 'v1' },
+      { url: `${HEYGEN_V2_API_URL}/avatar_group/${groupId}/train`, version: 'v2', useXApiKey: true },
+      { url: `${HEYGEN_V1_API_URL}/avatar/${groupId}/train`, version: 'v1', useXApiKey: false },
     ]
     
     for (const endpoint of trainEndpoints) {
       try {
         console.log(`Starting training with ${endpoint.version} API...`)
+        
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        }
+        
+        if (endpoint.useXApiKey) {
+          headers['X-Api-Key'] = apiKey
+        } else {
+          headers['Authorization'] = `Bearer ${apiKey}`
+        }
+        
         const trainResponse = await axios.post(
           endpoint.url,
           {},
-          {
-            headers: {
-              'Authorization': `Bearer ${getHeyGenKey()}`,
-              'Content-Type': 'application/json',
-            },
-          }
+          { headers }
         )
 
         avatarId = trainResponse.data?.data?.avatar_id || 
