@@ -6,15 +6,33 @@ export function errorHandler(
   res: Response,
   next: NextFunction
 ) {
-  console.error('Error:', err)
+  // Log full error details
+  console.error('Error Handler caught error:', {
+    message: err.message,
+    stack: err.stack,
+    name: err.name,
+    path: req.path,
+    method: req.method,
+  })
 
+  // If headers already sent, delegate to Express default handler
   if (res.headersSent) {
     return next(err)
   }
 
-  res.status(500).json({
-    error: 'Internal server error',
-    message: process.env.NODE_ENV === 'development' ? err.message : undefined,
+  // If error already has a status code (from express-validator or other middleware)
+  const status = (err as any).status || (err as any).statusCode || 500
+  
+  // Return error message if available, otherwise generic message
+  const errorMessage = err.message || 'Internal server error'
+  
+  res.status(status).json({
+    error: errorMessage,
+    details: process.env.NODE_ENV === 'development' ? {
+      stack: err.stack,
+      name: err.name,
+      path: req.path,
+    } : undefined,
   })
 }
 

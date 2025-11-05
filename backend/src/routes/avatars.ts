@@ -162,6 +162,13 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
     const userId = req.userId!
     const { photo_data, avatar_name } = req.body // photo_data is base64 data URL
 
+    console.log('Upload photo request received:', {
+      hasPhotoData: !!photo_data,
+      photoDataLength: photo_data?.length,
+      avatarName: avatar_name,
+      userId,
+    })
+
     if (!photo_data || !avatar_name) {
       return res.status(400).json({ error: 'photo_data and avatar_name are required' })
     }
@@ -257,7 +264,14 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
       avatar = await AvatarService.createAvatarFromPhoto(userId, publicUrl, avatar_name)
       console.log('Avatar created successfully with HeyGen:', avatar.id)
     } catch (heygenError: any) {
-      console.error('HeyGen avatar creation failed:', heygenError)
+      console.error('HeyGen avatar creation failed:', {
+        message: heygenError?.message,
+        stack: heygenError?.stack,
+        response: heygenError?.response?.data,
+        status: heygenError?.response?.status,
+        name: heygenError?.name,
+        code: heygenError?.code,
+      })
       
       // Re-throw the error - we now use the correct API endpoint so errors should be meaningful
       throw heygenError
@@ -269,6 +283,7 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
       photo_url: publicUrl,
     })
   } catch (error: any) {
+    // Log full error details for debugging
     console.error('Upload photo and create avatar error:', {
       message: error.message,
       stack: error.stack,
@@ -276,13 +291,18 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
       status: error.response?.status,
       statusText: error.response?.statusText,
       name: error.name,
+      code: error.code,
+      fullError: error,
     })
     
     // Extract detailed error message
     let errorMessage = 'Failed to upload photo and create avatar'
     
+    // Try to get the most specific error message
     if (error.response?.data?.error) {
-      errorMessage = error.response.data.error
+      errorMessage = typeof error.response.data.error === 'string' 
+        ? error.response.data.error 
+        : JSON.stringify(error.response.data.error)
     } else if (error.response?.data?.message) {
       errorMessage = error.response.data.message
     } else if (error.message) {
@@ -301,12 +321,20 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
         errorMessage = 'HeyGen API authentication failed. Please check your HEYGEN_KEY environment variable.'
       } else if (error.response.status === 403) {
         errorMessage = 'Access denied. Please check your HeyGen API key permissions.'
+      } else if (error.response.status === 400) {
+        errorMessage = `Invalid request: ${errorMessage}`
       }
     }
     
-    return res.status(500).json({ 
+    // Include more details in development
+    const statusCode = error.response?.status || 500
+    return res.status(statusCode).json({ 
       error: errorMessage,
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      details: process.env.NODE_ENV === 'development' ? {
+        originalMessage: error.message,
+        stack: error.stack,
+        responseData: error.response?.data,
+      } : undefined,
     })
   }
 })
