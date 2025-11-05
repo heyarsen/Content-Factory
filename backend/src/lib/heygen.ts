@@ -298,103 +298,182 @@ export async function generateVideo(
 /**
  * Create avatar from photo using HeyGen v2 API
  */
+/**
+ * Upload image to HeyGen Asset Storage
+ * Returns the image_key needed for avatar group creation
+ * Based on HeyGen docs: https://docs.heygen.com/docs/create-and-train-photo-avatar-groups
+ */
+async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
+  const apiKey = getHeyGenKey()
+  const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
+  
+  // First, download the image from the URL to get the buffer
+  let imageBuffer: Buffer
+  let contentType: string = 'image/jpeg'
+  
+  try {
+    if (photoUrl.startsWith('data:')) {
+      // Handle base64 data URL
+      const base64Data = photoUrl.split(',')[1]
+      imageBuffer = Buffer.from(base64Data, 'base64')
+      const mimeMatch = photoUrl.match(/data:([^;]+)/)
+      if (mimeMatch) {
+        contentType = mimeMatch[1]
+      }
+    } else {
+      // Download from URL
+      const imageResponse = await axios.get(photoUrl, { 
+        responseType: 'arraybuffer',
+        maxContentLength: 10 * 1024 * 1024, // 10MB limit
+      })
+      imageBuffer = Buffer.from(imageResponse.data)
+      contentType = imageResponse.headers['content-type'] || 'image/jpeg'
+    }
+  } catch (err: any) {
+    throw new Error(`Failed to download image: ${err.message}`)
+  }
+  
+  // Try different upload endpoints
+  const uploadEndpoints = [
+    { url: `${HEYGEN_V2_API_URL}/asset/upload`, method: 'multipart' },
+    { url: `${HEYGEN_V2_API_URL}/asset/upload`, method: 'url' },
+    { url: `${HEYGEN_V2_API_URL}/upload`, method: 'multipart' },
+  ]
+  
+  // Try uploading to HeyGen
+  for (const endpoint of uploadEndpoints) {
+    try {
+      console.log(`Trying to upload image to ${endpoint.url} (method: ${endpoint.method})...`)
+      
+      if (endpoint.method === 'url') {
+        // Try URL-based upload (if HeyGen accepts URLs)
+        const urlUploadResponse = await axios.post(
+          endpoint.url,
+          { url: photoUrl },
+          {
+            headers: {
+              'X-Api-Key': apiKey,
+              'Content-Type': 'application/json',
+            },
+          }
+        )
+        
+        const imageKey = urlUploadResponse.data?.data?.image_key || 
+                        urlUploadResponse.data?.image_key ||
+                        urlUploadResponse.data?.data?.key ||
+                        urlUploadResponse.data?.key
+        
+        if (imageKey) {
+          console.log(`Successfully uploaded image via URL, got image_key: ${imageKey}`)
+          return imageKey
+        }
+      } else {
+        // Try multipart/form-data upload using FormData
+        // Since we're in Node.js, we'll use a simple approach with axios
+        const FormData = (await import('form-data')).default
+        const form = new FormData()
+        form.append('file', imageBuffer, {
+          filename: 'avatar.jpg',
+          contentType: contentType,
+        })
+        
+        const uploadResponse = await axios.post(endpoint.url, form, {
+          headers: {
+            'X-Api-Key': apiKey,
+            ...form.getHeaders(),
+          },
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity,
+        })
+        
+        // Extract image_key from response
+        const imageKey = uploadResponse.data?.data?.image_key || 
+                        uploadResponse.data?.image_key ||
+                        uploadResponse.data?.data?.key ||
+                        uploadResponse.data?.key
+        
+        if (imageKey) {
+          console.log(`Successfully uploaded image, got image_key: ${imageKey}`)
+          return imageKey
+        }
+      }
+    } catch (err: any) {
+      console.log(`Upload to ${endpoint.url} (${endpoint.method}) failed:`, {
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        error: err.response?.data?.error || err.message,
+      })
+      
+      // Continue to next endpoint
+      continue
+    }
+  }
+  
+  throw new Error(
+    'Failed to upload image to HeyGen. All upload endpoints failed. ' +
+    'Please ensure the image URL is publicly accessible. ' +
+    'You may need to check HeyGen API documentation for the correct Upload Asset endpoint.'
+  )
+}
+
 export async function createAvatarFromPhoto(
   photoUrl: string,
   avatarName: string
 ): Promise<{ avatar_id: string; status: string }> {
   try {
-    // Try both v1 and v2 API endpoints
-    const HEYGEN_V1_API_URL = 'https://api.heygen.com/v1'
     const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
-    
-    let groupId: string | null = null
-    let lastError: any = null
-    
     const apiKey = getHeyGenKey()
     
-    // Step 1: Try to create avatar - try multiple endpoint formats
-    // Note: Based on HeyGen docs, creating avatars from photos may require dashboard setup
-    // But we'll try the API endpoints anyway
-    const endpoints = [
-      // Try v2 API formats (use X-Api-Key header)
-      { url: `${HEYGEN_V2_API_URL}/avatar_group.create`, payload: { name: avatarName }, version: 'v2-avatar_group.create', useXApiKey: true },
-      { url: `${HEYGEN_V2_API_URL}/avatar_groups`, payload: { name: avatarName }, version: 'v2-avatar_groups', useXApiKey: true },
-      { url: `${HEYGEN_V2_API_URL}/avatar_groups`, payload: { name: avatarName, photo_url: photoUrl }, version: 'v2-avatar_groups-with-photo', useXApiKey: true },
-      // Try v1 API formats (use Bearer token)
-      { url: `${HEYGEN_V1_API_URL}/avatar.create`, payload: { name: avatarName, photo_url: photoUrl }, version: 'v1-avatar.create', useXApiKey: false },
-      { url: `${HEYGEN_V1_API_URL}/avatar/create`, payload: { name: avatarName, photo_url: photoUrl }, version: 'v1-avatar/create', useXApiKey: false },
-      { url: `${HEYGEN_V1_API_URL}/avatars`, payload: { name: avatarName, photo_url: photoUrl }, version: 'v1-avatars', useXApiKey: false },
-    ]
-    
-    for (const endpoint of endpoints) {
-      try {
-        console.log(`Trying endpoint: ${endpoint.url} (${endpoint.version})...`)
-        
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-        }
-        
-        if (endpoint.useXApiKey) {
-          headers['X-Api-Key'] = apiKey
-        } else {
-          headers['Authorization'] = `Bearer ${apiKey}`
-        }
-        
-        const groupResponse = await axios.post(
-          endpoint.url,
-          endpoint.payload,
-          { headers }
-        )
-
-        console.log(`Response from ${endpoint.version}:`, {
-          status: groupResponse.status,
-          dataKeys: Object.keys(groupResponse.data || {}),
-          data: groupResponse.data,
-        })
-
-        groupId = groupResponse.data?.data?.group_id || 
-                  groupResponse.data?.group_id ||
-                  groupResponse.data?.data?.id ||
-                  groupResponse.data?.id ||
-                  groupResponse.data?.data?.avatar_id ||
-                  groupResponse.data?.avatar_id
-                  
-        if (groupId) {
-          console.log(`Successfully created avatar group with ${endpoint.version} API:`, groupId)
-          break
-        }
-      } catch (err: any) {
-        console.log(`${endpoint.version} failed:`, {
-          status: err.response?.status,
-          statusText: err.response?.statusText,
-          data: err.response?.data,
-          message: err.message,
-        })
-        lastError = err
-        continue
-      }
-    }
-
-    if (!groupId) {
-      const lastErrorMsg = lastError?.response?.data?.message || 
-                          lastError?.response?.data?.error?.message ||
-                          lastError?.message || 
-                          'Unknown error'
-      const lastErrorStatus = lastError?.response?.status || 'N/A'
-    throw new Error(
-        `HeyGen API does not support creating avatars from photos via API, or the endpoints have changed. ` +
-        `All endpoints returned 404. Please create avatars manually in the HeyGen dashboard and sync them using the "Sync from HeyGen" button. ` +
-        `Last error: ${lastErrorStatus} - ${lastErrorMsg}`
+    // Step 1: Upload image to HeyGen and get image_key
+    console.log('Step 1: Uploading image to HeyGen...')
+    let imageKey: string
+    try {
+      imageKey = await uploadImageToHeyGen(photoUrl)
+    } catch (uploadError: any) {
+      throw new Error(
+        `Failed to upload image to HeyGen: ${uploadError.message}. ` +
+        `Please ensure the image URL is publicly accessible or try uploading manually in the HeyGen dashboard.`
       )
     }
-
-    // Step 2: Upload photo to the group (only for v2 API)
+    
+    // Step 2: Create avatar group using image_key
+    // Based on https://docs.heygen.com/docs/create-and-train-photo-avatar-groups
+    console.log('Step 2: Creating avatar group with image_key...')
+    const createGroupResponse = await axios.post(
+      `${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/create`,
+      {
+        name: avatarName,
+        image_key: imageKey,
+      },
+      {
+        headers: {
+          'X-Api-Key': apiKey,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
+    
+    console.log('Avatar group creation response:', createGroupResponse.data)
+    
+    const groupId = createGroupResponse.data?.data?.id || 
+                   createGroupResponse.data?.data?.group_id ||
+                   createGroupResponse.data?.id ||
+                   createGroupResponse.data?.group_id
+    
+    if (!groupId) {
+      throw new Error('Failed to get group_id from avatar group creation response')
+    }
+    
+    console.log(`Successfully created avatar group: ${groupId}`)
+    
+    // Step 3: Train the avatar group (optional but recommended)
+    let status = 'pending'
     try {
-      console.log('Uploading photo to avatar group...')
-      await axios.post(
-        `${HEYGEN_V2_API_URL}/avatar_group/${groupId}/photos`,
+      console.log('Step 3: Starting avatar group training...')
+      const trainResponse = await axios.post(
+        `${HEYGEN_V2_API_URL}/photo_avatar/train`,
         {
-          photo_url: photoUrl,
+          group_id: groupId,
         },
         {
           headers: {
@@ -403,74 +482,16 @@ export async function createAvatarFromPhoto(
           },
         }
       )
-      console.log('Photo uploaded successfully')
-    } catch (err: any) {
-      // If 404, it might be v1 API which doesn't need separate photo upload
-      if (err.response?.status === 404) {
-        console.log('Photo upload endpoint not found (likely using v1 API), skipping...')
-      } else {
-        throw err
-      }
-    }
-
-    // Step 3: Start training (try both endpoints)
-    let avatarId: string | null = null
-    let status = 'training'
-    
-    const trainEndpoints = [
-      { url: `${HEYGEN_V2_API_URL}/avatar_group/${groupId}/train`, version: 'v2', useXApiKey: true },
-      { url: `${HEYGEN_V1_API_URL}/avatar/${groupId}/train`, version: 'v1', useXApiKey: false },
-    ]
-    
-    for (const endpoint of trainEndpoints) {
-      try {
-        console.log(`Starting training with ${endpoint.version} API...`)
-        
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-        }
-        
-        if (endpoint.useXApiKey) {
-          headers['X-Api-Key'] = apiKey
-        } else {
-          headers['Authorization'] = `Bearer ${apiKey}`
-        }
-        
-        const trainResponse = await axios.post(
-          endpoint.url,
-          {},
-          { headers }
-        )
-
-        avatarId = trainResponse.data?.data?.avatar_id || 
-                   trainResponse.data?.avatar_id ||
-                   trainResponse.data?.data?.id ||
-                   trainResponse.data?.id ||
-                   groupId
-        status = trainResponse.data?.data?.status || 
-                 trainResponse.data?.status || 
-                 'training'
-                 
-        if (avatarId) {
-          console.log(`Training started successfully with ${endpoint.version} API:`, avatarId)
-          break
-        }
-      } catch (err: any) {
-        console.log(`${endpoint.version} training endpoint failed:`, err.response?.status, err.response?.data)
-        lastError = err
-        continue
-      }
-    }
-
-    if (!avatarId) {
-      // If training failed, we still have the groupId, so return it
-      avatarId = groupId
-      status = 'pending'
-      console.log('Training endpoints failed, using groupId as avatar_id')
+      
+      console.log('Training started:', trainResponse.data)
+      status = 'training'
+    } catch (trainErr: any) {
+      console.log('Training failed (this is optional):', trainErr.response?.status, trainErr.response?.data)
+      // Training is optional, so we continue even if it fails
     }
 
     return {
-      avatar_id: avatarId,
+      avatar_id: groupId,
       status,
     }
   } catch (error: any) {
@@ -479,26 +500,17 @@ export async function createAvatarFromPhoto(
       status: error.response?.status,
       statusText: error.response?.statusText,
       data: error.response?.data,
-      photoUrlLength: photoUrl?.length,
-      photoUrlType: photoUrl?.substring(0, 50),
     })
     
     let errorMessage = 'Failed to create avatar from photo'
-    if (error.response?.data?.message) {
-      errorMessage = error.response.data.message
-    } else if (error.response?.data?.error?.message) {
-      errorMessage = error.response.data.error.message
-    } else if (error.response?.data?.error) {
+    if (error.response?.data?.error) {
       errorMessage = typeof error.response.data.error === 'string' 
         ? error.response.data.error 
         : JSON.stringify(error.response.data.error)
+    } else if (error.response?.data?.message) {
+      errorMessage = error.response.data.message
     } else if (error.message) {
       errorMessage = error.message
-    }
-    
-    // Check if it's a base64 issue
-    if (photoUrl?.startsWith('data:image')) {
-      errorMessage += '. Note: HeyGen API may require a publicly accessible URL instead of base64 data. Please upload the image to a storage service first.'
     }
     
     throw new Error(errorMessage)
