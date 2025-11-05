@@ -112,9 +112,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async () => {
-    await api.post('/api/auth/logout')
-    await supabase.auth.signOut()
+    try {
+      await api.post('/api/auth/logout')
+    } catch (error) {
+      console.error('Logout API error:', error)
+      // Continue with sign out even if API call fails
+    }
+    try {
+      await supabase.auth.signOut()
+    } catch (error) {
+      console.error('Supabase sign out error:', error)
+      // Continue with cleanup even if Supabase sign out fails
+    }
     setUser(null)
+    setIsAdmin(false)
     localStorage.removeItem('access_token')
   }
 

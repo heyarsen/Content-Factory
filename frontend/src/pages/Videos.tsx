@@ -9,11 +9,13 @@ import { Select } from '../components/ui/Select'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Modal } from '../components/ui/Modal'
-import { Video as VideoIcon, Search, Trash2, RefreshCw, Play, Download } from 'lucide-react'
+import { Textarea } from '../components/ui/Textarea'
+import { Video as VideoIcon, Search, Trash2, RefreshCw, Play, Download, FileText } from 'lucide-react'
 import {
   listVideos,
   deleteVideo as deleteVideoRequest,
   retryVideo as retryVideoRequest,
+  getVideo,
   type VideoRecord,
   type ListVideosParams,
 } from '../lib/videos'
@@ -25,6 +27,8 @@ export function Videos() {
   const [statusFilter, setStatusFilter] = useState<ListVideosParams['status']>('all')
   const [deleteModal, setDeleteModal] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [selectedVideo, setSelectedVideo] = useState<VideoRecord | null>(null)
+  const [loadingVideo, setLoadingVideo] = useState(false)
 
   const loadVideos = useCallback(async () => {
     try {
@@ -74,6 +78,24 @@ export function Videos() {
       loadVideos()
     } catch (error) {
       console.error('Failed to retry video:', error)
+    }
+  }
+
+  const handleCardClick = async (videoId: string, e: React.MouseEvent) => {
+    // Don't open modal if clicking on buttons or interactive elements
+    const target = e.target as HTMLElement
+    if (target.closest('button') || target.closest('a')) {
+      return
+    }
+
+    setLoadingVideo(true)
+    try {
+      const video = await getVideo(videoId)
+      setSelectedVideo(video)
+    } catch (error) {
+      console.error('Failed to load video details:', error)
+    } finally {
+      setLoadingVideo(false)
     }
   }
 
@@ -160,7 +182,12 @@ export function Videos() {
         ) : (
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {videos.map((video) => (
-              <Card key={video.id} hover className="flex h-full flex-col gap-5">
+              <Card 
+                key={video.id} 
+                hover 
+                className="flex h-full flex-col gap-5 cursor-pointer"
+                onClick={(e) => handleCardClick(video.id, e)}
+              >
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-2">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{video.style}</p>
@@ -192,7 +219,7 @@ export function Videos() {
                   <span className="ml-auto text-slate-300">ID - {video.id.slice(0, 6)}</span>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                   {video.status === 'completed' && video.video_url && (
                     <>
                       <Button
@@ -245,6 +272,145 @@ export function Videos() {
             ))}
           </div>
         )}
+
+        {/* Video Details Modal */}
+        <Modal
+          isOpen={selectedVideo !== null}
+          onClose={() => setSelectedVideo(null)}
+          title="Video Details"
+          size="lg"
+        >
+          {loadingVideo ? (
+            <div className="py-12 text-center">
+              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-brand-500 border-r-transparent"></div>
+              <p className="mt-4 text-sm text-slate-500">Loading video details...</p>
+            </div>
+          ) : selectedVideo ? (
+            <div className="space-y-6">
+              {/* Video Preview */}
+              {selectedVideo.status === 'completed' && selectedVideo.video_url && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold text-primary">Video Preview</h3>
+                  <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-900">
+                    <video 
+                      src={selectedVideo.video_url} 
+                      className="w-full rounded-xl" 
+                      controls 
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => window.open(selectedVideo.video_url!, '_blank')}
+                      leftIcon={<Play className="h-4 w-4" />}
+                    >
+                      Open in New Tab
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        const link = document.createElement('a')
+                        link.href = selectedVideo.video_url!
+                        link.download = `${selectedVideo.topic}.mp4`
+                        link.click()
+                      }}
+                      leftIcon={<Download className="h-4 w-4" />}
+                    >
+                      Download
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Video Info */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">Topic</label>
+                  <p className="mt-1 text-sm font-medium text-primary">{selectedVideo.topic}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">Style</label>
+                  <p className="mt-1 text-sm font-medium text-primary capitalize">{selectedVideo.style}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">Duration</label>
+                  <p className="mt-1 text-sm font-medium text-primary">{selectedVideo.duration} seconds</p>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">Status</label>
+                  <div className="mt-1">
+                    {getStatusBadge(selectedVideo.status)}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">Created</label>
+                  <p className="mt-1 text-sm font-medium text-primary">
+                    {new Date(selectedVideo.created_at).toLocaleString()}
+                  </p>
+                </div>
+                {selectedVideo.heygen_video_id && (
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">HeyGen ID</label>
+                    <p className="mt-1 text-sm font-mono text-primary">{selectedVideo.heygen_video_id}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Script */}
+              {selectedVideo.script && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-slate-400" />
+                    <h3 className="text-sm font-semibold text-primary">Script</h3>
+                  </div>
+                  <Textarea
+                    value={selectedVideo.script}
+                    readOnly
+                    rows={8}
+                    className="font-mono text-sm"
+                  />
+                </div>
+              )}
+
+              {/* Error Message */}
+              {selectedVideo.status === 'failed' && selectedVideo.error_message && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+                  <h3 className="mb-2 text-sm font-semibold text-rose-700">Error Message</h3>
+                  <p className="text-sm text-rose-600">{selectedVideo.error_message}</p>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-3 border-t border-slate-200 pt-4">
+                {selectedVideo.status === 'failed' && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      handleRetry(selectedVideo.id)
+                      setSelectedVideo(null)
+                    }}
+                    leftIcon={<RefreshCw className="h-4 w-4" />}
+                  >
+                    Retry Generation
+                  </Button>
+                )}
+                <Button
+                  variant="danger"
+                  onClick={() => {
+                    setSelectedVideo(null)
+                    setDeleteModal(selectedVideo.id)
+                  }}
+                  leftIcon={<Trash2 className="h-4 w-4" />}
+                  className="ml-auto"
+                >
+                  Delete Video
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </Modal>
 
         <Modal
           isOpen={deleteModal !== null}

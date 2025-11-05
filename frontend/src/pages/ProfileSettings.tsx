@@ -197,8 +197,14 @@ export function ProfileSettings() {
               <Button
                 variant="danger"
                 onClick={async () => {
-                  await signOut()
-                  navigate('/login')
+                  try {
+                    await signOut()
+                    navigate('/login')
+                  } catch (error) {
+                    console.error('Sign out error:', error)
+                    // Force navigation even if signOut fails
+                    navigate('/login')
+                  }
                 }}
                 leftIcon={<LogOut className="h-4 w-4" />}
               >
