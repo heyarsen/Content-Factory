@@ -278,22 +278,55 @@ export class AvatarService {
   }
 
   /**
-   * Get only user-created avatars (avatars created from uploaded photos)
-   * User-created avatars have avatar_url pointing to Supabase storage
+   * Get only user-created avatars (avatars created from uploaded photos or AI-generated)
+   * User-created avatars are those that were created by the user (not synced from HeyGen)
+   * They either have:
+   * - avatar_url pointing to Supabase storage (photo uploads)
+   * - status 'generating' (AI generation in progress)
+   * - status 'training' or 'pending' (recently created, not synced)
+   * We exclude avatars that were synced from HeyGen (which typically have avatar_url from HeyGen CDN)
    */
   static async getUserCreatedAvatars(userId: string): Promise<Avatar[]> {
     const { data, error } = await supabase
       .from('avatars')
       .select('*')
       .eq('user_id', userId)
-      .not('avatar_url', 'is', null) // avatar_url must be set
-      .like('avatar_url', '%supabase.co/storage%') // Must point to our storage
-      .in('status', ['active', 'training', 'pending'])
+      .in('status', ['active', 'training', 'pending', 'generating'])
       .order('is_default', { ascending: false })
       .order('avatar_name', { ascending: true })
 
     if (error) throw error
-    return data || []
+    
+    // Filter to only include user-created avatars:
+    // 1. Avatars with Supabase storage URLs (photo uploads)
+    // 2. Avatars with status 'generating' (AI generation in progress)
+    // 3. Avatars with status 'training' or 'pending' that don't have HeyGen CDN URLs
+    const userCreated = (data || []).filter(avatar => {
+      // If it has a Supabase storage URL, it's user-created
+      if (avatar.avatar_url && avatar.avatar_url.includes('supabase.co/storage')) {
+        return true
+      }
+      // If status is generating, it's user-created (AI generation)
+      if (avatar.status === 'generating') {
+        return true
+      }
+      // If status is training or pending and doesn't have a HeyGen CDN URL, it's likely user-created
+      if ((avatar.status === 'training' || avatar.status === 'pending') && 
+          (!avatar.avatar_url || !avatar.avatar_url.includes('heygen'))) {
+        return true
+      }
+      // Exclude avatars with HeyGen CDN URLs (these are synced from HeyGen)
+      if (avatar.avatar_url && avatar.avatar_url.includes('heygen')) {
+        return false
+      }
+      // Include avatars with no URL if they're in training/pending (recently created)
+      if (!avatar.avatar_url && (avatar.status === 'training' || avatar.status === 'pending')) {
+        return true
+      }
+      return false
+    })
+
+    return userCreated
   }
 
   /**

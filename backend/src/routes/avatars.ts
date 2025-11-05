@@ -378,15 +378,29 @@ router.post('/generate-ai', async (req: AuthRequest, res: Response) => {
     const userId = req.userId!
     const request: GenerateAIAvatarRequest = req.body
 
+    console.log('Generate AI avatar request:', {
+      userId,
+      hasName: !!request.name,
+      hasAge: !!request.age,
+      hasGender: !!request.gender,
+      hasEthnicity: !!request.ethnicity,
+      hasOrientation: !!request.orientation,
+      hasPose: !!request.pose,
+      hasStyle: !!request.style,
+      hasAppearance: !!request.appearance,
+    })
+
     if (!request.name || !request.age || !request.gender || !request.ethnicity || !request.orientation || !request.pose || !request.style || !request.appearance) {
       return res.status(400).json({ error: 'All fields are required for AI avatar generation' })
     }
 
     const result = await generateAIAvatar(request)
 
+    console.log('HeyGen AI avatar generation response:', result)
+
     // Save generation_id to database for tracking
     const { supabase } = await import('../lib/supabase.js')
-    await supabase
+    const { data, error } = await supabase
       .from('avatars')
       .insert({
         user_id: userId,
@@ -399,14 +413,55 @@ router.post('/generate-ai', async (req: AuthRequest, res: Response) => {
         status: 'generating',
         is_default: false,
       })
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Failed to save avatar generation to database:', error)
+      throw new Error(`Failed to save avatar generation: ${error.message}`)
+    }
+
+    console.log('Avatar generation saved to database:', data?.id)
 
     return res.json({
       message: 'AI avatar generation started',
       generation_id: result.generation_id,
     })
   } catch (error: any) {
-    console.error('Generate AI avatar error:', error)
-    return res.status(500).json({ error: error.message || 'Failed to generate AI avatar' })
+    console.error('Generate AI avatar error:', {
+      message: error.message,
+      stack: error.stack,
+      response: error.response?.data,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+    })
+    
+    let errorMessage = 'Failed to generate AI avatar'
+    
+    if (error.response?.status === 404) {
+      errorMessage = 'HeyGen AI avatar generation endpoint not found (404). The API endpoint may have changed or the feature may not be available in your HeyGen plan.'
+    } else if (error.response?.status === 401) {
+      errorMessage = 'HeyGen API authentication failed. Please check your HEYGEN_KEY environment variable.'
+    } else if (error.response?.status === 403) {
+      errorMessage = 'Access denied. AI avatar generation may not be available in your HeyGen plan.'
+    } else if (error.response?.data?.error) {
+      errorMessage = typeof error.response.data.error === 'string' 
+        ? error.response.data.error 
+        : JSON.stringify(error.response.data.error)
+    } else if (error.response?.data?.message) {
+      errorMessage = error.response.data.message
+    } else if (error.message) {
+      errorMessage = error.message
+    }
+    
+    return res.status(error.response?.status || 500).json({ 
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? {
+        originalMessage: error.message,
+        status: error.response?.status,
+        responseData: error.response?.data,
+      } : undefined,
+    })
   }
 })
 
