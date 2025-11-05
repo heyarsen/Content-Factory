@@ -617,27 +617,53 @@ router.post('/quick-create/generate-script', authenticate, async (req: AuthReque
       return res.status(400).json({ error: 'category and topic are required' })
     }
 
-    // Map category_key to category name
-    const categoryMap: Record<string, 'Trading' | 'Lifestyle' | 'Fin. Freedom'> = {
-      'trading': 'Trading',
-      'lifestyle': 'Lifestyle',
-      'fin_freedom': 'Fin. Freedom',
-      'financial_freedom': 'Fin. Freedom',
-      'fin. freedom': 'Fin. Freedom',
-      'Fin. Freedom': 'Fin. Freedom',
-      'Financial Freedom': 'Fin. Freedom',
-      'Trading': 'Trading',
-      'Lifestyle': 'Lifestyle',
+    // Look up category from database
+    const normalizedCategoryKey = category.toLowerCase().trim().replace(/\s+/g, '_')
+    
+    // Try to find category by key (exact match first, then normalized)
+    let { data: categoryData } = await supabase
+      .from('content_categories')
+      .select('name, category_key')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .eq('category_key', category)
+      .maybeSingle()
+    
+    // If not found, try normalized key
+    if (!categoryData) {
+      const { data } = await supabase
+        .from('content_categories')
+        .select('name, category_key')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .eq('category_key', normalizedCategoryKey)
+        .maybeSingle()
+      categoryData = data || null
     }
 
-    // Normalize the category key
-    const normalizedCategory = category.toLowerCase().trim().replace(/\s+/g, '_')
-    const mappedCategory = categoryMap[normalizedCategory] || categoryMap[category] || categoryMap[category.toLowerCase()]
-    
-    if (!mappedCategory || !['Trading', 'Lifestyle', 'Fin. Freedom'].includes(mappedCategory)) {
-      return res.status(400).json({ 
-        error: `Invalid category "${category}". Must be Trading, Lifestyle, or Fin. Freedom` 
-      })
+    let categoryName: string
+
+    if (!categoryData) {
+      // If category not found, try legacy mapping
+      const categoryMap: Record<string, string> = {
+        'trading': 'Trading',
+        'lifestyle': 'Lifestyle',
+        'fin_freedom': 'Fin. Freedom',
+        'financial_freedom': 'Fin. Freedom',
+        'fin. freedom': 'Fin. Freedom',
+      }
+
+      const normalizedCategory = category.toLowerCase().trim().replace(/\s+/g, '_')
+      categoryName = categoryMap[normalizedCategory] || categoryMap[category] || category
+
+      // If still not found in legacy map, use the provided category name as-is
+      if (!categoryMap[normalizedCategory] && !categoryMap[category]) {
+        // Use the category name directly if it looks like a name, otherwise use the key
+        categoryName = category
+      }
+    } else {
+      // Use the name from the database
+      categoryName = categoryData.name
     }
 
     const { ScriptService } = await import('../services/scriptService.js')
@@ -648,7 +674,7 @@ router.post('/quick-create/generate-script', authenticate, async (req: AuthReque
       description: description || '',
       whyItMatters: whyImportant || '',
       usefulTips: usefulTips || '',
-      category: mappedCategory,
+      category: categoryName,
     })
 
     return res.json({ script })

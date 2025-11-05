@@ -12,7 +12,7 @@ export interface ScriptGenerationRequest {
   description: string
   whyItMatters: string
   usefulTips: string
-  category: 'Trading' | 'Lifestyle' | 'Fin. Freedom'
+  category: string // Allow any category name
 }
 
 export interface ScriptGenerationResponse {
@@ -118,7 +118,38 @@ Moderation & Safety Criteria (must always be followed):
 	•	CTA must remain generic and safe: only "Follow for daily tips, and for deeper insights, use the link in our profile."`,
   }
 
-  const systemPrompt = systemPrompts[data.category]
+  // Use category-specific prompt if available, otherwise use default
+  const defaultPrompt = `You are a scriptwriter for short educational videos (25–30 seconds, about 60–70 words). Your task is to create a short script for a talking avatar video.
+
+Input fields you will always receive:
+	•	Idea
+	•	Description
+	•	WhyItMatters
+	•	UsefulTips
+
+Rules:
+	1.	Start with a Hook (2–3 sec) – a bold claim, surprising fact, or short question.
+	2.	Give the Insight (12–15 sec) – summarize key point from Description/WhyItMatters/UsefulTips.
+	3.	End with Call to Action (5–7 sec) – always invite to subscribe or follow, and always add: "Follow for daily tips, and for deeper insights, use the link in our profile."
+
+Constraints:
+	•	Simple, clear language
+	•	25–30 seconds speech (60–70 words)
+	•	Output ONLY the script text in one continuous paragraph
+	•	No labels, headers, or formatting
+	•	No introductory phrases like "Here's the script"
+	•	Just the raw script text ready for voice synthesis
+
+Moderation & Safety Criteria (must always be followed):
+	•	Neutral tone: avoid hype, exaggeration, or misleading claims.
+	•	No guarantees or promises of specific outcomes.
+	•	No promotion of specific firms, brands, or platforms by name; describe them generally.
+	•	Educational framing only: explain concepts, share insights, but never give direct advice.
+	•	Do not target vulnerable groups.
+	•	Exclude sensitive or restricted topics (politics, religion, health, sex, violence, illegal activity).
+	•	Call-to-action must be generic and safe: only "Follow for daily tips, and for deeper insights, use the link in our profile."`
+
+  const systemPrompt = systemPrompts[data.category as keyof typeof systemPrompts] || defaultPrompt
   const userPrompt = `Вот данные:
 
 Idea: ${data.idea}
