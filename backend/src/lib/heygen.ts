@@ -345,11 +345,14 @@ export async function generateVideo(
 /**
  * Upload image to HeyGen Asset Storage
  * Returns the image_key needed for avatar group creation
- * Based on HeyGen docs: https://docs.heygen.com/docs/create-and-train-photo-avatar-groups
+ * Based on HeyGen docs: https://docs.heygen.com/reference/upload-asset
+ * 
+ * The correct endpoint is: https://upload.heygen.com/v1/asset
+ * It expects raw binary image data in the body (not multipart/form-data)
  */
 async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
   const apiKey = getHeyGenKey()
-  const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
+  const HEYGEN_UPLOAD_URL = 'https://upload.heygen.com/v1/asset'
   
   // First, download the image from the URL to get the buffer
   let imageBuffer: Buffer
@@ -377,155 +380,69 @@ async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
     throw new Error(`Failed to download image: ${err.message}`)
   }
   
-  // Try different upload endpoints with various formats and field names
-  const uploadEndpoints = [
-    // Standard REST patterns with different field names
-    { url: `${HEYGEN_V2_API_URL}/asset/upload`, method: 'multipart', fieldName: 'file' },
-    { url: `${HEYGEN_V2_API_URL}/asset/upload`, method: 'multipart', fieldName: 'image' },
-    { url: `${HEYGEN_V2_API_URL}/asset/upload`, method: 'multipart', fieldName: 'asset' },
-    { url: `${HEYGEN_V2_API_URL}/assets/upload`, method: 'multipart', fieldName: 'file' },
-    { url: `${HEYGEN_V2_API_URL}/asset.upload`, method: 'multipart', fieldName: 'file' },
-    { url: `${HEYGEN_V2_API_URL}/assets.upload`, method: 'multipart', fieldName: 'file' },
-    { url: `${HEYGEN_V2_API_URL}/upload`, method: 'multipart', fieldName: 'file' },
-    { url: `${HEYGEN_V2_API_URL}/upload/asset`, method: 'multipart', fieldName: 'file' },
-    { url: `${HEYGEN_V2_API_URL}/upload/image`, method: 'multipart', fieldName: 'file' },
-    // URL-based uploads
-    { url: `${HEYGEN_V2_API_URL}/asset/upload`, method: 'url' },
-    { url: `${HEYGEN_V2_API_URL}/assets/upload`, method: 'url' },
-    { url: `${HEYGEN_V2_API_URL}/asset.upload`, method: 'url' },
-  ]
-  
-  // Try uploading to HeyGen with reduced timeout for faster failure
-  const uploadTimeout = 5000 // 5 seconds per endpoint (reduced from 10 for faster failure)
-  const attemptedEndpoints: string[] = []
-  let consecutive404s = 0
-  const maxConsecutive404s = 3 // Fail fast if we get 3 consecutive 404s
-  
-  for (const endpoint of uploadEndpoints) {
-    const endpointKey = `${endpoint.url} (${endpoint.method}${endpoint.fieldName ? `, field: ${endpoint.fieldName}` : ''})`
-    attemptedEndpoints.push(endpointKey)
+  try {
+    console.log(`Uploading image to HeyGen Upload Asset endpoint: ${HEYGEN_UPLOAD_URL}`)
+    console.log(`Content-Type: ${contentType}, Size: ${imageBuffer.length} bytes`)
     
-    try {
-      console.log(`Trying to upload image to ${endpointKey}...`)
-      
-      if (endpoint.method === 'url') {
-        // Try URL-based upload (if HeyGen accepts URLs)
-        const urlUploadResponse = await axios.post(
-          endpoint.url,
-          { url: photoUrl },
-          {
-            headers: {
-              'X-Api-Key': apiKey,
-              'Content-Type': 'application/json',
-            },
-            timeout: uploadTimeout,
-          }
-        )
-        
-        consecutive404s = 0 // Reset counter on any response
-        
-        // Log response structure for debugging
-        console.log(`Response from ${endpointKey}:`, {
-          status: urlUploadResponse.status,
-          dataKeys: Object.keys(urlUploadResponse.data || {}),
-          data: urlUploadResponse.data,
-        })
-        
-        const imageKey = urlUploadResponse.data?.data?.image_key || 
-                        urlUploadResponse.data?.image_key ||
-                        urlUploadResponse.data?.data?.key ||
-                        urlUploadResponse.data?.key ||
-                        urlUploadResponse.data?.data?.asset_key ||
-                        urlUploadResponse.data?.asset_key
-        
-        if (imageKey) {
-          console.log(`✅ Successfully uploaded image via URL, got image_key: ${imageKey}`)
-          return imageKey
-        } else {
-          console.log(`⚠️  Endpoint ${endpointKey} responded but no image_key found in response`)
-        }
-      } else {
-        // Try multipart/form-data upload using FormData
-        const FormData = (await import('form-data')).default
-        const form = new FormData()
-        form.append(endpoint.fieldName || 'file', imageBuffer, {
-          filename: 'avatar.jpg',
-          contentType: contentType,
-        })
-        
-        const uploadResponse = await axios.post(endpoint.url, form, {
-          headers: {
-            'X-Api-Key': apiKey,
-            ...form.getHeaders(),
-          },
-          maxContentLength: Infinity,
-          maxBodyLength: Infinity,
-          timeout: uploadTimeout,
-        })
-        
-        consecutive404s = 0 // Reset counter on any response
-        
-        // Log response structure for debugging
-        console.log(`Response from ${endpointKey}:`, {
-          status: uploadResponse.status,
-          dataKeys: Object.keys(uploadResponse.data || {}),
-          data: uploadResponse.data,
-        })
-        
-        // Extract image_key from response - check multiple possible paths
-        const imageKey = uploadResponse.data?.data?.image_key || 
-                        uploadResponse.data?.image_key ||
-                        uploadResponse.data?.data?.key ||
-                        uploadResponse.data?.key ||
-                        uploadResponse.data?.data?.asset_key ||
-                        uploadResponse.data?.asset_key
-        
-        if (imageKey) {
-          console.log(`✅ Successfully uploaded image, got image_key: ${imageKey}`)
-          return imageKey
-        } else {
-          console.log(`⚠️  Endpoint ${endpointKey} responded but no image_key found in response`)
-        }
+    // Upload raw binary data to HeyGen Upload Asset endpoint
+    // According to HeyGen docs: https://docs.heygen.com/reference/upload-asset
+    // The endpoint expects raw binary image data in the body (not multipart/form-data)
+    const uploadResponse = await axios.post(
+      HEYGEN_UPLOAD_URL,
+      imageBuffer,
+      {
+        headers: {
+          'X-Api-Key': apiKey,
+          'Content-Type': contentType,
+        },
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+        timeout: 30000, // 30 seconds timeout for upload
       }
-    } catch (err: any) {
-      const isTimeout = err.code === 'ECONNABORTED' || err.message?.includes('timeout')
-      const is404 = err.response?.status === 404
-      
-      // Track consecutive 404s for fail-fast logic
-      if (is404) {
-        consecutive404s++
-      } else {
-        consecutive404s = 0 // Reset on non-404 errors
-      }
-      
-      // Log detailed error for debugging
-      console.log(`❌ Upload to ${endpointKey} failed:`, {
-        status: err.response?.status,
-        statusText: err.response?.statusText,
-        error: err.response?.data?.error || err.message,
-        responseData: err.response?.data,
-        isTimeout,
-        is404,
-        consecutive404s,
-      })
-      
-      // Fail fast if we get too many consecutive 404s (likely all endpoints don't exist)
-      if (consecutive404s >= maxConsecutive404s) {
-        console.log(`⚠️  Got ${consecutive404s} consecutive 404s, likely all upload endpoints are unavailable. Skipping remaining attempts.`)
-        break
-      }
-      
-      // Continue to next endpoint
-      continue
+    )
+    
+    console.log('Upload response:', {
+      status: uploadResponse.status,
+      dataKeys: Object.keys(uploadResponse.data || {}),
+      data: uploadResponse.data,
+    })
+    
+    // Extract image_key from response
+    // Based on HeyGen docs, response should contain 'id' and 'image_key'
+    const imageKey = uploadResponse.data?.data?.image_key || 
+                    uploadResponse.data?.image_key ||
+                    uploadResponse.data?.data?.id || // Fallback to id if image_key not present
+                    uploadResponse.data?.id
+    
+    if (imageKey) {
+      console.log(`✅ Successfully uploaded image to HeyGen, got image_key: ${imageKey}`)
+      return imageKey
+    } else {
+      // Log the full response for debugging
+      console.error('Upload succeeded but image_key not found in response:', JSON.stringify(uploadResponse.data, null, 2))
+      throw new Error('Upload succeeded but image_key not found in response. Response: ' + JSON.stringify(uploadResponse.data))
     }
+  } catch (err: any) {
+    console.error('HeyGen Upload Asset API error:', {
+      status: err.response?.status,
+      statusText: err.response?.statusText,
+      error: err.response?.data?.error || err.message,
+      responseData: err.response?.data,
+    })
+    
+    let errorMessage = 'Failed to upload image to HeyGen'
+    if (err.response?.data?.error) {
+      errorMessage = typeof err.response.data.error === 'string' 
+        ? err.response.data.error 
+        : JSON.stringify(err.response.data.error)
+    } else if (err.response?.data?.message) {
+      errorMessage = err.response.data.message
+    } else if (err.message) {
+      errorMessage = err.message
+    }
+    
+    throw new Error(errorMessage)
   }
-  
-  throw new Error(
-    `Failed to upload image to HeyGen. All ${attemptedEndpoints.length} upload endpoints failed. ` +
-    `Attempted endpoints: ${attemptedEndpoints.join(', ')}. ` +
-    `The Upload Assets API endpoint may not be publicly documented or may require special access. ` +
-    `Please check HeyGen API documentation or contact HeyGen support for the correct endpoint.`
-  )
 }
 
 export async function createAvatarFromPhoto(
@@ -536,108 +453,65 @@ export async function createAvatarFromPhoto(
     const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
     const apiKey = getHeyGenKey()
     
-    // Step 1: Try to upload image to HeyGen and get image_key
-    // If upload fails, we'll try using the public URL directly
-    console.log('Step 1: Attempting to upload image to HeyGen...')
-    let imageKey: string | null = null
+    // Step 1: Upload image to HeyGen and get image_key
+    // According to HeyGen support: https://docs.heygen.com/reference/upload-asset
+    // This is required - we must upload the image first to get an image_key
+    console.log('Step 1: Uploading image to HeyGen Upload Asset endpoint...')
+    let imageKey: string
     
     try {
       imageKey = await uploadImageToHeyGen(photoUrl)
-      console.log('Successfully uploaded image to HeyGen, got image_key:', imageKey)
+      console.log('✅ Successfully uploaded image to HeyGen, got image_key:', imageKey)
     } catch (uploadError: any) {
-      console.log('Image upload failed, will try using public URL directly:', uploadError.message)
-      // Continue without image_key - we'll try using the URL directly
-    }
-    
-    // Step 2: Create avatar group
-    // Based on https://docs.heygen.com/docs/create-and-train-photo-avatar-groups
-    // Try with image_key first, then fallback to URL if needed
-    console.log('Step 2: Creating avatar group...')
-    let createGroupResponse: any
-    let lastError: any = null
-    const createTimeout = 15000 // 15 seconds timeout
-    
-    // Try with image_key if we have it
-    if (imageKey) {
-      try {
-        createGroupResponse = await axios.post(
-          `${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/create`,
-          {
-            name: avatarName,
-            image_key: imageKey,
-          },
-          {
-            headers: {
-              'X-Api-Key': apiKey,
-              'Content-Type': 'application/json',
-            },
-            timeout: createTimeout,
-          }
-        )
-        console.log('Avatar group created successfully with image_key')
-      } catch (err: any) {
-        console.log('Creating with image_key failed, trying with URL:', err.response?.status)
-        lastError = err
-        // Continue to try with URL
-      }
-    }
-    
-    // If image_key approach didn't work, try with photo_url (if HeyGen supports it)
-    if (!createGroupResponse && photoUrl) {
-      try {
-        console.log('Trying to create avatar group with photo_url...')
-        createGroupResponse = await axios.post(
-          `${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/create`,
-          {
-            name: avatarName,
-            photo_url: photoUrl, // Some APIs accept URLs directly
-          },
-          {
-            headers: {
-              'X-Api-Key': apiKey,
-              'Content-Type': 'application/json',
-            },
-            timeout: createTimeout,
-          }
-        )
-        console.log('Avatar group created successfully with photo_url')
-      } catch (err: any) {
-        console.log('Creating with photo_url also failed:', err.response?.status, err.response?.data)
-        lastError = err
-        
-        // Only try one alternative endpoint, then give up
-        if (err.response?.status !== 404) {
-          try {
-            createGroupResponse = await axios.post(
-              `${HEYGEN_V2_API_URL}/avatar_group.create`,
-              {
-                name: avatarName,
-                photo_url: photoUrl,
-              },
-              {
-                headers: {
-                  'X-Api-Key': apiKey,
-                  'Content-Type': 'application/json',
-                },
-                timeout: createTimeout,
-              }
-            )
-            console.log('Avatar group created with alternative endpoint')
-          } catch (altErr: any) {
-            lastError = altErr
-          }
-        }
-      }
-    }
-    
-    if (!createGroupResponse) {
-      // All attempts failed - throw helpful error
-      const errorMsg = lastError?.response?.data?.error || lastError?.message || 'Unknown error'
-    throw new Error(
-        `Unable to create avatar group. HeyGen API may require uploading the image through their dashboard first. ` +
-        `Please upload your photo to HeyGen dashboard and sync avatars, or use the "Generate AI Avatar" feature. ` +
-        `Error: ${errorMsg}`
+      console.error('❌ Image upload failed:', uploadError.message)
+      throw new Error(
+        `Failed to upload image to HeyGen: ${uploadError.message}. ` +
+        `Please check your HEYGEN_KEY and ensure the image is accessible.`
       )
+    }
+    
+    // Step 2: Create Photo Avatar Group using the image_key
+    // Based on https://docs.heygen.com/docs/create-and-train-photo-avatar-groups
+    console.log('Step 2: Creating Photo Avatar Group with image_key...')
+    let createGroupResponse: any
+    const createTimeout = 30000 // 30 seconds timeout
+    
+    try {
+      createGroupResponse = await axios.post(
+        `${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/create`,
+        {
+          name: avatarName,
+          image_key: imageKey,
+        },
+        {
+          headers: {
+            'X-Api-Key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          timeout: createTimeout,
+        }
+      )
+      console.log('✅ Avatar group created successfully')
+    } catch (err: any) {
+      console.error('❌ Failed to create avatar group:', {
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        error: err.response?.data?.error || err.message,
+        responseData: err.response?.data,
+      })
+      
+      let errorMessage = 'Failed to create avatar group'
+      if (err.response?.data?.error) {
+        errorMessage = typeof err.response.data.error === 'string' 
+          ? err.response.data.error 
+          : JSON.stringify(err.response.data.error)
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message
+      } else if (err.message) {
+        errorMessage = err.message
+      }
+      
+      throw new Error(`Failed to create Photo Avatar Group: ${errorMessage}`)
     }
     
     console.log('Avatar group creation response:', createGroupResponse.data)
