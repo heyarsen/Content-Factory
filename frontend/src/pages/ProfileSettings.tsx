@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { useToast } from '../hooks/useToast'
-import { User, Lock, Mail } from 'lucide-react'
+import { User, Lock, Mail, LogOut } from 'lucide-react'
 import api from '../lib/api'
 
 export function ProfileSettings() {
-  const { user } = useAuth()
+  const { user, signOut } = useAuth()
   const { toast } = useToast()
+  const navigate = useNavigate()
   const [emailForm, setEmailForm] = useState({
     email: '',
   })
@@ -177,6 +179,31 @@ export function ProfileSettings() {
               <span className="text-sm text-slate-500">
                 {user?.email_confirmed_at ? 'Yes' : 'No'}
               </span>
+            </div>
+          </div>
+        </Card>
+
+        {/* Logout */}
+        <Card className="p-6">
+          <div className="mb-6 flex items-center gap-3">
+            <LogOut className="h-5 w-5 text-slate-400" />
+            <h2 className="text-lg font-semibold text-primary">Sign Out</h2>
+          </div>
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Sign out of your account. You'll need to sign in again to access your workspace.
+            </p>
+            <div className="flex justify-end">
+              <Button
+                variant="danger"
+                onClick={async () => {
+                  await signOut()
+                  navigate('/login')
+                }}
+                leftIcon={<LogOut className="h-4 w-4" />}
+              >
+                Sign Out
+              </Button>
             </div>
           </div>
         </Card>

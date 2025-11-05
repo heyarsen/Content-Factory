@@ -12,6 +12,7 @@ import {
   Calendar,
   Tag,
   User,
+  Settings,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -29,6 +30,7 @@ const navigation = [
   { label: 'Scheduled Posts', to: '/posts', icon: CalendarCheck },
   { label: 'Categories', to: '/categories', icon: Tag },
   { label: 'Avatars', to: '/avatars', icon: User },
+  { label: 'Preferences', to: '/preferences', icon: Settings },
 ]
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
