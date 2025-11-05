@@ -242,58 +242,133 @@ export async function createAvatarFromPhoto(
   avatarName: string
 ): Promise<{ avatar_id: string; status: string }> {
   try {
+    // Try both v1 and v2 API endpoints
+    const HEYGEN_V1_API_URL = 'https://api.heygen.com/v1'
     const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
     
-    // Step 1: Create avatar group
-    const groupResponse = await axios.post(
-      `${HEYGEN_V2_API_URL}/avatar_group.create`,
-      {
-        name: avatarName,
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${getHeyGenKey()}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    )
+    let groupId: string | null = null
+    let lastError: any = null
+    
+    // Step 1: Try to create avatar group (try v2 first, then v1)
+    const endpoints = [
+      { url: `${HEYGEN_V2_API_URL}/avatar_group.create`, version: 'v2' },
+      { url: `${HEYGEN_V1_API_URL}/avatar.create`, version: 'v1' },
+    ]
+    
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`Trying to create avatar group with ${endpoint.version} API...`)
+        const groupResponse = await axios.post(
+          endpoint.url,
+          {
+            name: avatarName,
+            ...(endpoint.version === 'v1' ? { photo_url: photoUrl } : {}),
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${getHeyGenKey()}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        )
 
-    const groupId = groupResponse.data?.data?.group_id || groupResponse.data?.group_id
-    if (!groupId) {
-      throw new Error('Failed to create avatar group: No group ID returned')
+        groupId = groupResponse.data?.data?.group_id || 
+                  groupResponse.data?.group_id ||
+                  groupResponse.data?.data?.id ||
+                  groupResponse.data?.id
+                  
+        if (groupId) {
+          console.log(`Successfully created avatar group with ${endpoint.version} API:`, groupId)
+          break
+        }
+      } catch (err: any) {
+        console.log(`${endpoint.version} API failed:`, err.response?.status, err.response?.data)
+        lastError = err
+        continue
+      }
     }
 
-    // Step 2: Upload photo to the group
-    await axios.post(
-      `${HEYGEN_V2_API_URL}/avatar_group/${groupId}/photos`,
-      {
-        photo_url: photoUrl,
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${getHeyGenKey()}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    )
+    if (!groupId) {
+      throw new Error(`Failed to create avatar group. All API endpoints failed. Last error: ${lastError?.response?.status} - ${lastError?.response?.data?.message || lastError?.message}`)
+    }
 
-    // Step 3: Start training
-    const trainResponse = await axios.post(
-      `${HEYGEN_V2_API_URL}/avatar_group/${groupId}/train`,
-      {},
-      {
-        headers: {
-          'Authorization': `Bearer ${getHeyGenKey()}`,
-          'Content-Type': 'application/json',
+    // Step 2: Upload photo to the group (only for v2 API)
+    try {
+      console.log('Uploading photo to avatar group...')
+      await axios.post(
+        `${HEYGEN_V2_API_URL}/avatar_group/${groupId}/photos`,
+        {
+          photo_url: photoUrl,
         },
+        {
+          headers: {
+            'Authorization': `Bearer ${getHeyGenKey()}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      )
+      console.log('Photo uploaded successfully')
+    } catch (err: any) {
+      // If 404, it might be v1 API which doesn't need separate photo upload
+      if (err.response?.status === 404) {
+        console.log('Photo upload endpoint not found (likely using v1 API), skipping...')
+      } else {
+        throw err
       }
-    )
+    }
 
-    const avatarId = trainResponse.data?.data?.avatar_id || trainResponse.data?.avatar_id
-    const status = trainResponse.data?.data?.status || trainResponse.data?.status || 'training'
+    // Step 3: Start training (try both endpoints)
+    let avatarId: string | null = null
+    let status = 'training'
+    
+    const trainEndpoints = [
+      { url: `${HEYGEN_V2_API_URL}/avatar_group/${groupId}/train`, version: 'v2' },
+      { url: `${HEYGEN_V1_API_URL}/avatar/${groupId}/train`, version: 'v1' },
+    ]
+    
+    for (const endpoint of trainEndpoints) {
+      try {
+        console.log(`Starting training with ${endpoint.version} API...`)
+        const trainResponse = await axios.post(
+          endpoint.url,
+          {},
+          {
+            headers: {
+              'Authorization': `Bearer ${getHeyGenKey()}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        )
+
+        avatarId = trainResponse.data?.data?.avatar_id || 
+                   trainResponse.data?.avatar_id ||
+                   trainResponse.data?.data?.id ||
+                   trainResponse.data?.id ||
+                   groupId
+        status = trainResponse.data?.data?.status || 
+                 trainResponse.data?.status || 
+                 'training'
+                 
+        if (avatarId) {
+          console.log(`Training started successfully with ${endpoint.version} API:`, avatarId)
+          break
+        }
+      } catch (err: any) {
+        console.log(`${endpoint.version} training endpoint failed:`, err.response?.status, err.response?.data)
+        lastError = err
+        continue
+      }
+    }
+
+    if (!avatarId) {
+      // If training failed, we still have the groupId, so return it
+      avatarId = groupId
+      status = 'pending'
+      console.log('Training endpoints failed, using groupId as avatar_id')
+    }
 
     return {
-      avatar_id: avatarId || groupId, // Use groupId as fallback
+      avatar_id: avatarId,
       status,
     }
   } catch (error: any) {

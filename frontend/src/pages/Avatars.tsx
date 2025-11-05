@@ -203,11 +203,16 @@ export default function Avatars() {
         status: error.response?.status,
       })
       
-      const errorMessage = 
+      let errorMessage = 
         error.response?.data?.error || 
         error.response?.data?.message ||
         error.message || 
         'Failed to create avatar. Please check console for details.'
+      
+      // If it's a storage bucket error, make it more user-friendly
+      if (errorMessage.includes('bucket') || errorMessage.includes('Bucket')) {
+        errorMessage = 'Storage bucket not configured. Please contact support to set up avatar storage, or create the "avatars" bucket in Supabase Dashboard > Storage with public access.'
+      }
       
       toast.error(errorMessage)
       setCreating(false) // Set here too in case finally doesn't run

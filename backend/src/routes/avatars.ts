@@ -159,6 +159,22 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
     
     // Upload to Supabase Storage
     const { supabase } = await import('../lib/supabase.js')
+    
+    // Check if bucket exists first
+    const { data: buckets, error: bucketError } = await supabase.storage.listBuckets()
+    
+    if (bucketError) {
+      console.error('Error checking buckets:', bucketError)
+      // Continue anyway - might not have permission to list buckets, but can still try to upload
+    }
+    
+    const bucketExists = buckets?.some(b => b.name === 'avatars')
+    
+    if (buckets && !bucketExists) {
+      console.error('Avatars bucket does not exist. Please create it in Supabase Dashboard > Storage.')
+      throw new Error('Storage bucket "avatars" does not exist. Please create it in Supabase Dashboard > Storage with public access. You can run the SQL migration file: database/migrations/006_avatars_storage_bucket.sql')
+    }
+    
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('avatars')
       .upload(fileName, buffer, {
@@ -168,20 +184,28 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
 
     if (uploadError) {
       console.error('Supabase storage upload error:', uploadError)
-      throw new Error(`Failed to upload image: ${uploadError.message}`)
+      if (uploadError.message?.includes('Bucket') || uploadError.message?.includes('not found')) {
+        throw new Error(`Storage bucket "avatars" not found. Please create it in Supabase Dashboard > Storage with public access. Error: ${uploadError.message}`)
+      }
+      throw new Error(`Failed to upload image to storage: ${uploadError.message}`)
     }
 
     // Get public URL
-    const { data: { publicUrl } } = supabase.storage
+    const { data: urlData } = supabase.storage
       .from('avatars')
       .getPublicUrl(fileName)
 
+    const publicUrl = urlData?.publicUrl
     if (!publicUrl) {
       throw new Error('Failed to get public URL for uploaded image')
     }
+    
+    console.log('Image uploaded successfully, public URL:', publicUrl)
 
     // Create avatar using the public URL
+    console.log('Creating avatar with HeyGen using URL:', publicUrl)
     const avatar = await AvatarService.createAvatarFromPhoto(userId, publicUrl, avatar_name)
+    console.log('Avatar created successfully:', avatar.id)
 
     return res.status(201).json({
       message: 'Avatar creation started. It may take a few minutes to train.',
