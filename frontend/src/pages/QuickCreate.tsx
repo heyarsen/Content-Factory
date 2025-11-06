@@ -91,7 +91,8 @@ export function QuickCreate() {
 
   const loadAvatars = async () => {
     try {
-      const response = await api.get('/api/avatars')
+      // Only fetch user-created avatars
+      const response = await api.get('/api/avatars', { params: { created: 'true' } })
       setAvatars(response.data.avatars || [])
       // Set default avatar if available
       const defaultAvatar = response.data.avatars?.find((a: any) => a.is_default)

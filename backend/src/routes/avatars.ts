@@ -18,23 +18,27 @@ const router = Router()
 router.use(authenticate)
 
 // Get all avatars for the current user
-// Query parameter: ?created=true to show only user-created avatars
+// Query parameter: ?all=true to show all avatars (including synced from HeyGen)
+// By default, only shows user-created avatars
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
-    const onlyCreated = req.query.created === 'true'
+    const showAll = req.query.all === 'true'
     
-    // If onlyCreated is true, return only user-created avatars
-    const avatars = onlyCreated 
-      ? await AvatarService.getUserCreatedAvatars(userId)
-      : await AvatarService.getUserAvatars(userId)
+    // Default to showing only user-created avatars unless ?all=true is specified
+    const avatars = showAll 
+      ? await AvatarService.getUserAvatars(userId)
+      : await AvatarService.getUserCreatedAvatars(userId)
     
-    const defaultAvatar = await AvatarService.getDefaultAvatar(userId)
+    // Get default avatar (only from user-created avatars)
+    const defaultAvatar = showAll 
+      ? await AvatarService.getDefaultAvatar(userId)
+      : (await AvatarService.getUserCreatedAvatars(userId)).find(a => a.is_default) || null
 
     return res.json({
       avatars,
       default_avatar_id: defaultAvatar?.id || null,
-      only_created: onlyCreated,
+      only_created: !showAll,
     })
   } catch (error: any) {
     console.error('Get avatars error:', error)
