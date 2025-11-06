@@ -1,7 +1,6 @@
 import { Fragment, useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import {
-  CalendarCheck,
   Clapperboard,
   LayoutDashboard,
   Share2,
@@ -24,7 +23,6 @@ const navigation = [
   { label: 'Video Planning', to: '/planning', icon: Calendar },
   { label: 'My Videos', to: '/videos', icon: Clapperboard },
   { label: 'Social Accounts', to: '/social', icon: Share2 },
-  { label: 'Calendar', to: '/posts', icon: CalendarCheck },
   { label: 'Avatars', to: '/avatars', icon: User },
   { label: 'Preferences', to: '/preferences', icon: Settings },
 ]

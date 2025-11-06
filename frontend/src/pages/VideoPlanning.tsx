@@ -41,15 +41,6 @@ interface VideoPlan {
   created_at: string
 }
 
-interface Category {
-  id: string
-  name: string
-  category_key: string
-  description: string | null
-  status: 'active' | 'inactive'
-  sort_order: number
-}
-
 interface VideoPlanItem {
   id: string
   plan_id: string
@@ -78,11 +69,12 @@ export function VideoPlanning() {
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   )
+  const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [statusFilter, setStatusFilter] = useState<string>('all')
   const [scriptPreviewItem, setScriptPreviewItem] = useState<VideoPlanItem | null>(null)
   const [editingItem, setEditingItem] = useState<VideoPlanItem | null>(null)
   const [editForm, setEditForm] = useState<{
     topic: string
-    category: string | null
     scheduled_time: string
     description: string
     why_important: string
@@ -91,7 +83,6 @@ export function VideoPlanning() {
     platforms: string[]
   }>({
     topic: '',
-    category: null,
     scheduled_time: '',
     description: '',
     why_important: '',
@@ -118,10 +109,10 @@ export function VideoPlanning() {
   const [timezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
   const [videoTimes, setVideoTimes] = useState<string[]>(['09:00', '14:00', '19:00']) // Default times for 3 videos
   const [videoTopics, setVideoTopics] = useState<string[]>(['', '', '']) // Topics for each video slot
-  const [videoCategories, setVideoCategories] = useState<Array<string | null>>([null, null, null]) // Categories for each slot
-  const [categories, setCategories] = useState<Category[]>([]) // User categories from API
   const [deleteModal, setDeleteModal] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [editPlanModal, setEditPlanModal] = useState<VideoPlan | null>(null)
+  const [editingPlan, setEditingPlan] = useState(false)
   
   // Preset times for quick selection
   const timePresets = [
@@ -138,7 +129,6 @@ export function VideoPlanning() {
       // If we need more times, add defaults. If fewer, keep first N.
       setVideoTimes(defaultTimes.slice(0, videosPerDay))
       setVideoTopics(Array(videosPerDay).fill(''))
-      setVideoCategories(Array(videosPerDay).fill(null))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videosPerDay])
@@ -149,7 +139,6 @@ export function VideoPlanning() {
 
   useEffect(() => {
     loadPlans()
-    loadCategories()
   }, [])
 
   useEffect(() => {
@@ -158,14 +147,6 @@ export function VideoPlanning() {
     }
   }, [selectedPlan])
 
-  const loadCategories = async () => {
-    try {
-      const response = await api.get('/api/content')
-      setCategories((response.data.categories || []).filter((c: Category) => c.status === 'active'))
-    } catch (error) {
-      console.error('Failed to load categories:', error)
-    }
-  }
 
   const loadPlans = async () => {
     try {
@@ -211,7 +192,6 @@ export function VideoPlanning() {
         timezone: timezone,
         video_times: videoTimes.map((time: string) => `${time}:00`), // Send custom times
         video_topics: videoTopics, // Send topics for each slot
-        video_categories: videoCategories, // Send categories for each slot
       })
 
       setPlans([response.data.plan, ...plans])
@@ -227,7 +207,6 @@ export function VideoPlanning() {
       setAutoApprove(false)
       setVideoTimes(['09:00', '14:00', '19:00'])
       setVideoTopics(['', '', ''])
-      setVideoCategories([null, null, null])
     } catch (error: any) {
       alert(error.response?.data?.error || 'Failed to create plan')
     } finally {
@@ -284,6 +263,64 @@ export function VideoPlanning() {
     }
   }
 
+  const handleEditPlan = (plan: VideoPlan) => {
+    setEditPlanModal(plan)
+    setPlanName(plan.name)
+    setVideosPerDay(plan.videos_per_day)
+    setStartDate(plan.start_date.split('T')[0])
+    setEndDate(plan.end_date ? plan.end_date.split('T')[0] : '')
+    setAutoResearch(plan.auto_research)
+    setAutoScheduleTrigger(plan.auto_schedule_trigger || 'daily')
+    setTriggerTime(plan.trigger_time ? plan.trigger_time.substring(0, 5) : '09:00')
+    setDefaultPlatforms(plan.default_platforms || [])
+    setAutoApprove(plan.auto_approve || false)
+    // Load existing video times and topics from plan items if needed
+    // For now, use defaults
+    setVideoTimes(['09:00', '14:00', '19:00'].slice(0, plan.videos_per_day))
+    setVideoTopics(Array(plan.videos_per_day).fill(''))
+  }
+
+  const handleSavePlan = async () => {
+    if (!editPlanModal || !planName || !startDate) {
+      alert('Please fill in plan name and start date')
+      return
+    }
+
+    setEditingPlan(true)
+    try {
+      await api.patch(`/api/plans/${editPlanModal.id}`, {
+        name: planName,
+        videos_per_day: videosPerDay,
+        start_date: startDate,
+        end_date: endDate || null,
+        auto_research: autoResearch,
+        auto_schedule_trigger: autoScheduleTrigger,
+        trigger_time: autoScheduleTrigger === 'daily' ? `${triggerTime}:00` : null,
+        default_platforms: defaultPlatforms.length > 0 ? defaultPlatforms : null,
+        auto_approve: autoApprove,
+      })
+
+      // Reload plans to get updated data
+      await loadPlans()
+      setEditPlanModal(null)
+      // Reset form
+      setPlanName('')
+      setVideosPerDay(3)
+      setStartDate(new Date().toISOString().split('T')[0])
+      setEndDate('')
+      setAutoScheduleTrigger('daily')
+      setTriggerTime('09:00')
+      setDefaultPlatforms([])
+      setAutoApprove(false)
+      setVideoTimes(['09:00', '14:00', '19:00'])
+      setVideoTopics(['', '', ''])
+    } catch (error: any) {
+      alert(error.response?.data?.error || 'Failed to update plan')
+    } finally {
+      setEditingPlan(false)
+    }
+  }
+
   const handleDeletePlan = async () => {
     if (!deleteModal) return
 
@@ -307,7 +344,6 @@ export function VideoPlanning() {
     setEditingItem(item)
     setEditForm({
       topic: item.topic || '',
-      category: item.category || null,
       scheduled_time: item.scheduled_time || '',
       description: item.description || '',
       why_important: item.why_important || '',
@@ -323,7 +359,6 @@ export function VideoPlanning() {
     try {
       await api.patch(`/api/plans/items/${editingItem.id}`, {
         topic: editForm.topic || null,
-        category: editForm.category,
         scheduled_time: editForm.scheduled_time || null,
         description: editForm.description || null,
         why_important: editForm.why_important || null,
@@ -339,13 +374,78 @@ export function VideoPlanning() {
     }
   }
 
+  // Filter items by status
+  const filteredItems = statusFilter === 'all' 
+    ? planItems 
+    : planItems.filter(item => item.status === statusFilter)
+
   // Group items by date
-  const itemsByDate = planItems.reduce((acc, item) => {
+  const itemsByDate = filteredItems.reduce((acc, item) => {
     const date = item.scheduled_date
     if (!acc[date]) acc[date] = []
     acc[date].push(item)
     return acc
   }, {} as Record<string, VideoPlanItem[]>)
+
+  // Calendar helper functions
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear()
+    const month = date.getMonth()
+    const firstDay = new Date(year, month, 1)
+    const lastDay = new Date(year, month + 1, 0)
+    const daysInMonth = lastDay.getDate()
+    const startingDayOfWeek = firstDay.getDay()
+    
+    const days: (Date | null)[] = []
+    // Add empty cells for days before the first day of the month
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      days.push(null)
+    }
+    // Add all days of the month
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push(new Date(year, month, i))
+    }
+    return days
+  }
+
+  const formatMonthYear = (date: Date) => {
+    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  }
+
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    setCurrentMonth(prev => {
+      const newDate = new Date(prev)
+      if (direction === 'prev') {
+        newDate.setMonth(prev.getMonth() - 1)
+      } else {
+        newDate.setMonth(prev.getMonth() + 1)
+      }
+      return newDate
+    })
+  }
+
+  const getDateKey = (date: Date | null) => {
+    if (!date) return ''
+    return date.toISOString().split('T')[0]
+  }
+
+  const getItemsForDate = (date: Date | null) => {
+    if (!date) return []
+    const dateKey = getDateKey(date)
+    return itemsByDate[dateKey] || []
+  }
+
+  const getStatusCounts = () => {
+    return {
+      all: planItems.length,
+      pending: planItems.filter(i => i.status === 'pending').length,
+      ready: planItems.filter(i => i.status === 'ready').length,
+      completed: planItems.filter(i => i.status === 'completed').length,
+      failed: planItems.filter(i => i.status === 'failed').length,
+    }
+  }
+
+  const statusCounts = getStatusCounts()
 
   const getStatusBadge = (status: string, scriptStatus?: string | null) => {
     // Show script status if it's draft or approved
@@ -392,13 +492,6 @@ export function VideoPlanning() {
     return `${displayHour}:${minutes} ${ampm}`
   }
 
-  const getCategoryColor = (category: string | null) => {
-    // Use a consistent color scheme based on category name hash
-    if (!category) return 'bg-slate-100 text-slate-700'
-    const colors = ['bg-blue-100 text-blue-700', 'bg-green-100 text-green-700', 'bg-purple-100 text-purple-700', 'bg-orange-100 text-orange-700', 'bg-pink-100 text-pink-700']
-    const hash = category.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0)
-    return colors[hash % colors.length] || 'bg-slate-100 text-slate-700'
-  }
 
   if (loading) {
     return (
@@ -436,15 +529,22 @@ export function VideoPlanning() {
             <div className="flex flex-wrap gap-2">
               {plans.map((plan) => (
                 <div key={plan.id} className="flex items-center gap-2">
+                <button
+                  onClick={() => setSelectedPlan(plan)}
+                  className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+                    selectedPlan?.id === plan.id
+                      ? 'bg-brand-500 text-white'
+                      : 'bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {plan.name} ({plan.videos_per_day}/day)
+                </button>
                   <button
-                    onClick={() => setSelectedPlan(plan)}
-                    className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-                      selectedPlan?.id === plan.id
-                        ? 'bg-brand-500 text-white'
-                        : 'bg-white text-slate-600 hover:bg-slate-50'
-                    }`}
+                    onClick={() => handleEditPlan(plan)}
+                    className="rounded-xl p-2 text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition"
+                    title="Edit plan"
                   >
-                    {plan.name} ({plan.videos_per_day}/day)
+                    <Edit2 className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => setDeleteModal(plan.id)}
@@ -461,40 +561,149 @@ export function VideoPlanning() {
 
         {/* Plan Items Calendar View */}
         {selectedPlan ? (
-          <div className="grid gap-6 lg:grid-cols-3">
-            {/* Calendar Sidebar */}
-            <Card className="lg:col-span-1">
-              <div className="p-6">
-                <h2 className="mb-4 text-lg font-semibold text-primary">Select Date</h2>
-                <Input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full"
-                />
-                <div className="mt-6 space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-600">Total Items</span>
-                    <span className="font-semibold">{planItems.length}</span>
+          <div className="space-y-6">
+            {/* Status Summary and Filters */}
+            <Card className="p-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-6">
+                  <div className="text-sm">
+                    <span className="text-slate-600">Total: </span>
+                    <span className="font-semibold">{statusCounts.all}</span>
                   </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-600">Ready</span>
-                    <span className="font-semibold text-emerald-600">
-                      {planItems.filter((i) => i.status === 'ready').length}
-                    </span>
+                  <div className="text-sm">
+                    <span className="text-slate-600">Ready: </span>
+                    <span className="font-semibold text-emerald-600">{statusCounts.ready}</span>
                   </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-600">Completed</span>
-                    <span className="font-semibold text-blue-600">
-                      {planItems.filter((i) => i.status === 'completed').length}
-                    </span>
+                  <div className="text-sm">
+                    <span className="text-slate-600">Completed: </span>
+                    <span className="font-semibold text-blue-600">{statusCounts.completed}</span>
                   </div>
+                  <div className="text-sm">
+                    <span className="text-slate-600">Pending: </span>
+                    <span className="font-semibold text-yellow-600">{statusCounts.pending}</span>
+                  </div>
+                  {statusCounts.failed > 0 && (
+                    <div className="text-sm">
+                      <span className="text-slate-600">Failed: </span>
+                      <span className="font-semibold text-red-600">{statusCounts.failed}</span>
+                    </div>
+                  )}
                 </div>
+                <Select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  options={[
+                    { value: 'all', label: 'All Status' },
+                    { value: 'pending', label: 'Pending' },
+                    { value: 'ready', label: 'Ready' },
+                    { value: 'completed', label: 'Completed' },
+                    { value: 'failed', label: 'Failed' },
+                  ]}
+                  className="w-40"
+                />
+                  </div>
+            </Card>
+
+            {/* Calendar Grid */}
+            <Card className="p-6">
+              <div className="mb-6 flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-primary">{formatMonthYear(currentMonth)}</h2>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigateMonth('prev')}
+                  >
+                    ← Prev
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCurrentMonth(new Date())}
+                  >
+                    Today
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigateMonth('next')}
+                  >
+                    Next →
+                  </Button>
+                </div>
+              </div>
+
+              {/* Calendar Grid */}
+              <div className="grid grid-cols-7 gap-2">
+                {/* Day Headers */}
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                  <div key={day} className="p-2 text-center text-xs font-semibold text-slate-500">
+                    {day}
+                </div>
+                ))}
+
+                {/* Calendar Days */}
+                {getDaysInMonth(currentMonth).map((date, index) => {
+                  const dateKey = getDateKey(date)
+                  const items = getItemsForDate(date)
+                  const isToday = date && dateKey === new Date().toISOString().split('T')[0]
+                  const isSelected = date && dateKey === selectedDate
+
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => date && setSelectedDate(dateKey)}
+                      className={`min-h-[80px] rounded-lg border p-2 text-left transition ${
+                        !date
+                          ? 'border-transparent bg-transparent'
+                          : isSelected
+                          ? 'border-brand-500 bg-brand-50'
+                          : isToday
+                          ? 'border-brand-200 bg-brand-50/50'
+                          : 'border-slate-200 bg-white hover:border-brand-200 hover:bg-slate-50'
+                      }`}
+                      disabled={!date}
+                    >
+                      {date && (
+                        <>
+                          <div className={`text-sm font-medium ${isToday ? 'text-brand-600' : 'text-slate-700'}`}>
+                            {date.getDate()}
+                          </div>
+                          {items.length > 0 && (
+                            <div className="mt-1 space-y-1">
+                              {items.slice(0, 2).map(item => (
+                                <div
+                                  key={item.id}
+                                  className={`truncate rounded px-1.5 py-0.5 text-xs ${
+                                    item.status === 'completed' || item.status === 'posted'
+                                      ? 'bg-emerald-100 text-emerald-700'
+                                      : item.status === 'ready'
+                                      ? 'bg-blue-100 text-blue-700'
+                                      : item.status === 'failed'
+                                      ? 'bg-red-100 text-red-700'
+                                      : 'bg-yellow-100 text-yellow-700'
+                                  }`}
+                                  title={item.topic || 'No topic'}
+                                >
+                                  {item.topic || formatTime(item.scheduled_time) || 'Item'}
+                                </div>
+                              ))}
+                              {items.length > 2 && (
+                                <div className="text-xs text-slate-500">+{items.length - 2} more</div>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </button>
+                  )
+                })}
               </div>
             </Card>
 
             {/* Items for Selected Date */}
-            <div className="lg:col-span-2 space-y-4">
+            {itemsByDate[selectedDate] && itemsByDate[selectedDate].length > 0 && (
+              <div className="space-y-4">
               <h2 className="text-lg font-semibold text-primary">
                 {new Date(selectedDate).toLocaleDateString('en-US', {
                   weekday: 'long',
@@ -504,7 +713,6 @@ export function VideoPlanning() {
                 })}
               </h2>
 
-              {itemsByDate[selectedDate] ? (
                 <div className="space-y-3">
                   {itemsByDate[selectedDate]
                     .sort((a, b) => (a.scheduled_time || '').localeCompare(b.scheduled_time || ''))
@@ -517,15 +725,6 @@ export function VideoPlanning() {
                               <span className="text-sm font-medium text-slate-600">
                                 {formatTime(item.scheduled_time)}
                               </span>
-                              {item.category && (
-                                <span
-                                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${getCategoryColor(
-                                    item.category
-                                  )}`}
-                                >
-                                  {item.category}
-                                </span>
-                              )}
                               {getStatusBadge(item.status, item.script_status)}
                             </div>
 
@@ -540,15 +739,6 @@ export function VideoPlanning() {
                                   onChange={(e) => setEditForm({ ...editForm, topic: e.target.value })}
                                   placeholder="Enter topic (e.g., Best Trading Strategies for 2024)..."
                                   required
-                                />
-                                <Select
-                                  label="Category"
-                                  value={editForm.category || ''}
-                                  onChange={(e) => setEditForm({ ...editForm, category: e.target.value || null })}
-                                  options={[
-                                    { value: '', label: 'No category' },
-                                    ...categories.map((cat) => ({ value: cat.name, label: cat.name })),
-                                  ]}
                                 />
                                                                  <div className="space-y-3">
                                    <div>
@@ -774,14 +964,8 @@ export function VideoPlanning() {
                       </Card>
                     ))}
                 </div>
-              ) : (
-                <EmptyState
-                  icon={<Calendar className="w-12 h-12" />}
-                  title="No videos scheduled"
-                  description={`No videos scheduled for this date. Select another date or create a plan.`}
-                />
-              )}
-            </div>
+              </div>
+            )}
           </div>
         ) : (
           <EmptyState
@@ -847,7 +1031,7 @@ export function VideoPlanning() {
               <label className="block text-sm font-medium text-slate-700">
                 Video Slots Configuration
                 <span className="ml-2 text-xs font-normal text-slate-500">
-                  (Set time, topic, and category for each video)
+                  (Set time and topic for each video)
                 </span>
               </label>
               <div className="space-y-4">
@@ -915,24 +1099,6 @@ export function VideoPlanning() {
                       />
                     </div>
 
-                    {/* Category Selection */}
-                    <div className="space-y-2">
-                      <label className="block text-xs font-medium text-slate-600">
-                        Category <span className="text-slate-400">(optional)</span>
-                      </label>
-                      <Select
-                        value={videoCategories[index] || ''}
-                        onChange={(e) => {
-                          const newCategories = [...videoCategories]
-                          newCategories[index] = e.target.value || null
-                          setVideoCategories(newCategories)
-                        }}
-                        options={[
-                          { value: '', label: 'No category (auto-assign)' },
-                          ...categories.map((cat) => ({ value: cat.name, label: cat.name })),
-                        ]}
-                      />
-                    </div>
                   </div>
                 ))}
               </div>
@@ -1081,6 +1247,209 @@ export function VideoPlanning() {
           </div>
         </Modal>
 
+        {/* Edit Plan Modal */}
+        <Modal
+          isOpen={!!editPlanModal}
+          onClose={() => {
+            setEditPlanModal(null)
+            // Reset form
+            setPlanName('')
+            setVideosPerDay(3)
+            setStartDate(new Date().toISOString().split('T')[0])
+            setEndDate('')
+            setAutoScheduleTrigger('daily')
+            setTriggerTime('09:00')
+            setDefaultPlatforms([])
+            setAutoApprove(false)
+            setVideoTimes(['09:00', '14:00', '19:00'])
+            setVideoTopics(['', '', ''])
+          }}
+          title="Edit Video Plan"
+          size="xl"
+        >
+          <div className="space-y-4">
+            <Input
+              label="Plan Name"
+              placeholder="e.g., Daily Trading Content"
+              value={planName}
+              onChange={(e) => setPlanName(e.target.value)}
+              required
+            />
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <Input
+                label="Start Date"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                required
+              />
+
+              <Input
+                label="End Date (optional)"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                min={startDate}
+              />
+            </div>
+
+            <Select
+              label="Videos Per Day"
+              value={videosPerDay.toString()}
+              onChange={(e) => setVideosPerDay(parseInt(e.target.value))}
+              options={[
+                { value: '1', label: '1 video per day' },
+                { value: '2', label: '2 videos per day' },
+                { value: '3', label: '3 videos per day' },
+                { value: '4', label: '4 videos per day' },
+                { value: '5', label: '5 videos per day' },
+              ]}
+            />
+
+            <Select
+              label="Schedule Trigger"
+              value={autoScheduleTrigger}
+              onChange={(e) => setAutoScheduleTrigger(e.target.value as 'daily' | 'time_based' | 'manual')}
+              options={[
+                { value: 'daily', label: 'Daily at specific time' },
+                { value: 'time_based', label: 'Based on scheduled post times' },
+                { value: 'manual', label: 'Manual only' },
+              ]}
+            />
+
+            {autoScheduleTrigger === 'daily' && (
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-slate-700">
+                  Trigger Time
+                  <span className="ml-2 text-xs text-slate-500">
+                    (Timezone: {timezone})
+                  </span>
+                </label>
+                
+                <div className="flex flex-wrap gap-2">
+                  {timePresets.map((preset) => (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      onClick={() => setTriggerTime(preset.value)}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                        triggerTime === preset.value
+                          ? 'border-brand-500 bg-brand-50 text-brand-700'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                      }`}
+                    >
+                      {preset.label.split('(')[0].trim()}
+                    </button>
+                  ))}
+                </div>
+                
+                <Input
+                  label="Custom Time"
+                  type="time"
+                  value={triggerTime}
+                  onChange={(e) => setTriggerTime(e.target.value)}
+                  min="00:00"
+                  max="23:59"
+                />
+              </div>
+            )}
+
+            <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  id="editAutoResearch"
+                  checked={autoResearch}
+                  onChange={(e) => setAutoResearch(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
+                />
+                <div>
+                  <label htmlFor="editAutoResearch" className="text-sm font-medium text-slate-700">
+                    Auto Research Topics
+                  </label>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Automatically research topics using Perplexity AI
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  id="editAutoApprove"
+                  checked={autoApprove}
+                  onChange={(e) => setAutoApprove(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
+                />
+                <div>
+                  <label htmlFor="editAutoApprove" className="text-sm font-medium text-slate-700">
+                    Auto Approve Scripts
+                  </label>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Automatically approve generated scripts without manual review
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-slate-700">Default Platforms</label>
+              <div className="flex flex-wrap gap-2">
+                {availablePlatforms.map((platform) => (
+                  <button
+                    key={platform}
+                    type="button"
+                    onClick={() => {
+                      const newPlatforms = defaultPlatforms.includes(platform)
+                        ? defaultPlatforms.filter((p) => p !== platform)
+                        : [...defaultPlatforms, platform]
+                      setDefaultPlatforms(newPlatforms)
+                    }}
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                      defaultPlatforms.includes(platform)
+                        ? 'border-brand-500 bg-brand-50 text-brand-700'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                    }`}
+                  >
+                    {platform.charAt(0).toUpperCase() + platform.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setEditPlanModal(null)
+                  setPlanName('')
+                  setVideosPerDay(3)
+                  setStartDate(new Date().toISOString().split('T')[0])
+                  setEndDate('')
+                  setAutoScheduleTrigger('daily')
+                  setTriggerTime('09:00')
+                  setDefaultPlatforms([])
+                  setAutoApprove(false)
+                  setVideoTimes(['09:00', '14:00', '19:00'])
+                  setVideoTopics(['', '', ''])
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSavePlan}
+                loading={editingPlan}
+                leftIcon={<Save className="h-4 w-4" />}
+              >
+                Save Changes
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
         {/* Delete Plan Modal */}
         <Modal
           isOpen={!!deleteModal}
@@ -1121,11 +1490,6 @@ export function VideoPlanning() {
             <div className="space-y-4">
               <div>
                 <h3 className="font-semibold text-primary">{scriptPreviewItem.topic}</h3>
-                {scriptPreviewItem.category && (
-                  <div className="mt-1">
-                    <Badge>{scriptPreviewItem.category}</Badge>
-                  </div>
-                )}
               </div>
               
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
