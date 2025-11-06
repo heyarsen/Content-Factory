@@ -14,6 +14,7 @@ export interface VideoRecord {
   heygen_video_id: string | null
   created_at: string
   updated_at: string
+  progress?: number
 }
 
 export interface CreateVideoPayload {
@@ -59,5 +60,15 @@ export async function deleteVideo(id: string): Promise<void> {
 
 export async function retryVideo(id: string): Promise<void> {
   await api.post(`/api/videos/${id}/retry`)
+}
+
+export async function getSharableVideoUrl(id: string): Promise<{ share_url: string }> {
+  const { data } = await api.post(`/api/videos/${id}/share`)
+  return data
+}
+
+export async function generateDescription(id: string, topic?: string, script?: string): Promise<{ description: string }> {
+  const { data } = await api.post(`/api/videos/${id}/generate-description`, { topic, script })
+  return data
 }
 

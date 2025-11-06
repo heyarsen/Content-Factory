@@ -10,12 +10,15 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Modal } from '../components/ui/Modal'
 import { Textarea } from '../components/ui/Textarea'
-import { Video as VideoIcon, Search, Trash2, RefreshCw, Play, Download, FileText } from 'lucide-react'
+import { Video as VideoIcon, Search, Trash2, RefreshCw, Play, Download, FileText, Share2, MessageSquare, Upload } from 'lucide-react'
 import {
   listVideos,
   deleteVideo as deleteVideoRequest,
   retryVideo as retryVideoRequest,
   getVideo,
+  refreshVideoStatus,
+  getSharableVideoUrl,
+  generateDescription,
   type VideoRecord,
   type ListVideosParams,
 } from '../lib/videos'
@@ -29,6 +32,8 @@ export function Videos() {
   const [deleting, setDeleting] = useState(false)
   const [selectedVideo, setSelectedVideo] = useState<VideoRecord | null>(null)
   const [loadingVideo, setLoadingVideo] = useState(false)
+  const [generatingDescription, setGeneratingDescription] = useState(false)
+  const [socialDescription, setSocialDescription] = useState('')
 
   const loadVideos = useCallback(async () => {
     try {
@@ -49,15 +54,29 @@ export function Videos() {
   }, [loadVideos])
 
   useEffect(() => {
-    // Poll for status updates on generating videos
-    const interval = setInterval(() => {
+    // Poll for status updates on generating videos (more frequently)
+    const interval = setInterval(async () => {
       const generating = videos.filter((v) => v.status === 'generating' || v.status === 'pending')
       if (generating.length > 0) {
-        loadVideos()
+        // Refresh status for generating videos
+        for (const video of generating) {
+          try {
+            const updated = await refreshVideoStatus(video.id)
+            setVideos((prev) => 
+              prev.map((v) => v.id === video.id ? updated : v)
+            )
+            // If this is the selected video, update it too
+            if (selectedVideo?.id === video.id) {
+              setSelectedVideo(updated)
+            }
+          } catch (error) {
+            console.error('Failed to refresh video status:', error)
+          }
+        }
       }
-    }, 10000)
+    }, 3000) // Poll every 3 seconds for better UX
     return () => clearInterval(interval)
-  }, [videos, loadVideos])
+  }, [videos, selectedVideo])
 
   const handleDelete = async (id: string) => {
     setDeleting(true)
@@ -205,6 +224,34 @@ export function Videos() {
                   </div>
                 )}
 
+                {(video.status === 'generating' || video.status === 'pending') && (
+                  <div className="relative overflow-hidden rounded-2xl border border-brand-200/50 bg-brand-50/30 px-6 py-8">
+                    <div className="flex flex-col items-center justify-center gap-4">
+                      <div className="relative h-16 w-16">
+                        <div className="absolute inset-0 animate-spin rounded-full border-4 border-brand-200 border-t-brand-500"></div>
+                        <VideoIcon className="absolute inset-0 m-auto h-6 w-6 text-brand-500" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-semibold text-brand-700">Generating Video</p>
+                        {video.progress !== undefined && (
+                          <div className="mt-2">
+                            <div className="h-2 w-48 overflow-hidden rounded-full bg-brand-100">
+                              <div 
+                                className="h-full bg-brand-500 transition-all duration-300"
+                                style={{ width: `${video.progress}%` }}
+                              />
+                            </div>
+                            <p className="mt-1 text-xs text-brand-600">{video.progress}%</p>
+                          </div>
+                        )}
+                        {!video.progress && (
+                          <p className="mt-1 text-xs text-brand-500">This may take a few moments...</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {video.status === 'failed' && video.error_message && (
                   <div className="rounded-2xl border border-rose-200/70 bg-rose-50/70 px-4 py-3 text-xs text-rose-600">
                     {video.error_message}
@@ -247,6 +294,12 @@ export function Videos() {
                       </Button>
                     </>
                   )}
+                  {(video.status === 'generating' || video.status === 'pending') && (
+                    <div className="flex items-center gap-2 text-xs text-slate-400">
+                      <div className="h-2 w-2 animate-pulse rounded-full bg-brand-400"></div>
+                      <span>Generating...</span>
+                    </div>
+                  )}
                   {video.status === 'failed' && (
                     <Button
                       variant="ghost"
@@ -276,7 +329,10 @@ export function Videos() {
         {/* Video Details Modal */}
         <Modal
           isOpen={selectedVideo !== null}
-          onClose={() => setSelectedVideo(null)}
+          onClose={() => {
+            setSelectedVideo(null)
+            setSocialDescription('') // Clear description when modal closes
+          }}
           title="Video Details"
           size="lg"
         >
@@ -289,7 +345,7 @@ export function Videos() {
             <div className="space-y-6">
               {/* Video Preview */}
               {selectedVideo.status === 'completed' && selectedVideo.video_url && (
-                <div className="space-y-2">
+                <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-primary">Video Preview</h3>
                   <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-900">
                     <video 
@@ -298,14 +354,31 @@ export function Videos() {
                       controls 
                     />
                   </div>
-                  <div className="flex gap-2">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     <Button
                       variant="secondary"
                       size="sm"
                       onClick={() => window.open(selectedVideo.video_url!, '_blank')}
                       leftIcon={<Play className="h-4 w-4" />}
                     >
-                      Open in New Tab
+                      Preview
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          const { share_url } = await getSharableVideoUrl(selectedVideo.id)
+                          await navigator.clipboard.writeText(share_url)
+                          alert('Sharable URL copied to clipboard!')
+                        } catch (error) {
+                          console.error('Failed to get sharable URL:', error)
+                          alert('Failed to get sharable URL')
+                        }
+                      }}
+                      leftIcon={<Share2 className="h-4 w-4" />}
+                    >
+                      Share
                     </Button>
                     <Button
                       variant="secondary"
@@ -320,6 +393,80 @@ export function Videos() {
                     >
                       Download
                     </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={async () => {
+                        setGeneratingDescription(true)
+                        try {
+                          const { description } = await generateDescription(
+                            selectedVideo.id,
+                            selectedVideo.topic,
+                            selectedVideo.script || undefined
+                          )
+                          setSocialDescription(description)
+                        } catch (error) {
+                          console.error('Failed to generate description:', error)
+                          alert('Failed to generate description')
+                        } finally {
+                          setGeneratingDescription(false)
+                        }
+                      }}
+                      loading={generatingDescription}
+                      leftIcon={<MessageSquare className="h-4 w-4" />}
+                    >
+                      Description
+                    </Button>
+                  </div>
+                  {socialDescription && (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="mb-2 flex items-center justify-between">
+                        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Social Media Description</h4>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            navigator.clipboard.writeText(socialDescription)
+                            alert('Description copied to clipboard!')
+                          }}
+                        >
+                          Copy
+                        </Button>
+                      </div>
+                      <p className="text-sm text-slate-700">{socialDescription}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Generating Status */}
+              {(selectedVideo.status === 'generating' || selectedVideo.status === 'pending') && (
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-primary">Video Generation Status</h3>
+                  <div className="relative overflow-hidden rounded-xl border border-brand-200 bg-brand-50/30 px-8 py-12">
+                    <div className="flex flex-col items-center justify-center gap-4">
+                      <div className="relative h-20 w-20">
+                        <div className="absolute inset-0 animate-spin rounded-full border-4 border-brand-200 border-t-brand-500"></div>
+                        <VideoIcon className="absolute inset-0 m-auto h-8 w-8 text-brand-500" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-base font-semibold text-brand-700">Generating Your Video</p>
+                        {selectedVideo.progress !== undefined ? (
+                          <div className="mt-4">
+                            <div className="h-3 w-64 overflow-hidden rounded-full bg-brand-100">
+                              <div 
+                                className="h-full bg-brand-500 transition-all duration-300"
+                                style={{ width: `${selectedVideo.progress}%` }}
+                              />
+                            </div>
+                            <p className="mt-2 text-sm font-medium text-brand-600">{selectedVideo.progress}% Complete</p>
+                          </div>
+                        ) : (
+                          <p className="mt-2 text-sm text-brand-500">This may take a few moments...</p>
+                        )}
+                        <p className="mt-4 text-xs text-slate-500">We'll notify you when it's ready!</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -394,6 +541,18 @@ export function Videos() {
                     leftIcon={<RefreshCw className="h-4 w-4" />}
                   >
                     Retry Generation
+                  </Button>
+                )}
+                {selectedVideo.status === 'completed' && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      // Navigate to distribution page with video pre-selected
+                      window.location.href = `/distribution?video=${selectedVideo.id}`
+                    }}
+                    leftIcon={<Upload className="h-4 w-4" />}
+                  >
+                    Post to Social Media
                   </Button>
                 )}
                 <Button

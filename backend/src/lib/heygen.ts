@@ -880,32 +880,96 @@ export async function generateAvatarLook(
 
 export async function getVideoStatus(
   videoId: string
-): Promise<HeyGenVideoResponse> {
+): Promise<HeyGenVideoResponse & { progress?: number }> {
   try {
-    const response = await axios.get(
-      `${HEYGEN_API_URL}/video_status.get`,
-      {
-        headers: {
-          'Authorization': `Bearer ${getHeyGenKey()}`,
-        },
-        params: {
-          video_id: videoId,
-        },
+    const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
+    const apiKey = getHeyGenKey()
+    
+    // Try v2 API first
+    try {
+      const response = await axios.get(
+        `${HEYGEN_V2_API_URL}/video/${videoId}`,
+        {
+          headers: {
+            'X-Api-Key': apiKey,
+            'Content-Type': 'application/json',
+          },
+        }
+      )
+
+      const data = response.data?.data || response.data
+      
+      return {
+        video_id: videoId,
+        status: data.status || 'pending',
+        video_url: data.video_url || data.videoUrl || data.url || null,
+        error: data.error || data.error_message || null,
+        progress: data.progress || data.progress_percentage || undefined,
       }
-    )
+    } catch (v2Error: any) {
+      // Fallback to v1 API
+      console.log('v2 API failed, trying v1:', v2Error.response?.status)
+      const response = await axios.get(
+        `${HEYGEN_API_URL}/video_status.get`,
+        {
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          params: {
+            video_id: videoId,
+          },
+        }
+      )
 
-    const data = response.data.data || response.data
+      const data = response.data.data || response.data
 
-    return {
-      video_id: videoId,
-      status: data.status,
-      video_url: data.video_url || data.videoUrl || data.url,
-      error: data.error || data.error_message,
+      return {
+        video_id: videoId,
+        status: data.status,
+        video_url: data.video_url || data.videoUrl || data.url,
+        error: data.error || data.error_message,
+      }
     }
   } catch (error: any) {
     console.error('HeyGen API error (getVideoStatus):', error.response?.data || error.message)
     throw new Error(
       error.response?.data?.message || 'Failed to get video status'
+    )
+  }
+}
+
+/**
+ * Get sharable video URL from HeyGen
+ * Based on: https://docs.heygen.com/reference/retrieve-sharable-video-url
+ */
+export async function getSharableVideoUrl(
+  videoId: string
+): Promise<{ share_url: string }> {
+  try {
+    const apiKey = getHeyGenKey()
+    
+    const response = await axios.post(
+      `${HEYGEN_API_URL}/video/share`,
+      {
+        video_id: videoId,
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
+
+    const data = response.data?.data || response.data
+    
+    return {
+      share_url: data.share_url || data.shareUrl || data.url,
+    }
+  } catch (error: any) {
+    console.error('HeyGen API error (getSharableVideoUrl):', error.response?.data || error.message)
+    throw new Error(
+      error.response?.data?.message || 'Failed to get sharable video URL'
     )
   }
 }

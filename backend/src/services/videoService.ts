@@ -263,7 +263,7 @@ export class VideoService {
   /**
    * Refresh HeyGen status for a video if it is still processing
    */
-  static async refreshVideoStatus(videoId: string, userId: string): Promise<Video | null> {
+  static async refreshVideoStatus(videoId: string, userId: string): Promise<Video & { progress?: number } | null> {
     const video = await this.getVideoForUser(videoId, userId)
     if (!video) {
       return null
@@ -289,7 +289,10 @@ export class VideoService {
           throw new Error('Failed to update video status')
         }
 
-        return data
+        return {
+          ...data,
+          progress: status.progress,
+        }
       } catch (error) {
         console.error('HeyGen status check error:', error)
       }

@@ -214,5 +214,29 @@ router.post('/:id/retry', authenticate, async (req: AuthRequest, res: Response) 
   }
 })
 
+// Get sharable video URL
+router.post('/:id/share', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { id } = req.params
+
+    const video = await VideoService.getVideoForUser(id, userId)
+    if (!video) {
+      return res.status(404).json({ error: 'Video not found' })
+    }
+
+    if (!video.heygen_video_id) {
+      return res.status(400).json({ error: 'Video does not have a HeyGen video ID' })
+    }
+
+    const { getSharableVideoUrl } = await import('../lib/heygen.js')
+    const { share_url } = await getSharableVideoUrl(video.heygen_video_id)
+
+    res.json({ share_url })
+  } catch (error: any) {
+    handleServiceError(res, error, 'Get sharable URL error:')
+  }
+})
+
 export default router
 
