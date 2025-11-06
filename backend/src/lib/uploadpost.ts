@@ -273,23 +273,75 @@ export async function postVideo(
       payload.user_id = request.userId
     }
 
+    // Try both endpoint paths - some APIs use /uploadposts/ prefix
+    const endpoints = [
+      `${UPLOADPOST_API_URL}/uploadposts/upload_videos`,
+      `${UPLOADPOST_API_URL}/upload_videos`,
+    ]
+
     console.log('Upload-Post API request:', {
-      url: `${UPLOADPOST_API_URL}/upload_videos`,
+      endpoints,
       payload,
       hasApiKey: !!getUploadPostKey(),
+      videoUrl: request.videoUrl,
     })
 
-    const response = await axios.post(
-      `${UPLOADPOST_API_URL}/upload_videos`,
-      payload,
-      {
-        headers: {
-          'Authorization': getAuthHeader(),
-          'Content-Type': 'application/json',
-        },
-        timeout: 30000, // 30 second timeout
+    // First, verify the video URL is accessible
+    try {
+      const videoCheck = await axios.head(request.videoUrl, { timeout: 5000 })
+      console.log('Video URL check:', {
+        status: videoCheck.status,
+        headers: videoCheck.headers,
+      })
+    } catch (videoError: any) {
+      console.warn('Video URL may not be accessible:', {
+        status: videoError.response?.status,
+        message: videoError.message,
+        url: request.videoUrl,
+      })
+      // Continue anyway - Upload-Post might handle it
+    }
+
+    let lastError: any = null
+    let response: any = null
+
+    // Try each endpoint
+    for (const endpoint of endpoints) {
+      try {
+        response = await axios.post(
+          endpoint,
+          payload,
+          {
+            headers: {
+              'Authorization': getAuthHeader(),
+              'Content-Type': 'application/json',
+            },
+            timeout: 30000, // 30 second timeout
+          }
+        )
+        console.log('Upload-Post API success:', {
+          endpoint,
+          status: response.status,
+          data: response.data,
+        })
+        break // Success, exit loop
+      } catch (error: any) {
+        lastError = error
+        console.log('Upload-Post API attempt failed:', {
+          endpoint,
+          status: error.response?.status,
+          message: error.message,
+        })
+        // If it's not a 404, don't try other endpoints
+        if (error.response?.status !== 404) {
+          break
+        }
       }
-    )
+    }
+
+    if (!response) {
+      throw lastError || new Error('All endpoint attempts failed')
+    }
 
     console.log('Upload-Post API response:', {
       status: response.status,
@@ -311,10 +363,25 @@ export async function postVideo(
       url: error.config?.url,
     })
     
-    const errorMessage = error.response?.data?.message || 
-                        error.response?.data?.error ||
-                        error.message || 
-                        'Failed to post video'
+    // Provide more detailed error message
+    let errorMessage = 'Failed to post video'
+    
+    if (lastError?.response?.status === 404) {
+      errorMessage = `Upload-Post API endpoint not found (404). The video URL may be invalid or the API endpoint has changed. Video URL: ${request.videoUrl?.substring(0, 100)}...`
+    } else if (lastError?.response?.data) {
+      errorMessage = lastError.response.data.message || 
+                    lastError.response.data.error ||
+                    `Upload-Post API error: ${lastError.response.status} ${lastError.response.statusText}`
+    } else if (lastError?.message) {
+      errorMessage = lastError.message
+    }
+    
+    console.error('Upload-Post final error:', {
+      message: errorMessage,
+      status: lastError?.response?.status,
+      url: request.videoUrl,
+      platforms: request.platforms,
+    })
     
     throw new Error(errorMessage)
   }
