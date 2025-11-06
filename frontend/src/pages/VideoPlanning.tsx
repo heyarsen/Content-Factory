@@ -55,7 +55,17 @@ interface VideoPlanItem {
   script_status?: 'draft' | 'approved' | 'rejected' | null
   platforms?: string[] | null
   caption?: string | null
-  status: 'pending' | 'researching' | 'ready' | 'draft' | 'approved' | 'generating' | 'completed' | 'scheduled' | 'posted' | 'failed'
+  status:
+    | 'pending'
+    | 'researching'
+    | 'ready'
+    | 'draft'
+    | 'approved'
+    | 'generating'
+    | 'completed'
+    | 'scheduled'
+    | 'posted'
+    | 'failed'
   video_id: string | null
   error_message: string | null
 }
@@ -67,11 +77,12 @@ export function VideoPlanning() {
   const [loading, setLoading] = useState(true)
   const [createModal, setCreateModal] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
+    new Date().toISOString().split('T')[0],
   )
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [scriptPreviewItem, setScriptPreviewItem] = useState<VideoPlanItem | null>(null)
+  const [scriptPreviewItem, setScriptPreviewItem] =
+    useState<VideoPlanItem | null>(null)
   const [editingItem, setEditingItem] = useState<VideoPlanItem | null>(null)
   const [editForm, setEditForm] = useState<{
     topic: string
@@ -94,10 +105,14 @@ export function VideoPlanning() {
   // Create plan form
   const [planName, setPlanName] = useState('')
   const [videosPerDay, setVideosPerDay] = useState(3)
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0])
+  const [startDate, setStartDate] = useState(
+    new Date().toISOString().split('T')[0],
+  )
   const [endDate, setEndDate] = useState('')
   const [autoResearch, setAutoResearch] = useState(true)
-  const [autoScheduleTrigger, setAutoScheduleTrigger] = useState<'daily' | 'time_based' | 'manual'>('daily')
+  const [autoScheduleTrigger, setAutoScheduleTrigger] = useState<
+    'daily' | 'time_based' | 'manual'
+  >('daily')
   const [triggerTime, setTriggerTime] = useState(() => {
     // Default to 9 AM in user's local time
     const hours = 9
@@ -106,14 +121,21 @@ export function VideoPlanning() {
   })
   const [defaultPlatforms, setDefaultPlatforms] = useState<string[]>([])
   const [autoApprove, setAutoApprove] = useState(false)
-  const [timezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
-  const [videoTimes, setVideoTimes] = useState<string[]>(['09:00', '14:00', '19:00']) // Default times for 3 videos
+  const [autoCreate, setAutoCreate] = useState(false)
+  const [timezone] = useState(
+    () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+  )
+  const [videoTimes, setVideoTimes] = useState<string[]>([
+    '09:00',
+    '14:00',
+    '19:00',
+  ]) // Default times for 3 videos
   const [videoTopics, setVideoTopics] = useState<string[]>(['', '', '']) // Topics for each video slot
   const [deleteModal, setDeleteModal] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [editPlanModal, setEditPlanModal] = useState<VideoPlan | null>(null)
   const [editingPlan, setEditingPlan] = useState(false)
-  
+
   // Preset times for quick selection
   const timePresets = [
     { label: 'Morning (9:00 AM)', value: '09:00' },
@@ -121,7 +143,7 @@ export function VideoPlanning() {
     { label: 'Afternoon (3:00 PM)', value: '15:00' },
     { label: 'Evening (6:00 PM)', value: '18:00' },
   ]
-  
+
   // Update videoTimes and videoTopics when videosPerDay changes
   useEffect(() => {
     const defaultTimes = ['09:00', '14:00', '19:00', '10:00', '11:00']
@@ -132,7 +154,7 @@ export function VideoPlanning() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videosPerDay])
-  
+
   // Available platforms
   const availablePlatforms = ['instagram', 'youtube', 'tiktok', 'twitter']
   const [creating, setCreating] = useState(false)
@@ -146,7 +168,6 @@ export function VideoPlanning() {
       loadPlanItems(selectedPlan.id)
     }
   }, [selectedPlan])
-
 
   const loadPlans = async () => {
     try {
@@ -186,9 +207,12 @@ export function VideoPlanning() {
         end_date: endDate || null,
         auto_research: autoResearch,
         auto_schedule_trigger: autoScheduleTrigger,
-        trigger_time: autoScheduleTrigger === 'daily' ? `${triggerTime}:00` : null,
-        default_platforms: defaultPlatforms.length > 0 ? defaultPlatforms : null,
+        trigger_time:
+          autoScheduleTrigger === 'daily' ? `${triggerTime}:00` : null,
+        default_platforms:
+          defaultPlatforms.length > 0 ? defaultPlatforms : null,
         auto_approve: autoApprove,
+        auto_create: autoCreate,
         timezone: timezone,
         video_times: videoTimes.map((time: string) => `${time}:00`), // Send custom times
         video_topics: videoTopics, // Send topics for each slot
@@ -205,6 +229,7 @@ export function VideoPlanning() {
       setTriggerTime('09:00')
       setDefaultPlatforms([])
       setAutoApprove(false)
+      setAutoCreate(false)
       setVideoTimes(['09:00', '14:00', '19:00'])
       setVideoTopics(['', '', ''])
     } catch (error: any) {
@@ -271,9 +296,12 @@ export function VideoPlanning() {
     setEndDate(plan.end_date ? plan.end_date.split('T')[0] : '')
     setAutoResearch(plan.auto_research)
     setAutoScheduleTrigger(plan.auto_schedule_trigger || 'daily')
-    setTriggerTime(plan.trigger_time ? plan.trigger_time.substring(0, 5) : '09:00')
+    setTriggerTime(
+      plan.trigger_time ? plan.trigger_time.substring(0, 5) : '09:00',
+    )
     setDefaultPlatforms(plan.default_platforms || [])
     setAutoApprove(plan.auto_approve || false)
+    setAutoCreate(plan.auto_create || false)
     // Load existing video times and topics from plan items if needed
     // For now, use defaults
     setVideoTimes(['09:00', '14:00', '19:00'].slice(0, plan.videos_per_day))
@@ -295,9 +323,12 @@ export function VideoPlanning() {
         end_date: endDate || null,
         auto_research: autoResearch,
         auto_schedule_trigger: autoScheduleTrigger,
-        trigger_time: autoScheduleTrigger === 'daily' ? `${triggerTime}:00` : null,
-        default_platforms: defaultPlatforms.length > 0 ? defaultPlatforms : null,
+        trigger_time:
+          autoScheduleTrigger === 'daily' ? `${triggerTime}:00` : null,
+        default_platforms:
+          defaultPlatforms.length > 0 ? defaultPlatforms : null,
         auto_approve: autoApprove,
+        auto_create: autoCreate,
       })
 
       // Reload plans to get updated data
@@ -312,6 +343,7 @@ export function VideoPlanning() {
       setTriggerTime('09:00')
       setDefaultPlatforms([])
       setAutoApprove(false)
+      setAutoCreate(false)
       setVideoTimes(['09:00', '14:00', '19:00'])
       setVideoTopics(['', '', ''])
     } catch (error: any) {
@@ -366,7 +398,7 @@ export function VideoPlanning() {
         caption: editForm.caption || null,
         platforms: editForm.platforms.length > 0 ? editForm.platforms : null,
       })
-      
+
       setEditingItem(null)
       loadPlanItems(selectedPlan.id)
     } catch (error: any) {
@@ -375,17 +407,21 @@ export function VideoPlanning() {
   }
 
   // Filter items by status
-  const filteredItems = statusFilter === 'all' 
-    ? planItems 
-    : planItems.filter(item => item.status === statusFilter)
+  const filteredItems =
+    statusFilter === 'all'
+      ? planItems
+      : planItems.filter((item) => item.status === statusFilter)
 
   // Group items by date
-  const itemsByDate = filteredItems.reduce((acc, item) => {
-    const date = item.scheduled_date
-    if (!acc[date]) acc[date] = []
-    acc[date].push(item)
-    return acc
-  }, {} as Record<string, VideoPlanItem[]>)
+  const itemsByDate = filteredItems.reduce(
+    (acc, item) => {
+      const date = item.scheduled_date
+      if (!acc[date]) acc[date] = []
+      acc[date].push(item)
+      return acc
+    },
+    {} as Record<string, VideoPlanItem[]>,
+  )
 
   // Calendar helper functions
   const getDaysInMonth = (date: Date) => {
@@ -395,7 +431,7 @@ export function VideoPlanning() {
     const lastDay = new Date(year, month + 1, 0)
     const daysInMonth = lastDay.getDate()
     const startingDayOfWeek = firstDay.getDay()
-    
+
     const days: (Date | null)[] = []
     // Add empty cells for days before the first day of the month
     for (let i = 0; i < startingDayOfWeek; i++) {
@@ -413,7 +449,7 @@ export function VideoPlanning() {
   }
 
   const navigateMonth = (direction: 'prev' | 'next') => {
-    setCurrentMonth(prev => {
+    setCurrentMonth((prev) => {
       const newDate = new Date(prev)
       if (direction === 'prev') {
         newDate.setMonth(prev.getMonth() - 1)
@@ -438,10 +474,10 @@ export function VideoPlanning() {
   const getStatusCounts = () => {
     return {
       all: planItems.length,
-      pending: planItems.filter(i => i.status === 'pending').length,
-      ready: planItems.filter(i => i.status === 'ready').length,
-      completed: planItems.filter(i => i.status === 'completed').length,
-      failed: planItems.filter(i => i.status === 'failed').length,
+      pending: planItems.filter((i) => i.status === 'pending').length,
+      ready: planItems.filter((i) => i.status === 'ready').length,
+      completed: planItems.filter((i) => i.status === 'completed').length,
+      failed: planItems.filter((i) => i.status === 'failed').length,
     }
   }
 
@@ -455,8 +491,11 @@ export function VideoPlanning() {
     if (scriptStatus === 'approved') {
       return <Badge variant="info">Approved</Badge>
     }
-    
-    const variants: Record<string, 'default' | 'success' | 'error' | 'warning' | 'info'> = {
+
+    const variants: Record<
+      string,
+      'default' | 'success' | 'error' | 'warning' | 'info'
+    > = {
       completed: 'success',
       scheduled: 'success',
       posted: 'success',
@@ -480,7 +519,11 @@ export function VideoPlanning() {
       posted: 'Posted',
       failed: 'Failed',
     }
-    return <Badge variant={variants[status] || 'default'}>{labels[status] || status}</Badge>
+    return (
+      <Badge variant={variants[status] || 'default'}>
+        {labels[status] || status}
+      </Badge>
+    )
   }
 
   const formatTime = (time: string | null) => {
@@ -491,7 +534,6 @@ export function VideoPlanning() {
     const displayHour = hour % 12 || 12
     return `${displayHour}:${minutes} ${ampm}`
   }
-
 
   if (loading) {
     return (
@@ -513,12 +555,18 @@ export function VideoPlanning() {
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
               Video Planning
             </p>
-            <h1 className="text-3xl font-semibold text-primary">Plan Your Videos</h1>
+            <h1 className="text-3xl font-semibold text-primary">
+              Plan Your Videos
+            </h1>
             <p className="text-sm text-slate-500">
-              Schedule daily videos with automatic topic generation and research via Perplexity
+              Schedule daily videos with automatic topic generation and research
+              via Perplexity
             </p>
           </div>
-          <Button onClick={() => setCreateModal(true)} leftIcon={<Plus className="h-4 w-4" />}>
+          <Button
+            onClick={() => setCreateModal(true)}
+            leftIcon={<Plus className="h-4 w-4" />}
+          >
             New Plan
           </Button>
         </div>
@@ -529,16 +577,16 @@ export function VideoPlanning() {
             <div className="flex flex-wrap gap-2">
               {plans.map((plan) => (
                 <div key={plan.id} className="flex items-center gap-2">
-                <button
-                  onClick={() => setSelectedPlan(plan)}
-                  className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-                    selectedPlan?.id === plan.id
-                      ? 'bg-brand-500 text-white'
-                      : 'bg-white text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  {plan.name} ({plan.videos_per_day}/day)
-                </button>
+                  <button
+                    onClick={() => setSelectedPlan(plan)}
+                    className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+                      selectedPlan?.id === plan.id
+                        ? 'bg-brand-500 text-white'
+                        : 'bg-white text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    {plan.name} ({plan.videos_per_day}/day)
+                  </button>
                   <button
                     onClick={() => handleEditPlan(plan)}
                     className="rounded-xl p-2 text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition"
@@ -572,20 +620,28 @@ export function VideoPlanning() {
                   </div>
                   <div className="text-sm">
                     <span className="text-slate-600">Ready: </span>
-                    <span className="font-semibold text-emerald-600">{statusCounts.ready}</span>
+                    <span className="font-semibold text-emerald-600">
+                      {statusCounts.ready}
+                    </span>
                   </div>
                   <div className="text-sm">
                     <span className="text-slate-600">Completed: </span>
-                    <span className="font-semibold text-blue-600">{statusCounts.completed}</span>
+                    <span className="font-semibold text-blue-600">
+                      {statusCounts.completed}
+                    </span>
                   </div>
                   <div className="text-sm">
                     <span className="text-slate-600">Pending: </span>
-                    <span className="font-semibold text-yellow-600">{statusCounts.pending}</span>
+                    <span className="font-semibold text-yellow-600">
+                      {statusCounts.pending}
+                    </span>
                   </div>
                   {statusCounts.failed > 0 && (
                     <div className="text-sm">
                       <span className="text-slate-600">Failed: </span>
-                      <span className="font-semibold text-red-600">{statusCounts.failed}</span>
+                      <span className="font-semibold text-red-600">
+                        {statusCounts.failed}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -601,13 +657,15 @@ export function VideoPlanning() {
                   ]}
                   className="w-40"
                 />
-                  </div>
+              </div>
             </Card>
 
             {/* Calendar Grid */}
             <Card className="p-6">
               <div className="mb-6 flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-primary">{formatMonthYear(currentMonth)}</h2>
+                <h2 className="text-xl font-semibold text-primary">
+                  {formatMonthYear(currentMonth)}
+                </h2>
                 <div className="flex gap-2">
                   <Button
                     variant="ghost"
@@ -636,17 +694,23 @@ export function VideoPlanning() {
               {/* Calendar Grid */}
               <div className="grid grid-cols-7 gap-2">
                 {/* Day Headers */}
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                  <div key={day} className="p-2 text-center text-xs font-semibold text-slate-500">
-                    {day}
-                </div>
-                ))}
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(
+                  (day) => (
+                    <div
+                      key={day}
+                      className="p-2 text-center text-xs font-semibold text-slate-500"
+                    >
+                      {day}
+                    </div>
+                  ),
+                )}
 
                 {/* Calendar Days */}
                 {getDaysInMonth(currentMonth).map((date, index) => {
                   const dateKey = getDateKey(date)
                   const items = getItemsForDate(date)
-                  const isToday = date && dateKey === new Date().toISOString().split('T')[0]
+                  const isToday =
+                    date && dateKey === new Date().toISOString().split('T')[0]
                   const isSelected = date && dateKey === selectedDate
 
                   return (
@@ -657,39 +721,46 @@ export function VideoPlanning() {
                         !date
                           ? 'border-transparent bg-transparent'
                           : isSelected
-                          ? 'border-brand-500 bg-brand-50'
-                          : isToday
-                          ? 'border-brand-200 bg-brand-50/50'
-                          : 'border-slate-200 bg-white hover:border-brand-200 hover:bg-slate-50'
+                            ? 'border-brand-500 bg-brand-50'
+                            : isToday
+                              ? 'border-brand-200 bg-brand-50/50'
+                              : 'border-slate-200 bg-white hover:border-brand-200 hover:bg-slate-50'
                       }`}
                       disabled={!date}
                     >
                       {date && (
                         <>
-                          <div className={`text-sm font-medium ${isToday ? 'text-brand-600' : 'text-slate-700'}`}>
+                          <div
+                            className={`text-sm font-medium ${isToday ? 'text-brand-600' : 'text-slate-700'}`}
+                          >
                             {date.getDate()}
                           </div>
                           {items.length > 0 && (
                             <div className="mt-1 space-y-1">
-                              {items.slice(0, 2).map(item => (
+                              {items.slice(0, 2).map((item) => (
                                 <div
                                   key={item.id}
                                   className={`truncate rounded px-1.5 py-0.5 text-xs ${
-                                    item.status === 'completed' || item.status === 'posted'
+                                    item.status === 'completed' ||
+                                    item.status === 'posted'
                                       ? 'bg-emerald-100 text-emerald-700'
                                       : item.status === 'ready'
-                                      ? 'bg-blue-100 text-blue-700'
-                                      : item.status === 'failed'
-                                      ? 'bg-red-100 text-red-700'
-                                      : 'bg-yellow-100 text-yellow-700'
+                                        ? 'bg-blue-100 text-blue-700'
+                                        : item.status === 'failed'
+                                          ? 'bg-red-100 text-red-700'
+                                          : 'bg-yellow-100 text-yellow-700'
                                   }`}
                                   title={item.topic || 'No topic'}
                                 >
-                                  {item.topic || formatTime(item.scheduled_time) || 'Item'}
+                                  {item.topic ||
+                                    formatTime(item.scheduled_time) ||
+                                    'Item'}
                                 </div>
                               ))}
                               {items.length > 2 && (
-                                <div className="text-xs text-slate-500">+{items.length - 2} more</div>
+                                <div className="text-xs text-slate-500">
+                                  +{items.length - 2} more
+                                </div>
                               )}
                             </div>
                           )}
@@ -702,270 +773,344 @@ export function VideoPlanning() {
             </Card>
 
             {/* Items for Selected Date */}
-            {itemsByDate[selectedDate] && itemsByDate[selectedDate].length > 0 && (
-              <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-primary">
-                {new Date(selectedDate).toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
-              </h2>
+            {itemsByDate[selectedDate] &&
+              itemsByDate[selectedDate].length > 0 && (
+                <div className="space-y-4">
+                  <h2 className="text-lg font-semibold text-primary">
+                    {new Date(selectedDate).toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })}
+                  </h2>
 
-                <div className="space-y-3">
-                  {itemsByDate[selectedDate]
-                    .sort((a, b) => (a.scheduled_time || '').localeCompare(b.scheduled_time || ''))
-                    .map((item) => (
-                      <Card key={item.id} className="p-5">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1 space-y-3">
-                            <div className="flex items-center gap-3">
-                              <Clock className="h-4 w-4 text-slate-400" />
-                              <span className="text-sm font-medium text-slate-600">
-                                {formatTime(item.scheduled_time)}
-                              </span>
-                              {getStatusBadge(item.status, item.script_status)}
-                            </div>
-
-                            {editingItem?.id === item.id ? (
-                              <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                                <div className="flex items-center justify-between">
-                                  <h4 className="font-semibold text-primary">Edit Video Details</h4>
-                                </div>
-                                <Input
-                                  label="Topic *"
-                                  value={editForm.topic}
-                                  onChange={(e) => setEditForm({ ...editForm, topic: e.target.value })}
-                                  placeholder="Enter topic (e.g., Best Trading Strategies for 2024)..."
-                                  required
-                                />
-                                                                 <div className="space-y-3">
-                                   <div>
-                                     <label className="mb-2 block text-xs font-medium text-slate-700">
-                                       Posting Time
-                                     </label>
-                                     <Input
-                                       type="time"
-                                       value={editForm.scheduled_time}
-                                       onChange={(e) => setEditForm({ ...editForm, scheduled_time: e.target.value })}
-                                       className="mb-2"
-                                     />
-                                     <div className="flex flex-wrap gap-2">
-                                       {timePresets.map((preset) => (
-                                         <button
-                                           key={preset.value}
-                                           type="button"
-                                           onClick={() => setEditForm({ ...editForm, scheduled_time: preset.value })}
-                                           className={`rounded-lg border px-2 py-1 text-xs font-medium transition ${
-                                             editForm.scheduled_time === preset.value
-                                               ? 'border-brand-500 bg-brand-50 text-brand-700'
-                                               : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                                           }`}
-                                         >
-                                           {preset.label.split(' ')[0]}
-                                         </button>
-                                       ))}
-                                     </div>
-                                   </div>
-                                   <div className="space-y-2">
-                                     <label className="block text-xs font-medium text-slate-700">Platforms</label>
-                                     <div className="flex flex-wrap gap-2">
-                                       {availablePlatforms.map((platform) => (
-                                         <button
-                                           key={platform}
-                                           type="button"
-                                           onClick={() => {
-                                             const newPlatforms = editForm.platforms.includes(platform)
-                                               ? editForm.platforms.filter((p) => p !== platform)
-                                               : [...editForm.platforms, platform]
-                                             setEditForm({ ...editForm, platforms: newPlatforms })
-                                           }}
-                                           className={`rounded-lg border px-2 py-1 text-xs font-medium transition ${
-                                             editForm.platforms.includes(platform)
-                                               ? 'border-brand-500 bg-brand-50 text-brand-700'
-                                               : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                                           }`}
-                                         >
-                                           {platform}
-                                         </button>
-                                       ))}
-                                     </div>
-                                   </div>
-                                 </div>
-                                <Textarea
-                                  label="Description"
-                                  value={editForm.description}
-                                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                                  placeholder="Video description..."
-                                  rows={2}
-                                />
-                                <Textarea
-                                  label="Caption (for social posts)"
-                                  value={editForm.caption}
-                                  onChange={(e) => setEditForm({ ...editForm, caption: e.target.value })}
-                                  placeholder="Custom caption for social media..."
-                                  rows={2}
-                                />
-                              </div>
-                            ) : (
-                              <div>
-                                {item.topic ? (
-                                  <>
-                                    <h3 className="font-semibold text-primary">{item.topic}</h3>
-                                    {item.description && (
-                                      <p className="mt-1 text-sm text-slate-600 line-clamp-2">
-                                        {item.description}
-                                      </p>
-                                    )}
-                                    {item.caption && (
-                                      <p className="mt-1 text-xs text-slate-500 italic">
-                                        Caption: {item.caption}
-                                      </p>
-                                    )}
-                                    {item.platforms && item.platforms.length > 0 && (
-                                      <div className="mt-2 flex flex-wrap gap-1">
-                                        {item.platforms.map((platform) => (
-                                          <span
-                                            key={platform}
-                                            className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700"
-                                          >
-                                            {platform}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </>
-                                ) : (
-                                  <p className="text-sm text-slate-400">No topic yet</p>
+                  <div className="space-y-3">
+                    {itemsByDate[selectedDate]
+                      .sort((a, b) =>
+                        (a.scheduled_time || '').localeCompare(
+                          b.scheduled_time || '',
+                        ),
+                      )
+                      .map((item) => (
+                        <Card key={item.id} className="p-5">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 space-y-3">
+                              <div className="flex items-center gap-3">
+                                <Clock className="h-4 w-4 text-slate-400" />
+                                <span className="text-sm font-medium text-slate-600">
+                                  {formatTime(item.scheduled_time)}
+                                </span>
+                                {getStatusBadge(
+                                  item.status,
+                                  item.script_status,
                                 )}
                               </div>
-                            )}
 
-                            {item.error_message && (
-                              <p className="text-xs text-rose-600">{item.error_message}</p>
-                            )}
-                          </div>
+                              {editingItem?.id === item.id ? (
+                                <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                  <div className="flex items-center justify-between">
+                                    <h4 className="font-semibold text-primary">
+                                      Edit Video Details
+                                    </h4>
+                                  </div>
+                                  <Input
+                                    label="Topic *"
+                                    value={editForm.topic}
+                                    onChange={(e) =>
+                                      setEditForm({
+                                        ...editForm,
+                                        topic: e.target.value,
+                                      })
+                                    }
+                                    placeholder="Enter topic (e.g., Best Trading Strategies for 2024)..."
+                                    required
+                                  />
+                                  <div className="space-y-3">
+                                    <div>
+                                      <label className="mb-2 block text-xs font-medium text-slate-700">
+                                        Posting Time
+                                      </label>
+                                      <Input
+                                        type="time"
+                                        value={editForm.scheduled_time}
+                                        onChange={(e) =>
+                                          setEditForm({
+                                            ...editForm,
+                                            scheduled_time: e.target.value,
+                                          })
+                                        }
+                                        className="mb-2"
+                                      />
+                                      <div className="flex flex-wrap gap-2">
+                                        {timePresets.map((preset) => (
+                                          <button
+                                            key={preset.value}
+                                            type="button"
+                                            onClick={() =>
+                                              setEditForm({
+                                                ...editForm,
+                                                scheduled_time: preset.value,
+                                              })
+                                            }
+                                            className={`rounded-lg border px-2 py-1 text-xs font-medium transition ${
+                                              editForm.scheduled_time ===
+                                              preset.value
+                                                ? 'border-brand-500 bg-brand-50 text-brand-700'
+                                                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                            }`}
+                                          >
+                                            {preset.label.split(' ')[0]}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                      <label className="block text-xs font-medium text-slate-700">
+                                        Platforms
+                                      </label>
+                                      <div className="flex flex-wrap gap-2">
+                                        {availablePlatforms.map((platform) => (
+                                          <button
+                                            key={platform}
+                                            type="button"
+                                            onClick={() => {
+                                              const newPlatforms =
+                                                editForm.platforms.includes(
+                                                  platform,
+                                                )
+                                                  ? editForm.platforms.filter(
+                                                      (p) => p !== platform,
+                                                    )
+                                                  : [
+                                                      ...editForm.platforms,
+                                                      platform,
+                                                    ]
+                                              setEditForm({
+                                                ...editForm,
+                                                platforms: newPlatforms,
+                                              })
+                                            }}
+                                            className={`rounded-lg border px-2 py-1 text-xs font-medium transition ${
+                                              editForm.platforms.includes(
+                                                platform,
+                                              )
+                                                ? 'border-brand-500 bg-brand-50 text-brand-700'
+                                                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                            }`}
+                                          >
+                                            {platform}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <Textarea
+                                    label="Description"
+                                    value={editForm.description}
+                                    onChange={(e) =>
+                                      setEditForm({
+                                        ...editForm,
+                                        description: e.target.value,
+                                      })
+                                    }
+                                    placeholder="Video description..."
+                                    rows={2}
+                                  />
+                                  <Textarea
+                                    label="Caption (for social posts)"
+                                    value={editForm.caption}
+                                    onChange={(e) =>
+                                      setEditForm({
+                                        ...editForm,
+                                        caption: e.target.value,
+                                      })
+                                    }
+                                    placeholder="Custom caption for social media..."
+                                    rows={2}
+                                  />
+                                </div>
+                              ) : (
+                                <div>
+                                  {item.topic ? (
+                                    <>
+                                      <h3 className="font-semibold text-primary">
+                                        {item.topic}
+                                      </h3>
+                                      {item.description && (
+                                        <p className="mt-1 text-sm text-slate-600 line-clamp-2">
+                                          {item.description}
+                                        </p>
+                                      )}
+                                      {item.caption && (
+                                        <p className="mt-1 text-xs text-slate-500 italic">
+                                          Caption: {item.caption}
+                                        </p>
+                                      )}
+                                      {item.platforms &&
+                                        item.platforms.length > 0 && (
+                                          <div className="mt-2 flex flex-wrap gap-1">
+                                            {item.platforms.map((platform) => (
+                                              <span
+                                                key={platform}
+                                                className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700"
+                                              >
+                                                {platform}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        )}
+                                    </>
+                                  ) : (
+                                    <p className="text-sm text-slate-400">
+                                      No topic yet
+                                    </p>
+                                  )}
+                                </div>
+                              )}
 
-                          <div className="flex flex-wrap gap-2">
-                            {editingItem?.id === item.id ? (
-                              <>
-                                <Button
-                                  size="sm"
-                                  onClick={handleSaveItem}
-                                  leftIcon={<Save className="h-4 w-4" />}
-                                >
-                                  Save
-                                </Button>
+                              {item.error_message && (
+                                <p className="text-xs text-rose-600">
+                                  {item.error_message}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                              {editingItem?.id === item.id ? (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    onClick={handleSaveItem}
+                                    leftIcon={<Save className="h-4 w-4" />}
+                                  >
+                                    Save
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setEditingItem(null)}
+                                    leftIcon={<X className="h-4 w-4" />}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  {!item.topic ? (
+                                    <>
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleEditItem(item)}
+                                        leftIcon={<Edit2 className="h-4 w-4" />}
+                                      >
+                                        Set Topic
+                                      </Button>
+                                      {item.status === 'pending' && (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() =>
+                                            handleGenerateTopic(item.id)
+                                          }
+                                          leftIcon={
+                                            <Sparkles className="h-4 w-4" />
+                                          }
+                                        >
+                                          Auto Generate
+                                        </Button>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => handleEditItem(item)}
+                                        leftIcon={<Edit2 className="h-4 w-4" />}
+                                      >
+                                        Edit Topic
+                                      </Button>
+                                      {item.status === 'pending' && (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() =>
+                                            handleGenerateTopic(item.id)
+                                          }
+                                          leftIcon={
+                                            <Sparkles className="h-4 w-4" />
+                                          }
+                                        >
+                                          Regenerate
+                                        </Button>
+                                      )}
+                                    </>
+                                  )}
+                                </>
+                              )}
+                              {item.script_status === 'draft' &&
+                                item.script && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setScriptPreviewItem(item)}
+                                    leftIcon={<PenSquare className="h-4 w-4" />}
+                                  >
+                                    Review Script
+                                  </Button>
+                                )}
+                              {item.status === 'ready' && !item.script && (
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  onClick={() => setEditingItem(null)}
-                                  leftIcon={<X className="h-4 w-4" />}
+                                  onClick={async () => {
+                                    try {
+                                      await api.post(
+                                        `/api/plans/items/${item.id}/generate-script`,
+                                      )
+                                      if (selectedPlan)
+                                        loadPlanItems(selectedPlan.id)
+                                    } catch (error: any) {
+                                      alert(
+                                        error.response?.data?.error ||
+                                          'Failed to generate script',
+                                      )
+                                    }
+                                  }}
+                                  leftIcon={<Sparkles className="h-4 w-4" />}
                                 >
-                                  Cancel
+                                  Generate Script
                                 </Button>
-                              </>
-                            ) : (
-                              <>
-                                {!item.topic ? (
-                                  <>
-                                    <Button
-                                      size="sm"
-                                      onClick={() => handleEditItem(item)}
-                                      leftIcon={<Edit2 className="h-4 w-4" />}
-                                    >
-                                      Set Topic
-                                    </Button>
-                                    {item.status === 'pending' && (
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => handleGenerateTopic(item.id)}
-                                        leftIcon={<Sparkles className="h-4 w-4" />}
-                                      >
-                                        Auto Generate
-                                      </Button>
-                                    )}
-                                  </>
-                                ) : (
-                                  <>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => handleEditItem(item)}
-                                      leftIcon={<Edit2 className="h-4 w-4" />}
-                                    >
-                                      Edit Topic
-                                    </Button>
-                                    {item.status === 'pending' && (
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => handleGenerateTopic(item.id)}
-                                        leftIcon={<Sparkles className="h-4 w-4" />}
-                                      >
-                                        Regenerate
-                                      </Button>
-                                    )}
-                                  </>
-                                )}
-                              </>
-                            )}
-                            {item.script_status === 'draft' && item.script && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setScriptPreviewItem(item)}
-                                leftIcon={<PenSquare className="h-4 w-4" />}
-                              >
-                                Review Script
-                              </Button>
-                            )}
-                            {item.status === 'ready' && !item.script && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={async () => {
-                                  try {
-                                    await api.post(`/api/plans/items/${item.id}/generate-script`)
-                                    if (selectedPlan) loadPlanItems(selectedPlan.id)
-                                  } catch (error: any) {
-                                    alert(error.response?.data?.error || 'Failed to generate script')
-                                  }
-                                }}
-                                leftIcon={<Sparkles className="h-4 w-4" />}
-                              >
-                                Generate Script
-                              </Button>
-                            )}
-                            {item.status === 'approved' && (
-                              <Button
-                                size="sm"
-                                onClick={() => handleCreateVideo(item)}
-                                leftIcon={<Video className="h-4 w-4" />}
-                              >
-                                Create Video
-                              </Button>
-                            )}
-                            {item.status === 'researching' || item.status === 'generating' ? (
-                              <Loader className="h-4 w-4 animate-spin text-brand-500" />
-                            ) : null}
-                            {item.video_id && (
-                              <a
-                                href={`/videos`}
-                                className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-600"
-                              >
-                                View Video
-                              </a>
-                            )}
+                              )}
+                              {item.status === 'approved' && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleCreateVideo(item)}
+                                  leftIcon={<Video className="h-4 w-4" />}
+                                >
+                                  Create Video
+                                </Button>
+                              )}
+                              {item.status === 'researching' ||
+                              item.status === 'generating' ? (
+                                <Loader className="h-4 w-4 animate-spin text-brand-500" />
+                              ) : null}
+                              {item.video_id && (
+                                <a
+                                  href={`/videos`}
+                                  className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-600"
+                                >
+                                  View Video
+                                </a>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </Card>
-                    ))}
+                        </Card>
+                      ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
           </div>
         ) : (
           <EmptyState
@@ -973,7 +1118,10 @@ export function VideoPlanning() {
             title="No plans yet"
             description="Create your first video plan to schedule daily videos with automatic topic generation."
             action={
-              <Button onClick={() => setCreateModal(true)} leftIcon={<Plus className="h-4 w-4" />}>
+              <Button
+                onClick={() => setCreateModal(true)}
+                leftIcon={<Plus className="h-4 w-4" />}
+              >
                 Create Plan
               </Button>
             }
@@ -1036,13 +1184,16 @@ export function VideoPlanning() {
               </label>
               <div className="space-y-4">
                 {Array.from({ length: videosPerDay }).map((_, index) => (
-                  <div key={index} className="rounded-lg border border-slate-200 bg-white p-4">
+                  <div
+                    key={index}
+                    className="rounded-lg border border-slate-200 bg-white p-4"
+                  >
                     <div className="mb-3 flex items-center gap-2">
                       <span className="rounded-full bg-brand-500 px-2 py-1 text-xs font-semibold text-white">
                         Video {index + 1}
                       </span>
                     </div>
-                    
+
                     {/* Time Selection */}
                     <div className="mb-3 space-y-2">
                       <label className="block text-xs font-medium text-slate-600">
@@ -1085,7 +1236,10 @@ export function VideoPlanning() {
                     {/* Topic Input */}
                     <div className="mb-3 space-y-2">
                       <label className="block text-xs font-medium text-slate-600">
-                        Topic <span className="text-slate-400">(optional - leave empty to auto-generate)</span>
+                        Topic{' '}
+                        <span className="text-slate-400">
+                          (optional - leave empty to auto-generate)
+                        </span>
                       </label>
                       <Input
                         value={videoTopics[index] || ''}
@@ -1098,7 +1252,6 @@ export function VideoPlanning() {
                         className="w-full"
                       />
                     </div>
-
                   </div>
                 ))}
               </div>
@@ -1107,7 +1260,11 @@ export function VideoPlanning() {
             <Select
               label="Schedule Trigger"
               value={autoScheduleTrigger}
-              onChange={(e) => setAutoScheduleTrigger(e.target.value as 'daily' | 'time_based' | 'manual')}
+              onChange={(e) =>
+                setAutoScheduleTrigger(
+                  e.target.value as 'daily' | 'time_based' | 'manual',
+                )
+              }
               options={[
                 { value: 'daily', label: 'Daily at specific time' },
                 { value: 'time_based', label: 'Based on scheduled post times' },
@@ -1123,7 +1280,7 @@ export function VideoPlanning() {
                     (Timezone: {timezone})
                   </span>
                 </label>
-                
+
                 {/* Quick preset buttons */}
                 <div className="flex flex-wrap gap-2">
                   {timePresets.map((preset) => (
@@ -1141,7 +1298,7 @@ export function VideoPlanning() {
                     </button>
                   ))}
                 </div>
-                
+
                 <Input
                   label="Custom Time"
                   type="time"
@@ -1166,11 +1323,15 @@ export function VideoPlanning() {
                   className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
                 />
                 <div className="flex-1">
-                  <label htmlFor="autoResearch" className="text-sm font-medium text-slate-700">
+                  <label
+                    htmlFor="autoResearch"
+                    className="text-sm font-medium text-slate-700"
+                  >
                     Enable automatic research
                   </label>
                   <p className="mt-0.5 text-xs text-slate-500">
-                    Automatically research topics using Perplexity AI when they are generated.
+                    Automatically research topics using Perplexity AI when they
+                    are generated.
                   </p>
                 </div>
               </div>
@@ -1186,12 +1347,39 @@ export function VideoPlanning() {
                   className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
                 />
                 <div className="flex-1">
-                  <label htmlFor="autoApprove" className="text-sm font-medium text-slate-700">
+                  <label
+                    htmlFor="autoApprove"
+                    className="text-sm font-medium text-slate-700"
+                  >
                     Auto-approve scripts
                   </label>
                   <p className="mt-0.5 text-xs text-slate-500">
-                    Automatically approve generated scripts without manual review. 
-                    Recommended for trusted AI outputs.
+                    Automatically approve generated scripts without manual
+                    review. Recommended for trusted AI outputs.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  id="autoCreate"
+                  checked={autoCreate}
+                  onChange={(e) => setAutoCreate(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
+                />
+                <div className="flex-1">
+                  <label
+                    htmlFor="autoCreate"
+                    className="text-sm font-medium text-slate-700"
+                  >
+                    Auto-generate videos
+                  </label>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Automatically request video generation for approved scripts using
+                    your default avatar. Works best when auto-approve is enabled.
                   </p>
                 </div>
               </div>
@@ -1211,7 +1399,9 @@ export function VideoPlanning() {
                     type="button"
                     onClick={() => {
                       if (defaultPlatforms.includes(platform)) {
-                        setDefaultPlatforms(defaultPlatforms.filter((p) => p !== platform))
+                        setDefaultPlatforms(
+                          defaultPlatforms.filter((p) => p !== platform),
+                        )
                       } else {
                         setDefaultPlatforms([...defaultPlatforms, platform])
                       }
@@ -1261,11 +1451,12 @@ export function VideoPlanning() {
             setTriggerTime('09:00')
             setDefaultPlatforms([])
             setAutoApprove(false)
+            setAutoCreate(false)
             setVideoTimes(['09:00', '14:00', '19:00'])
             setVideoTopics(['', '', ''])
           }}
           title="Edit Video Plan"
-          size="xl"
+          size="full"
         >
           <div className="space-y-4">
             <Input
@@ -1310,7 +1501,11 @@ export function VideoPlanning() {
             <Select
               label="Schedule Trigger"
               value={autoScheduleTrigger}
-              onChange={(e) => setAutoScheduleTrigger(e.target.value as 'daily' | 'time_based' | 'manual')}
+              onChange={(e) =>
+                setAutoScheduleTrigger(
+                  e.target.value as 'daily' | 'time_based' | 'manual',
+                )
+              }
               options={[
                 { value: 'daily', label: 'Daily at specific time' },
                 { value: 'time_based', label: 'Based on scheduled post times' },
@@ -1326,7 +1521,7 @@ export function VideoPlanning() {
                     (Timezone: {timezone})
                   </span>
                 </label>
-                
+
                 <div className="flex flex-wrap gap-2">
                   {timePresets.map((preset) => (
                     <button
@@ -1343,7 +1538,7 @@ export function VideoPlanning() {
                     </button>
                   ))}
                 </div>
-                
+
                 <Input
                   label="Custom Time"
                   type="time"
@@ -1365,7 +1560,10 @@ export function VideoPlanning() {
                   className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
                 />
                 <div>
-                  <label htmlFor="editAutoResearch" className="text-sm font-medium text-slate-700">
+                  <label
+                    htmlFor="editAutoResearch"
+                    className="text-sm font-medium text-slate-700"
+                  >
                     Auto Research Topics
                   </label>
                   <p className="mt-1 text-xs text-slate-500">
@@ -1385,18 +1583,48 @@ export function VideoPlanning() {
                   className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
                 />
                 <div>
-                  <label htmlFor="editAutoApprove" className="text-sm font-medium text-slate-700">
+                  <label
+                    htmlFor="editAutoApprove"
+                    className="text-sm font-medium text-slate-700"
+                  >
                     Auto Approve Scripts
                   </label>
                   <p className="mt-1 text-xs text-slate-500">
-                    Automatically approve generated scripts without manual review
+                    Automatically approve generated scripts without manual
+                    review
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  id="editAutoCreate"
+                  checked={autoCreate}
+                  onChange={(e) => setAutoCreate(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
+                />
+                <div>
+                  <label
+                    htmlFor="editAutoCreate"
+                    className="text-sm font-medium text-slate-700"
+                  >
+                    Auto Generate Videos
+                  </label>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Automatically start video generation for approved scripts. Works best
+                    with auto approval enabled and requires a configured avatar.
                   </p>
                 </div>
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-slate-700">Default Platforms</label>
+              <label className="block text-sm font-medium text-slate-700">
+                Default Platforms
+              </label>
               <div className="flex flex-wrap gap-2">
                 {availablePlatforms.map((platform) => (
                   <button
@@ -1433,6 +1661,7 @@ export function VideoPlanning() {
                   setTriggerTime('09:00')
                   setDefaultPlatforms([])
                   setAutoApprove(false)
+                  setAutoCreate(false)
                   setVideoTimes(['09:00', '14:00', '19:00'])
                   setVideoTopics(['', '', ''])
                 }}
@@ -1459,7 +1688,8 @@ export function VideoPlanning() {
         >
           <div className="space-y-4">
             <p className="text-sm text-slate-600">
-              Are you sure you want to delete this plan? This will also delete all associated plan items. This action cannot be undone.
+              Are you sure you want to delete this plan? This will also delete
+              all associated plan items. This action cannot be undone.
             </p>
             <div className="flex justify-end gap-3 pt-4">
               <Button
@@ -1489,9 +1719,11 @@ export function VideoPlanning() {
           {scriptPreviewItem && (
             <div className="space-y-4">
               <div>
-                <h3 className="font-semibold text-primary">{scriptPreviewItem.topic}</h3>
+                <h3 className="font-semibold text-primary">
+                  {scriptPreviewItem.topic}
+                </h3>
               </div>
-              
+
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                 <p className="whitespace-pre-wrap text-sm text-slate-700">
                   {scriptPreviewItem.script}

@@ -18,43 +18,62 @@ export class AutomationService {
     if (!plans) return
 
     const now = new Date()
+    let pipelineTriggered = false
 
     for (const plan of plans) {
       try {
-        // For daily trigger, check if it's time to process
-        if (plan.auto_schedule_trigger === 'daily' && plan.trigger_time) {
-          // Convert trigger time to plan's timezone or UTC
-          const planTimezone = plan.timezone || 'UTC'
-          
-          // Get current time in plan's timezone
-          const nowInTimezone = new Date(now.toLocaleString('en-US', { timeZone: planTimezone }))
-          const currentHour = nowInTimezone.getHours()
-          const currentMinute = nowInTimezone.getMinutes()
-          
-          // Parse trigger time
-          const [triggerHour, triggerMinute] = plan.trigger_time.split(':').map(Number)
+        const planTimezone = plan.timezone || 'UTC'
 
-          // Only process if within 15 minutes of trigger time (in plan's timezone)
+        const hourFormatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: planTimezone,
+          hour: '2-digit',
+          hour12: false,
+        })
+        const minuteFormatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: planTimezone,
+          minute: '2-digit',
+          hour12: false,
+        })
+        const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+          timeZone: planTimezone,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        })
+
+        const currentHour = parseInt(hourFormatter.format(now), 10)
+        const currentMinute = parseInt(minuteFormatter.format(now), 10)
+        const today = dateFormatter.format(now)
+
+        let shouldProcessPlan = plan.auto_schedule_trigger !== 'daily'
+
+        // For daily trigger, check if it's time to process (within 15 minutes window)
+        if (plan.auto_schedule_trigger === 'daily' && plan.trigger_time) {
+          const [triggerHourStr, triggerMinuteStr] = plan.trigger_time.split(':')
+          const triggerHour = parseInt(triggerHourStr, 10)
+          const triggerMinute = parseInt(triggerMinuteStr || '0', 10)
+
           const triggerMinutes = triggerHour * 60 + triggerMinute
           const currentMinutes = currentHour * 60 + currentMinute
           const timeDiff = Math.abs(currentMinutes - triggerMinutes)
-          
-          // Handle wrap-around (e.g., 23:50 to 00:05)
           const minutesDiff = Math.min(timeDiff, 1440 - timeDiff)
-          
-          if (minutesDiff > 15) {
-            continue
-          }
+
+          shouldProcessPlan = minutesDiff <= 15
         }
 
-        // Get pending items for today and upcoming dates
-        const today = now.toISOString().split('T')[0]
+        if (!shouldProcessPlan) {
+          continue
+        }
+
+        pipelineTriggered = true
+
+        // Get pending items for today
         const { data: pendingItems } = await supabase
           .from('video_plan_items')
           .select('*')
           .eq('plan_id', plan.id)
           .eq('status', 'pending')
-          .gte('scheduled_date', today)
+          .eq('scheduled_date', today)
           .limit(plan.videos_per_day)
 
         if (pendingItems && pendingItems.length > 0) {
@@ -80,6 +99,26 @@ export class AutomationService {
         }
       } catch (error) {
         console.error(`Error processing plan ${plan.id}:`, error)
+      }
+    }
+
+    if (pipelineTriggered) {
+      try {
+        await this.generateScriptsForReadyItems()
+      } catch (error) {
+        console.error('[Automation] Error during script generation pipeline:', error)
+      }
+
+      try {
+        await this.generateVideosForApprovedItems()
+      } catch (error) {
+        console.error('[Automation] Error during video generation pipeline:', error)
+      }
+
+      try {
+        await this.scheduleDistributionForCompletedVideos()
+      } catch (error) {
+        console.error('[Automation] Error during distribution scheduling pipeline:', error)
       }
     }
   }
