@@ -893,56 +893,66 @@ export function QuickCreate() {
           isOpen={avatarModalOpen}
           onClose={() => setAvatarModalOpen(false)}
           title="Select Avatar"
-          size="lg"
+          size="xl"
         >
-          <div className="space-y-4">
-            <p className="text-sm text-slate-500 mb-4">
+          <div className="space-y-6">
+            <p className="text-sm text-slate-500">
               Choose an avatar for your video. The avatar will appear in the generated video.
             </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-h-[60vh] overflow-y-auto">
-              {avatars.map((avatar) => (
-                <button
-                  key={avatar.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedAvatarId(avatar.heygen_avatar_id)
-                    setAvatarModalOpen(false)
-                  }}
-                  className={`relative rounded-xl border-2 p-3 transition-all ${
-                    selectedAvatarId === avatar.heygen_avatar_id
-                      ? 'border-brand-500 bg-brand-50 shadow-md'
-                      : 'border-slate-200 hover:border-brand-300 hover:shadow-sm'
-                  }`}
-                >
-                  {avatar.thumbnail_url || avatar.preview_url ? (
-                    <img
-                      src={avatar.thumbnail_url || avatar.preview_url || ''}
-                      alt={avatar.avatar_name}
-                      className="w-full h-32 object-cover rounded-lg mb-2"
-                    />
-                  ) : (
-                    <div className="w-full h-32 bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center mb-2">
-                      <Users className="h-10 w-10 text-white opacity-50" />
-                    </div>
-                  )}
-                  <p className="text-xs font-medium text-slate-700 truncate text-center">
-                    {avatar.avatar_name}
-                  </p>
-                  {selectedAvatarId === avatar.heygen_avatar_id && (
-                    <div className="absolute top-2 right-2 bg-brand-500 text-white rounded-full p-1.5 shadow-lg">
-                      <CheckCircle2 className="h-4 w-4" />
-                    </div>
-                  )}
-                </button>
-              ))}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 max-h-[65vh] overflow-y-auto pr-2 -mr-2">
+              {avatars.length === 0 ? (
+                <div className="col-span-full text-center py-12 text-slate-500">
+                  <Users className="h-12 w-12 mx-auto mb-3 text-slate-300" />
+                  <p>No avatars available</p>
+                </div>
+              ) : (
+                avatars.map((avatar) => (
+                  <button
+                    key={avatar.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedAvatarId(avatar.heygen_avatar_id)
+                      setAvatarModalOpen(false)
+                    }}
+                    className={`relative rounded-xl border-2 p-3 transition-all hover:scale-105 ${
+                      selectedAvatarId === avatar.heygen_avatar_id
+                        ? 'border-brand-500 bg-brand-50 shadow-lg ring-2 ring-brand-200'
+                        : 'border-slate-200 bg-white hover:border-brand-300 hover:shadow-md'
+                    }`}
+                  >
+                    {avatar.thumbnail_url || avatar.preview_url ? (
+                      <img
+                        src={avatar.thumbnail_url || avatar.preview_url || ''}
+                        alt={avatar.avatar_name}
+                        className="w-full h-36 object-cover rounded-lg mb-2"
+                      />
+                    ) : (
+                      <div className="w-full h-36 bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center mb-2">
+                        <Users className="h-12 w-12 text-white opacity-50" />
+                      </div>
+                    )}
+                    <p className="text-xs font-medium text-slate-700 truncate text-center">
+                      {avatar.avatar_name}
+                    </p>
+                    {selectedAvatarId === avatar.heygen_avatar_id && (
+                      <div className="absolute top-2 right-2 bg-brand-500 text-white rounded-full p-1.5 shadow-lg ring-2 ring-white">
+                        <CheckCircle2 className="h-4 w-4" />
+                      </div>
+                    )}
+                  </button>
+                ))
+              )}
             </div>
-            <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+            <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+              <p className="text-xs text-slate-400">
+                {avatars.length} avatar{avatars.length !== 1 ? 's' : ''} available
+              </p>
               <Button
                 variant="ghost"
                 onClick={() => setAvatarModalOpen(false)}
                 className="border border-white/60 bg-white/70 text-slate-500 hover:border-slate-200 hover:bg-white"
               >
-                Cancel
+                Close
               </Button>
             </div>
           </div>
