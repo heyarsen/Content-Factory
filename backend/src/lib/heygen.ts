@@ -231,9 +231,8 @@ export async function generateVideo(
     const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
     const apiKey = getHeyGenKey()
     
-    // Build payload based on HeyGen API requirements
-    // For v2 API, we use video_inputs array format
-    // https://docs.heygen.com/docs/create-videos-with-photo-avatars
+    // Always use v2 API - https://docs.heygen.com/reference/create-an-avatar-video-v2
+    // Build payload with video_inputs array format
     const payload: any = {
       video_inputs: [
         {
@@ -247,77 +246,79 @@ export async function generateVideo(
       ],
     }
 
-    // Check if this is a photo avatar (talking_photo_id) or regular avatar
-    // Photo avatars use talking_photo_id, regular avatars use avatar_id
+    // Determine if this is a photo avatar (talking_photo) or regular avatar
+    // Photo avatars use talking_photo_id, regular avatars use avatar_id in AvatarSettings
     if (request.talking_photo_id) {
-      // Photo avatar - use v2 API
+      // Photo avatar - use TalkingPhotoSettings
       payload.video_inputs[0].character = {
         type: 'talking_photo',
         talking_photo_id: request.talking_photo_id,
       }
-      
-      const response = await axios.post(
-        `${HEYGEN_V2_API_URL}/video/generate`,
-        payload,
-        {
-          headers: {
-            'X-Api-Key': apiKey,
-            'Content-Type': 'application/json',
-          },
-        }
-      )
-
-      const data = response.data?.data || response.data
-      return {
-        video_id: data.video_id || data.id || data.videoId,
-        status: data.status || 'generating',
-        video_url: data.video_url || data.videoUrl || data.url,
+    } else if (request.avatar_id) {
+      // Regular avatar - use AvatarSettings
+      payload.video_inputs[0].character = {
+        type: 'avatar',
+        avatar_id: request.avatar_id,
       }
     } else {
-      // Regular avatar - use v1 API
-      const v1Payload: any = {
-      script: {
-        type: 'text',
-        input: request.script || request.topic,
-      },
-      dimension: {
-        width: 1920,
-        height: 1080,
-      },
-      aspect_ratio: '16:9',
+      throw new Error('Either avatar_id or talking_photo_id must be provided')
     }
-
-    if (request.avatar_id) {
-        v1Payload.avatar_id = request.avatar_id
-    } else if (request.template_id) {
-        v1Payload.template_id = request.template_id
-    }
-
+    
+    console.log('HeyGen v2 API request:', {
+      url: `${HEYGEN_V2_API_URL}/video/generate`,
+      payload: JSON.stringify(payload, null, 2),
+    })
+    
     const response = await axios.post(
-      `${HEYGEN_API_URL}/video.generate`,
-        v1Payload,
+      `${HEYGEN_V2_API_URL}/video/generate`,
+      payload,
       {
         headers: {
-            'Authorization': `Bearer ${apiKey}`,
+          'X-Api-Key': apiKey,
           'Content-Type': 'application/json',
         },
+        timeout: 30000,
       }
     )
 
-    const data = response.data.data || response.data
+    console.log('HeyGen v2 API response:', {
+      status: response.status,
+      data: response.data,
+    })
+
+    // HeyGen v2 API returns: { code: 100, data: { video_id: "...", ... }, message: "Success" }
+    const data = response.data?.data || response.data
+    const videoId = data.video_id || data.id || data.videoId
+    
+    if (!videoId) {
+      throw new Error('Failed to get video_id from HeyGen response. Response: ' + JSON.stringify(response.data))
+    }
+    
     return {
-      video_id: data.video_id || data.id || data.videoId,
-      status: data.status || 'generating',
-      video_url: data.video_url || data.videoUrl || data.url,
-      }
+      video_id: videoId,
+      status: data.status || 'pending',
+      video_url: data.video_url || data.videoUrl || data.url || null,
     }
   } catch (error: any) {
-    console.error('HeyGen API error (generateVideo):', error.response?.data || error.message)
+    console.error('HeyGen API error (generateVideo):', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+    })
     
     // Extract detailed error message
     let errorMessage = 'Failed to generate video'
     
-    if (error.response?.data?.message) {
+    if (error.response?.status === 404) {
+      errorMessage = 'HeyGen API endpoint not found (404). Please check your API configuration and avatar ID.'
+    } else if (error.response?.status === 401) {
+      errorMessage = 'HeyGen API authentication failed. Please check your HEYGEN_KEY environment variable.'
+    } else if (error.response?.status === 429) {
+      errorMessage = 'HeyGen API rate limit exceeded. Please try again later.'
+    } else if (error.response?.status >= 500) {
+      errorMessage = 'HeyGen API server error. Please try again later.'
+    } else if (error.response?.data?.message) {
       errorMessage = error.response.data.message
     } else if (error.response?.data?.error?.message) {
       errorMessage = error.response.data.error.message
@@ -325,12 +326,6 @@ export async function generateVideo(
       errorMessage = typeof error.response.data.error === 'string' 
         ? error.response.data.error 
         : JSON.stringify(error.response.data.error)
-    } else if (error.response?.status === 401) {
-      errorMessage = 'HeyGen API authentication failed. Please check your API key configuration.'
-    } else if (error.response?.status === 429) {
-      errorMessage = 'HeyGen API rate limit exceeded. Please try again later.'
-    } else if (error.response?.status >= 500) {
-      errorMessage = 'HeyGen API server error. Please try again later.'
     } else if (error.message) {
       errorMessage = error.message
     }

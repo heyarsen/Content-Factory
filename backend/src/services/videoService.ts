@@ -41,13 +41,13 @@ function mapHeygenStatus(status: string): Video['status'] {
   return 'generating'
 }
 
-function buildHeygenPayload(topic: string, script: string | undefined, style: VideoStyle, duration: number, avatarId?: string) {
+function buildHeygenPayload(topic: string, script: string | undefined, style: VideoStyle, duration: number, avatarId?: string, isPhotoAvatar: boolean = false) {
   return {
     topic,
     script: script || topic,
     style,
     duration,
-    avatar_id: avatarId,
+    ...(isPhotoAvatar ? { talking_photo_id: avatarId } : { avatar_id: avatarId }),
   }
 }
 
@@ -83,15 +83,22 @@ async function applyManualGenerationFailure(videoId: string, error: Error): Prom
   }
 }
 
-async function runHeygenGeneration(video: Video, avatarId?: string): Promise<void> {
+async function runHeygenGeneration(video: Video, avatarId?: string, isPhotoAvatar: boolean = false): Promise<void> {
   try {
     if (!avatarId) {
       throw new Error('No avatar available. Please configure an avatar in your settings.')
     }
     
-    const response = await requestHeygenVideo(
-      buildHeygenPayload(video.topic, video.script || undefined, video.style, video.duration, avatarId)
-    )
+    // Build payload with proper avatar type
+    const payload = {
+      topic: video.topic,
+      script: video.script || undefined,
+      style: video.style,
+      duration: video.duration,
+      ...(isPhotoAvatar ? { talking_photo_id: avatarId } : { avatar_id: avatarId }),
+    }
+    
+    const response = await requestHeygenVideo(payload)
     await applyManualGenerationSuccess(video.id, response)
   } catch (error: any) {
     console.error('HeyGen generation error:', error)
@@ -128,12 +135,16 @@ export class VideoService {
     // Get default avatar if no avatar_id specified
     let avatarId: string | undefined = input.avatar_id || undefined
     let avatarRecordId: string | undefined
+    let isPhotoAvatar = false
+    
     if (!avatarId) {
       const { AvatarService } = await import('./avatarService.js')
       const defaultAvatar = await AvatarService.getDefaultAvatar(userId)
       if (defaultAvatar) {
         avatarId = defaultAvatar.heygen_avatar_id
         avatarRecordId = defaultAvatar.id
+        // Check if it's a photo avatar (avatar_url points to Supabase storage)
+        isPhotoAvatar = defaultAvatar.avatar_url?.includes('supabase.co/storage') || false
       }
     } else {
       // If avatar_id is provided, get the database record ID
@@ -142,6 +153,8 @@ export class VideoService {
       avatarRecordId = avatar?.id
       if (avatar) {
         avatarId = avatar.heygen_avatar_id
+        // Check if it's a photo avatar (avatar_url points to Supabase storage)
+        isPhotoAvatar = avatar.avatar_url?.includes('supabase.co/storage') || false
       }
     }
     
@@ -151,7 +164,7 @@ export class VideoService {
     }
     
     const video = await this.createVideoRecord(userId, input, avatarRecordId)
-    void runHeygenGeneration(video, avatarId)
+    void runHeygenGeneration(video, avatarId, isPhotoAvatar)
     return video
   }
 
@@ -318,8 +331,9 @@ export class VideoService {
     const template = reel.template || CATEGORY_TEMPLATES[reel.category] || CATEGORY_TEMPLATES.Trading
 
     try {
+      // For reels, we don't have avatar info, so use default (regular avatar)
       const response = await requestHeygenVideo(
-        buildHeygenPayload(reel.topic, reel.script, DEFAULT_REEL_STYLE, DEFAULT_REEL_DURATION)
+        buildHeygenPayload(reel.topic, reel.script, DEFAULT_REEL_STYLE, DEFAULT_REEL_DURATION, undefined, false)
       )
 
       // template is currently not sent to HeyGen, but kept for future use
