@@ -255,35 +255,48 @@ export async function postVideo(
   request: PostVideoRequest
 ): Promise<UploadPostResponse> {
   try {
-    const payload: any = {
-      video_url: request.videoUrl,
-      platforms: request.platforms,
-      async_upload: request.asyncUpload ?? true,
+    if (!request.userId) {
+      throw new Error('User ID is required for posting videos')
     }
 
+    // Build form data according to Upload-Post API documentation
+    // https://docs.upload-post.com/api/upload-video
+    const { default: FormData } = await import('form-data')
+    const formData = new FormData()
+    
+    // Required fields
+    formData.append('user', request.userId)
+    formData.append('video', request.videoUrl) // Can be URL or file
+    formData.append('title', request.caption || 'Video Post')
+    
+    // Platform array - must be sent as platform[] for each platform
+    request.platforms.forEach(platform => {
+      formData.append('platform[]', platform)
+    })
+
+    // Optional fields
     if (request.caption) {
-      payload.caption = request.caption
+      formData.append('description', request.caption)
     }
 
     if (request.scheduledTime) {
-      payload.scheduled_time = request.scheduledTime
+      // Convert to ISO-8601 format if needed
+      const scheduledDate = new Date(request.scheduledTime).toISOString()
+      formData.append('scheduled_date', scheduledDate)
     }
 
-    if (request.userId) {
-      payload.user_id = request.userId
-    }
+    // Always use async upload to avoid timeouts
+    formData.append('async_upload', String(request.asyncUpload ?? true))
 
-    // Try both endpoint paths - some APIs use /uploadposts/ prefix
-    const endpoints = [
-      `${UPLOADPOST_API_URL}/uploadposts/upload_videos`,
-      `${UPLOADPOST_API_URL}/upload_videos`,
-    ]
+    const endpoint = `${UPLOADPOST_API_URL}/upload`
 
     console.log('Upload-Post API request:', {
-      endpoints,
-      payload,
-      hasApiKey: !!getUploadPostKey(),
+      endpoint,
+      user: request.userId,
+      platforms: request.platforms,
       videoUrl: request.videoUrl,
+      hasApiKey: !!getUploadPostKey(),
+      scheduledDate: request.scheduledTime,
     })
 
     // First, verify the video URL is accessible
@@ -302,77 +315,60 @@ export async function postVideo(
       // Continue anyway - Upload-Post might handle it
     }
 
-    let lastError: any = null
-    let response: any = null
-
-    // Try each endpoint
-    for (const endpoint of endpoints) {
-      try {
-        response = await axios.post(
-          endpoint,
-          payload,
-          {
-            headers: {
-              'Authorization': getAuthHeader(),
-              'Content-Type': 'application/json',
-            },
-            timeout: 30000, // 30 second timeout
-          }
-        )
-        console.log('Upload-Post API success:', {
-          endpoint,
-          status: response.status,
-          data: response.data,
-        })
-        break // Success, exit loop
-      } catch (error: any) {
-        lastError = error
-        console.log('Upload-Post API attempt failed:', {
-          endpoint,
-          status: error.response?.status,
-          message: error.message,
-        })
-        // If it's not a 404, don't try other endpoints
-        if (error.response?.status !== 404) {
-          break
-        }
+    const response = await axios.post(
+      endpoint,
+      formData,
+      {
+        headers: {
+          'Authorization': getAuthHeader(),
+          ...formData.getHeaders(), // Important: form-data needs proper headers
+        },
+        timeout: 30000, // 30 second timeout
       }
-    }
-
-    if (!response) {
-      // Provide more detailed error message before throwing
-      let errorMessage = 'Failed to post video'
-      
-      if (lastError?.response?.status === 404) {
-        errorMessage = `Upload-Post API endpoint not found (404). The video URL may be invalid or the API endpoint has changed. Video URL: ${request.videoUrl?.substring(0, 100)}...`
-      } else if (lastError?.response?.data) {
-        errorMessage = lastError.response.data.message || 
-                      lastError.response.data.error ||
-                      `Upload-Post API error: ${lastError.response.status} ${lastError.response.statusText}`
-      } else if (lastError?.message) {
-        errorMessage = lastError.message
-      }
-      
-      console.error('Upload-Post final error:', {
-        message: errorMessage,
-        status: lastError?.response?.status,
-        url: request.videoUrl,
-        platforms: request.platforms,
-      })
-      
-      throw new Error(errorMessage)
-    }
+    )
 
     console.log('Upload-Post API response:', {
       status: response.status,
       data: response.data,
     })
 
+    // Handle different response formats
+    if (response.status === 202) {
+      // Scheduled - return job_id as upload_id
+      return {
+        upload_id: response.data.job_id,
+        status: 'scheduled',
+        results: [],
+      }
+    } else if (response.data.request_id) {
+      // Async upload started
+      return {
+        upload_id: response.data.request_id,
+        status: 'pending',
+        results: [],
+      }
+    } else if (response.data.results) {
+      // Synchronous response with results
+      const results = Object.entries(response.data.results || {}).map(([platform, result]: [string, any]) => ({
+        platform,
+        status: result.success ? 'success' : 'failed',
+        post_id: result.url || result.container_id || result.post_id || result.video_id,
+        error: result.error || null,
+      }))
+
+      return {
+        upload_id: response.data.request_id || undefined,
+        status: response.data.success ? 'success' : 'pending',
+        results,
+        error: response.data.error || null,
+      }
+    }
+
+    // Fallback response
     return {
-      upload_id: response.data.upload_id || response.data.id,
-      status: response.data.status || 'pending',
-      results: response.data.results,
-      error: response.data.error,
+      upload_id: response.data.request_id || response.data.job_id,
+      status: 'pending',
+      results: [],
     }
   } catch (error: any) {
     console.error('Upload-post API error:', {
@@ -383,8 +379,28 @@ export async function postVideo(
       url: error.config?.url,
     })
     
-    // Re-throw the error (it already has a detailed message if from our code above)
-    throw error
+    // Provide more detailed error message
+    let errorMessage = 'Failed to post video'
+    
+    if (error.response?.status === 404) {
+      errorMessage = `Upload-Post API endpoint not found (404). Please check the API endpoint. Error: ${error.response?.data?.message || error.message}`
+    } else if (error.response?.status === 400) {
+      errorMessage = error.response?.data?.message || 'Invalid request parameters'
+    } else if (error.response?.status === 401) {
+      errorMessage = 'Upload-Post API authentication failed. Please check your API key.'
+    } else if (error.response?.status === 403) {
+      errorMessage = error.response?.data?.message || 'Access denied. Platform may not be available on your plan.'
+    } else if (error.response?.status === 429) {
+      errorMessage = error.response?.data?.message || 'Rate limit exceeded. Please try again later.'
+    } else if (error.response?.data?.message) {
+      errorMessage = error.response.data.message
+    } else if (error.response?.data?.error) {
+      errorMessage = error.response.data.error
+    } else if (error.message) {
+      errorMessage = error.message
+    }
+    
+    throw new Error(errorMessage)
   }
 }
 
@@ -398,7 +414,7 @@ export async function getUploadStatus(uploadId: string): Promise<UploadPostRespo
           'Authorization': getAuthHeader(),
         },
         params: {
-          upload_id: uploadId,
+          request_id: uploadId, // API uses request_id parameter
         },
       }
     )
