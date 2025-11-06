@@ -4,17 +4,14 @@ import {
   CalendarCheck,
   Clapperboard,
   LayoutDashboard,
-  PenSquare,
   Share2,
   Sparkles,
-  Shield,
   Zap,
   Calendar,
   Tag,
   User,
   Settings,
 } from 'lucide-react'
-import { useAuth } from '../../contexts/AuthContext'
 import api from '../../lib/api'
 
 interface SidebarProps {
@@ -36,13 +33,7 @@ const navigation = [
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation()
-  const { isAdmin } = useAuth()
   const [hasVideos, setHasVideos] = useState<boolean | null>(null) // null = loading
-  
-  // Debug: Log admin status
-  useEffect(() => {
-    console.log('[Sidebar] Admin status:', isAdmin)
-  }, [isAdmin])
 
   // Check if user has videos
   useEffect(() => {
@@ -128,57 +119,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 </NavLink>
               )
             })}
-            {isAdmin && (
-              <>
-                <div className="my-2 border-t border-slate-200" />
-                <NavLink
-                  to="/admin"
-                  onClick={onClose}
-                  className={`group relative flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
-                    location.pathname.startsWith('/admin')
-                      ? 'bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent text-amber-600'
-                      : 'text-slate-500 hover:bg-white hover:text-primary'
-                  }`}
-                >
-                  <div
-                    className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-all duration-200 ${
-                      location.pathname.startsWith('/admin')
-                        ? 'border-amber-200 bg-white text-amber-600 shadow-sm'
-                        : 'border-transparent bg-slate-100 text-slate-500 group-hover:border-slate-200'
-                    }`}
-                  >
-                    <Shield className="h-4 w-4" />
-                  </div>
-                  <span>Admin Panel</span>
-                  {location.pathname.startsWith('/admin') && (
-                    <span className="absolute inset-y-0 right-0 w-1 rounded-full bg-amber-500" />
-                  )}
-                </NavLink>
-                <NavLink
-                  to="/content"
-                  onClick={onClose}
-                  className={`group relative flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
-                    location.pathname.startsWith('/content')
-                      ? 'bg-gradient-to-r from-slate-500/10 via-slate-500/5 to-transparent text-slate-600'
-                      : 'text-slate-500 hover:bg-white hover:text-primary'
-                  }`}
-                >
-                  <div
-                    className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-all duration-200 ${
-                      location.pathname.startsWith('/content')
-                        ? 'border-slate-200 bg-white text-slate-600 shadow-sm'
-                        : 'border-transparent bg-slate-100 text-slate-500 group-hover:border-slate-200'
-                    }`}
-                  >
-                    <PenSquare className="h-4 w-4" />
-                  </div>
-                  <span>Content Settings</span>
-                  {location.pathname.startsWith('/content') && (
-                    <span className="absolute inset-y-0 right-0 w-1 rounded-full bg-slate-500" />
-                  )}
-                </NavLink>
-              </>
-            )}
           </nav>
 
           {hasVideos === false && (

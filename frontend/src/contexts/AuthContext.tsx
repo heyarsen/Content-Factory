@@ -10,51 +10,18 @@ interface User {
 
 interface AuthContextType {
   user: User | null
-  isAdmin: boolean
   loading: boolean
   signUp: (email: string, password: string) => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
-  refreshAdminStatus: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
-
-  const checkAdminStatus = async () => {
-    try {
-      const token = localStorage.getItem('access_token')
-      if (!token) {
-        console.log('[Admin Check] No token found')
-        return false
-      }
-      
-      console.log('[Admin Check] Checking admin status...')
-      const response = await api.get('/api/admin/check', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const isAdmin = response.data.isAdmin || false
-      console.log('[Admin Check] Admin status:', isAdmin, 'Response:', response.data)
-      return isAdmin
-    } catch (error: any) {
-      console.error('[Admin Check] Failed to check admin status:', error)
-      console.error('[Admin Check] Error details:', error.response?.data || error.message)
-      return false
-    }
-  }
-
-  const refreshAdminStatus = async () => {
-    if (user) {
-      const adminStatus = await checkAdminStatus()
-      setIsAdmin(adminStatus)
-      console.log('[Admin Refresh] Updated admin status to:', adminStatus)
-    }
-  }
 
   useEffect(() => {
     // Check for existing session
@@ -62,8 +29,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         setUser(session.user as User)
         localStorage.setItem('access_token', session.access_token)
-        const adminStatus = await checkAdminStatus()
-        setIsAdmin(adminStatus)
       }
       setLoading(false)
     })
@@ -75,11 +40,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         setUser(session.user as User)
         localStorage.setItem('access_token', session.access_token)
-        const adminStatus = await checkAdminStatus()
-        setIsAdmin(adminStatus)
       } else {
         setUser(null)
-        setIsAdmin(false)
         localStorage.removeItem('access_token')
       }
       setLoading(false)
@@ -103,11 +65,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         access_token: data.access_token,
         refresh_token: data.refresh_token,
       })
-      // Check admin status after login
-      if (data.user?.id) {
-        const adminStatus = await checkAdminStatus()
-        setIsAdmin(adminStatus)
-      }
     }
   }
 
@@ -125,7 +82,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Continue with cleanup even if Supabase sign out fails
     }
     setUser(null)
-    setIsAdmin(false)
     localStorage.removeItem('access_token')
   }
 
@@ -134,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, loading, signUp, signIn, signOut, resetPassword, refreshAdminStatus }}>
+    <AuthContext.Provider value={{ user, loading, signUp, signIn, signOut, resetPassword }}>
       {children}
     </AuthContext.Provider>
   )

@@ -17,10 +17,12 @@ export function GenerateVideo() {
   const [duration, setDuration] = useState(60)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setSuccess(false)
     setLoading(true)
 
     try {
@@ -30,10 +32,15 @@ export function GenerateVideo() {
         style,
         duration,
       })
-      navigate('/videos')
+      
+      setSuccess(true)
+      
+      // Navigate after showing success message
+      setTimeout(() => {
+        navigate('/videos')
+      }, 3000) // Show success message for 3 seconds
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to generate video')
-    } finally {
       setLoading(false)
     }
   }
@@ -55,6 +62,27 @@ export function GenerateVideo() {
             {error && (
               <div className="rounded-2xl border border-rose-200/80 bg-rose-50/80 px-4 py-3 text-sm text-rose-600">
                 {error}
+              </div>
+            )}
+
+            {success && (
+              <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/80 px-6 py-5">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500">
+                    <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-emerald-800">Video Generation Started!</h3>
+                    <p className="mt-1 text-sm text-emerald-700">
+                      Your video is now being generated. This typically takes 1-3 minutes depending on the duration.
+                    </p>
+                    <p className="mt-2 text-xs text-emerald-600">
+                      Redirecting to your video library to track progress...
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
 
