@@ -557,12 +557,6 @@ export function Videos() {
                     {new Date(selectedVideo.created_at).toLocaleString()}
                   </p>
                 </div>
-                {selectedVideo.heygen_video_id && (
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">HeyGen ID</label>
-                    <p className="mt-1 text-sm font-mono text-primary">{selectedVideo.heygen_video_id}</p>
-                  </div>
-                )}
               </div>
 
               {/* Script */}

@@ -23,7 +23,6 @@ import { ContentFactory } from './pages/ContentFactory'
 import { Workflows } from './pages/Workflows'
 import { AdminPanel } from './pages/AdminPanel'
 import { VideoPlanning } from './pages/VideoPlanning'
-import { Categories } from './pages/Categories'
 import { ProfileSettings } from './pages/ProfileSettings'
 import { Preferences } from './pages/Preferences'
 import Avatars from './pages/Avatars'
@@ -142,14 +141,6 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <AdminPanel />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/categories"
-          element={
-            <ProtectedRoute>
-              <Categories />
             </ProtectedRoute>
           }
         />

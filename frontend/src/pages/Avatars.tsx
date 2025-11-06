@@ -89,14 +89,14 @@ export default function Avatars() {
   const handleSync = async () => {
     setSyncing(true)
     try {
-      console.log('Syncing avatars from HeyGen...')
+      console.log('Syncing avatars...')
       const response = await api.post('/api/avatars/sync')
       console.log('Sync response:', response.data)
       
       if (response.data.count === 0) {
-        toast.error('No avatars found. Please check your HeyGen API key and ensure you have avatars in your HeyGen account.')
+        toast.error('No avatars found. Please check your API configuration.')
       } else {
-        toast.success(`Synced ${response.data.count || 0} avatars from HeyGen`)
+        toast.success(`Synced ${response.data.count || 0} avatars`)
       }
       
       // Reload avatars with current filter
@@ -115,7 +115,7 @@ export default function Avatars() {
         error.message || 
         'Failed to sync avatars'
       
-      toast.error(errorMessage + '. Please check your HEYGEN_KEY environment variable and HeyGen API documentation.')
+      toast.error(errorMessage + '. Please check your API configuration.')
     } finally {
       setSyncing(false)
     }
@@ -470,7 +470,7 @@ export default function Avatars() {
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Settings</p>
             <h1 className="mt-2 text-3xl font-semibold text-primary">Avatars</h1>
             <p className="mt-1 text-sm text-slate-500">
-              Manage your HeyGen avatars for video generation
+              Manage your avatars for video generation
             </p>
           </div>
           <div className="flex gap-3">
@@ -513,7 +513,7 @@ export default function Avatars() {
               className="flex items-center gap-2"
             >
               <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-              {syncing ? 'Syncing...' : 'Sync from HeyGen'}
+              {syncing ? 'Syncing...' : 'Sync Avatars'}
             </Button>
           </div>
         </div>
@@ -527,7 +527,7 @@ export default function Avatars() {
             <p className="text-slate-600 mb-6">
               {onlyCreated 
                 ? 'Create an avatar from a photo to get started'
-                : 'Sync avatars from HeyGen or create one from a photo to get started'}
+                : 'Sync avatars or create one from a photo to get started'}
             </p>
             <div className="flex gap-3 justify-center">
               <Button
@@ -549,7 +549,7 @@ export default function Avatars() {
               {!onlyCreated && (
                 <Button onClick={handleSync} disabled={syncing} variant="secondary">
                   <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-                  Sync from HeyGen
+                  Sync Avatars
                 </Button>
               )}
             </div>

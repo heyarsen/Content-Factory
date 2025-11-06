@@ -8,7 +8,6 @@ import {
   Sparkles,
   Zap,
   Calendar,
-  Tag,
   User,
   Settings,
 } from 'lucide-react'
@@ -26,7 +25,6 @@ const navigation = [
   { label: 'My Videos', to: '/videos', icon: Clapperboard },
   { label: 'Social Accounts', to: '/social', icon: Share2 },
   { label: 'Calendar', to: '/posts', icon: CalendarCheck },
-  { label: 'Categories', to: '/categories', icon: Tag },
   { label: 'Avatars', to: '/avatars', icon: User },
   { label: 'Preferences', to: '/preferences', icon: Settings },
 ]

@@ -28,6 +28,7 @@ interface Post {
   status: 'pending' | 'posted' | 'failed' | 'cancelled'
   posted_at: string | null
   error_message: string | null
+  upload_post_id: string | null
   videos: {
     topic: string
     video_url: string | null

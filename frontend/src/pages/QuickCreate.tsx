@@ -12,12 +12,6 @@ import { Modal } from '../components/ui/Modal'
 import api from '../lib/api'
 import { useNotifications } from '../contexts/NotificationContext'
 
-interface Category {
-  id: string
-  category_key: string
-  name: string
-  status: 'active' | 'inactive'
-}
 
 interface SocialAccount {
   id: string
@@ -49,13 +43,10 @@ export function QuickCreate() {
   const [step, setStep] = useState<Step>('idea')
   
   // Step 1: Idea
-  const [categories, setCategories] = useState<Category[]>([])
-  const [selectedCategory, setSelectedCategory] = useState('')
   const [topic, setTopic] = useState('')
   const [description, setDescription] = useState('')
   const [whyImportant, setWhyImportant] = useState('')
   const [usefulTips, setUsefulTips] = useState('')
-  const [loadingCategories, setLoadingCategories] = useState(true)
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([])
   
   // Step 2: Script
@@ -84,7 +75,6 @@ export function QuickCreate() {
   const [posting, setPosting] = useState(false)
 
   useEffect(() => {
-    loadCategories()
     loadSocialAccounts()
     loadAvatars()
   }, [])
@@ -193,22 +183,6 @@ export function QuickCreate() {
     }
   }, [videoId, videoStatus, topic, addNotification])
 
-  const loadCategories = async () => {
-    try {
-      const response = await api.get('/api/content')
-      const activeCategories = (response.data.categories || []).filter(
-        (c: Category) => c.status === 'active'
-      )
-      setCategories(activeCategories)
-      if (activeCategories.length > 0) {
-        setSelectedCategory(activeCategories[0].category_key)
-      }
-    } catch (error) {
-      console.error('Failed to load categories:', error)
-    } finally {
-      setLoadingCategories(false)
-    }
-  }
 
   const loadSocialAccounts = async () => {
     try {
@@ -220,8 +194,8 @@ export function QuickCreate() {
   }
 
   const handleGenerateScript = async () => {
-    if (!topic || !selectedCategory) {
-      setScriptError('Please fill in the topic and select a category')
+    if (!topic) {
+      setScriptError('Please fill in the topic')
       return
     }
 
@@ -230,7 +204,7 @@ export function QuickCreate() {
 
     try {
       const response = await api.post('/api/content/quick-create/generate-script', {
-        category: selectedCategory,
+        category: 'general', // Default category
         topic,
         description: description || undefined,
         whyImportant: whyImportant || undefined,
@@ -264,7 +238,7 @@ export function QuickCreate() {
         scriptLength: generatedScript?.length,
         style,
         duration,
-        category: selectedCategory,
+        category: 'general', // Default category
         avatar_id: selectedAvatarId || undefined,
       })
       
@@ -273,7 +247,7 @@ export function QuickCreate() {
         script: generatedScript,
         style,
         duration,
-        category: selectedCategory,
+        category: 'general', // Default category
         avatar_id: selectedAvatarId || undefined,
       })
 
@@ -386,7 +360,7 @@ export function QuickCreate() {
     )
   }
 
-  const canProceedToScript = topic.trim().length > 0 && selectedCategory.length > 0
+  const canProceedToScript = topic.trim().length > 0
   const canProceedToVideo = generatedScript.trim().length > 0
   const connectedPlatforms = socialAccounts.filter(acc => acc.status === 'connected').map(acc => acc.platform)
 
@@ -490,14 +464,6 @@ export function QuickCreate() {
             )}
 
             <div className="space-y-6">
-              <Select
-                label="Category"
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                options={categories.map((cat) => ({ value: cat.category_key, label: cat.name }))}
-                disabled={loadingCategories}
-                required
-              />
 
               <Input
                 label="Topic"
