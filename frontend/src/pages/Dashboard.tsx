@@ -5,7 +5,7 @@ import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Badge } from '../components/ui/Badge'
-import { Video, Calendar, Zap } from 'lucide-react'
+import { Video, Calendar, Users, Zap } from 'lucide-react'
 import api from '../lib/api'
 
 interface VideoStats {
