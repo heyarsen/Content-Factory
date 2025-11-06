@@ -148,6 +148,18 @@ export function initializeScheduler(): void {
     }
   })
 
+  // Automation: Generate research for ready items with topics but no research (Step 1.5)
+  // Runs every 10 minutes
+  cron.schedule('*/10 * * * *', async () => {
+    console.log('[Cron] Running automation: generate research for ready items...')
+    try {
+      await AutomationService.generateResearchForReadyItems()
+      console.log('[Automation] Generated research for ready items')
+    } catch (error: any) {
+      console.error('[Automation] Error generating research:', error)
+    }
+  })
+
   // Automation: Generate scripts for ready items (Step 2)
   // Runs every 10 minutes
   cron.schedule('*/10 * * * *', async () => {

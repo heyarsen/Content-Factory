@@ -148,7 +148,8 @@ export class PlanService {
         if (customTopic) {
           topic = customTopic
           category = customCategory
-          status = 'ready' // Ready for script generation since topic is set
+          // If auto_research is enabled, start with researching, otherwise ready
+          status = plan.auto_research ? 'pending' : 'ready'
         }
         
         const { data: item, error } = await supabase

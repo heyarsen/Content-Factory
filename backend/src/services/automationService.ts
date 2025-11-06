@@ -59,8 +59,22 @@ export class AutomationService {
 
         if (pendingItems && pendingItems.length > 0) {
           for (const item of pendingItems) {
+            // If item has a topic but status is pending, it means auto_research is enabled
+            // Generate research for it
             if (plan.auto_research) {
-              await PlanService.generateTopicForItem(item.id, plan.user_id).catch(console.error)
+              if (item.topic) {
+                // Has topic but needs research
+                await PlanService.generateTopicForItem(item.id, plan.user_id).catch(console.error)
+              } else {
+                // No topic, generate topic first (which will also research it)
+                await PlanService.generateTopicForItem(item.id, plan.user_id).catch(console.error)
+              }
+            } else if (item.topic) {
+              // Has topic but no auto_research, mark as ready
+              await supabase
+                .from('video_plan_items')
+                .update({ status: 'ready' })
+                .eq('id', item.id)
             }
           }
         }
@@ -71,10 +85,39 @@ export class AutomationService {
   }
 
   /**
+   * Generate research for items with topics but no research
+   */
+  static async generateResearchForReadyItems(): Promise<void> {
+    const { data: items } = await supabase
+      .from('video_plan_items')
+      .select('*, plan:video_plans!inner(enabled, auto_research, user_id)')
+      .eq('plan.enabled', true)
+      .eq('status', 'ready')
+      .not('topic', 'is', null)
+      .is('research_data', null)
+      .limit(10)
+
+    if (!items) return
+
+    for (const item of items) {
+      try {
+        const plan = item.plan as any
+        if (!plan.auto_research || !item.topic) continue
+
+        // Generate research for the topic
+        await PlanService.generateTopicForItem(item.id, plan.user_id)
+      } catch (error: any) {
+        console.error(`Error generating research for item ${item.id}:`, error)
+      }
+    }
+  }
+
+  /**
    * Generate script for items with research but no script
    */
   static async generateScriptsForReadyItems(): Promise<void> {
-    const { data: items } = await supabase
+    // First, get items with research data
+    const { data: itemsWithResearch } = await supabase
       .from('video_plan_items')
       .select('*, plan:video_plans!inner(enabled, auto_approve)')
       .eq('plan.enabled', true)
@@ -83,22 +126,35 @@ export class AutomationService {
       .not('research_data', 'is', null)
       .limit(10)
 
-    if (!items) return
+    // Also get items with topics but no research (will use topic directly)
+    const { data: itemsWithTopic } = await supabase
+      .from('video_plan_items')
+      .select('*, plan:video_plans!inner(enabled, auto_approve)')
+      .eq('plan.enabled', true)
+      .eq('status', 'ready')
+      .is('script', null)
+      .is('research_data', null)
+      .not('topic', 'is', null)
+      .limit(10)
 
-    for (const item of items) {
+    const allItems = [...(itemsWithResearch || []), ...(itemsWithTopic || [])]
+
+    if (allItems.length === 0) return
+
+    for (const item of allItems) {
       try {
+        const plan = item.plan as any
         const research = item.research_data
-        if (!research) continue
 
+        // If no research but has topic, use topic directly
         const script = await ScriptService.generateScriptCustom({
-          idea: item.topic || research.Idea || '',
-          description: item.description || research.Description || '',
-          whyItMatters: item.why_important || research.WhyItMatters || '',
-          usefulTips: item.useful_tips || research.UsefulTips || '',
-          category: item.category || research.Category || 'Trading',
+          idea: item.topic || research?.Idea || '',
+          description: item.description || research?.Description || '',
+          whyItMatters: item.why_important || research?.WhyItMatters || '',
+          usefulTips: item.useful_tips || research?.UsefulTips || '',
+          category: item.category || research?.Category || 'general',
         })
 
-        const plan = item.plan as any
         const newStatus = plan.auto_approve ? 'approved' : 'draft'
         const scriptStatus = plan.auto_approve ? 'approved' : 'draft'
 
@@ -129,7 +185,7 @@ export class AutomationService {
   static async generateVideosForApprovedItems(): Promise<void> {
     const { data: items } = await supabase
       .from('video_plan_items')
-      .select('*, plan:video_plans!inner(enabled, user_id)')
+      .select('*, plan:video_plans!inner(enabled, user_id, auto_create)')
       .eq('plan.enabled', true)
       .eq('status', 'approved')
       .eq('script_status', 'approved')
@@ -142,6 +198,9 @@ export class AutomationService {
     for (const item of items) {
       try {
         const plan = item.plan as any
+        // Only auto-create if auto_create is enabled
+        if (!plan.auto_create) continue
+
         await supabase
           .from('video_plan_items')
           .update({ status: 'generating' })
@@ -184,6 +243,7 @@ export class AutomationService {
       .eq('plan.enabled', true)
       .eq('status', 'completed')
       .not('video_id', 'is', null)
+      .is('scheduled_post_id', null) // Only schedule if not already scheduled
       .limit(10)
 
     if (!items) return
@@ -222,10 +282,19 @@ export class AutomationService {
 
         const uploadPostUserId = accounts[0].platform_account_id
 
-        // Build scheduled time
+        // Build scheduled time - use scheduled_date and scheduled_time
         let scheduledTime: string | undefined
+        const now = new Date()
         if (item.scheduled_date && item.scheduled_time) {
-          scheduledTime = `${item.scheduled_date}T${item.scheduled_time}`
+          // scheduled_time is in HH:MM format, combine with scheduled_date
+          const [hours, minutes] = item.scheduled_time.split(':')
+          const scheduledDateTime = new Date(`${item.scheduled_date}T${hours}:${minutes}:00`)
+          
+          // Only schedule if the time hasn't passed yet (or allow immediate posting if time passed)
+          if (scheduledDateTime > now) {
+            scheduledTime = scheduledDateTime.toISOString()
+          }
+          // If time has passed, post immediately (scheduledTime will be undefined)
         }
 
         // Call upload-post.com API
@@ -239,27 +308,37 @@ export class AutomationService {
         })
 
         // Create scheduled_posts records
+        const postIds: string[] = []
         for (const platform of platforms) {
           const platformResult = postResponse.results?.find((r: any) => r.platform === platform)
 
-          await supabase
+          const { data: postData } = await supabase
             .from('scheduled_posts')
             .insert({
               video_id: item.video_id,
               user_id: plan.user_id,
               platform: platform,
               scheduled_time: scheduledTime ? new Date(scheduledTime).toISOString() : null,
-              status: platformResult?.status === 'success' ? 'posted' : 'pending',
+              status: platformResult?.status === 'success' ? 'posted' : (scheduledTime ? 'pending' : 'pending'),
               upload_post_id: postResponse.upload_id || platformResult?.post_id,
               posted_at: platformResult?.status === 'success' ? new Date().toISOString() : null,
               error_message: platformResult?.error || null,
             })
+            .select()
+            .single()
+
+          if (postData) {
+            postIds.push(postData.id)
+          }
         }
 
         // Update plan item status
         await supabase
           .from('video_plan_items')
-          .update({ status: 'scheduled' })
+          .update({ 
+            status: scheduledTime ? 'scheduled' : 'posted',
+            scheduled_post_id: postIds[0] || null,
+          })
           .eq('id', item.id)
       } catch (error: any) {
         console.error(`Error scheduling distribution for item ${item.id}:`, error)
