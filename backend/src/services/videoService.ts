@@ -98,6 +98,16 @@ async function runHeygenGeneration(video: Video, avatarId?: string, isPhotoAvata
       ...(isPhotoAvatar ? { talking_photo_id: avatarId } : { avatar_id: avatarId }),
     }
     
+    console.log('Calling HeyGen API with payload:', {
+      videoId: video.id,
+      avatarId,
+      isPhotoAvatar,
+      hasScript: !!payload.script,
+      scriptLength: payload.script?.length,
+      style: payload.style,
+      duration: payload.duration,
+    })
+    
     const response = await requestHeygenVideo(payload)
     await applyManualGenerationSuccess(video.id, response)
   } catch (error: any) {
@@ -137,8 +147,9 @@ export class VideoService {
     let avatarRecordId: string | undefined
     let isPhotoAvatar = false
     
+    const { AvatarService } = await import('./avatarService.js')
+    
     if (!avatarId) {
-      const { AvatarService } = await import('./avatarService.js')
       const defaultAvatar = await AvatarService.getDefaultAvatar(userId)
       if (defaultAvatar) {
         avatarId = defaultAvatar.heygen_avatar_id
@@ -147,14 +158,42 @@ export class VideoService {
         isPhotoAvatar = defaultAvatar.avatar_url?.includes('supabase.co/storage') || false
       }
     } else {
-      // If avatar_id is provided, get the database record ID
-      const { AvatarService } = await import('./avatarService.js')
-      const avatar = await AvatarService.getAvatarById(avatarId, userId)
+      // If avatar_id is provided, try to find by database record ID first
+      let avatar = await AvatarService.getAvatarById(avatarId, userId)
+      
+      // If not found by database ID, try to find by HeyGen avatar ID
+      if (!avatar) {
+        const { data } = await supabase
+          .from('avatars')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('heygen_avatar_id', avatarId)
+          .single()
+        
+        if (data) {
+          avatar = data as any
+        }
+      }
+      
       avatarRecordId = avatar?.id
       if (avatar) {
         avatarId = avatar.heygen_avatar_id
         // Check if it's a photo avatar (avatar_url points to Supabase storage)
         isPhotoAvatar = avatar.avatar_url?.includes('supabase.co/storage') || false
+        
+        console.log('Avatar lookup result:', {
+          inputAvatarId: input.avatar_id,
+          databaseRecordId: avatarRecordId,
+          heygenAvatarId: avatarId,
+          isPhotoAvatar,
+          avatarStatus: avatar.status,
+        })
+      } else {
+        console.error('Avatar not found:', {
+          inputAvatarId: input.avatar_id,
+          userId,
+        })
+        throw new Error(`Avatar not found. Please ensure the avatar ID is correct and belongs to your account.`)
       }
     }
     

@@ -248,11 +248,39 @@ export async function generateVideo(
 
     // Determine if this is a photo avatar (talking_photo) or regular avatar
     // Photo avatars use talking_photo_id, regular avatars use avatar_id in AvatarSettings
+    // Note: For photo avatars, talking_photo_id should be an individual avatar ID from a group,
+    // not the group ID itself. If a group_id is provided, we need to fetch the first available avatar from the group.
     if (request.talking_photo_id) {
       // Photo avatar - use TalkingPhotoSettings
+      // Check if this is a group_id (photo avatar groups) or individual avatar ID
+      let talkingPhotoId = request.talking_photo_id
+      
+      // If it's a group_id format (usually longer), try to fetch individual avatars from the group
+      // HeyGen API requires individual avatar IDs, not group IDs for talking_photo_id
+      try {
+        const avatarGroupResponse = await axios.get(
+          `${HEYGEN_V2_API_URL}/avatar_group/${talkingPhotoId}/avatars`,
+          {
+            headers: {
+              'X-Api-Key': apiKey,
+              'Content-Type': 'application/json',
+            },
+          }
+        )
+        
+        if (avatarGroupResponse.data?.data?.avatar_list && avatarGroupResponse.data.data.avatar_list.length > 0) {
+          // Use the first available avatar from the group
+          talkingPhotoId = avatarGroupResponse.data.data.avatar_list[0].id
+          console.log(`Found individual avatar ID ${talkingPhotoId} from group ${request.talking_photo_id}`)
+        }
+      } catch (groupErr: any) {
+        // If fetching from group fails, assume it's already an individual avatar ID
+        console.log(`Assuming ${talkingPhotoId} is an individual avatar ID (group fetch failed: ${groupErr.response?.status || groupErr.message})`)
+      }
+      
       payload.video_inputs[0].character = {
         type: 'talking_photo',
-        talking_photo_id: request.talking_photo_id,
+        talking_photo_id: talkingPhotoId,
       }
     } else if (request.avatar_id) {
       // Regular avatar - use AvatarSettings
@@ -264,13 +292,18 @@ export async function generateVideo(
       throw new Error('Either avatar_id or talking_photo_id must be provided')
     }
     
+    const requestUrl = `${HEYGEN_V2_API_URL}/video/generate`
     console.log('HeyGen v2 API request:', {
-      url: `${HEYGEN_V2_API_URL}/video/generate`,
+      url: requestUrl,
+      hasAvatarId: !!request.avatar_id,
+      hasTalkingPhotoId: !!request.talking_photo_id,
+      avatarId: request.avatar_id,
+      talkingPhotoId: request.talking_photo_id,
       payload: JSON.stringify(payload, null, 2),
     })
     
     const response = await axios.post(
-      `${HEYGEN_V2_API_URL}/video/generate`,
+      requestUrl,
       payload,
       {
         headers: {
@@ -311,7 +344,8 @@ export async function generateVideo(
     let errorMessage = 'Failed to generate video'
     
     if (error.response?.status === 404) {
-      errorMessage = 'HeyGen API endpoint not found (404). Please check your API configuration and avatar ID.'
+      const avatarId = request.avatar_id || request.talking_photo_id
+      errorMessage = `HeyGen API endpoint not found (404). The avatar ID "${avatarId}" may not exist or may not be accessible. Please verify the avatar ID is correct and belongs to your HeyGen account.`
     } else if (error.response?.status === 401) {
       errorMessage = 'HeyGen API authentication failed. Please check your HEYGEN_KEY environment variable.'
     } else if (error.response?.status === 429) {
