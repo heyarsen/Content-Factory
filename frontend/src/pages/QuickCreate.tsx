@@ -8,6 +8,7 @@ import { Textarea } from '../components/ui/Textarea'
 import { Select } from '../components/ui/Select'
 import { Badge } from '../components/ui/Badge'
 import { Video, Sparkles, FileText, CheckCircle2, ArrowRight, ArrowLeft, Loader, Download, Share2, Instagram, Youtube, Users, Facebook } from 'lucide-react'
+import { Modal } from '../components/ui/Modal'
 import api from '../lib/api'
 import { useNotifications } from '../contexts/NotificationContext'
 
@@ -68,6 +69,7 @@ export function QuickCreate() {
   const [duration, setDuration] = useState(30)
   const [avatars, setAvatars] = useState<Array<{ id: string; heygen_avatar_id: string; avatar_name: string; thumbnail_url: string | null; preview_url: string | null; is_default: boolean }>>([])
   const [selectedAvatarId, setSelectedAvatarId] = useState<string>('')
+  const [avatarModalOpen, setAvatarModalOpen] = useState(false)
   const [generatingVideo, setGeneratingVideo] = useState(false)
   const [videoError, setVideoError] = useState('')
   const [videoId, setVideoId] = useState<string | null>(null)
@@ -108,12 +110,22 @@ export function QuickCreate() {
     if (!videoId) return
     if (videoStatus === 'completed' || videoStatus === 'failed') return
 
-    const pollInterval = setInterval(async () => {
+    let pollInterval: NodeJS.Timeout
+    let pollDelay = 3000 // Start with 3 seconds
+    let consecutiveErrors = 0
+    let isRateLimited = false
+
+    const pollStatus = async () => {
       try {
         const response = await api.get(`/api/videos/${videoId}/status`)
         const video = response.data.video
         const previousStatus = previousStatusRef.current
         const newStatus = video.status as 'pending' | 'generating' | 'completed' | 'failed'
+        
+        // Reset error tracking on success
+        consecutiveErrors = 0
+        isRateLimited = false
+        pollDelay = 3000 // Reset to normal polling interval
         
         // Update ref before setting state
         previousStatusRef.current = newStatus
@@ -141,13 +153,46 @@ export function QuickCreate() {
               message: `"${topic}" failed to generate: ${video.error_message || 'Unknown error'}`,
             })
           }
+        } else {
+          // Continue polling with current delay
+          pollInterval = setTimeout(pollStatus, pollDelay)
         }
-      } catch (error) {
-        console.error('Failed to poll video status:', error)
+      } catch (error: any) {
+        consecutiveErrors++
+        const is429 = error.response?.status === 429
+        
+        if (is429) {
+          isRateLimited = true
+          // Exponential backoff for rate limits: 30s, 60s, 120s, max 300s
+          pollDelay = Math.min(30000 * Math.pow(2, consecutiveErrors - 1), 300000)
+          
+          console.warn(`Rate limited (429). Waiting ${pollDelay / 1000}s before next poll.`)
+          
+          // Show notification only once
+          if (consecutiveErrors === 1) {
+            addNotification({
+              type: 'warning',
+              title: 'Rate Limit Reached',
+              message: 'Polling paused due to rate limit. Will resume automatically.',
+            })
+          }
+        } else {
+          // For other errors, use shorter backoff
+          pollDelay = Math.min(5000 * consecutiveErrors, 60000)
+          console.error('Failed to poll video status:', error)
+        }
+        
+        // Continue polling with backoff
+        pollInterval = setTimeout(pollStatus, pollDelay)
       }
-    }, 3000) // Poll every 3 seconds
+    }
 
-    return () => clearInterval(pollInterval)
+    // Start polling
+    pollInterval = setTimeout(pollStatus, pollDelay)
+
+    return () => {
+      if (pollInterval) clearTimeout(pollInterval)
+    }
   }, [videoId, videoStatus, topic, addNotification])
 
   const loadCategories = async () => {
@@ -657,43 +702,46 @@ export function QuickCreate() {
                 {/* Avatar Selection */}
                 {avatars.length > 0 && (
                   <div className="rounded-2xl border border-white/60 bg-white/70 p-6">
-                    <label className="block text-sm font-semibold text-primary mb-4">
-                      Choose Avatar
-                    </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                      {avatars.map((avatar) => (
-                        <button
-                          key={avatar.id}
-                          type="button"
-                          onClick={() => setSelectedAvatarId(avatar.heygen_avatar_id)}
-                          className={`relative rounded-xl border-2 p-2 transition-all ${
-                            selectedAvatarId === avatar.heygen_avatar_id
-                              ? 'border-brand-500 bg-brand-50'
-                              : 'border-slate-200 hover:border-brand-300'
-                          }`}
-                        >
-                          {avatar.thumbnail_url || avatar.preview_url ? (
-                            <img
-                              src={avatar.thumbnail_url || avatar.preview_url || ''}
-                              alt={avatar.avatar_name}
-                              className="w-full h-24 object-cover rounded-lg"
-                            />
-                          ) : (
-                            <div className="w-full h-24 bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center">
-                              <Users className="h-8 w-8 text-white opacity-50" />
-                            </div>
-                          )}
-                          <p className="mt-2 text-xs font-medium text-slate-700 truncate">
-                            {avatar.avatar_name}
-                          </p>
-                          {selectedAvatarId === avatar.heygen_avatar_id && (
-                            <div className="absolute top-2 right-2 bg-brand-500 text-white rounded-full p-1">
-                              <CheckCircle2 className="h-3 w-3" />
-                            </div>
-                          )}
-                        </button>
-                      ))}
+                    <div className="flex items-center justify-between mb-4">
+                      <label className="block text-sm font-semibold text-primary">
+                        Choose Avatar
+                      </label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setAvatarModalOpen(true)}
+                        className="text-xs"
+                      >
+                        {selectedAvatarId ? 'Change Avatar' : 'Select Avatar'}
+                      </Button>
                     </div>
+                    {selectedAvatarId && (
+                      <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                        {(() => {
+                          const selected = avatars.find(a => a.heygen_avatar_id === selectedAvatarId)
+                          return selected ? (
+                            <>
+                              {selected.thumbnail_url || selected.preview_url ? (
+                                <img
+                                  src={selected.thumbnail_url || selected.preview_url || ''}
+                                  alt={selected.avatar_name}
+                                  className="w-12 h-12 object-cover rounded-lg"
+                                />
+                              ) : (
+                                <div className="w-12 h-12 bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center">
+                                  <Users className="h-6 w-6 text-white opacity-50" />
+                                </div>
+                              )}
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-slate-700">{selected.avatar_name}</p>
+                                <p className="text-xs text-slate-500">Selected</p>
+                              </div>
+                            </>
+                          ) : null
+                        })()}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -842,6 +890,66 @@ export function QuickCreate() {
             </div>
           </div>
         )}
+
+        {/* Avatar Selection Modal */}
+        <Modal
+          isOpen={avatarModalOpen}
+          onClose={() => setAvatarModalOpen(false)}
+          title="Select Avatar"
+          size="lg"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-slate-500 mb-4">
+              Choose an avatar for your video. The avatar will appear in the generated video.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-h-[60vh] overflow-y-auto">
+              {avatars.map((avatar) => (
+                <button
+                  key={avatar.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedAvatarId(avatar.heygen_avatar_id)
+                    setAvatarModalOpen(false)
+                  }}
+                  className={`relative rounded-xl border-2 p-3 transition-all ${
+                    selectedAvatarId === avatar.heygen_avatar_id
+                      ? 'border-brand-500 bg-brand-50 shadow-md'
+                      : 'border-slate-200 hover:border-brand-300 hover:shadow-sm'
+                  }`}
+                >
+                  {avatar.thumbnail_url || avatar.preview_url ? (
+                    <img
+                      src={avatar.thumbnail_url || avatar.preview_url || ''}
+                      alt={avatar.avatar_name}
+                      className="w-full h-32 object-cover rounded-lg mb-2"
+                    />
+                  ) : (
+                    <div className="w-full h-32 bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center mb-2">
+                      <Users className="h-10 w-10 text-white opacity-50" />
+                    </div>
+                  )}
+                  <p className="text-xs font-medium text-slate-700 truncate text-center">
+                    {avatar.avatar_name}
+                  </p>
+                  {selectedAvatarId === avatar.heygen_avatar_id && (
+                    <div className="absolute top-2 right-2 bg-brand-500 text-white rounded-full p-1.5 shadow-lg">
+                      <CheckCircle2 className="h-4 w-4" />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+              <Button
+                variant="ghost"
+                onClick={() => setAvatarModalOpen(false)}
+                className="border border-white/60 bg-white/70 text-slate-500 hover:border-slate-200 hover:bg-white"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </Modal>
       </div>
     </Layout>
   )

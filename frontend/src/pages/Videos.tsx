@@ -57,39 +57,85 @@ export function Videos() {
   }, [loadVideos])
 
   useEffect(() => {
-    // Poll for status updates on generating videos (more frequently)
-    const interval = setInterval(async () => {
+    // Poll for status updates on generating videos with rate limit handling
+    let pollTimeout: NodeJS.Timeout
+    let pollDelay = 3000 // Start with 3 seconds
+    let consecutiveErrors = 0
+
+    const pollStatus = async () => {
       const generating = videos.filter((v) => v.status === 'generating' || v.status === 'pending')
-      if (generating.length > 0) {
-        // Refresh status for generating videos
-        for (const video of generating) {
-          try {
-            const updated = await refreshVideoStatus(video.id)
-            setVideos((prev) => 
-              prev.map((v) => v.id === video.id ? updated : v)
-            )
-            // If this is the selected video, update it too
-            if (selectedVideo?.id === video.id) {
-              setSelectedVideo(updated)
-            }
+      if (generating.length === 0) {
+        // No videos to poll, check again in 10 seconds
+        pollTimeout = setTimeout(pollStatus, 10000)
+        return
+      }
+
+      let hasError = false
+      // Refresh status for generating videos
+      for (const video of generating) {
+        try {
+          const updated = await refreshVideoStatus(video.id)
+          setVideos((prev) => 
+            prev.map((v) => v.id === video.id ? updated : v)
+          )
+          // If this is the selected video, update it too
+          if (selectedVideo?.id === video.id) {
+            setSelectedVideo(updated)
+          }
+          
+          // Check if video just completed
+          if (updated.status === 'completed' && !completedVideos.has(video.id)) {
+            setCompletedVideos((prev) => new Set(prev).add(video.id))
+            addNotification({
+              type: 'success',
+              title: 'Video Ready!',
+              message: `"${updated.topic}" has finished generating and is ready to view.`,
+              link: `/videos`,
+            })
+          }
+        } catch (error: any) {
+          hasError = true
+          const is429 = error.response?.status === 429
+          
+          if (is429) {
+            consecutiveErrors++
+            // Exponential backoff for rate limits: 30s, 60s, 120s, max 300s
+            pollDelay = Math.min(30000 * Math.pow(2, consecutiveErrors - 1), 300000)
+            console.warn(`Rate limited (429) while polling. Waiting ${pollDelay / 1000}s before next poll.`)
             
-            // Check if video just completed
-            if (updated.status === 'completed' && !completedVideos.has(video.id)) {
-              setCompletedVideos((prev) => new Set(prev).add(video.id))
+            // Show notification only once
+            if (consecutiveErrors === 1) {
               addNotification({
-                type: 'success',
-                title: 'Video Ready!',
-                message: `"${updated.topic}" has finished generating and is ready to view.`,
-                link: `/videos`,
+                type: 'warning',
+                title: 'Rate Limit Reached',
+                message: 'Video status updates paused due to rate limit. Will resume automatically.',
               })
             }
-          } catch (error) {
+          } else {
+            // For other errors, use shorter backoff
+            pollDelay = Math.min(5000 * consecutiveErrors, 60000)
             console.error('Failed to refresh video status:', error)
           }
+          break // Stop processing other videos if we hit an error
         }
       }
-    }, 3000) // Poll every 3 seconds for better UX
-    return () => clearInterval(interval)
+
+      // Reset error tracking on success
+      if (!hasError) {
+        consecutiveErrors = 0
+        pollDelay = 3000 // Reset to normal polling interval
+      }
+
+      // Schedule next poll
+      pollTimeout = setTimeout(pollStatus, pollDelay)
+    }
+
+    // Start polling
+    pollTimeout = setTimeout(pollStatus, pollDelay)
+
+    return () => {
+      if (pollTimeout) clearTimeout(pollTimeout)
+    }
   }, [videos, selectedVideo, completedVideos, addNotification])
 
   const handleDelete = async (id: string) => {
