@@ -21,7 +21,6 @@ export function GenerateVideoModal({ isOpen, onClose, onSuccess }: GenerateVideo
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
-  const [videoId, setVideoId] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -30,14 +29,13 @@ export function GenerateVideoModal({ isOpen, onClose, onSuccess }: GenerateVideo
     setLoading(true)
 
     try {
-      const video = await createVideo({
+      await createVideo({
         topic,
         script: script || undefined,
         style,
         duration,
       })
       
-      setVideoId(video.id)
       setSuccess(true)
       
       // Reset form after showing success
@@ -48,7 +46,6 @@ export function GenerateVideoModal({ isOpen, onClose, onSuccess }: GenerateVideo
         setDuration(60)
         setError('')
         setSuccess(false)
-        setVideoId(null)
         onSuccess()
         onClose()
       }, 3000) // Show success message for 3 seconds

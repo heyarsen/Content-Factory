@@ -5,9 +5,8 @@ import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Badge } from '../components/ui/Badge'
-import { Video, Calendar, Users, RefreshCw, Zap } from 'lucide-react'
+import { Video, Calendar, Zap } from 'lucide-react'
 import api from '../lib/api'
-import { useAuth } from '../contexts/AuthContext'
 
 interface VideoStats {
   total: number
@@ -22,7 +21,6 @@ interface PostStats {
 }
 
 export function Dashboard() {
-  const { isAdmin, refreshAdminStatus } = useAuth()
   const [videoStats, setVideoStats] = useState<VideoStats | null>(null)
   const [postStats, setPostStats] = useState<PostStats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -109,26 +107,6 @@ export function Dashboard() {
                          Library
                        </Button>
                      </Link>
-                     {isAdmin && (
-                       <Link to="/admin">
-                         <Button
-                           variant="ghost"
-                           className="border border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/20 hover:text-white"
-                         >
-                           <Users className="mr-2 h-4 w-4" />
-                           Admin
-                         </Button>
-                       </Link>
-                     )}
-                     <Button
-                       variant="ghost"
-                       size="sm"
-                       onClick={refreshAdminStatus}
-                       className="border border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/20 hover:text-white"
-                       title="Refresh admin status"
-                     >
-                       <RefreshCw className="h-4 w-4" />
-                     </Button>
                    </div>
                  </div>
         </section>
