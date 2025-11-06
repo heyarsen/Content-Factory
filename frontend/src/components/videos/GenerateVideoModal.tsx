@@ -31,7 +31,7 @@ export function GenerateVideoModal({ isOpen, onClose, onSuccess }: GenerateVideo
     setLoading(true)
 
     try {
-      const video = await createVideo({
+      await createVideo({
         topic,
         script: script || undefined,
         style,

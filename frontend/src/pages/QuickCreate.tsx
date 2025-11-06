@@ -104,16 +104,18 @@ export function QuickCreate() {
 
   // Poll for video status when video is generating
   useEffect(() => {
-    if (!videoId || videoStatus === 'completed' || videoStatus === 'failed') return
+    if (!videoId) return
+    if (videoStatus === 'completed' || videoStatus === 'failed') return
 
     const pollInterval = setInterval(async () => {
       try {
         const response = await api.get(`/api/videos/${videoId}/status`)
         const video = response.data.video
         const previousStatus = videoStatus
-        setVideoStatus(video.status)
+        const newStatus = video.status as 'pending' | 'generating' | 'completed' | 'failed'
+        setVideoStatus(newStatus)
         
-        if (video.status === 'completed' && video.video_url) {
+        if (newStatus === 'completed' && video.video_url) {
           setVideoUrl(video.video_url)
           setStep('complete')
           
@@ -126,7 +128,7 @@ export function QuickCreate() {
               link: `/videos`,
             })
           }
-        } else if (video.status === 'failed') {
+        } else if (newStatus === 'failed') {
           setVideoError(video.error_message || 'Video generation failed')
           if (previousStatus !== 'failed') {
             addNotification({

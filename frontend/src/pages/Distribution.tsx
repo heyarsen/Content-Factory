@@ -341,13 +341,17 @@ export function Distribution() {
       const failedPosts = posts.filter((p: any) => p.status === 'failed')
       
       if (failedPosts.length > 0) {
-        const errorMessages = failedPosts.map((p: any) => 
-          `${platformNames[p.platform] || p.platform}: ${p.error_message || 'Unknown error'}`
-        ).join('\n')
+        const errorMessages = failedPosts.map((p: any) => {
+          const platform = p.platform as keyof typeof platformNames
+          return `${platformNames[platform] || p.platform}: ${p.error_message || 'Unknown error'}`
+        }).join('\n')
         alert(`Some posts failed:\n${errorMessages}`)
       } else {
         // Success - show success message
-        alert(`Successfully scheduled post${posts.length > 1 ? 's' : ''} to ${posts.map((p: any) => platformNames[p.platform] || p.platform).join(', ')}`)
+        alert(`Successfully scheduled post${posts.length > 1 ? 's' : ''} to ${posts.map((p: any) => {
+          const platform = p.platform as keyof typeof platformNames
+          return platformNames[platform] || p.platform
+        }).join(', ')}`)
       }
       
       setScheduleModal(false)
