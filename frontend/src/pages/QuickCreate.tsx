@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
@@ -75,6 +75,7 @@ export function QuickCreate() {
   // Step 4: Post-Generation
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [videoStatus, setVideoStatus] = useState<'pending' | 'generating' | 'completed' | 'failed'>('pending')
+  const previousStatusRef = useRef<'pending' | 'generating' | 'completed' | 'failed'>('pending')
   const [socialDescription, setSocialDescription] = useState('')
   const [generatingDescription, setGeneratingDescription] = useState(false)
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
@@ -111,8 +112,11 @@ export function QuickCreate() {
       try {
         const response = await api.get(`/api/videos/${videoId}/status`)
         const video = response.data.video
-        const previousStatus = videoStatus
+        const previousStatus = previousStatusRef.current
         const newStatus = video.status as 'pending' | 'generating' | 'completed' | 'failed'
+        
+        // Update ref before setting state
+        previousStatusRef.current = newStatus
         setVideoStatus(newStatus)
         
         if (newStatus === 'completed' && video.video_url) {
@@ -232,7 +236,9 @@ export function QuickCreate() {
 
       console.log('Video generation response:', response.data)
       setVideoId(response.data.video.id)
-      setVideoStatus(response.data.video.status)
+      const initialStatus = response.data.video.status as 'pending' | 'generating' | 'completed' | 'failed'
+      previousStatusRef.current = initialStatus
+      setVideoStatus(initialStatus)
       
       // Show success message immediately
       setVideoError('')
