@@ -113,7 +113,6 @@ export function QuickCreate() {
     let pollInterval: NodeJS.Timeout
     let pollDelay = 3000 // Start with 3 seconds
     let consecutiveErrors = 0
-    let isRateLimited = false
 
     const pollStatus = async () => {
       try {
@@ -124,7 +123,6 @@ export function QuickCreate() {
         
         // Reset error tracking on success
         consecutiveErrors = 0
-        isRateLimited = false
         pollDelay = 3000 // Reset to normal polling interval
         
         // Update ref before setting state
@@ -162,7 +160,6 @@ export function QuickCreate() {
         const is429 = error.response?.status === 429
         
         if (is429) {
-          isRateLimited = true
           // Exponential backoff for rate limits: 30s, 60s, 120s, max 300s
           pollDelay = Math.min(30000 * Math.pow(2, consecutiveErrors - 1), 300000)
           
