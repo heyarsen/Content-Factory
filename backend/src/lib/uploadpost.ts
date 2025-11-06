@@ -340,7 +340,27 @@ export async function postVideo(
     }
 
     if (!response) {
-      throw lastError || new Error('All endpoint attempts failed')
+      // Provide more detailed error message before throwing
+      let errorMessage = 'Failed to post video'
+      
+      if (lastError?.response?.status === 404) {
+        errorMessage = `Upload-Post API endpoint not found (404). The video URL may be invalid or the API endpoint has changed. Video URL: ${request.videoUrl?.substring(0, 100)}...`
+      } else if (lastError?.response?.data) {
+        errorMessage = lastError.response.data.message || 
+                      lastError.response.data.error ||
+                      `Upload-Post API error: ${lastError.response.status} ${lastError.response.statusText}`
+      } else if (lastError?.message) {
+        errorMessage = lastError.message
+      }
+      
+      console.error('Upload-Post final error:', {
+        message: errorMessage,
+        status: lastError?.response?.status,
+        url: request.videoUrl,
+        platforms: request.platforms,
+      })
+      
+      throw new Error(errorMessage)
     }
 
     console.log('Upload-Post API response:', {
@@ -363,27 +383,8 @@ export async function postVideo(
       url: error.config?.url,
     })
     
-    // Provide more detailed error message
-    let errorMessage = 'Failed to post video'
-    
-    if (lastError?.response?.status === 404) {
-      errorMessage = `Upload-Post API endpoint not found (404). The video URL may be invalid or the API endpoint has changed. Video URL: ${request.videoUrl?.substring(0, 100)}...`
-    } else if (lastError?.response?.data) {
-      errorMessage = lastError.response.data.message || 
-                    lastError.response.data.error ||
-                    `Upload-Post API error: ${lastError.response.status} ${lastError.response.statusText}`
-    } else if (lastError?.message) {
-      errorMessage = lastError.message
-    }
-    
-    console.error('Upload-Post final error:', {
-      message: errorMessage,
-      status: lastError?.response?.status,
-      url: request.videoUrl,
-      platforms: request.platforms,
-    })
-    
-    throw new Error(errorMessage)
+    // Re-throw the error (it already has a detailed message if from our code above)
+    throw error
   }
 }
 
