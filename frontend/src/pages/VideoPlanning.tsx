@@ -21,6 +21,7 @@ import {
   X,
   Edit2,
   Save,
+  Trash2,
 } from 'lucide-react'
 import api from '../lib/api'
 
@@ -119,6 +120,8 @@ export function VideoPlanning() {
   const [videoTopics, setVideoTopics] = useState<string[]>(['', '', '']) // Topics for each video slot
   const [videoCategories, setVideoCategories] = useState<Array<string | null>>([null, null, null]) // Categories for each slot
   const [categories, setCategories] = useState<Category[]>([]) // User categories from API
+  const [deleteModal, setDeleteModal] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
   
   // Preset times for quick selection
   const timePresets = [
@@ -281,6 +284,25 @@ export function VideoPlanning() {
     }
   }
 
+  const handleDeletePlan = async () => {
+    if (!deleteModal) return
+
+    setDeleting(true)
+    try {
+      await api.delete(`/api/plans/${deleteModal}`)
+      setPlans(plans.filter((p) => p.id !== deleteModal))
+      if (selectedPlan?.id === deleteModal) {
+        const remainingPlans = plans.filter((p) => p.id !== deleteModal)
+        setSelectedPlan(remainingPlans.length > 0 ? remainingPlans[0] : null)
+      }
+      setDeleteModal(null)
+    } catch (error: any) {
+      alert(error.response?.data?.error || 'Failed to delete plan')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const handleEditItem = (item: VideoPlanItem) => {
     setEditingItem(item)
     setEditForm({
@@ -413,17 +435,25 @@ export function VideoPlanning() {
           <Card className="p-4">
             <div className="flex flex-wrap gap-2">
               {plans.map((plan) => (
-                <button
-                  key={plan.id}
-                  onClick={() => setSelectedPlan(plan)}
-                  className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-                    selectedPlan?.id === plan.id
-                      ? 'bg-brand-500 text-white'
-                      : 'bg-white text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  {plan.name} ({plan.videos_per_day}/day)
-                </button>
+                <div key={plan.id} className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSelectedPlan(plan)}
+                    className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+                      selectedPlan?.id === plan.id
+                        ? 'bg-brand-500 text-white'
+                        : 'bg-white text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    {plan.name} ({plan.videos_per_day}/day)
+                  </button>
+                  <button
+                    onClick={() => setDeleteModal(plan.id)}
+                    className="rounded-xl p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                    title="Delete plan"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               ))}
             </div>
           </Card>
@@ -1046,6 +1076,36 @@ export function VideoPlanning() {
               </Button>
               <Button onClick={handleCreatePlan} loading={creating}>
                 Create Plan
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Delete Plan Modal */}
+        <Modal
+          isOpen={!!deleteModal}
+          onClose={() => setDeleteModal(null)}
+          title="Delete Plan"
+          size="sm"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Are you sure you want to delete this plan? This will also delete all associated plan items. This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                variant="ghost"
+                onClick={() => setDeleteModal(null)}
+                className="border border-white/60 bg-white/70 text-slate-500 hover:border-slate-200 hover:bg-white"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                onClick={handleDeletePlan}
+                loading={deleting}
+              >
+                Delete Plan
               </Button>
             </div>
           </div>

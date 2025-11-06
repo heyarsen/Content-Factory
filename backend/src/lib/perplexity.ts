@@ -171,10 +171,19 @@ Categories and order are fixed: Trading, Fin. Freedom, Lifestyle.`
   } catch (error: any) {
     console.error('Perplexity API error:', error.response?.data || error.message)
     const status = error.response?.status
+    
     if (status === 429) {
-      throw new Error('Rate limit exceeded. Please wait a moment and try again.')
+      const retryAfter = error.response?.headers?.['retry-after'] || error.response?.headers?.['x-ratelimit-reset']
+      const waitTime = retryAfter ? `Please wait ${retryAfter} seconds` : 'Please wait a few minutes'
+      throw new Error(`Rate limit exceeded. ${waitTime} before trying again.`)
     }
-    throw new Error(`Failed to generate topics: ${error.message}`)
+    
+    // Provide more context for other errors
+    const errorMsg = error.response?.data?.error?.message || 
+                     error.response?.data?.message || 
+                     error.message || 
+                     'Unknown error'
+    throw new Error(`Failed to generate topics: ${errorMsg}`)
   }
 }
 
@@ -275,10 +284,19 @@ Return strictly in JSON array with fields "Idea", "Description", "WhyItMatters",
   } catch (error: any) {
     console.error('Perplexity API error:', error.response?.data || error.message)
     const status = error.response?.status
+    
     if (status === 429) {
-      throw new Error('Rate limit exceeded. Please wait a moment and try again.')
+      const retryAfter = error.response?.headers?.['retry-after'] || error.response?.headers?.['x-ratelimit-reset']
+      const waitTime = retryAfter ? `Please wait ${retryAfter} seconds` : 'Please wait a few minutes'
+      throw new Error(`Rate limit exceeded. ${waitTime} before trying again.`)
     }
-    throw new Error(`Failed to research topic: ${error.message}`)
+    
+    // Provide more context for other errors
+    const errorMsg = error.response?.data?.error?.message || 
+                     error.response?.data?.message || 
+                     error.message || 
+                     'Unknown error'
+    throw new Error(`Failed to research topic: ${errorMsg}`)
   }
 }
 

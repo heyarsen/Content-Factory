@@ -255,11 +255,21 @@ export class PlanService {
         .eq('id', itemId)
 
     } catch (error: any) {
+      // Extract user-friendly error message
+      let errorMessage = error.message || 'Failed to research topic'
+      
+      // Handle rate limit errors specifically
+      if (errorMessage.includes('Rate limit') || errorMessage.includes('429')) {
+        errorMessage = 'Rate limit exceeded. The research service is temporarily unavailable. Please try again in a few minutes.'
+      } else if (errorMessage.includes('Failed to research topic')) {
+        errorMessage = `Failed to research topic: ${errorMessage}`
+      }
+      
       await supabase
         .from('video_plan_items')
         .update({
           status: 'failed',
-          error_message: error.message,
+          error_message: errorMessage,
         })
         .eq('id', itemId)
       throw error
