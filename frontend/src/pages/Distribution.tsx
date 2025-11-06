@@ -123,6 +123,19 @@ export function Distribution() {
     loadVideos()
   }, [loadAccounts, statusFilter])
 
+  // Poll for pending posts to update their status
+  useEffect(() => {
+    const pendingPosts = posts.filter(p => p.status === 'pending' && p.upload_post_id)
+    if (pendingPosts.length === 0) return
+
+    const pollInterval = setInterval(() => {
+      // Refresh posts to get updated status
+      loadPosts()
+    }, 15000) // Poll every 15 seconds
+
+    return () => clearInterval(pollInterval)
+  }, [posts, loadPosts])
+
   useEffect(() => {
     const connectedPlatform = searchParams.get('connected') as SocialAccount['platform'] | null
 

@@ -274,6 +274,13 @@ export async function postVideo(
       formData.append('platform[]', platform)
     })
 
+    // Platform-specific parameters
+    // Instagram: Set media_type to REELS for vertical format
+    if (request.platforms.includes('instagram')) {
+      formData.append('media_type', 'REELS')
+      formData.append('share_to_feed', 'true')
+    }
+
     // Optional fields
     if (request.caption) {
       formData.append('description', request.caption)
@@ -419,10 +426,27 @@ export async function getUploadStatus(uploadId: string): Promise<UploadPostRespo
       }
     )
 
+    // Parse results from the response
+    let results: any[] = []
+    
+    if (response.data.results) {
+      // If results is an object with platform keys, convert to array
+      if (typeof response.data.results === 'object' && !Array.isArray(response.data.results)) {
+        results = Object.entries(response.data.results).map(([platform, result]: [string, any]) => ({
+          platform,
+          status: result.success ? 'success' : result.error ? 'failed' : 'pending',
+          post_id: result.url || result.container_id || result.post_id || result.video_id,
+          error: result.error || null,
+        }))
+      } else if (Array.isArray(response.data.results)) {
+        results = response.data.results
+      }
+    }
+
     return {
       upload_id: uploadId,
       status: response.data.status || 'unknown',
-      results: response.data.results,
+      results,
       error: response.data.error,
     }
   } catch (error: any) {

@@ -91,11 +91,16 @@ router.post('/schedule', authenticate, async (req: AuthRequest, res: Response) =
 
       console.log('Upload-Post response:', postResponse)
 
+      // If async upload, start polling for status updates
+      const isAsync = postResponse.status === 'pending' && postResponse.upload_id
+      
       // Create scheduled_post record for each platform
       for (const platform of platforms) {
         const platformResult = postResponse.results?.find((r: any) => r.platform === platform)
         
-        const status = platformResult?.status === 'success' || postResponse.status === 'success' ? 'posted' : 
+        // For async uploads, always start as pending
+        const status = isAsync ? 'pending' :
+                      platformResult?.status === 'success' || postResponse.status === 'success' ? 'posted' : 
                       platformResult?.status === 'failed' ? 'failed' : 'pending'
         
         const { data: postData, error: postError } = await supabase
@@ -119,6 +124,13 @@ router.post('/schedule', authenticate, async (req: AuthRequest, res: Response) =
         }
 
         scheduledPosts.push(postData)
+      }
+
+      // If async upload, start background polling
+      if (isAsync && postResponse.upload_id) {
+        // Poll for status updates in the background (don't await)
+        pollUploadStatus(postResponse.upload_id, platforms, scheduledPosts.map((p: any) => p.id))
+          .catch(err => console.error('Background status polling error:', err))
       }
 
       // Check if any posts failed
@@ -309,6 +321,69 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: 'Internal server error' })
   }
 })
+
+// Background function to poll upload status
+async function pollUploadStatus(
+  uploadId: string,
+  platforms: string[],
+  postIds: string[]
+): Promise<void> {
+  const maxAttempts = 30 // Poll for up to 5 minutes (30 * 10s)
+  let attempts = 0
+
+  while (attempts < maxAttempts) {
+    try {
+      await new Promise(resolve => setTimeout(resolve, 10000)) // Wait 10 seconds between polls
+      attempts++
+
+      const uploadStatus = await getUploadStatus(uploadId)
+      console.log(`Polling upload status (attempt ${attempts}/${maxAttempts}):`, uploadStatus)
+
+      // Update each post based on platform-specific results
+      for (let i = 0; i < platforms.length && i < postIds.length; i++) {
+        const platform = platforms[i]
+        const postId = postIds[i]
+        
+        const platformResult = uploadStatus.results?.find((r: any) => r.platform === platform)
+        
+        if (platformResult) {
+          const status = platformResult.status === 'success' ? 'posted' :
+                        platformResult.status === 'failed' ? 'failed' :
+                        'pending'
+
+          await supabase
+            .from('scheduled_posts')
+            .update({
+              status,
+              posted_at: status === 'posted' ? new Date().toISOString() : null,
+              error_message: platformResult.error || null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', postId)
+
+          console.log(`Updated post ${postId} (${platform}) to status: ${status}`)
+        }
+      }
+
+      // If all platforms are done (success or failed), stop polling
+      const allDone = uploadStatus.results?.every((r: any) => 
+        r.status === 'success' || r.status === 'failed'
+      ) || uploadStatus.status === 'success' || uploadStatus.status === 'failed'
+
+      if (allDone) {
+        console.log('All uploads completed, stopping polling')
+        break
+      }
+    } catch (error: any) {
+      console.error(`Error polling upload status (attempt ${attempts}):`, error)
+      // Continue polling on error
+    }
+  }
+
+  if (attempts >= maxAttempts) {
+    console.warn(`Stopped polling after ${maxAttempts} attempts. Some posts may still be pending.`)
+  }
+}
 
 export default router
 
