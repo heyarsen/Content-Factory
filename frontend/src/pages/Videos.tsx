@@ -11,6 +11,7 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { Modal } from '../components/ui/Modal'
 import { Textarea } from '../components/ui/Textarea'
 import { Video as VideoIcon, Search, Trash2, RefreshCw, Play, Download, FileText, Share2, MessageSquare, Upload } from 'lucide-react'
+import { useNotifications } from '../contexts/NotificationContext'
 import {
   listVideos,
   deleteVideo as deleteVideoRequest,
@@ -24,6 +25,7 @@ import {
 } from '../lib/videos'
 
 export function Videos() {
+  const { addNotification } = useNotifications()
   const [videos, setVideos] = useState<VideoRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -34,6 +36,7 @@ export function Videos() {
   const [loadingVideo, setLoadingVideo] = useState(false)
   const [generatingDescription, setGeneratingDescription] = useState(false)
   const [socialDescription, setSocialDescription] = useState('')
+  const [completedVideos, setCompletedVideos] = useState<Set<string>>(new Set())
 
   const loadVideos = useCallback(async () => {
     try {
@@ -69,6 +72,17 @@ export function Videos() {
             if (selectedVideo?.id === video.id) {
               setSelectedVideo(updated)
             }
+            
+            // Check if video just completed
+            if (updated.status === 'completed' && !completedVideos.has(video.id)) {
+              setCompletedVideos((prev) => new Set(prev).add(video.id))
+              addNotification({
+                type: 'success',
+                title: 'Video Ready!',
+                message: `"${updated.topic}" has finished generating and is ready to view.`,
+                link: `/videos`,
+              })
+            }
           } catch (error) {
             console.error('Failed to refresh video status:', error)
           }
@@ -76,7 +90,7 @@ export function Videos() {
       }
     }, 3000) // Poll every 3 seconds for better UX
     return () => clearInterval(interval)
-  }, [videos, selectedVideo])
+  }, [videos, selectedVideo, completedVideos, addNotification])
 
   const handleDelete = async (id: string) => {
     setDeleting(true)

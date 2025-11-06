@@ -6,6 +6,7 @@ import { Select } from '../ui/Select'
 import { Modal } from '../ui/Modal'
 import { Video } from 'lucide-react'
 import { createVideo } from '../../lib/videos'
+import { useNotifications } from '../../contexts/NotificationContext'
 
 interface GenerateVideoModalProps {
   isOpen: boolean
@@ -14,6 +15,7 @@ interface GenerateVideoModalProps {
 }
 
 export function GenerateVideoModal({ isOpen, onClose, onSuccess }: GenerateVideoModalProps) {
+  const { addNotification } = useNotifications()
   const [topic, setTopic] = useState('')
   const [script, setScript] = useState('')
   const [style, setStyle] = useState<'casual' | 'professional' | 'energetic' | 'educational'>('professional')
@@ -29,14 +31,20 @@ export function GenerateVideoModal({ isOpen, onClose, onSuccess }: GenerateVideo
     setLoading(true)
 
     try {
-      await createVideo({
+      const video = await createVideo({
         topic,
         script: script || undefined,
         style,
         duration,
       })
       
+      // Show success immediately
       setSuccess(true)
+      addNotification({
+        type: 'info',
+        title: 'Video Generation Started!',
+        message: `"${topic}" is now being generated. This typically takes 1-3 minutes. You'll be notified when it's ready!`,
+      })
       
       // Reset form after showing success
       setTimeout(() => {

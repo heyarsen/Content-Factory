@@ -8,9 +8,11 @@ import { Textarea } from '../components/ui/Textarea'
 import { Select } from '../components/ui/Select'
 import { Video } from 'lucide-react'
 import { createVideo } from '../lib/videos'
+import { useNotifications } from '../contexts/NotificationContext'
 
 export function GenerateVideo() {
   const navigate = useNavigate()
+  const { addNotification } = useNotifications()
   const [topic, setTopic] = useState('')
   const [script, setScript] = useState('')
   const [style, setStyle] = useState<'casual' | 'professional' | 'energetic' | 'educational'>('professional')
@@ -33,7 +35,13 @@ export function GenerateVideo() {
         duration,
       })
       
+      // Show success immediately
       setSuccess(true)
+      addNotification({
+        type: 'info',
+        title: 'Video Generation Started!',
+        message: `"${topic}" is now being generated. This typically takes 1-3 minutes. You'll be notified when it's ready!`,
+      })
       
       // Navigate after showing success message
       setTimeout(() => {

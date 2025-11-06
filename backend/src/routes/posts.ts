@@ -54,6 +54,13 @@ router.post('/schedule', authenticate, async (req: AuthRequest, res: Response) =
 
     // Call upload-post.com API once for all platforms
     try {
+      console.log('Posting video to Upload-Post:', {
+        videoUrl: video.video_url,
+        platforms,
+        userId: uploadPostUserId,
+        caption: caption || video.topic,
+      })
+
       const postResponse = await postVideo({
         videoUrl: video.video_url,
         platforms: platforms, // Array of platform names
@@ -63,9 +70,14 @@ router.post('/schedule', authenticate, async (req: AuthRequest, res: Response) =
         asyncUpload: true, // Use async upload to handle multiple platforms
       })
 
+      console.log('Upload-Post response:', postResponse)
+
       // Create scheduled_post record for each platform
       for (const platform of platforms) {
         const platformResult = postResponse.results?.find((r: any) => r.platform === platform)
+        
+        const status = platformResult?.status === 'success' || postResponse.status === 'success' ? 'posted' : 
+                      platformResult?.status === 'failed' ? 'failed' : 'pending'
         
         const { data: postData, error: postError } = await supabase
           .from('scheduled_posts')
@@ -74,8 +86,7 @@ router.post('/schedule', authenticate, async (req: AuthRequest, res: Response) =
             user_id: userId,
             platform: platform,
             scheduled_time: scheduled_time || null,
-            status: platformResult?.status === 'success' || postResponse.status === 'success' ? 'posted' : 
-                    platformResult?.status === 'failed' ? 'failed' : 'pending',
+            status: status,
             upload_post_id: postResponse.upload_id || platformResult?.post_id,
             posted_at: platformResult?.status === 'success' ? new Date().toISOString() : null,
             error_message: platformResult?.error || postResponse.error || null,
@@ -90,8 +101,30 @@ router.post('/schedule', authenticate, async (req: AuthRequest, res: Response) =
 
         scheduledPosts.push(postData)
       }
+
+      // Check if any posts failed
+      const hasFailures = scheduledPosts.some((p: any) => p.status === 'failed')
+      if (hasFailures) {
+        const failedPosts = scheduledPosts.filter((p: any) => p.status === 'failed')
+        const errorMessages = failedPosts.map((p: any) => `${p.platform}: ${p.error_message || 'Unknown error'}`).join('; ')
+        return res.status(400).json({ 
+          error: `Some posts failed: ${errorMessages}`,
+          posts: scheduledPosts 
+        })
+      }
     } catch (error: any) {
-      console.error('Error posting video:', error)
+      console.error('Error posting video:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        stack: error.stack,
+      })
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.response?.data?.error ||
+                          error.message || 
+                          'Failed to post video'
+      
       // Create failed records for all platforms
       for (const platform of platforms) {
         const { data: postData } = await supabase
@@ -102,7 +135,7 @@ router.post('/schedule', authenticate, async (req: AuthRequest, res: Response) =
             platform: platform,
             scheduled_time: scheduled_time || null,
             status: 'failed',
-            error_message: error.message,
+            error_message: errorMessage,
           })
           .select()
           .single()
@@ -111,6 +144,12 @@ router.post('/schedule', authenticate, async (req: AuthRequest, res: Response) =
           scheduledPosts.push(postData)
         }
       }
+      
+      // Return error response so frontend knows it failed
+      return res.status(500).json({ 
+        error: errorMessage,
+        posts: scheduledPosts 
+      })
     }
 
     res.json({ posts: scheduledPosts })

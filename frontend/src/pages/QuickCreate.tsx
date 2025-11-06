@@ -211,7 +211,7 @@ export function QuickCreate() {
       setVideoId(response.data.video.id)
       setVideoStatus(response.data.video.status)
       
-      // Show success message
+      // Show success message immediately
       setVideoError('')
       
       // If video is already completed (unlikely), go to complete step

@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { Bell, Menu, User } from 'lucide-react'
+import { useNotifications } from '../../contexts/NotificationContext'
+import { Bell, Menu, User, X, CheckCircle2, AlertCircle, Info, AlertTriangle } from 'lucide-react'
 import { useMemo, useState, useRef, useEffect } from 'react'
 
 interface HeaderProps {
@@ -10,6 +11,7 @@ interface HeaderProps {
 export function Header({ onToggleSidebar }: HeaderProps) {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const { notifications, unreadCount, markAsRead, markAllAsRead, removeNotification } = useNotifications()
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const notificationRef = useRef<HTMLDivElement>(null)
 
@@ -62,16 +64,96 @@ export function Header({ onToggleSidebar }: HeaderProps) {
               aria-label="Notifications"
             >
               <Bell className="h-5 w-5" />
+              {unreadCount > 0 && (
               <span className="absolute right-2 top-2 inline-flex h-2.5 w-2.5 rounded-full bg-brand-500" />
+              )}
             </button>
 
             {notificationsOpen && (
-              <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-80 sm:max-w-80 rounded-xl border border-slate-200 bg-white shadow-lg z-50">
-                <div className="p-4">
-                  <div className="mb-2 text-sm font-semibold text-slate-900">Notifications</div>
-                  <div className="text-sm text-slate-500">
-                    No new notifications
+              <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-96 sm:max-w-96 rounded-xl border border-slate-200 bg-white shadow-lg z-50 max-h-[80vh] overflow-hidden flex flex-col">
+                <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+                  <div className="text-sm font-semibold text-slate-900">Notifications</div>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={markAllAsRead}
+                      className="text-xs text-brand-600 hover:text-brand-700 font-medium"
+                    >
+                      Mark all as read
+                    </button>
+                  )}
+                </div>
+                <div className="overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <Bell className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                      <div className="text-sm text-slate-500">No notifications</div>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-100">
+                      {notifications.map((notification) => {
+                        const iconMap = {
+                          success: CheckCircle2,
+                          error: AlertCircle,
+                          info: Info,
+                          warning: AlertTriangle,
+                        }
+                        const Icon = iconMap[notification.type]
+                        const iconColors = {
+                          success: 'text-emerald-500',
+                          error: 'text-rose-500',
+                          info: 'text-blue-500',
+                          warning: 'text-amber-500',
+                        }
+
+                        return (
+                          <div
+                            key={notification.id}
+                            className={`p-4 hover:bg-slate-50 transition-colors cursor-pointer ${
+                              !notification.read ? 'bg-blue-50/50' : ''
+                            }`}
+                            onClick={() => {
+                              if (!notification.read) {
+                                markAsRead(notification.id)
+                              }
+                              if (notification.link) {
+                                navigate(notification.link)
+                                setNotificationsOpen(false)
+                              }
+                            }}
+                          >
+                            <div className="flex items-start gap-3">
+                              <Icon className={`h-5 w-5 shrink-0 mt-0.5 ${iconColors[notification.type]}`} />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex-1">
+                                    <p className={`text-sm font-medium ${!notification.read ? 'text-slate-900' : 'text-slate-700'}`}>
+                                      {notification.title}
+                                    </p>
+                                    <p className="text-xs text-slate-500 mt-1">{notification.message}</p>
+                                    <p className="text-xs text-slate-400 mt-1">
+                                      {new Date(notification.createdAt).toLocaleString()}
+                                    </p>
+                                  </div>
+                                  {!notification.read && (
+                                    <span className="inline-flex h-2 w-2 rounded-full bg-brand-500 shrink-0 mt-1" />
+                                  )}
+                                </div>
+                              </div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  removeNotification(notification.id)
+                                }}
+                                className="shrink-0 text-slate-400 hover:text-slate-600"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
                   </div>
+                  )}
                 </div>
               </div>
             )}

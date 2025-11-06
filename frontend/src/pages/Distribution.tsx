@@ -329,12 +329,27 @@ export function Distribution() {
 
     setScheduling(true)
     try {
-      await api.post('/api/posts/schedule', {
+      const response = await api.post('/api/posts/schedule', {
         video_id: selectedVideo,
         platforms: selectedPlatforms,
         scheduled_time: scheduledTime || null,
         caption: caption || undefined,
       })
+      
+      // Check if any posts failed
+      const posts = response.data.posts || []
+      const failedPosts = posts.filter((p: any) => p.status === 'failed')
+      
+      if (failedPosts.length > 0) {
+        const errorMessages = failedPosts.map((p: any) => 
+          `${platformNames[p.platform] || p.platform}: ${p.error_message || 'Unknown error'}`
+        ).join('\n')
+        alert(`Some posts failed:\n${errorMessages}`)
+      } else {
+        // Success - show success message
+        alert(`Successfully scheduled post${posts.length > 1 ? 's' : ''} to ${posts.map((p: any) => platformNames[p.platform] || p.platform).join(', ')}`)
+      }
+      
       setScheduleModal(false)
       setSelectedVideo('')
       setSelectedPlatforms([])
@@ -343,7 +358,8 @@ export function Distribution() {
       loadPosts()
     } catch (error: any) {
       console.error('Failed to schedule post:', error)
-      alert(error.response?.data?.error || 'Failed to schedule post')
+      const errorMessage = error.response?.data?.error || 'Failed to schedule post'
+      alert(errorMessage)
     } finally {
       setScheduling(false)
     }

@@ -273,6 +273,12 @@ export async function postVideo(
       payload.user_id = request.userId
     }
 
+    console.log('Upload-Post API request:', {
+      url: `${UPLOADPOST_API_URL}/upload_videos`,
+      payload,
+      hasApiKey: !!getUploadPostKey(),
+    })
+
     const response = await axios.post(
       `${UPLOADPOST_API_URL}/upload_videos`,
       payload,
@@ -281,8 +287,14 @@ export async function postVideo(
           'Authorization': getAuthHeader(),
           'Content-Type': 'application/json',
         },
+        timeout: 30000, // 30 second timeout
       }
     )
+
+    console.log('Upload-Post API response:', {
+      status: response.status,
+      data: response.data,
+    })
 
     return {
       upload_id: response.data.upload_id || response.data.id,
@@ -291,10 +303,20 @@ export async function postVideo(
       error: response.data.error,
     }
   } catch (error: any) {
-    console.error('Upload-post API error:', error.response?.data || error.message)
-    throw new Error(
-      error.response?.data?.message || 'Failed to post video'
-    )
+    console.error('Upload-post API error:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      url: error.config?.url,
+    })
+    
+    const errorMessage = error.response?.data?.message || 
+                        error.response?.data?.error ||
+                        error.message || 
+                        'Failed to post video'
+    
+    throw new Error(errorMessage)
   }
 }
 
