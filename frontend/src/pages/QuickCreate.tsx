@@ -9,6 +9,7 @@ import { Select } from '../components/ui/Select'
 import { Badge } from '../components/ui/Badge'
 import { Video, Sparkles, FileText, CheckCircle2, ArrowRight, ArrowLeft, Loader, Download, Share2, Instagram, Youtube, Users, Facebook } from 'lucide-react'
 import api from '../lib/api'
+import { useNotifications } from '../contexts/NotificationContext'
 
 interface Category {
   id: string
@@ -43,6 +44,7 @@ const platformNames: Record<string, string> = {
 
 export function QuickCreate() {
   const navigate = useNavigate()
+  const { addNotification } = useNotifications()
   const [step, setStep] = useState<Step>('idea')
   
   // Step 1: Idea
@@ -108,12 +110,31 @@ export function QuickCreate() {
       try {
         const response = await api.get(`/api/videos/${videoId}/status`)
         const video = response.data.video
+        const previousStatus = videoStatus
         setVideoStatus(video.status)
+        
         if (video.status === 'completed' && video.video_url) {
           setVideoUrl(video.video_url)
           setStep('complete')
+          
+          // Show notification when video completes
+          if (previousStatus !== 'completed') {
+            addNotification({
+              type: 'success',
+              title: 'Video Ready!',
+              message: `"${topic}" has finished generating and is ready to view.`,
+              link: `/videos`,
+            })
+          }
         } else if (video.status === 'failed') {
           setVideoError(video.error_message || 'Video generation failed')
+          if (previousStatus !== 'failed') {
+            addNotification({
+              type: 'error',
+              title: 'Video Generation Failed',
+              message: `"${topic}" failed to generate: ${video.error_message || 'Unknown error'}`,
+            })
+          }
         }
       } catch (error) {
         console.error('Failed to poll video status:', error)
@@ -121,7 +142,7 @@ export function QuickCreate() {
     }, 3000) // Poll every 3 seconds
 
     return () => clearInterval(pollInterval)
-  }, [videoId, videoStatus])
+  }, [videoId, videoStatus, topic, addNotification])
 
   const loadCategories = async () => {
     try {
@@ -213,6 +234,11 @@ export function QuickCreate() {
       
       // Show success message immediately
       setVideoError('')
+      addNotification({
+        type: 'info',
+        title: 'Video Generation Started!',
+        message: `"${topic}" is now being generated. This typically takes 1-3 minutes. You'll be notified when it's ready!`,
+      })
       
       // If video is already completed (unlikely), go to complete step
       if (response.data.video.status === 'completed' && response.data.video.video_url) {
