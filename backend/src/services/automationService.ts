@@ -572,7 +572,7 @@ export class AutomationService {
         // Fetch video to check status and URL
         const { data: videoData } = await supabase
           .from('videos')
-          .select('video_url, status')
+          .select('video_url, status, topic')
           .eq('id', item.video_id)
           .single()
 
@@ -870,7 +870,7 @@ export class AutomationService {
     // Fetch video to verify status and URL
     const { data: videoData } = await supabase
       .from('videos')
-      .select('video_url, status')
+      .select('video_url, status, topic')
       .eq('id', item.video_id)
       .single()
 
