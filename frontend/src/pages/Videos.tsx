@@ -394,7 +394,7 @@ export function Videos() {
             setSocialDescription('') // Clear description when modal closes
           }}
           title="Video Details"
-          size="lg"
+          size="md"
         >
           {loadingVideo ? (
             <div className="py-12 text-center">

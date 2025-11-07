@@ -144,12 +144,13 @@ export class PlanService {
         let topic: string | null = null
         let category: string | null = null
         
-        // If user provided a topic, set it directly
+        // If user provided a topic, set it directly and ALWAYS use it
         if (customTopic) {
           topic = customTopic
           category = customCategory
-          // If auto_research is enabled, start with researching, otherwise ready
-          status = plan.auto_research ? 'pending' : 'ready'
+          // If auto_research is enabled, still set topic but mark as ready for script generation
+          // The topic provided by user should ALWAYS be used, not overwritten by research
+          status = plan.auto_research ? 'ready' : 'ready'
         }
         
         const { data: item, error } = await supabase
@@ -161,6 +162,7 @@ export class PlanService {
             topic: topic,
             category: category,
             status: status,
+            platforms: plan.default_platforms || null, // Set platforms from plan's default_platforms
           })
           .select()
           .single()
@@ -168,10 +170,13 @@ export class PlanService {
         if (!error && item) {
           items.push(item)
           
-          // Auto-generate topic if no custom topic provided and auto_research is enabled
+          // Only auto-generate topic if no custom topic was provided and auto_research is enabled
+          // If user provided a topic, we should NOT generate a new one - use the user's topic
           if (!customTopic && plan.auto_research) {
+            // No topic provided, generate one
             this.generateTopicForItem(item.id, userId).catch(console.error)
           }
+          // If customTopic exists, it's already set and should be preserved
         }
       }
       
@@ -199,6 +204,60 @@ export class PlanService {
    * Generate topic for a plan item using Perplexity
    */
   static async generateTopicForItem(itemId: string, userId: string): Promise<void> {
+    // First, check if item already has a topic (user-provided)
+    const { data: existingItem } = await supabase
+      .from('video_plan_items')
+      .select('topic')
+      .eq('id', itemId)
+      .single()
+
+    // If item already has a topic, don't overwrite it - just research it if needed
+    if (existingItem?.topic) {
+      // Item has a user-provided topic, research it instead of generating a new one
+      try {
+        // Get the plan item to find category
+        const { data: item } = await supabase
+          .from('video_plan_items')
+          .select('*, plan:video_plans(*)')
+          .eq('id', itemId)
+          .single()
+
+        if (!item) throw new Error('Plan item not found')
+
+        // Update status to researching
+        await supabase
+          .from('video_plan_items')
+          .update({ status: 'researching' })
+          .eq('id', itemId)
+
+        // Research the existing topic
+        const research = await ResearchService.researchTopic(
+          existingItem.topic,
+          item.category || 'general'
+        )
+
+        // Update the plan item with research data but keep the original topic
+        await supabase
+          .from('video_plan_items')
+          .update({
+            // Keep the original topic - don't overwrite it
+            category: research.category as string || item.category,
+            description: research.description,
+            why_important: research.whyItMatters,
+            useful_tips: research.usefulTips,
+            research_data: research,
+            status: 'ready',
+          })
+          .eq('id', itemId)
+        
+        return
+      } catch (error: any) {
+        console.error('Error researching existing topic:', error)
+        throw error
+      }
+    }
+
+    // No topic exists, generate a new one
     // Update status to researching
     await supabase
       .from('video_plan_items')

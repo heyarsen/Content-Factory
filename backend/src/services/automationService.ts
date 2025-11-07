@@ -89,26 +89,26 @@ export class AutomationService {
           const researchPromises: Promise<void>[] = []
           
           for (const item of pendingItems) {
-            // If item has a topic but status is pending, it means auto_research is enabled
-            // Generate research for it
+            // If item has a topic but status is pending, check if we need to research it
             if (plan.auto_research) {
               if (item.topic) {
-                // Has topic but needs research
+                // Has user-provided topic - research it (generateTopicForItem will preserve the topic)
+                // This will research the topic without overwriting it
                 researchPromises.push(
                   PlanService.generateTopicForItem(item.id, plan.user_id).catch((error) => {
-                    console.error(`Error generating research for item ${item.id}:`, error)
+                    console.error(`Error researching topic for item ${item.id}:`, error)
                   })
                 )
               } else {
                 // No topic, generate topic first (which will also research it)
                 researchPromises.push(
                   PlanService.generateTopicForItem(item.id, plan.user_id).catch((error) => {
-                    console.error(`Error generating research for item ${item.id}:`, error)
+                    console.error(`Error generating topic for item ${item.id}:`, error)
                   })
                 )
               }
             } else if (item.topic) {
-              // Has topic but no auto_research, mark as ready
+              // Has topic but no auto_research, mark as ready for script generation
               await supabase
                 .from('video_plan_items')
                 .update({ status: 'ready' })
