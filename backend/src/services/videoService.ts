@@ -491,8 +491,18 @@ export class VideoService {
       .single()
 
     if (error || !data) {
-      console.error('Error creating video record:', error)
-      throw new Error('Failed to create video record')
+      console.error('Error creating video record:', {
+        error,
+        userId,
+        topic: input.topic,
+        hasScript: !!input.script,
+        style: input.style,
+        duration: input.duration,
+        avatarRecordId,
+      })
+      const errorMessage = error?.message || 'Failed to create video record'
+      const detailedMessage = error?.details ? `${errorMessage}: ${error.details}` : errorMessage
+      throw new Error(detailedMessage)
     }
 
     return data

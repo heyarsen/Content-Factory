@@ -504,16 +504,16 @@ export function VideoPlanning() {
       generating: 'info',
       researching: 'info',
       pending: 'warning',
-      draft: 'warning',
+      draft: 'info', // Show as info when generating script
       failed: 'error',
     }
     const labels: Record<string, string> = {
       pending: 'Pending',
       researching: 'Researching...',
       ready: 'Ready',
-      draft: 'Draft',
+      draft: 'Generating Script', // Show "Generating Script" when status is draft
       approved: 'Approved',
-      generating: 'Generating...',
+      generating: 'Creating Video', // Show "Creating Video" when generating
       completed: 'Completed',
       scheduled: 'Scheduled',
       posted: 'Posted',
