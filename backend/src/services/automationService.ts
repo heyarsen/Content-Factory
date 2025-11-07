@@ -272,13 +272,18 @@ export class AutomationService {
           throw new Error('Missing topic or script for video generation')
         }
 
-        console.log(`[Video Generation] Creating video for item ${item.id} with topic: ${item.topic}`)
+        console.log(`[Video Generation] Creating video for item ${item.id} with topic: "${item.topic}" and script length: ${item.script?.length || 0}`)
+        
+        // Ensure we're using the correct topic - use item.topic as the primary topic
+        // The script should already be based on this topic, but we pass both for clarity
         const video = await VideoService.requestManualVideo(userId, {
-          topic: item.topic,
-          script: item.script,
+          topic: item.topic || 'Video Content', // Ensure topic is never empty
+          script: item.script, // Script should match the topic
           style: 'professional',
           duration: 30,
         })
+        
+        console.log(`[Video Generation] Video created with ID: ${video.id}, topic: "${video.topic}"`)
 
         const finalUpdate = await supabase
           .from('video_plan_items')
@@ -376,14 +381,22 @@ export class AutomationService {
 
         const research = item.research_data
 
+        // Prioritize item.topic over research.Idea - user's topic input should always be used
+        const topicToUse = item.topic || research?.Idea || ''
+        if (!topicToUse) {
+          throw new Error('No topic available for script generation')
+        }
+
         // If no research but has topic, use topic directly
         const script = await ScriptService.generateScriptCustom({
-          idea: item.topic || research?.Idea || '',
+          idea: topicToUse, // Always use the item's topic first
           description: item.description || research?.Description || '',
           whyItMatters: item.why_important || research?.WhyItMatters || '',
           usefulTips: item.useful_tips || research?.UsefulTips || '',
           category: item.category || research?.Category || 'general',
         })
+        
+        console.log(`[Script Generation] Generated script for topic: "${topicToUse}" (item topic: "${item.topic || 'N/A'}")`)
 
         const newStatus = plan.auto_approve ? 'approved' : 'draft'
         const scriptStatus = plan.auto_approve ? 'approved' : 'draft'
@@ -491,6 +504,48 @@ export class AutomationService {
    * Schedule distribution for completed videos
    */
   static async scheduleDistributionForCompletedVideos(): Promise<void> {
+    // First, refresh video statuses for videos that might have completed
+    const { data: itemsWithVideos } = await supabase
+      .from('video_plan_items')
+      .select('*, plan:video_plans!inner(enabled, user_id, default_platforms), videos(*)')
+      .eq('plan.enabled', true)
+      .eq('status', 'generating')
+      .not('video_id', 'is', null)
+      .limit(10)
+
+    // Refresh video statuses
+    if (itemsWithVideos && itemsWithVideos.length > 0) {
+      const { getVideoStatus } = await import('../lib/heygen.js')
+      for (const item of itemsWithVideos) {
+        const video = item.videos as any
+        if (video?.heygen_video_id) {
+          try {
+            const status = await getVideoStatus(video.heygen_video_id)
+            await supabase
+              .from('videos')
+              .update({
+                status: status.status === 'completed' ? 'completed' : (status.status === 'failed' ? 'failed' : 'generating'),
+                video_url: status.video_url || video.video_url,
+                error_message: status.error || null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', video.id)
+
+            // If video completed, update plan item status
+            if (status.status === 'completed' && status.video_url) {
+              await supabase
+                .from('video_plan_items')
+                .update({ status: 'completed' })
+                .eq('id', item.id)
+            }
+          } catch (error: any) {
+            console.error(`[Distribution] Error refreshing video status for ${video.id}:`, error)
+          }
+        }
+      }
+    }
+
+    // Now get items with completed videos
     const { data: items } = await supabase
       .from('video_plan_items')
       .select('*, plan:video_plans!inner(enabled, user_id, default_platforms), videos(*)')
@@ -500,7 +555,12 @@ export class AutomationService {
       .is('scheduled_post_id', null) // Only schedule if not already scheduled
       .limit(10)
 
-    if (!items) return
+    if (!items || items.length === 0) {
+      console.log('[Distribution] No completed items found for posting')
+      return
+    }
+
+    console.log(`[Distribution] Found ${items.length} completed items to post`)
 
     for (const item of items) {
       try {
@@ -521,18 +581,27 @@ export class AutomationService {
         }
 
         const platforms = item.platforms || plan.default_platforms || []
-        if (platforms.length === 0) continue
+        if (platforms.length === 0) {
+          console.log(`[Distribution] Skipping item ${item.id} - no platforms configured`)
+          continue
+        }
+
+        console.log(`[Distribution] Processing item ${item.id} for platforms: ${platforms.join(', ')}`)
 
         // Get user's connected social accounts
         const { data: accounts } = await supabase
           .from('social_accounts')
-          .select('platform_account_id')
+          .select('platform_account_id, platform')
           .eq('user_id', plan.user_id)
           .in('platform', platforms)
           .eq('status', 'connected')
-          .limit(1)
 
-        if (!accounts || accounts.length === 0) continue
+        if (!accounts || accounts.length === 0) {
+          console.log(`[Distribution] Skipping item ${item.id} - no connected social accounts for platforms: ${platforms.join(', ')}`)
+          continue
+        }
+
+        console.log(`[Distribution] Found ${accounts.length} connected account(s) for item ${item.id}`)
 
         const uploadPostUserId = accounts[0].platform_account_id
 
@@ -552,13 +621,20 @@ export class AutomationService {
         }
 
         // Call upload-post.com API
+        console.log(`[Distribution] Posting video ${item.video_id} to platforms: ${platforms.join(', ')}`)
         const postResponse = await postVideo({
           videoUrl: videoData.video_url,
           platforms: platforms as string[],
-          caption: item.caption || item.topic || '',
+          caption: item.caption || item.topic || videoData.topic || '',
           scheduledTime,
           userId: uploadPostUserId,
           asyncUpload: true,
+        })
+        
+        console.log(`[Distribution] Post response for item ${item.id}:`, {
+          status: postResponse.status,
+          upload_id: postResponse.upload_id,
+          resultsCount: postResponse.results?.length || 0,
         })
 
         // Create scheduled_posts records
@@ -698,17 +774,22 @@ export class AutomationService {
     }
 
     const research = item.research_data
-    if (!research) {
-      throw new Error('Item must have research data')
+    
+    // Prioritize item.topic over research.Idea - user's topic input should always be used
+    const topicToUse = item.topic || research?.Idea || ''
+    if (!topicToUse) {
+      throw new Error('No topic available for script generation')
     }
 
     const script = await ScriptService.generateScriptCustom({
-      idea: item.topic || research.Idea || '',
-      description: item.description || research.Description || '',
-      whyItMatters: item.why_important || research.WhyItMatters || '',
-      usefulTips: item.useful_tips || research.UsefulTips || '',
-      category: item.category || research.Category || 'Trading',
+      idea: topicToUse, // Always use the item's topic first
+      description: item.description || research?.Description || '',
+      whyItMatters: item.why_important || research?.WhyItMatters || '',
+      usefulTips: item.useful_tips || research?.UsefulTips || '',
+      category: item.category || research?.Category || 'Trading',
     })
+    
+    console.log(`[Script Generation] Generated script for topic: "${topicToUse}" (item topic: "${item.topic || 'N/A'}")`)
 
     const plan = item.plan as any
     const newStatus = plan.auto_approve ? 'approved' : 'draft'
