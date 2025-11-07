@@ -149,8 +149,8 @@ export function initializeScheduler(): void {
   })
 
   // Automation: Generate research for ready items with topics but no research (Step 1.5)
-  // Runs every 10 minutes
-  cron.schedule('*/10 * * * *', async () => {
+  // Runs every 5 minutes for faster processing
+  cron.schedule('*/5 * * * *', async () => {
     console.log('[Cron] Running automation: generate research for ready items...')
     try {
       await AutomationService.generateResearchForReadyItems()
@@ -161,8 +161,8 @@ export function initializeScheduler(): void {
   })
 
   // Automation: Generate scripts for ready items (Step 2)
-  // Runs every 10 minutes
-  cron.schedule('*/10 * * * *', async () => {
+  // Runs every 2 minutes for faster processing
+  cron.schedule('*/2 * * * *', async () => {
     console.log('[Cron] Running automation: generate scripts...')
     try {
       await AutomationService.generateScriptsForReadyItems()
@@ -173,8 +173,8 @@ export function initializeScheduler(): void {
   })
 
   // Automation: Generate videos for approved scripts (Step 4)
-  // Runs every 5 minutes
-  cron.schedule('*/5 * * * *', async () => {
+  // Runs every 2 minutes for faster processing
+  cron.schedule('*/2 * * * *', async () => {
     console.log('[Cron] Running automation: generate videos...')
     try {
       await AutomationService.generateVideosForApprovedItems()

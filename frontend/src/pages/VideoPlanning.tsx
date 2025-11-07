@@ -174,16 +174,16 @@ export function VideoPlanning() {
     }
   }, [selectedPlan])
 
-  // Poll for status updates every 10 seconds for items in progress
+  // Poll for status updates more frequently for items in progress
   useEffect(() => {
     if (!selectedPlan) return
 
-    // Set up polling interval - always poll when a plan is selected
+    // Set up polling interval - poll more frequently to show status updates quickly
     // The backend will handle checking if updates are needed
     const planId = selectedPlan.id
     const interval = setInterval(() => {
       loadPlanItems(planId)
-    }, 10000) // Poll every 10 seconds
+    }, 3000) // Poll every 3 seconds for faster status updates
 
     return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
