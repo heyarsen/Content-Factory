@@ -22,6 +22,9 @@ import {
   Edit2,
   Save,
   Trash2,
+  FileText,
+  Play,
+  ExternalLink,
 } from 'lucide-react'
 import api from '../lib/api'
 
@@ -135,6 +138,7 @@ export function VideoPlanning() {
   const [deleting, setDeleting] = useState(false)
   const [editPlanModal, setEditPlanModal] = useState<VideoPlan | null>(null)
   const [editingPlan, setEditingPlan] = useState(false)
+  const [selectedItem, setSelectedItem] = useState<VideoPlanItem | null>(null)
 
   // Preset times for quick selection
   const timePresets = [
@@ -793,7 +797,18 @@ export function VideoPlanning() {
                         ),
                       )
                       .map((item) => (
-                        <Card key={item.id} className="p-5">
+                        <Card 
+                          key={item.id} 
+                          className="p-5 cursor-pointer transition hover:shadow-md"
+                          onClick={(e: React.MouseEvent<HTMLDivElement>) => {
+                            // Don't open modal if clicking on buttons or interactive elements
+                            const target = e.target as HTMLElement
+                            if (target.closest('button') || target.closest('a') || editingItem?.id === item.id) {
+                              return
+                            }
+                            setSelectedItem(item)
+                          }}
+                        >
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex-1 space-y-3">
                               <div className="flex items-center gap-3">
@@ -1743,6 +1758,279 @@ export function VideoPlanning() {
                 >
                   Approve
                 </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
+
+        {/* Plan Item Details Modal */}
+        <Modal
+          isOpen={selectedItem !== null}
+          onClose={() => setSelectedItem(null)}
+          title="Plan Item Details"
+          size="lg"
+        >
+          {selectedItem && (
+            <div className="space-y-6">
+              {/* Header Info */}
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Scheduled Time
+                  </label>
+                  <p className="mt-1 text-sm font-medium text-primary">
+                    {formatTime(selectedItem.scheduled_time)}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Scheduled Date
+                  </label>
+                  <p className="mt-1 text-sm font-medium text-primary">
+                    {new Date(selectedItem.scheduled_date).toLocaleDateString()}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Status
+                  </label>
+                  <div className="mt-1">
+                    {getStatusBadge(selectedItem.status, selectedItem.script_status)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Topic */}
+              {selectedItem.topic && (
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Topic
+                  </label>
+                  <p className="mt-1 text-lg font-semibold text-primary">
+                    {selectedItem.topic}
+                  </p>
+                </div>
+              )}
+
+              {/* Category */}
+              {selectedItem.category && (
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Category
+                  </label>
+                  <p className="mt-1 text-sm font-medium text-primary">
+                    {selectedItem.category}
+                  </p>
+                </div>
+              )}
+
+              {/* Description */}
+              {selectedItem.description && (
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Description
+                  </label>
+                  <p className="mt-1 text-sm text-slate-700">
+                    {selectedItem.description}
+                  </p>
+                </div>
+              )}
+
+              {/* Why Important */}
+              {selectedItem.why_important && (
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Why It Matters
+                  </label>
+                  <p className="mt-1 text-sm text-slate-700">
+                    {selectedItem.why_important}
+                  </p>
+                </div>
+              )}
+
+              {/* Useful Tips */}
+              {selectedItem.useful_tips && (
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Useful Tips
+                  </label>
+                  <p className="mt-1 text-sm text-slate-700">
+                    {selectedItem.useful_tips}
+                  </p>
+                </div>
+              )}
+
+              {/* Script */}
+              {selectedItem.script && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-slate-400" />
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Script
+                    </label>
+                    {selectedItem.script_status && (
+                      <Badge variant={selectedItem.script_status === 'approved' ? 'success' : selectedItem.script_status === 'rejected' ? 'error' : 'warning'}>
+                        {selectedItem.script_status}
+                      </Badge>
+                    )}
+                  </div>
+                  <Textarea
+                    value={selectedItem.script}
+                    readOnly
+                    rows={8}
+                    className="font-mono text-sm"
+                  />
+                  {selectedItem.script_status === 'draft' && (
+                    <div className="flex gap-3 pt-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          handleRejectScript(selectedItem.id)
+                          setSelectedItem(null)
+                        }}
+                        leftIcon={<X className="h-4 w-4" />}
+                      >
+                        Reject
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          handleApproveScript(selectedItem.id)
+                          setSelectedItem(null)
+                        }}
+                        leftIcon={<Check className="h-4 w-4" />}
+                      >
+                        Approve
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Caption */}
+              {selectedItem.caption && (
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Social Media Caption
+                  </label>
+                  <p className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">
+                    {selectedItem.caption}
+                  </p>
+                </div>
+              )}
+
+              {/* Platforms */}
+              {selectedItem.platforms && selectedItem.platforms.length > 0 && (
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Platforms
+                  </label>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {selectedItem.platforms.map((platform) => (
+                      <Badge key={platform} variant="default">
+                        {platform}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Video Link */}
+              {selectedItem.video_id && (
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Video
+                  </label>
+                  <div className="mt-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => window.open(`/videos`, '_blank')}
+                      leftIcon={<ExternalLink className="h-4 w-4" />}
+                    >
+                      View Video
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Error Message */}
+              {selectedItem.error_message && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-rose-700">
+                    Error Message
+                  </label>
+                  <p className="mt-1 text-sm text-rose-600">
+                    {selectedItem.error_message}
+                  </p>
+                </div>
+              )}
+
+              {/* Timestamps */}
+              <div className="grid grid-cols-2 gap-4 border-t border-slate-200 pt-4">
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Created
+                  </label>
+                  <p className="mt-1 text-sm font-medium text-primary">
+                    {new Date(selectedItem.created_at).toLocaleString()}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Updated
+                  </label>
+                  <p className="mt-1 text-sm font-medium text-primary">
+                    {new Date(selectedItem.updated_at).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 border-t border-slate-200 pt-4">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setEditingItem(selectedItem)
+                    setEditForm({
+                      topic: selectedItem.topic || '',
+                      scheduled_time: selectedItem.scheduled_time || '',
+                      description: selectedItem.description || '',
+                      why_important: selectedItem.why_important || '',
+                      useful_tips: selectedItem.useful_tips || '',
+                      caption: selectedItem.caption || '',
+                      platforms: selectedItem.platforms || [],
+                    })
+                    setSelectedItem(null)
+                  }}
+                  leftIcon={<Edit2 className="h-4 w-4" />}
+                >
+                  Edit
+                </Button>
+                {selectedItem.script && selectedItem.script_status === 'draft' && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        handleRejectScript(selectedItem.id)
+                        setSelectedItem(null)
+                      }}
+                      leftIcon={<X className="h-4 w-4" />}
+                    >
+                      Reject Script
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        handleApproveScript(selectedItem.id)
+                        setSelectedItem(null)
+                      }}
+                      leftIcon={<Check className="h-4 w-4" />}
+                    >
+                      Approve Script
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           )}
