@@ -47,7 +47,7 @@ export class AutomationService {
 
         let shouldProcessPlan = plan.auto_schedule_trigger !== 'daily'
 
-        // For daily trigger, check if it's time to process (within 15 minutes window)
+        // For daily trigger, check if it's time to process (at or past trigger time, within 5 minutes window)
         if (plan.auto_schedule_trigger === 'daily' && plan.trigger_time) {
           const [triggerHourStr, triggerMinuteStr] = plan.trigger_time.split(':')
           const triggerHour = parseInt(triggerHourStr, 10)
@@ -55,26 +55,35 @@ export class AutomationService {
 
           const triggerMinutes = triggerHour * 60 + triggerMinute
           const currentMinutes = currentHour * 60 + currentMinute
-          const timeDiff = Math.abs(currentMinutes - triggerMinutes)
-          const minutesDiff = Math.min(timeDiff, 1440 - timeDiff)
-
-          shouldProcessPlan = minutesDiff <= 15
+          
+          // Process if we're at or past the trigger time (within 5 minutes window)
+          // This ensures we catch the trigger time exactly when cron runs
+          shouldProcessPlan = currentMinutes >= triggerMinutes && (currentMinutes - triggerMinutes) <= 5
         }
 
         if (!shouldProcessPlan) {
           continue
         }
+        
+        console.log(`[Automation] Processing plan ${plan.id} at trigger time ${plan.trigger_time || 'N/A'}`)
 
         pipelineTriggered = true
 
         // Get pending items for today that need research
-        const { data: pendingItems } = await supabase
+        // Also check items that match the trigger time (if scheduled_time is set)
+        const query = supabase
           .from('video_plan_items')
           .select('*')
           .eq('plan_id', plan.id)
           .eq('status', 'pending')
           .eq('scheduled_date', today)
-          .limit(plan.videos_per_day)
+        
+        // If trigger_time is set, also filter by scheduled_time matching trigger_time
+        if (plan.trigger_time) {
+          query.eq('scheduled_time', plan.trigger_time)
+        }
+        
+        const { data: pendingItems } = await query.limit(plan.videos_per_day)
 
         if (pendingItems && pendingItems.length > 0) {
           const researchPromises: Promise<void>[] = []
@@ -115,30 +124,37 @@ export class AutomationService {
         }
 
         // Also check for items that are 'ready' but might have been missed
-        const { data: readyItems } = await supabase
+        // Prioritize items that match the trigger time
+        const readyQuery = supabase
           .from('video_plan_items')
           .select('*')
           .eq('plan_id', plan.id)
           .eq('scheduled_date', today)
           .eq('status', 'ready')
           .is('script', null)
-          .limit(plan.videos_per_day)
+        
+        // If trigger_time is set, prioritize items matching that time
+        if (plan.trigger_time) {
+          readyQuery.eq('scheduled_time', plan.trigger_time)
+        }
+        
+        const { data: readyItems } = await readyQuery.limit(plan.videos_per_day)
 
         // Generate scripts for today's items (including items that are already ready from previous runs)
         if (readyItems && readyItems.length > 0) {
-          console.log(`[Automation] Found ${readyItems.length} ready items for script generation`)
+          console.log(`[Automation] Found ${readyItems.length} ready items for script generation at trigger time`)
           await this.generateScriptsForTodayItems(plan.id, today, plan.auto_approve || false)
           // Small delay to ensure script generation updates are reflected
           await new Promise(resolve => setTimeout(resolve, 2000))
         } else {
-          // Also try to generate scripts for items that might already be ready
+          // Also try to generate scripts for items that might already be ready (without time filter)
           await this.generateScriptsForTodayItems(plan.id, today, plan.auto_approve || false)
           await new Promise(resolve => setTimeout(resolve, 1000))
         }
 
         // Generate videos for today's approved items
         console.log(`[Automation] Checking for approved items to generate videos for plan ${plan.id}`)
-        await this.generateVideosForTodayItems(plan.id, today, plan.user_id, plan.auto_create || false)
+        await this.generateVideosForTodayItems(plan.id, today, plan.user_id, plan.auto_create || false, plan.trigger_time || undefined)
       } catch (error) {
         console.error(`Error processing plan ${plan.id}:`, error)
       }
@@ -178,17 +194,21 @@ export class AutomationService {
 
     for (const item of allItems) {
       try {
-        // Update status to show script generation in progress
+        // Update status to show script generation in progress IMMEDIATELY
+        // This ensures the UI shows "Generating Script" right away
         const updateResult = await supabase
           .from('video_plan_items')
-          .update({ status: 'draft' }) // Using 'draft' status to indicate script generation
+          .update({ 
+            status: 'draft', // Using 'draft' status to indicate script generation
+            updated_at: new Date().toISOString()
+          })
           .eq('id', item.id)
           .select()
 
         if (updateResult.error) {
           console.error(`[Script Generation] Failed to update status for item ${item.id}:`, updateResult.error)
         } else {
-          console.log(`[Script Generation] Updated item ${item.id} status to 'draft' (Generating Script)`)
+          console.log(`[Script Generation] Updated item ${item.id} status to 'draft' (Generating Script) - Topic: "${item.topic || 'N/A'}"`)
         }
 
         const research = item.research_data
@@ -236,11 +256,11 @@ export class AutomationService {
   /**
    * Generate videos for today's approved items in a specific plan
    */
-  static async generateVideosForTodayItems(planId: string, today: string, userId: string, autoCreate: boolean): Promise<void> {
+  static async generateVideosForTodayItems(planId: string, today: string, userId: string, autoCreate: boolean, triggerTime?: string): Promise<void> {
     // Only auto-create if auto_create is enabled
     if (!autoCreate) return
 
-    const { data: items } = await supabase
+    const query = supabase
       .from('video_plan_items')
       .select('*')
       .eq('plan_id', planId)
@@ -249,23 +269,33 @@ export class AutomationService {
       .eq('script_status', 'approved')
       .is('video_id', null)
       .not('script', 'is', null)
-      .limit(10)
+    
+    // If trigger_time is provided, prioritize items matching that time
+    if (triggerTime) {
+      query.eq('scheduled_time', triggerTime)
+    }
+    
+    const { data: items } = await query.limit(10)
 
     if (!items || items.length === 0) return
 
     for (const item of items) {
       try {
-        // Update status to show video generation in progress
+        // Update status to show video generation in progress IMMEDIATELY
+        // This ensures the UI shows "Creating Video" right away
         const statusUpdate = await supabase
           .from('video_plan_items')
-          .update({ status: 'generating' })
+          .update({ 
+            status: 'generating',
+            updated_at: new Date().toISOString()
+          })
           .eq('id', item.id)
           .select()
 
         if (statusUpdate.error) {
           console.error(`[Video Generation] Failed to update status for item ${item.id}:`, statusUpdate.error)
         } else {
-          console.log(`[Video Generation] Updated item ${item.id} status to 'generating' (Creating Video)`)
+          console.log(`[Video Generation] Updated item ${item.id} status to 'generating' (Creating Video) - Topic: "${item.topic || 'N/A'}"`)
         }
 
         if (!item.topic || !item.script) {
