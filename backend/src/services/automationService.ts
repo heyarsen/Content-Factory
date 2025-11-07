@@ -67,7 +67,7 @@ export class AutomationService {
 
         pipelineTriggered = true
 
-        // Get pending items for today
+        // Get pending items for today that need research
         const { data: pendingItems } = await supabase
           .from('video_plan_items')
           .select('*')
@@ -77,16 +77,26 @@ export class AutomationService {
           .limit(plan.videos_per_day)
 
         if (pendingItems && pendingItems.length > 0) {
+          const researchPromises: Promise<void>[] = []
+          
           for (const item of pendingItems) {
             // If item has a topic but status is pending, it means auto_research is enabled
             // Generate research for it
             if (plan.auto_research) {
               if (item.topic) {
                 // Has topic but needs research
-                await PlanService.generateTopicForItem(item.id, plan.user_id).catch(console.error)
+                researchPromises.push(
+                  PlanService.generateTopicForItem(item.id, plan.user_id).catch((error) => {
+                    console.error(`Error generating research for item ${item.id}:`, error)
+                  })
+                )
               } else {
                 // No topic, generate topic first (which will also research it)
-                await PlanService.generateTopicForItem(item.id, plan.user_id).catch(console.error)
+                researchPromises.push(
+                  PlanService.generateTopicForItem(item.id, plan.user_id).catch((error) => {
+                    console.error(`Error generating research for item ${item.id}:`, error)
+                  })
+                )
               }
             } else if (item.topic) {
               // Has topic but no auto_research, mark as ready
@@ -96,29 +106,150 @@ export class AutomationService {
                 .eq('id', item.id)
             }
           }
+
+          // Wait for all research to complete before generating scripts
+          await Promise.all(researchPromises)
+          
+          // Small delay to ensure database updates are reflected
+          await new Promise(resolve => setTimeout(resolve, 2000))
         }
+
+        // Generate scripts for today's items (including items that are already ready from previous runs)
+        await this.generateScriptsForTodayItems(plan.id, today, plan.auto_approve || false)
+
+        // Small delay to ensure script generation updates are reflected
+        await new Promise(resolve => setTimeout(resolve, 1000))
+
+        // Generate videos for today's approved items
+        await this.generateVideosForTodayItems(plan.id, today, plan.user_id, plan.auto_create || false)
       } catch (error) {
         console.error(`Error processing plan ${plan.id}:`, error)
       }
     }
+  }
 
-    if (pipelineTriggered) {
+  /**
+   * Generate scripts for today's items in a specific plan
+   */
+  static async generateScriptsForTodayItems(planId: string, today: string, autoApprove: boolean): Promise<void> {
+    // Get items with research data for today
+    const { data: itemsWithResearch } = await supabase
+      .from('video_plan_items')
+      .select('*')
+      .eq('plan_id', planId)
+      .eq('scheduled_date', today)
+      .eq('status', 'ready')
+      .is('script', null)
+      .not('research_data', 'is', null)
+      .limit(10)
+
+    // Also get items with topics but no research (will use topic directly)
+    const { data: itemsWithTopic } = await supabase
+      .from('video_plan_items')
+      .select('*')
+      .eq('plan_id', planId)
+      .eq('scheduled_date', today)
+      .eq('status', 'ready')
+      .is('script', null)
+      .is('research_data', null)
+      .not('topic', 'is', null)
+      .limit(10)
+
+    const allItems = [...(itemsWithResearch || []), ...(itemsWithTopic || [])]
+
+    if (allItems.length === 0) return
+
+    for (const item of allItems) {
       try {
-        await this.generateScriptsForReadyItems()
-      } catch (error) {
-        console.error('[Automation] Error during script generation pipeline:', error)
+        const research = item.research_data
+
+        // If no research but has topic, use topic directly
+        const script = await ScriptService.generateScriptCustom({
+          idea: item.topic || research?.Idea || '',
+          description: item.description || research?.Description || '',
+          whyItMatters: item.why_important || research?.WhyItMatters || '',
+          usefulTips: item.useful_tips || research?.UsefulTips || '',
+          category: item.category || research?.Category || 'general',
+        })
+
+        const newStatus = autoApprove ? 'approved' : 'draft'
+        const scriptStatus = autoApprove ? 'approved' : 'draft'
+
+        await supabase
+          .from('video_plan_items')
+          .update({
+            script,
+            script_status: scriptStatus,
+            status: newStatus,
+          })
+          .eq('id', item.id)
+
+        console.log(`[Script Generation] Generated script for today's item ${item.id}`)
+      } catch (error: any) {
+        console.error(`Error generating script for today's item ${item.id}:`, error)
+        await supabase
+          .from('video_plan_items')
+          .update({
+            status: 'failed',
+            error_message: error.message,
+          })
+          .eq('id', item.id)
       }
+    }
+  }
 
-      try {
-        await this.generateVideosForApprovedItems()
-      } catch (error) {
-        console.error('[Automation] Error during video generation pipeline:', error)
-      }
+  /**
+   * Generate videos for today's approved items in a specific plan
+   */
+  static async generateVideosForTodayItems(planId: string, today: string, userId: string, autoCreate: boolean): Promise<void> {
+    // Only auto-create if auto_create is enabled
+    if (!autoCreate) return
 
+    const { data: items } = await supabase
+      .from('video_plan_items')
+      .select('*')
+      .eq('plan_id', planId)
+      .eq('scheduled_date', today)
+      .eq('status', 'approved')
+      .eq('script_status', 'approved')
+      .is('video_id', null)
+      .not('script', 'is', null)
+      .limit(10)
+
+    if (!items || items.length === 0) return
+
+    for (const item of items) {
       try {
-        await this.scheduleDistributionForCompletedVideos()
-      } catch (error) {
-        console.error('[Automation] Error during distribution scheduling pipeline:', error)
+        await supabase
+          .from('video_plan_items')
+          .update({ status: 'generating' })
+          .eq('id', item.id)
+
+        const video = await VideoService.requestManualVideo(userId, {
+          topic: item.topic!,
+          script: item.script!,
+          style: 'professional',
+          duration: 30,
+        })
+
+        await supabase
+          .from('video_plan_items')
+          .update({
+            video_id: video.id,
+            status: 'completed',
+          })
+          .eq('id', item.id)
+
+        console.log(`[Video Generation] Generated video for today's item ${item.id}`)
+      } catch (error: any) {
+        console.error(`Error generating video for today's item ${item.id}:`, error)
+        await supabase
+          .from('video_plan_items')
+          .update({
+            status: 'failed',
+            error_message: error.message,
+          })
+          .eq('id', item.id)
       }
     }
   }
