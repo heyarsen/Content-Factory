@@ -535,7 +535,108 @@ export class AutomationService {
    * This runs frequently to check video status updates and post at scheduled times
    */
   static async checkVideoStatusAndScheduleDistribution(): Promise<void> {
+    // First, check and update pending async uploads
+    await this.checkPendingUploadStatus()
+    // Then, schedule new distributions
     await this.scheduleDistributionForCompletedVideos()
+  }
+
+  /**
+   * Check status of pending async uploads and update scheduled posts
+   */
+  static async checkPendingUploadStatus(): Promise<void> {
+    // Get all pending scheduled posts with upload_post_id
+    const { data: pendingPosts } = await supabase
+      .from('scheduled_posts')
+      .select('*')
+      .eq('status', 'pending')
+      .not('upload_post_id', 'is', null)
+      .limit(20) // Check up to 20 posts at a time
+
+    if (!pendingPosts || pendingPosts.length === 0) {
+      return
+    }
+
+    console.log(`[Distribution] Checking status for ${pendingPosts.length} pending uploads`)
+
+    const { getUploadStatus } = await import('../lib/uploadpost.js')
+
+    for (const post of pendingPosts) {
+      if (!post.upload_post_id) continue
+
+      try {
+        const uploadStatus = await getUploadStatus(post.upload_post_id)
+        console.log(`[Distribution] Upload status for post ${post.id} (${post.platform}):`, {
+          status: uploadStatus.status,
+          resultsCount: uploadStatus.results?.length || 0,
+        })
+
+        // Find the platform-specific result
+        const platformResult = uploadStatus.results?.find((r: any) => r.platform === post.platform)
+
+        if (platformResult) {
+          const newStatus = platformResult.status === 'success' ? 'posted' :
+                           platformResult.status === 'failed' ? 'failed' :
+                           'pending'
+
+          // Only update if status changed
+          if (newStatus !== post.status) {
+            await supabase
+              .from('scheduled_posts')
+              .update({
+                status: newStatus,
+                posted_at: newStatus === 'posted' ? new Date().toISOString() : post.posted_at,
+                error_message: platformResult.error || null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', post.id)
+
+            console.log(`[Distribution] Updated post ${post.id} (${post.platform}) from ${post.status} to ${newStatus}`)
+
+            // If post succeeded, update plan item status
+            if (newStatus === 'posted') {
+              const { data: item } = await supabase
+                .from('video_plan_items')
+                .select('id, status')
+                .eq('video_id', post.video_id)
+                .single()
+
+              if (item && item.status !== 'posted') {
+                // Check if all posts for this video are posted
+                const { data: allPosts } = await supabase
+                  .from('scheduled_posts')
+                  .select('status')
+                  .eq('video_id', post.video_id)
+
+                const allPosted = allPosts?.every((p: any) => p.status === 'posted' || p.status === 'failed')
+                if (allPosted) {
+                  await supabase
+                    .from('video_plan_items')
+                    .update({ status: 'posted' })
+                    .eq('id', item.id)
+                  console.log(`[Distribution] All posts completed for item ${item.id}, updated status to posted`)
+                }
+              }
+            }
+          }
+        } else if (uploadStatus.status === 'success' || uploadStatus.status === 'failed') {
+          // Overall status is known, but no platform-specific result
+          const newStatus = uploadStatus.status === 'success' ? 'posted' : 'failed'
+          await supabase
+            .from('scheduled_posts')
+            .update({
+              status: newStatus,
+              posted_at: newStatus === 'posted' ? new Date().toISOString() : post.posted_at,
+              error_message: uploadStatus.error || null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', post.id)
+        }
+      } catch (error: any) {
+        console.error(`[Distribution] Error checking upload status for post ${post.id}:`, error.message)
+        // Don't throw - continue checking other posts
+      }
+    }
   }
 
   /**
@@ -678,54 +779,142 @@ export class AutomationService {
 
         // Call upload-post.com API
         console.log(`[Distribution] Posting video ${item.video_id} to platforms: ${platforms.join(', ')}`)
-        const postResponse = await postVideo({
-          videoUrl: videoData.video_url,
-          platforms: platforms as string[],
-          caption: item.caption || item.topic || videoData.topic || '',
-          scheduledTime,
-          userId: uploadPostUserId,
-          asyncUpload: true,
-        })
-        
-        console.log(`[Distribution] Post response for item ${item.id}:`, {
-          status: postResponse.status,
-          upload_id: postResponse.upload_id,
+        let postResponse
+        try {
+          postResponse = await postVideo({
+            videoUrl: videoData.video_url,
+            platforms: platforms as string[],
+            caption: item.caption || item.topic || videoData.topic || '',
+            scheduledTime,
+            userId: uploadPostUserId,
+            asyncUpload: true,
+          })
+          
+          console.log(`[Distribution] Post response for item ${item.id}:`, {
+            status: postResponse.status,
+            upload_id: postResponse.upload_id,
+            resultsCount: postResponse.results?.length || 0,
+            hasResults: !!postResponse.results,
+          })
+        } catch (postError: any) {
+          console.error(`[Distribution] Failed to post video for item ${item.id}:`, {
+            error: postError.message,
+            videoUrl: videoData.video_url,
+            platforms,
+            userId: uploadPostUserId,
+          })
+          // Update item with error
+          await supabase
+            .from('video_plan_items')
+            .update({
+              status: 'failed',
+              error_message: `Failed to post: ${postError.message}`,
+            })
+            .eq('id', item.id)
+          continue // Skip to next item
+        }
+
+        // Check if async upload was initiated
+        const isAsyncUpload = (postResponse.status === 'pending' || postResponse.status === 'scheduled') && postResponse.upload_id
+        const hasImmediateResults = postResponse.results && postResponse.results.length > 0
+        const allImmediateSuccess = postResponse.results?.every((r: any) => r.status === 'success')
+
+        console.log(`[Distribution] Upload response analysis:`, {
+          isAsyncUpload,
+          hasImmediateResults,
+          allImmediateSuccess,
+          uploadId: postResponse.upload_id,
           resultsCount: postResponse.results?.length || 0,
         })
 
-        // Create scheduled_posts records
+        // Create scheduled_posts records for each platform
         const postIds: string[] = []
         for (const platform of platforms) {
           const platformResult = postResponse.results?.find((r: any) => r.platform === platform)
+          
+          // Determine initial status based on response
+          let initialStatus = 'pending'
+          if (platformResult?.status === 'success') {
+            initialStatus = 'posted'
+          } else if (platformResult?.status === 'failed') {
+            initialStatus = 'failed'
+          } else if (isAsyncUpload) {
+            // Async upload started - will check status later via cron job
+            initialStatus = 'pending'
+          } else if (scheduledTime) {
+            // Scheduled for future posting
+            initialStatus = 'pending'
+          } else {
+            // No immediate result - mark as pending and check later
+            initialStatus = 'pending'
+          }
 
-          const { data: postData } = await supabase
+          const { data: postData, error: postError } = await supabase
             .from('scheduled_posts')
             .insert({
               video_id: item.video_id,
               user_id: plan.user_id,
               platform: platform,
               scheduled_time: scheduledTime ? new Date(scheduledTime).toISOString() : null,
-              status: platformResult?.status === 'success' ? 'posted' : (scheduledTime ? 'pending' : 'pending'),
-              upload_post_id: postResponse.upload_id || platformResult?.post_id,
+              status: initialStatus,
+              upload_post_id: postResponse.upload_id || platformResult?.post_id || null,
               posted_at: platformResult?.status === 'success' ? new Date().toISOString() : null,
               error_message: platformResult?.error || null,
             })
             .select()
             .single()
 
+          if (postError) {
+            console.error(`[Distribution] Failed to create scheduled_post for ${platform}:`, postError)
+            // Continue with other platforms even if one fails
+            continue
+          }
+
           if (postData) {
             postIds.push(postData.id)
+            console.log(`[Distribution] Created scheduled_post ${postData.id} for platform ${platform} with status ${initialStatus}, upload_post_id: ${postData.upload_post_id}`)
           }
         }
 
         // Update plan item status
-        await supabase
-          .from('video_plan_items')
-          .update({ 
-            status: scheduledTime ? 'scheduled' : 'posted',
-            scheduled_post_id: postIds[0] || null,
-          })
-          .eq('id', item.id)
+        if (postIds.length > 0) {
+          // If all platforms posted immediately, mark as posted
+          // Otherwise, mark as completed (video is ready, posts are pending/completed)
+          let itemStatus: string
+          if (allImmediateSuccess && !scheduledTime) {
+            itemStatus = 'posted'
+          } else if (scheduledTime) {
+            itemStatus = 'scheduled'
+          } else {
+            // Video is ready, posts are in progress (async) or pending
+            itemStatus = 'completed'
+          }
+
+          const updateResult = await supabase
+            .from('video_plan_items')
+            .update({ 
+              status: itemStatus,
+              scheduled_post_id: postIds[0] || null,
+            })
+            .eq('id', item.id)
+            .select()
+
+          if (updateResult.error) {
+            console.error(`[Distribution] Failed to update item ${item.id} status:`, updateResult.error)
+          } else {
+            console.log(`[Distribution] Updated item ${item.id} status to ${itemStatus} with ${postIds.length} scheduled posts`)
+          }
+        } else {
+          console.error(`[Distribution] No scheduled posts were created for item ${item.id} - this indicates a problem`)
+          // Mark as failed if no posts were created
+          await supabase
+            .from('video_plan_items')
+            .update({
+              status: 'failed',
+              error_message: 'Failed to create scheduled posts - no posts were created',
+            })
+            .eq('id', item.id)
+        }
       } catch (error: any) {
         console.error(`Error scheduling distribution for item ${item.id}:`, error)
         await supabase
@@ -996,3 +1185,4 @@ export class AutomationService {
       .eq('id', itemId)
   }
 }
+

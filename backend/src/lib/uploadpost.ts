@@ -295,7 +295,25 @@ export async function postVideo(
     // Always use async upload to avoid timeouts
     formData.append('async_upload', String(request.asyncUpload ?? true))
 
-    const endpoint = `${UPLOADPOST_API_URL}/upload`
+    // Try both endpoints - /upload and /uploadposts/upload
+    // The API might use either depending on version
+    const endpoints = [
+      `${UPLOADPOST_API_URL}/uploadposts/upload`,
+      `${UPLOADPOST_API_URL}/upload`,
+    ]
+    
+    let endpoint = endpoints[0]
+    let lastError: any = null
+    
+    // Try the first endpoint, fallback to second if it fails
+    for (const tryEndpoint of endpoints) {
+      try {
+        endpoint = tryEndpoint
+        break // Use first endpoint by default
+      } catch (e) {
+        lastError = e
+      }
+    }
 
     console.log('Upload-Post API request:', {
       endpoint,
@@ -322,60 +340,123 @@ export async function postVideo(
       // Continue anyway - Upload-Post might handle it
     }
 
-    const response = await axios.post(
-      endpoint,
-      formData,
-      {
-        headers: {
-          'Authorization': getAuthHeader(),
-          ...formData.getHeaders(), // Important: form-data needs proper headers
-        },
-        timeout: 30000, // 30 second timeout
+    let response
+    try {
+      response = await axios.post(
+        endpoint,
+        formData,
+        {
+          headers: {
+            'Authorization': getAuthHeader(),
+            ...formData.getHeaders(), // Important: form-data needs proper headers
+          },
+          timeout: 30000, // 30 second timeout
+        }
+      )
+    } catch (firstError: any) {
+      // If first endpoint fails with 404, try the alternative endpoint
+      if (firstError.response?.status === 404 && endpoints.length > 1) {
+        console.log(`[Upload-Post] First endpoint failed with 404, trying alternative endpoint`)
+        endpoint = endpoints[1]
+        try {
+          response = await axios.post(
+            endpoint,
+            formData,
+            {
+              headers: {
+                'Authorization': getAuthHeader(),
+                ...formData.getHeaders(),
+              },
+              timeout: 30000,
+            }
+          )
+        } catch (secondError: any) {
+          // Both endpoints failed, throw the original error
+          throw firstError
+        }
+      } else {
+        throw firstError
       }
-    )
+    }
 
     console.log('Upload-Post API response:', {
       status: response.status,
+      statusText: response.statusText,
       data: response.data,
+      headers: response.headers,
     })
 
-    // Handle different response formats
+    // Handle different response formats based on upload-post.com API
+    // Response can be:
+    // 1. 202 Accepted - Scheduled upload (has job_id)
+    // 2. 200 OK with request_id - Async upload started
+    // 3. 200 OK with results - Synchronous response with immediate results
+    
     if (response.status === 202) {
       // Scheduled - return job_id as upload_id
+      const uploadId = response.data.job_id || response.data.request_id || response.data.upload_id
+      console.log('[Upload-Post] Scheduled upload, job_id:', uploadId)
       return {
-        upload_id: response.data.job_id,
+        upload_id: uploadId,
         status: 'scheduled',
         results: [],
       }
-    } else if (response.data.request_id) {
-      // Async upload started
-      return {
-        upload_id: response.data.request_id,
-        status: 'pending',
-        results: [],
+    }
+    
+    // Check for async upload response
+    if (response.data.request_id || response.data.upload_id) {
+      const uploadId = response.data.request_id || response.data.upload_id
+      console.log('[Upload-Post] Async upload started, request_id:', uploadId)
+      
+      // If there are immediate results, include them
+      let results: any[] = []
+      if (response.data.results) {
+        if (typeof response.data.results === 'object' && !Array.isArray(response.data.results)) {
+          results = Object.entries(response.data.results).map(([platform, result]: [string, any]) => ({
+            platform,
+            status: result.success ? 'success' : (result.error ? 'failed' : 'pending'),
+            post_id: result.url || result.container_id || result.post_id || result.video_id,
+            error: result.error || null,
+          }))
+        } else if (Array.isArray(response.data.results)) {
+          results = response.data.results
+        }
       }
-    } else if (response.data.results) {
-      // Synchronous response with results
-      const results = Object.entries(response.data.results || {}).map(([platform, result]: [string, any]) => ({
-        platform,
-        status: result.success ? 'success' : 'failed',
-        post_id: result.url || result.container_id || result.post_id || result.video_id,
-        error: result.error || null,
-      }))
-
+      
       return {
-        upload_id: response.data.request_id || undefined,
-        status: response.data.success ? 'success' : 'pending',
+        upload_id: uploadId,
+        status: results.length > 0 && results.every((r: any) => r.status === 'success') ? 'success' : 'pending',
+        results,
+      }
+    }
+    
+    // Check for synchronous response with results
+    if (response.data.results) {
+      const results = typeof response.data.results === 'object' && !Array.isArray(response.data.results)
+        ? Object.entries(response.data.results).map(([platform, result]: [string, any]) => ({
+            platform,
+            status: result.success ? 'success' : (result.error ? 'failed' : 'pending'),
+            post_id: result.url || result.container_id || result.post_id || result.video_id,
+            error: result.error || null,
+          }))
+        : response.data.results
+
+      console.log('[Upload-Post] Synchronous response with results:', results)
+      return {
+        upload_id: response.data.request_id || response.data.upload_id || undefined,
+        status: response.data.success ? 'success' : (response.data.status || 'pending'),
         results,
         error: response.data.error || null,
       }
     }
 
-    // Fallback response
+    // Fallback - log warning and return pending status
+    console.warn('[Upload-Post] Unexpected response format:', response.data)
     return {
-      upload_id: response.data.request_id || response.data.job_id,
+      upload_id: response.data.request_id || response.data.job_id || response.data.upload_id || undefined,
       status: 'pending',
       results: [],
+      error: 'Unexpected response format from upload-post API',
     }
   } catch (error: any) {
     console.error('Upload-post API error:', {
