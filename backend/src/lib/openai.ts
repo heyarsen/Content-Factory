@@ -7,6 +7,8 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
+export { openai }
+
 export interface ScriptGenerationRequest {
   idea: string
   description: string
