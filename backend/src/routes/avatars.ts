@@ -576,4 +576,30 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
   }
 })
 
+// Upload look image to HeyGen and get image_key
+router.post('/upload-look-image', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { photo_data } = req.body // photo_data is base64 data URL
+
+    if (!photo_data) {
+      return res.status(400).json({ error: 'photo_data is required' })
+    }
+
+    // Import uploadImageToHeyGen function
+    const { uploadImageToHeyGen } = await import('../lib/heygen.js')
+    
+    // Upload to HeyGen and get image_key
+    const imageKey = await uploadImageToHeyGen(photo_data)
+
+    return res.json({
+      image_key: imageKey,
+    })
+  } catch (error: any) {
+    console.error('Upload look image error:', error)
+    return res.status(500).json({ 
+      error: error.message || 'Failed to upload look image' 
+    })
+  }
+})
+
 export default router

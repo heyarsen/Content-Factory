@@ -381,7 +381,7 @@ export async function generateVideo(
  * 
  * Note: HeyGen supports JPEG and PNG, but not WebP. WebP images will be converted to JPEG.
  */
-async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
+export async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
   const apiKey = getHeyGenKey()
   const HEYGEN_UPLOAD_URL = 'https://upload.heygen.com/v1/asset'
   

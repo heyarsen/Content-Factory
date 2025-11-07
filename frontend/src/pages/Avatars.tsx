@@ -6,7 +6,7 @@ import { Input } from '../components/ui/Input'
 import { Modal } from '../components/ui/Modal'
 import { useToast } from '../hooks/useToast'
 import api from '../lib/api'
-import { RefreshCw, Star, Trash2, User, Upload, Plus, Sparkles } from 'lucide-react'
+import { RefreshCw, Star, Trash2, User, Upload, Plus, Sparkles, Image, Loader2, X } from 'lucide-react'
 import { Select } from '../components/ui/Select'
 import { Textarea } from '../components/ui/Textarea'
 
@@ -37,6 +37,13 @@ export default function Avatars() {
   const [showGenerateAIModal, setShowGenerateAIModal] = useState(false)
   const [generatingAI, setGeneratingAI] = useState(false)
   const [checkingStatus, setCheckingStatus] = useState(false)
+  const [showLooksModal, setShowLooksModal] = useState<Avatar | null>(null)
+  const [showAddLooksModal, setShowAddLooksModal] = useState(false)
+  const [showGenerateLookModal, setShowGenerateLookModal] = useState(false)
+  const [addingLooks, setAddingLooks] = useState(false)
+  const [generatingLook, setGeneratingLook] = useState(false)
+  const [lookImageFiles, setLookImageFiles] = useState<File[]>([])
+  const [lookImagePreviews, setLookImagePreviews] = useState<string[]>([])
   
   // AI Generation form fields
   const [aiName, setAiName] = useState('')
@@ -48,6 +55,12 @@ export default function Avatars() {
   const [aiStyle, setAiStyle] = useState<'Realistic' | 'Cartoon' | 'Anime'>('Realistic')
   const [aiAppearance, setAiAppearance] = useState('')
   
+  // Generate look form fields
+  const [lookPrompt, setLookPrompt] = useState('')
+  const [lookOrientation, setLookOrientation] = useState<'horizontal' | 'vertical' | 'square'>('square')
+  const [lookPose, setLookPose] = useState<'half_body' | 'full_body' | 'close_up'>('close_up')
+  const [lookStyle, setLookStyle] = useState<'Realistic' | 'Cartoon' | 'Anime'>('Realistic')
+  
   const fileInputRef = useRef<HTMLInputElement>(null)
   const statusCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const { toast } = useToast()
@@ -58,10 +71,37 @@ export default function Avatars() {
     toastRef.current = toast
   }, [toast])
 
+  // Helper function to check if avatar is user-created
+  const isUserCreatedAvatar = (avatar: Avatar): boolean => {
+    // User-created avatars have Supabase storage URLs or specific statuses
+    if (avatar.avatar_url && avatar.avatar_url.includes('supabase.co/storage')) {
+      return true
+    }
+    // AI generation in progress
+    if (avatar.status === 'generating') {
+      return true
+    }
+    // Training or pending status without HeyGen CDN URL
+    if ((avatar.status === 'training' || avatar.status === 'pending') && 
+        (!avatar.avatar_url || !avatar.avatar_url.includes('heygen'))) {
+      return true
+    }
+    // Exclude avatars with HeyGen CDN URLs (synced from HeyGen)
+    if (avatar.avatar_url && avatar.avatar_url.includes('heygen')) {
+      return false
+    }
+    // Include avatars with no URL if they're in training/pending (recently created)
+    if (!avatar.avatar_url && (avatar.status === 'training' || avatar.status === 'pending')) {
+      return true
+    }
+    return false
+  }
+
   const loadAvatars = useCallback(async () => {
     try {
       setLoading(true)
-      const params = onlyCreated ? { created: 'true' } : {}
+      // Backend expects 'all=true' to show all avatars, default shows only user-created
+      const params = onlyCreated ? {} : { all: 'true' }
       const response = await api.get('/api/avatars', { params })
       setAvatars(response.data.avatars || [])
       setDefaultAvatarId(response.data.default_avatar_id || null)
@@ -445,6 +485,124 @@ export default function Avatars() {
     }
   }
 
+  const handleManageLooks = (avatar: Avatar) => {
+    setShowLooksModal(avatar)
+  }
+
+  const handleAddLooks = async () => {
+    if (!showLooksModal || lookImageFiles.length === 0) {
+      toast.error('Please select at least one image')
+      return
+    }
+
+    setAddingLooks(true)
+    try {
+      // Upload images and get image_keys
+      const imageKeys: string[] = []
+      for (const file of lookImageFiles) {
+        const base64Data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onloadend = () => {
+            if (reader.result && typeof reader.result === 'string') {
+              resolve(reader.result)
+            } else {
+              reject(new Error('Failed to read file'))
+            }
+          }
+          reader.onerror = () => reject(new Error('Failed to read file'))
+          reader.readAsDataURL(file)
+        })
+
+        // Upload to HeyGen via backend endpoint
+        // The backend will handle uploading to HeyGen and return image_key
+        const uploadResponse = await api.post('/api/avatars/upload-look-image', {
+          photo_data: base64Data,
+        })
+        imageKeys.push(uploadResponse.data.image_key)
+      }
+
+      // Add looks to avatar group
+      await api.post('/api/avatars/add-looks', {
+        group_id: showLooksModal.heygen_avatar_id,
+        image_keys: imageKeys,
+        name: showLooksModal.avatar_name,
+      })
+
+      toast.success('Looks added successfully!')
+      setShowAddLooksModal(false)
+      setShowLooksModal(null)
+      setLookImageFiles([])
+      setLookImagePreviews([])
+      await loadAvatars()
+    } catch (error: any) {
+      console.error('Failed to add looks:', error)
+      toast.error(error.response?.data?.error || 'Failed to add looks')
+    } finally {
+      setAddingLooks(false)
+    }
+  }
+
+  const handleGenerateLook = async () => {
+    if (!showLooksModal || !lookPrompt.trim()) {
+      toast.error('Please enter a prompt for the look')
+      return
+    }
+
+    setGeneratingLook(true)
+    try {
+      const response = await api.post('/api/avatars/generate-look', {
+        group_id: showLooksModal.heygen_avatar_id,
+        prompt: lookPrompt,
+        orientation: lookOrientation,
+        pose: lookPose,
+        style: lookStyle,
+      })
+
+      toast.success('Look generation started! This may take a few minutes.')
+      setShowGenerateLookModal(false)
+      setShowLooksModal(null)
+      setLookPrompt('')
+      setLookOrientation('square')
+      setLookPose('close_up')
+      setLookStyle('Realistic')
+    } catch (error: any) {
+      console.error('Failed to generate look:', error)
+      toast.error(error.response?.data?.error || 'Failed to generate look')
+    } finally {
+      setGeneratingLook(false)
+    }
+  }
+
+  const handleLookFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    const validFiles = files.filter(file => {
+      if (!file.type.startsWith('image/')) {
+        toast.error(`${file.name} is not an image file`)
+        return false
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(`${file.name} is larger than 10MB`)
+        return false
+      }
+      return true
+    })
+
+    setLookImageFiles([...lookImageFiles, ...validFiles])
+    
+    // Create previews
+    validFiles.forEach(file => {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        if (reader.result) {
+          setLookImagePreviews(prev => [...prev, reader.result as string])
+        }
+      }
+      reader.readAsDataURL(file)
+    })
+  }
+
   if (loading) {
     return (
       <Layout>
@@ -598,14 +756,27 @@ export default function Avatars() {
                         Set Default
                       </Button>
                     )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(avatar.id, avatar.avatar_name)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {isUserCreatedAvatar(avatar) && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleManageLooks(avatar)}
+                          className="text-brand-600 hover:text-brand-700 hover:bg-brand-50"
+                          title="Manage Looks"
+                        >
+                          <Image className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(avatar.id, avatar.avatar_name)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               </Card>
@@ -622,20 +793,23 @@ export default function Avatars() {
         >
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Avatar Name
-              </label>
-              <Input
-                value={avatarName}
-                onChange={(e) => setAvatarName(e.target.value)}
-                placeholder="Enter avatar name"
-                disabled={creating}
-              />
+              <p className="text-sm text-slate-600 mb-4">
+                Upload a front-facing photo to create a personalized avatar for your videos.
+              </p>
             </div>
+
+            <Input
+              label="Avatar Name"
+              value={avatarName}
+              onChange={(e) => setAvatarName(e.target.value)}
+              placeholder="Enter avatar name (e.g., Professional Business Person)"
+              disabled={creating}
+              required
+            />
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Photo
+                Photo *
               </label>
               {photoPreview ? (
                 <div className="space-y-3">
@@ -743,11 +917,13 @@ export default function Avatars() {
               </div>
             ) : (
               <>
-                <p className="text-sm text-slate-600">
-                  Describe the avatar you want to generate. AI will create a unique avatar based on your description.
-                </p>
+                <div className="rounded-lg bg-brand-50 border border-brand-200 p-4 mb-2">
+                  <p className="text-sm text-slate-700">
+                    <span className="font-semibold">AI Avatar Generation:</span> Describe the avatar you want to generate. AI will create a unique avatar based on your detailed description.
+                  </p>
+                </div>
 
-                <div className="grid gap-6 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-2">
                   <Input
                     label="Avatar Name *"
                     value={aiName}
@@ -854,6 +1030,232 @@ export default function Avatars() {
                 </div>
               </>
             )}
+          </div>
+        </Modal>
+
+        {/* Manage Looks Modal */}
+        <Modal
+          isOpen={!!showLooksModal}
+          onClose={() => {
+            setShowLooksModal(null)
+            setShowAddLooksModal(false)
+            setShowGenerateLookModal(false)
+          }}
+          title={`Manage Looks - ${showLooksModal?.avatar_name || ''}`}
+          size="lg"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Add new looks to this avatar by uploading photos or generating them with AI.
+            </p>
+            <div className="flex gap-3">
+              <Button
+                onClick={() => {
+                  setShowAddLooksModal(true)
+                  setShowGenerateLookModal(false)
+                }}
+                className="flex-1"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Upload Looks
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowGenerateLookModal(true)
+                  setShowAddLooksModal(false)
+                }}
+                variant="secondary"
+                className="flex-1"
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Generate Look
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Add Looks Modal */}
+        <Modal
+          isOpen={showAddLooksModal && !!showLooksModal}
+          onClose={() => {
+            setShowAddLooksModal(false)
+            setLookImageFiles([])
+            setLookImagePreviews([])
+          }}
+          title="Add Looks to Avatar"
+          size="lg"
+        >
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Upload Photos *
+              </label>
+              {lookImagePreviews.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    {lookImagePreviews.map((preview, index) => (
+                      <div key={index} className="relative">
+                        <img
+                          src={preview}
+                          alt={`Preview ${index + 1}`}
+                          className="w-full h-32 object-cover rounded-lg border-2 border-slate-200"
+                        />
+                        <button
+                          onClick={() => {
+                            setLookImageFiles(lookImageFiles.filter((_, i) => i !== index))
+                            setLookImagePreviews(lookImagePreviews.filter((_, i) => i !== index))
+                          }}
+                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={addingLooks}
+                  >
+                    Add More Photos
+                  </Button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center cursor-pointer hover:border-brand-500 transition-colors"
+                >
+                  <Upload className="h-12 w-12 mx-auto text-slate-400 mb-3" />
+                  <p className="text-sm text-slate-600 mb-1">
+                    Click to upload photos
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    PNG, JPG up to 10MB. You can upload multiple photos.
+                  </p>
+                </div>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleLookFileSelect}
+                className="hidden"
+                disabled={addingLooks}
+              />
+            </div>
+
+            <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowAddLooksModal(false)
+                  setLookImageFiles([])
+                  setLookImagePreviews([])
+                }}
+                disabled={addingLooks}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAddLooks}
+                disabled={addingLooks || lookImageFiles.length === 0}
+                loading={addingLooks}
+              >
+                {addingLooks ? 'Adding Looks...' : 'Add Looks'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Generate Look Modal */}
+        <Modal
+          isOpen={showGenerateLookModal && !!showLooksModal}
+          onClose={() => {
+            setShowGenerateLookModal(false)
+            setLookPrompt('')
+            setLookOrientation('square')
+            setLookPose('close_up')
+            setLookStyle('Realistic')
+          }}
+          title="Generate AI Look"
+          size="lg"
+        >
+          <div className="space-y-6">
+            <p className="text-sm text-slate-600">
+              Generate a new look for this avatar using AI. Describe the look you want to create.
+            </p>
+
+            <Textarea
+              label="Look Description *"
+              value={lookPrompt}
+              onChange={(e) => setLookPrompt(e.target.value)}
+              placeholder="e.g., Professional business suit, formal attire, confident expression"
+              rows={4}
+              disabled={generatingLook}
+            />
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <Select
+                label="Orientation *"
+                value={lookOrientation}
+                onChange={(e) => setLookOrientation(e.target.value as any)}
+                options={[
+                  { value: 'horizontal', label: 'Horizontal' },
+                  { value: 'vertical', label: 'Vertical' },
+                  { value: 'square', label: 'Square' },
+                ]}
+                disabled={generatingLook}
+              />
+
+              <Select
+                label="Pose *"
+                value={lookPose}
+                onChange={(e) => setLookPose(e.target.value as any)}
+                options={[
+                  { value: 'close_up', label: 'Close Up' },
+                  { value: 'half_body', label: 'Half Body' },
+                  { value: 'full_body', label: 'Full Body' },
+                ]}
+                disabled={generatingLook}
+              />
+
+              <Select
+                label="Style *"
+                value={lookStyle}
+                onChange={(e) => setLookStyle(e.target.value as any)}
+                options={[
+                  { value: 'Realistic', label: 'Realistic' },
+                  { value: 'Cartoon', label: 'Cartoon' },
+                  { value: 'Anime', label: 'Anime' },
+                ]}
+                disabled={generatingLook}
+              />
+            </div>
+
+            <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowGenerateLookModal(false)
+                  setLookPrompt('')
+                  setLookOrientation('square')
+                  setLookPose('close_up')
+                  setLookStyle('Realistic')
+                }}
+                disabled={generatingLook}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleGenerateLook}
+                disabled={generatingLook || !lookPrompt.trim()}
+                loading={generatingLook}
+              >
+                {generatingLook ? 'Generating...' : 'Generate Look'}
+              </Button>
+            </div>
           </div>
         </Modal>
       </div>

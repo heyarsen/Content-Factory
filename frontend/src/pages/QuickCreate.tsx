@@ -73,6 +73,7 @@ export function QuickCreate() {
   const [generatingDescription, setGeneratingDescription] = useState(false)
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
   const [posting, setPosting] = useState(false)
+  const [generateCaption, setGenerateCaption] = useState(true)
 
   useEffect(() => {
     loadSocialAccounts()
@@ -81,8 +82,8 @@ export function QuickCreate() {
 
   const loadAvatars = async () => {
     try {
-      // Only fetch user-created avatars
-      const response = await api.get('/api/avatars', { params: { created: 'true' } })
+      // Only fetch user-created avatars (default behavior, no params needed)
+      const response = await api.get('/api/avatars')
       setAvatars(response.data.avatars || [])
       // Set default avatar if available
       const defaultAvatar = response.data.avatars?.find((a: any) => a.is_default)
@@ -249,6 +250,7 @@ export function QuickCreate() {
         duration,
         category: 'general', // Default category
         avatar_id: selectedAvatarId || undefined,
+        generate_caption: generateCaption,
       })
 
       console.log('Video generation response:', response.data)
@@ -708,6 +710,30 @@ export function QuickCreate() {
                     )}
                   </div>
                 )}
+
+                {/* Caption Generation Toggle */}
+                <div className="rounded-2xl border border-white/60 bg-white/70 p-6">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id="generateCaption"
+                      checked={generateCaption}
+                      onChange={(e) => setGenerateCaption(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
+                    />
+                    <div className="flex-1">
+                      <label
+                        htmlFor="generateCaption"
+                        className="text-sm font-semibold text-primary cursor-pointer"
+                      >
+                        Generate Social Media Caption
+                      </label>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Automatically generate an engaging caption for your video when it's ready
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
                 <div className="flex justify-between gap-3 pt-4">
                   <Button
