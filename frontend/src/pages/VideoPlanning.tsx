@@ -504,44 +504,76 @@ export function VideoPlanning() {
   const statusCounts = getStatusCounts()
 
   const getStatusBadge = (status: string, scriptStatus?: string | null) => {
-    // Show script status if it's draft or approved
-    if (scriptStatus === 'draft') {
-      return <Badge variant="warning">Draft Script</Badge>
-    }
-    if (scriptStatus === 'approved') {
-      return <Badge variant="info">Approved</Badge>
+    // Clear, user-friendly status labels that explain what's happening in the workflow
+    
+    // Handle rejected scripts first (highest priority)
+    if (scriptStatus === 'rejected') {
+      return <Badge variant="error">Script Rejected</Badge>
     }
 
-    const variants: Record<
-      string,
-      'default' | 'success' | 'error' | 'warning' | 'info'
-    > = {
-      completed: 'success',
-      scheduled: 'success',
-      posted: 'success',
-      ready: 'success',
-      approved: 'success',
-      generating: 'info',
-      researching: 'info',
-      pending: 'warning',
-      draft: 'info', // Show as info when generating script
-      failed: 'error',
+    // Determine the most descriptive label based on status and script_status
+    let label = ''
+    let variant: 'default' | 'success' | 'error' | 'warning' | 'info' = 'default'
+
+    switch (status) {
+      case 'pending':
+        label = 'Waiting to Start'
+        variant = 'warning'
+        break
+      case 'researching':
+        label = 'Gathering Research'
+        variant = 'info'
+        break
+      case 'ready':
+        label = 'Ready for Script'
+        variant = 'info'
+        break
+      case 'draft':
+        if (scriptStatus === 'draft') {
+          label = 'Writing Script'
+        } else {
+          label = 'Draft'
+        }
+        variant = 'info'
+        break
+      case 'approved':
+        if (scriptStatus === 'approved') {
+          label = 'Script Ready'
+        } else if (scriptStatus === 'draft') {
+          label = 'Reviewing Script'
+        } else {
+          label = 'Approved'
+        }
+        variant = 'success'
+        break
+      case 'generating':
+        label = 'Rendering Video'
+        variant = 'info'
+        break
+      case 'completed':
+        label = 'Video Ready'
+        variant = 'success'
+        break
+      case 'scheduled':
+        label = 'Scheduled to Post'
+        variant = 'success'
+        break
+      case 'posted':
+        label = 'Posted Successfully'
+        variant = 'success'
+        break
+      case 'failed':
+        label = 'Error Occurred'
+        variant = 'error'
+        break
+      default:
+        label = status
+        variant = 'default'
     }
-    const labels: Record<string, string> = {
-      pending: 'Pending',
-      researching: 'Researching...',
-      ready: 'Ready',
-      draft: 'Generating Script', // Show "Generating Script" when status is draft
-      approved: 'Approved',
-      generating: 'Creating Video', // Show "Creating Video" when generating
-      completed: 'Completed',
-      scheduled: 'Scheduled',
-      posted: 'Posted',
-      failed: 'Failed',
-    }
+    
     return (
-      <Badge variant={variants[status] || 'default'}>
-        {labels[status] || status}
+      <Badge variant={variant}>
+        {label}
       </Badge>
     )
   }
@@ -1885,8 +1917,10 @@ export function VideoPlanning() {
                       Script
                     </label>
                     {selectedItem.script_status && (
-                      <Badge variant={selectedItem.script_status === 'approved' ? 'success' : selectedItem.script_status === 'rejected' ? 'error' : 'warning'}>
-                        {selectedItem.script_status}
+                      <Badge variant={selectedItem.script_status === 'approved' ? 'success' : selectedItem.script_status === 'rejected' ? 'error' : 'info'}>
+                        {selectedItem.script_status === 'approved' ? 'Approved' : 
+                         selectedItem.script_status === 'rejected' ? 'Rejected' : 
+                         'Draft'}
                       </Badge>
                     )}
                   </div>
