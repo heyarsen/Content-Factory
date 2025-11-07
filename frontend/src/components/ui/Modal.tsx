@@ -33,9 +33,17 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
 
   return (
     <div
-      className="fixed inset-0 z-[9999] p-4"
+      className="fixed inset-0 z-[9999]"
       onClick={onClose}
-      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+      style={{ 
+        position: 'fixed', 
+        top: 0, 
+        left: 0, 
+        right: 0, 
+        bottom: 0, 
+        padding: '1rem',
+        paddingTop: '6rem' /* Ensure modal container has space for header (5rem) + padding (1rem) */
+      }}
     >
       {/* Backdrop */}
       <div
@@ -49,7 +57,10 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
         onClick={(e) => e.stopPropagation()}
         style={{
           // Max dimensions: Account for header (5rem = 80px) and padding
-          maxHeight: 'calc(100vh - 7rem)', // Account for header (5rem = 80px) + top/bottom padding (2rem total)
+          // Ensure modal never exceeds available vertical space
+          // Header is 5rem, we need at least 2rem padding (1rem top + 1rem bottom)
+          // So max height = viewport - header - padding
+          maxHeight: 'calc(100vh - 7rem)', // Account for header (5rem) + top padding (1rem) + bottom padding (1rem)
           // Max width is handled by CSS media queries in index.css
         }}
       >
