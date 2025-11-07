@@ -6,7 +6,7 @@ import { Input } from '../components/ui/Input'
 import { Modal } from '../components/ui/Modal'
 import { useToast } from '../hooks/useToast'
 import api from '../lib/api'
-import { RefreshCw, Star, Trash2, User, Upload, Plus, Sparkles, Image, Loader2, X } from 'lucide-react'
+import { RefreshCw, Star, Trash2, User, Upload, Plus, Sparkles, Image, X } from 'lucide-react'
 import { Select } from '../components/ui/Select'
 import { Textarea } from '../components/ui/Textarea'
 
@@ -550,7 +550,7 @@ export default function Avatars() {
 
     setGeneratingLook(true)
     try {
-      const response = await api.post('/api/avatars/generate-look', {
+      await api.post('/api/avatars/generate-look', {
         group_id: showLooksModal.heygen_avatar_id,
         prompt: lookPrompt,
         orientation: lookOrientation,
