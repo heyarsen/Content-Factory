@@ -43,22 +43,29 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
         aria-hidden="true"
       ></div>
 
-      {/* Modal Content - Centered accounting for sidebar on desktop */}
+      {/* Modal Content - Centered accounting for sidebar and header on desktop */}
       <div
-        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 lg:left-[calc(18rem+(100%-18rem)/2)] lg:translate-x-[-50%] w-full ${sizes[size]} max-w-[calc(100vw-2rem)] transform overflow-hidden rounded-3xl border border-white/60 bg-white/95 text-left shadow-[0_45px_95px_-55px_rgba(15,23,42,0.55)] backdrop-blur-xl transition-all`}
+        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 lg:left-[calc(18rem+(100%-18rem)/2)] lg:translate-x-[-50%] w-full ${sizes[size]} max-w-[calc(100vw-2rem)] max-h-[calc(100vh-6rem)] transform overflow-hidden rounded-3xl border border-white/60 bg-white/95 text-left shadow-[0_45px_95px_-55px_rgba(15,23,42,0.55)] backdrop-blur-xl transition-all flex flex-col`}
         onClick={(e) => e.stopPropagation()}
+        style={{
+          // Ensure modal doesn't overlap header (80px) + padding (32px) = 112px total
+          // Use max-height to constrain modal height
+          maxHeight: 'calc(100vh - 7rem)', // Account for header (80px) + top/bottom padding (32px)
+        }}
       >
-        <div className="flex items-center justify-between border-b border-white/60 px-8 py-5 bg-gradient-to-r from-white to-slate-50/50">
-          <h3 className="text-xl font-semibold text-primary">{title}</h3>
+        {/* Header - Fixed height */}
+        <div className="flex items-center justify-between border-b border-white/60 px-6 sm:px-8 py-4 sm:py-5 bg-gradient-to-r from-white to-slate-50/50 flex-shrink-0">
+          <h3 className="text-lg sm:text-xl font-semibold text-primary truncate pr-2">{title}</h3>
           <button 
             onClick={onClose} 
-            className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100/70 hover:text-primary focus:outline-none focus:ring-2 focus:ring-brand-200"
+            className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100/70 hover:text-primary focus:outline-none focus:ring-2 focus:ring-brand-200 flex-shrink-0"
             aria-label="Close modal"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="px-8 py-6 max-h-[80vh] overflow-y-auto">
+        {/* Content - Scrollable */}
+        <div className="px-6 sm:px-8 py-4 sm:py-6 overflow-y-auto flex-1 min-h-0">
           {children}
         </div>
       </div>
