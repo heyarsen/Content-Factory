@@ -1456,7 +1456,6 @@ export function VideoPlanning() {
             setVideoTopics(['', '', ''])
           }}
           title="Edit Video Plan"
-          size="full"
         >
           <div className="space-y-4">
             <Input
