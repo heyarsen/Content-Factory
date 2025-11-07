@@ -174,6 +174,21 @@ export function VideoPlanning() {
     }
   }, [selectedPlan])
 
+  // Poll for status updates every 10 seconds for items in progress
+  useEffect(() => {
+    if (!selectedPlan) return
+
+    // Set up polling interval - always poll when a plan is selected
+    // The backend will handle checking if updates are needed
+    const planId = selectedPlan.id
+    const interval = setInterval(() => {
+      loadPlanItems(planId)
+    }, 10000) // Poll every 10 seconds
+
+    return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPlan?.id])
+
   const loadPlans = async () => {
     try {
       const response = await api.get('/api/plans')

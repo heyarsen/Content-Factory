@@ -184,15 +184,15 @@ export function initializeScheduler(): void {
     }
   })
 
-  // Automation: Schedule distribution for completed videos (Step 5)
-  // Runs every 5 minutes
-  cron.schedule('*/5 * * * *', async () => {
-    console.log('[Cron] Running automation: schedule distribution...')
+  // Automation: Check video status and schedule distribution for completed videos (Step 5)
+  // Runs every minute to check video status more frequently
+  cron.schedule('* * * * *', async () => {
+    console.log('[Cron] Running automation: check video status and schedule distribution...')
     try {
-      await AutomationService.scheduleDistributionForCompletedVideos()
-      console.log('[Automation] Scheduled distribution for completed videos')
+      await AutomationService.checkVideoStatusAndScheduleDistribution()
+      console.log('[Automation] Checked video status and scheduled distribution')
     } catch (error: any) {
-      console.error('[Automation] Error scheduling distribution:', error)
+      console.error('[Automation] Error checking video status and scheduling distribution:', error)
     }
   })
 

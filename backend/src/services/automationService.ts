@@ -531,6 +531,14 @@ export class AutomationService {
   }
 
   /**
+   * Check video status and schedule distribution for completed videos
+   * This runs frequently to check video status updates and post at scheduled times
+   */
+  static async checkVideoStatusAndScheduleDistribution(): Promise<void> {
+    await this.scheduleDistributionForCompletedVideos()
+  }
+
+  /**
    * Schedule distribution for completed videos
    */
   static async scheduleDistributionForCompletedVideos(): Promise<void> {
@@ -636,6 +644,7 @@ export class AutomationService {
         const uploadPostUserId = accounts[0].platform_account_id
 
         // Build scheduled time - use scheduled_date and scheduled_time
+        // Post at the exact scheduled time (within 1 minute window)
         let scheduledTime: string | undefined
         const now = new Date()
         if (item.scheduled_date && item.scheduled_time) {
@@ -643,11 +652,28 @@ export class AutomationService {
           const [hours, minutes] = item.scheduled_time.split(':')
           const scheduledDateTime = new Date(`${item.scheduled_date}T${hours}:${minutes}:00`)
           
-          // Only schedule if the time hasn't passed yet (or allow immediate posting if time passed)
-          if (scheduledDateTime > now) {
+          // Check if it's time to post (within 1 minute window)
+          const timeDiff = scheduledDateTime.getTime() - now.getTime()
+          const minutesDiff = timeDiff / (1000 * 60)
+          
+          // If scheduled time is within 1 minute in the past or future, post now
+          // Otherwise, schedule for the future
+          if (Math.abs(minutesDiff) <= 1) {
+            // It's time to post now (within 1 minute window)
+            scheduledTime = undefined // Post immediately
+            console.log(`[Distribution] Posting item ${item.id} now - scheduled time reached`)
+          } else if (scheduledDateTime > now) {
+            // Future time, schedule it
             scheduledTime = scheduledDateTime.toISOString()
+            console.log(`[Distribution] Scheduling item ${item.id} for ${scheduledDateTime.toISOString()}`)
+          } else {
+            // Past time (more than 1 minute ago), post immediately
+            scheduledTime = undefined // Post immediately
+            console.log(`[Distribution] Posting item ${item.id} now - scheduled time passed`)
           }
-          // If time has passed, post immediately (scheduledTime will be undefined)
+        } else {
+          // No scheduled time, post immediately
+          scheduledTime = undefined
         }
 
         // Call upload-post.com API
