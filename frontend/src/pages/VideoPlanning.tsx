@@ -23,7 +23,6 @@ import {
   Save,
   Trash2,
   FileText,
-  Play,
   ExternalLink,
 } from 'lucide-react'
 import api from '../lib/api'
@@ -71,6 +70,8 @@ interface VideoPlanItem {
     | 'failed'
   video_id: string | null
   error_message: string | null
+  created_at?: string
+  updated_at?: string
 }
 
 export function VideoPlanning() {
@@ -1968,24 +1969,30 @@ export function VideoPlanning() {
               )}
 
               {/* Timestamps */}
-              <div className="grid grid-cols-2 gap-4 border-t border-slate-200 pt-4">
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Created
-                  </label>
-                  <p className="mt-1 text-sm font-medium text-primary">
-                    {new Date(selectedItem.created_at).toLocaleString()}
-                  </p>
+              {(selectedItem.created_at || selectedItem.updated_at) && (
+                <div className="grid grid-cols-2 gap-4 border-t border-slate-200 pt-4">
+                  {selectedItem.created_at && (
+                    <div>
+                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Created
+                      </label>
+                      <p className="mt-1 text-sm font-medium text-primary">
+                        {new Date(selectedItem.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                  )}
+                  {selectedItem.updated_at && (
+                    <div>
+                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Updated
+                      </label>
+                      <p className="mt-1 text-sm font-medium text-primary">
+                        {new Date(selectedItem.updated_at).toLocaleString()}
+                      </p>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Updated
-                  </label>
-                  <p className="mt-1 text-sm font-medium text-primary">
-                    {new Date(selectedItem.updated_at).toLocaleString()}
-                  </p>
-                </div>
-              </div>
+              )}
 
               {/* Actions */}
               <div className="flex gap-3 border-t border-slate-200 pt-4">
