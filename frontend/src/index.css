@@ -39,3 +39,18 @@ code {
   box-sizing: border-box;
 }
 
+/* Modal positioning to avoid sidebar and header overlap */
+@media (min-width: 1024px) {
+  .modal-content {
+    left: calc(9rem + 50vw) !important;
+    max-width: calc(100vw - 20rem) !important; /* Account for sidebar (18rem) + padding (2rem) */
+  }
+}
+
+@media (max-width: 1023px) {
+  .modal-content {
+    left: 50% !important;
+    max-width: calc(100vw - 2rem) !important; /* Just padding on mobile */
+  }
+}
+

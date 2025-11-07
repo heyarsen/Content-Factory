@@ -43,14 +43,14 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
         aria-hidden="true"
       ></div>
 
-      {/* Modal Content - Centered accounting for sidebar and header on desktop */}
+      {/* Modal Content - Centered accounting for sidebar and header */}
       <div
-        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 lg:left-[calc(18rem+(100%-18rem)/2)] lg:translate-x-[-50%] w-full ${sizes[size]} max-w-[calc(100vw-2rem)] max-h-[calc(100vh-6rem)] transform overflow-hidden rounded-3xl border border-white/60 bg-white/95 text-left shadow-[0_45px_95px_-55px_rgba(15,23,42,0.55)] backdrop-blur-xl transition-all flex flex-col`}
+        className={`modal-content absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full ${sizes[size]} transform overflow-hidden rounded-3xl border border-white/60 bg-white/95 text-left shadow-[0_45px_95px_-55px_rgba(15,23,42,0.55)] backdrop-blur-xl transition-all flex flex-col`}
         onClick={(e) => e.stopPropagation()}
         style={{
-          // Ensure modal doesn't overlap header (80px) + padding (32px) = 112px total
-          // Use max-height to constrain modal height
-          maxHeight: 'calc(100vh - 7rem)', // Account for header (80px) + top/bottom padding (32px)
+          // Max dimensions: Account for header (5rem = 80px) and padding
+          maxHeight: 'calc(100vh - 7rem)', // Account for header (5rem = 80px) + top/bottom padding (2rem total)
+          // Max width is handled by CSS media queries in index.css
         }}
       >
         {/* Header - Fixed height */}
