@@ -137,8 +137,8 @@ export function initializeScheduler(): void {
   })
 
   // Automation: Process scheduled plans - generate topics (Step 1)
-  // Runs every 15 minutes
-  cron.schedule('*/15 * * * *', async () => {
+  // Runs every 5 minutes to catch trigger times more quickly
+  cron.schedule('*/5 * * * *', async () => {
     console.log('[Cron] Running automation: process scheduled plans...')
     try {
       await AutomationService.processScheduledPlans()

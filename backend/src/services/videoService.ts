@@ -77,69 +77,12 @@ async function applyManualGenerationSuccess(videoId: string, response: HeyGenVid
   }
 
   // Generate caption if video is completed and caption generation was requested
-  if (mapHeygenStatus(response.status) === 'completed' && video) {
-    const metadata = video.metadata as any
-    if (metadata?.generate_caption && video.topic) {
-      // Generate caption asynchronously
-      void generateCaptionForVideo(videoId, video.topic, video.script)
-    }
-  }
+  // Note: Caption generation is handled separately via the generate-description endpoint
+  // Skipping automatic caption generation to avoid metadata column dependency
 }
 
-async function generateCaptionForVideo(videoId: string, topic: string, script?: string | null): Promise<void> {
-  try {
-    const { openai } = await import('../lib/openai.js')
-    
-    const prompt = `Generate a compelling social media caption/description for a short video post. 
-
-${topic ? `Topic: ${topic}` : ''}
-${script ? `Script: ${script.substring(0, 500)}` : ''}
-
-Requirements:
-- Engaging and click-worthy
-- Include relevant hashtags (3-5)
-- Platform-optimized (works for Instagram, TikTok, YouTube Shorts, etc.)
-- 100-200 characters for the main caption
-- Include a call-to-action
-- Professional but approachable tone
-
-Output ONLY the caption text, nothing else.`
-
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a social media content writer specializing in video captions for short-form content platforms.',
-        },
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-      temperature: 0.8,
-      max_tokens: 300,
-    })
-
-    const caption = completion.choices[0]?.message?.content?.trim() || ''
-    
-    if (caption) {
-      // Update video with generated caption (store in metadata or a caption field if it exists)
-      await supabase
-        .from('videos')
-        .update({
-          metadata: { ...((await supabase.from('videos').select('metadata').eq('id', videoId).single()).data?.metadata as any || {}), caption },
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', videoId)
-      
-      console.log(`Generated caption for video ${videoId}:`, caption.substring(0, 50) + '...')
-    }
-  } catch (error: any) {
-    console.error('Failed to generate caption for video:', error)
-    // Don't throw - caption generation failure shouldn't break video completion
-  }
-}
+// Caption generation is handled via the /api/videos/:id/generate-description endpoint
+// Removed automatic caption generation to avoid metadata column dependency
 
 async function applyManualGenerationFailure(videoId: string, error: Error): Promise<void> {
   const { error: dbError } = await supabase
@@ -485,7 +428,6 @@ export class VideoService {
         video_url: null,
         avatar_id: avatarRecordId || null,
         error_message: null,
-        metadata: input.generate_caption !== false ? { generate_caption: true } : null,
       })
       .select()
       .single()

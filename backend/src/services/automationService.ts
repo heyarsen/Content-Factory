@@ -114,13 +114,30 @@ export class AutomationService {
           await new Promise(resolve => setTimeout(resolve, 2000))
         }
 
-        // Generate scripts for today's items (including items that are already ready from previous runs)
-        await this.generateScriptsForTodayItems(plan.id, today, plan.auto_approve || false)
+        // Also check for items that are 'ready' but might have been missed
+        const { data: readyItems } = await supabase
+          .from('video_plan_items')
+          .select('*')
+          .eq('plan_id', plan.id)
+          .eq('scheduled_date', today)
+          .eq('status', 'ready')
+          .is('script', null)
+          .limit(plan.videos_per_day)
 
-        // Small delay to ensure script generation updates are reflected
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        // Generate scripts for today's items (including items that are already ready from previous runs)
+        if (readyItems && readyItems.length > 0) {
+          console.log(`[Automation] Found ${readyItems.length} ready items for script generation`)
+          await this.generateScriptsForTodayItems(plan.id, today, plan.auto_approve || false)
+          // Small delay to ensure script generation updates are reflected
+          await new Promise(resolve => setTimeout(resolve, 2000))
+        } else {
+          // Also try to generate scripts for items that might already be ready
+          await this.generateScriptsForTodayItems(plan.id, today, plan.auto_approve || false)
+          await new Promise(resolve => setTimeout(resolve, 1000))
+        }
 
         // Generate videos for today's approved items
+        console.log(`[Automation] Checking for approved items to generate videos for plan ${plan.id}`)
         await this.generateVideosForTodayItems(plan.id, today, plan.user_id, plan.auto_create || false)
       } catch (error) {
         console.error(`Error processing plan ${plan.id}:`, error)
@@ -162,10 +179,17 @@ export class AutomationService {
     for (const item of allItems) {
       try {
         // Update status to show script generation in progress
-        await supabase
+        const updateResult = await supabase
           .from('video_plan_items')
           .update({ status: 'draft' }) // Using 'draft' status to indicate script generation
           .eq('id', item.id)
+          .select()
+
+        if (updateResult.error) {
+          console.error(`[Script Generation] Failed to update status for item ${item.id}:`, updateResult.error)
+        } else {
+          console.log(`[Script Generation] Updated item ${item.id} status to 'draft' (Generating Script)`)
+        }
 
         const research = item.research_data
 
@@ -181,7 +205,7 @@ export class AutomationService {
         const newStatus = autoApprove ? 'approved' : 'draft'
         const scriptStatus = autoApprove ? 'approved' : 'draft'
 
-        await supabase
+        const finalUpdate = await supabase
           .from('video_plan_items')
           .update({
             script,
@@ -189,8 +213,13 @@ export class AutomationService {
             status: newStatus,
           })
           .eq('id', item.id)
+          .select()
 
-        console.log(`[Script Generation] Generated script for today's item ${item.id}`)
+        if (finalUpdate.error) {
+          console.error(`[Script Generation] Failed to save script for item ${item.id}:`, finalUpdate.error)
+        } else {
+          console.log(`[Script Generation] Generated script for today's item ${item.id}, status: ${newStatus}`)
+        }
       } catch (error: any) {
         console.error(`Error generating script for today's item ${item.id}:`, error)
         await supabase
@@ -227,15 +256,23 @@ export class AutomationService {
     for (const item of items) {
       try {
         // Update status to show video generation in progress
-        await supabase
+        const statusUpdate = await supabase
           .from('video_plan_items')
           .update({ status: 'generating' })
           .eq('id', item.id)
+          .select()
+
+        if (statusUpdate.error) {
+          console.error(`[Video Generation] Failed to update status for item ${item.id}:`, statusUpdate.error)
+        } else {
+          console.log(`[Video Generation] Updated item ${item.id} status to 'generating' (Creating Video)`)
+        }
 
         if (!item.topic || !item.script) {
           throw new Error('Missing topic or script for video generation')
         }
 
+        console.log(`[Video Generation] Creating video for item ${item.id} with topic: ${item.topic}`)
         const video = await VideoService.requestManualVideo(userId, {
           topic: item.topic,
           script: item.script,
@@ -243,15 +280,20 @@ export class AutomationService {
           duration: 30,
         })
 
-        await supabase
+        const finalUpdate = await supabase
           .from('video_plan_items')
           .update({
             video_id: video.id,
             status: 'completed',
           })
           .eq('id', item.id)
+          .select()
 
-        console.log(`[Video Generation] Generated video for today's item ${item.id}`)
+        if (finalUpdate.error) {
+          console.error(`[Video Generation] Failed to update video_id for item ${item.id}:`, finalUpdate.error)
+        } else {
+          console.log(`[Video Generation] Generated video for today's item ${item.id}, video_id: ${video.id}`)
+        }
       } catch (error: any) {
         console.error(`Error generating video for today's item ${item.id}:`, error)
         const errorMessage = error?.message || 'Failed to create video record'
@@ -387,18 +429,29 @@ export class AutomationService {
       try {
         const plan = item.plan as any
         // Only auto-create if auto_create is enabled
-        if (!plan.auto_create) continue
+        if (!plan.auto_create) {
+          console.log(`[Video Generation] Skipping item ${item.id} - auto_create is disabled`)
+          continue
+        }
 
         // Update status to show video generation in progress
-        await supabase
+        const statusUpdate = await supabase
           .from('video_plan_items')
           .update({ status: 'generating' })
           .eq('id', item.id)
+          .select()
+
+        if (statusUpdate.error) {
+          console.error(`[Video Generation] Failed to update status for item ${item.id}:`, statusUpdate.error)
+        } else {
+          console.log(`[Video Generation] Updated item ${item.id} status to 'generating' (Creating Video)`)
+        }
 
         if (!item.topic || !item.script) {
           throw new Error('Missing topic or script for video generation')
         }
 
+        console.log(`[Video Generation] Creating video for item ${item.id} with topic: ${item.topic}`)
         const video = await VideoService.requestManualVideo(plan.user_id, {
           topic: item.topic,
           script: item.script,
@@ -406,13 +459,20 @@ export class AutomationService {
           duration: 30,
         })
 
-        await supabase
+        const finalUpdate = await supabase
           .from('video_plan_items')
           .update({
             video_id: video.id,
             status: 'completed',
           })
           .eq('id', item.id)
+          .select()
+
+        if (finalUpdate.error) {
+          console.error(`[Video Generation] Failed to update video_id for item ${item.id}:`, finalUpdate.error)
+        } else {
+          console.log(`[Video Generation] Generated video for item ${item.id}, video_id: ${video.id}`)
+        }
       } catch (error: any) {
         console.error(`Error generating video for item ${item.id}:`, error)
         const errorMessage = error?.message || 'Failed to create video record'
