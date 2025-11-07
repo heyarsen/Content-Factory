@@ -789,7 +789,7 @@ export default function Avatars() {
           isOpen={showCreateModal}
           onClose={handleCloseCreateModal}
           title="Create Avatar from Photo"
-          size="lg"
+          size="md"
         >
           <div className="space-y-6">
             <div>
@@ -902,7 +902,7 @@ export default function Avatars() {
           isOpen={showGenerateAIModal}
           onClose={handleCloseGenerateAIModal}
           title="Generate AI Avatar"
-          size="lg"
+          size="md"
         >
           <div className="space-y-6">
             {checkingStatus ? (
@@ -1042,7 +1042,7 @@ export default function Avatars() {
             setShowGenerateLookModal(false)
           }}
           title={`Manage Looks - ${showLooksModal?.avatar_name || ''}`}
-          size="lg"
+          size="md"
         >
           <div className="space-y-4">
             <p className="text-sm text-slate-600">
@@ -1083,7 +1083,7 @@ export default function Avatars() {
             setLookImagePreviews([])
           }}
           title="Add Looks to Avatar"
-          size="lg"
+          size="md"
         >
           <div className="space-y-6">
             <div>
@@ -1180,7 +1180,7 @@ export default function Avatars() {
             setLookStyle('Realistic')
           }}
           title="Generate AI Look"
-          size="lg"
+          size="md"
         >
           <div className="space-y-6">
             <p className="text-sm text-slate-600">

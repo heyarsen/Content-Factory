@@ -45,7 +45,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
 
       {/* Modal Content - Centered accounting for sidebar on desktop */}
       <div
-        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 lg:left-[calc(18rem+(100%-18rem)/2)] lg:translate-x-[-50%] w-full max-w-full ${sizes[size]} transform overflow-hidden rounded-3xl border border-white/60 bg-white/95 text-left shadow-[0_45px_95px_-55px_rgba(15,23,42,0.55)] backdrop-blur-xl transition-all`}
+        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 lg:left-[calc(18rem+(100%-18rem)/2)] lg:translate-x-[-50%] w-full ${sizes[size]} max-w-[calc(100vw-2rem)] transform overflow-hidden rounded-3xl border border-white/60 bg-white/95 text-left shadow-[0_45px_95px_-55px_rgba(15,23,42,0.55)] backdrop-blur-xl transition-all`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-white/60 px-8 py-5 bg-gradient-to-r from-white to-slate-50/50">
