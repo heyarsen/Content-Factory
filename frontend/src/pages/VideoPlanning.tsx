@@ -24,6 +24,7 @@ import {
   Trash2,
   FileText,
   ExternalLink,
+  User,
 } from 'lucide-react'
 import api from '../lib/api'
 
@@ -57,6 +58,7 @@ interface VideoPlanItem {
   script_status?: 'draft' | 'approved' | 'rejected' | null
   platforms?: string[] | null
   caption?: string | null
+  avatar_id?: string | null
   status:
     | 'pending'
     | 'researching'
@@ -135,6 +137,9 @@ export function VideoPlanning() {
     '19:00',
   ]) // Default times for 3 videos
   const [videoTopics, setVideoTopics] = useState<string[]>(['', '', '']) // Topics for each video slot
+  const [videoAvatars, setVideoAvatars] = useState<string[]>(['', '', '']) // Avatar IDs for each video slot
+  const [avatars, setAvatars] = useState<Array<{ id: string; avatar_name: string; thumbnail_url: string | null; preview_url: string | null }>>([])
+  const [loadingAvatars, setLoadingAvatars] = useState(false)
   const [deleteModal, setDeleteModal] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [editPlanModal, setEditPlanModal] = useState<VideoPlan | null>(null)
@@ -149,13 +154,33 @@ export function VideoPlanning() {
     { label: 'Evening (6:00 PM)', value: '18:00' },
   ]
 
-  // Update videoTimes and videoTopics when videosPerDay changes
+  // Load avatars when create modal opens
+  useEffect(() => {
+    if (createModal) {
+      loadAvatars()
+    }
+  }, [createModal])
+
+  const loadAvatars = async () => {
+    try {
+      setLoadingAvatars(true)
+      const response = await api.get('/api/avatars', { params: { all: 'true' } })
+      setAvatars(response.data.avatars || [])
+    } catch (error) {
+      console.error('Failed to load avatars:', error)
+    } finally {
+      setLoadingAvatars(false)
+    }
+  }
+
+  // Update videoTimes, videoTopics, and videoAvatars when videosPerDay changes
   useEffect(() => {
     const defaultTimes = ['09:00', '14:00', '19:00', '10:00', '11:00']
     if (videoTimes.length !== videosPerDay) {
       // If we need more times, add defaults. If fewer, keep first N.
       setVideoTimes(defaultTimes.slice(0, videosPerDay))
       setVideoTopics(Array(videosPerDay).fill(''))
+      setVideoAvatars(Array(videosPerDay).fill(''))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videosPerDay])
@@ -236,6 +261,7 @@ export function VideoPlanning() {
         timezone: timezone,
         video_times: videoTimes.map((time: string) => `${time}:00`), // Send custom times
         video_topics: videoTopics, // Send topics for each slot
+        video_avatars: videoAvatars, // Send avatar IDs for each slot
       })
 
       setPlans([response.data.plan, ...plans])
@@ -252,6 +278,7 @@ export function VideoPlanning() {
       setAutoCreate(false)
       setVideoTimes(['09:00', '14:00', '19:00'])
       setVideoTopics(['', '', ''])
+      setVideoAvatars(['', '', ''])
     } catch (error: any) {
       alert(error.response?.data?.error || 'Failed to create plan')
     } finally {
@@ -326,6 +353,7 @@ export function VideoPlanning() {
     // For now, use defaults
     setVideoTimes(['09:00', '14:00', '19:00'].slice(0, plan.videos_per_day))
     setVideoTopics(Array(plan.videos_per_day).fill(''))
+    setVideoAvatars(Array(plan.videos_per_day).fill(''))
   }
 
   const handleSavePlan = async () => {
@@ -366,6 +394,7 @@ export function VideoPlanning() {
       setAutoCreate(false)
       setVideoTimes(['09:00', '14:00', '19:00'])
       setVideoTopics(['', '', ''])
+      setVideoAvatars(['', '', ''])
     } catch (error: any) {
       alert(error.response?.data?.error || 'Failed to update plan')
     } finally {
@@ -1315,6 +1344,62 @@ export function VideoPlanning() {
                         className="w-full"
                       />
                     </div>
+
+                    {/* Avatar Selection */}
+                    <div className="mb-3 space-y-2">
+                      <label className="block text-xs font-medium text-slate-600">
+                        Avatar <span className="text-red-500">*</span>
+                      </label>
+                      {loadingAvatars ? (
+                        <div className="text-sm text-slate-500">Loading avatars...</div>
+                      ) : avatars.length === 0 ? (
+                        <div className="text-sm text-amber-600">
+                          No avatars available. Please create an avatar first.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto">
+                          {avatars.map((avatar) => {
+                            const isSelected = videoAvatars[index] === avatar.id
+                            return (
+                              <button
+                                key={avatar.id}
+                                type="button"
+                                onClick={() => {
+                                  const newAvatars = [...videoAvatars]
+                                  newAvatars[index] = avatar.id
+                                  setVideoAvatars(newAvatars)
+                                }}
+                                className={`relative rounded-lg border-2 p-2 transition-all ${
+                                  isSelected
+                                    ? 'border-brand-500 bg-brand-50'
+                                    : 'border-slate-200 bg-white hover:border-brand-300'
+                                }`}
+                              >
+                                {avatar.thumbnail_url || avatar.preview_url ? (
+                                  <img
+                                    src={avatar.thumbnail_url || avatar.preview_url || ''}
+                                    alt={avatar.avatar_name}
+                                    className="w-full h-16 object-cover rounded mb-1"
+                                  />
+                                ) : (
+                                  <div className="w-full h-16 bg-gradient-to-br from-brand-400 to-brand-600 rounded flex items-center justify-center mb-1">
+                                    <User className="h-6 w-6 text-white opacity-50" />
+                                  </div>
+                                )}
+                                <p className="text-xs font-medium text-slate-700 truncate text-center">
+                                  {avatar.avatar_name}
+                                </p>
+                                {isSelected && (
+                                  <div className="absolute top-1 right-1 bg-brand-500 text-white rounded-full p-0.5">
+                                    <Check className="h-3 w-3" />
+                                  </div>
+                                )}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1517,6 +1602,7 @@ export function VideoPlanning() {
             setAutoCreate(false)
             setVideoTimes(['09:00', '14:00', '19:00'])
             setVideoTopics(['', '', ''])
+            setVideoAvatars(['', '', ''])
           }}
           title="Edit Video Plan"
         >
@@ -1726,6 +1812,7 @@ export function VideoPlanning() {
                   setAutoCreate(false)
                   setVideoTimes(['09:00', '14:00', '19:00'])
                   setVideoTopics(['', '', ''])
+                  setVideoAvatars(['', '', ''])
                 }}
               >
                 Cancel
@@ -1871,6 +1958,34 @@ export function VideoPlanning() {
                   </p>
                 </div>
               )}
+
+              {/* Avatar */}
+              {selectedItem.avatar_id && (() => {
+                const itemAvatar = avatars.find(a => a.id === selectedItem.avatar_id)
+                return itemAvatar ? (
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Avatar
+                    </label>
+                    <div className="mt-2 flex items-center gap-3">
+                      {itemAvatar.thumbnail_url || itemAvatar.preview_url ? (
+                        <img
+                          src={itemAvatar.thumbnail_url || itemAvatar.preview_url || ''}
+                          alt={itemAvatar.avatar_name}
+                          className="h-16 w-16 rounded-lg object-cover border-2 border-brand-200"
+                        />
+                      ) : (
+                        <div className="h-16 w-16 rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">
+                          <User className="h-8 w-8 text-white opacity-50" />
+                        </div>
+                      )}
+                      <p className="text-sm font-medium text-primary">
+                        {itemAvatar.avatar_name}
+                      </p>
+                    </div>
+                  </div>
+                ) : null
+              })()}
 
               {/* Description */}
               {selectedItem.description && (

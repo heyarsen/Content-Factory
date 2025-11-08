@@ -37,6 +37,7 @@ export interface VideoPlanItem {
   script_status?: 'draft' | 'approved' | 'rejected' | null
   platforms?: string[] | null
   caption?: string | null
+  avatar_id?: string | null
   status: 'pending' | 'researching' | 'ready' | 'draft' | 'approved' | 'generating' | 'completed' | 'scheduled' | 'posted' | 'failed'
   video_id: string | null
   error_message: string | null
@@ -118,11 +119,54 @@ export class PlanService {
     endDate?: string,
     customTimes?: string[], // Custom posting times from user
     customTopics?: string[], // Custom topics for each time slot
-    customCategories?: Array<string | null> // Custom categories for each slot
+    customCategories?: Array<string | null>, // Custom categories for each slot
+    avatarIds?: string[] // Avatar IDs for each time slot
   ): Promise<VideoPlanItem[]> {
     const plan = await this.getPlanById(planId, userId)
     
-    const start = new Date(startDate)
+    const planTimezone = plan.timezone || 'UTC'
+    const now = new Date()
+    
+    // Format current date in plan's timezone
+    const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: planTimezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    })
+    const hourFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: planTimezone,
+      hour: '2-digit',
+      hour12: false,
+    })
+    const minuteFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: planTimezone,
+      minute: '2-digit',
+      hour12: false,
+    })
+    
+    const today = dateFormatter.format(now)
+    const currentHour = parseInt(hourFormatter.format(now), 10)
+    const currentMinute = parseInt(minuteFormatter.format(now), 10)
+    
+    // Check if trigger_time has passed today
+    let start = new Date(startDate)
+    if (plan.trigger_time && startDate === today) {
+      const [triggerHourStr, triggerMinuteStr] = plan.trigger_time.split(':')
+      const triggerHour = parseInt(triggerHourStr, 10)
+      const triggerMinute = parseInt(triggerMinuteStr || '0', 10)
+      
+      const triggerMinutes = triggerHour * 60 + triggerMinute
+      const currentMinutes = currentHour * 60 + currentMinute
+      
+      // If trigger time has passed today, skip today and start from tomorrow
+      if (currentMinutes >= triggerMinutes) {
+        start = new Date(start)
+        start.setDate(start.getDate() + 1)
+        console.log(`[Plan Service] Trigger time (${plan.trigger_time}) has passed today, skipping today and starting from tomorrow`)
+      }
+    }
+    
     const end = endDate ? new Date(endDate) : new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000) // Default 30 days
     
     const items: VideoPlanItem[] = []
@@ -138,6 +182,7 @@ export class PlanService {
         const timeSlot = timeSlots[i]
         const customTopic = customTopics && customTopics[i] ? customTopics[i].trim() : null
         const customCategory = customCategories && customCategories[i] ? customCategories[i] : null
+        const avatarId = avatarIds && avatarIds[i] ? avatarIds[i] : null
         
         // Determine initial status and topic
         let status: string = 'pending'
@@ -163,6 +208,7 @@ export class PlanService {
             category: category,
             status: status,
             platforms: plan.default_platforms || null, // Set platforms from plan's default_platforms
+            avatar_id: avatarId, // Store avatar_id for this time slot
           })
           .select()
           .single()
