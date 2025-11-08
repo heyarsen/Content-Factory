@@ -641,7 +641,7 @@ export function VideoPlanning() {
 
   // Helper to check if an item is a scheduled post
   const isScheduledPost = (item: CalendarItem): item is ScheduledPost & { _isScheduledPost: true; scheduled_date: string; topic: string } => {
-    return '_isScheduledPost' in item && item._isScheduledPost === true
+    return '_isScheduledPost' in item && (item as any)._isScheduledPost === true
   }
 
   const getStatusCounts = () => {
@@ -967,10 +967,16 @@ export function VideoPlanning() {
                             <div className="mt-1 space-y-1">
                               {items.slice(0, 2).map((item) => {
                                 const isPost = isScheduledPost(item)
-                                const status = isPost ? item.status : item.status
-                                const displayTopic = isPost 
-                                  ? (item.videos?.topic || `${item.platform} Post`)
-                                  : (item.topic || formatTime(item.scheduled_time) || 'Item')
+                                let status: string
+                                let displayTopic: string
+                                
+                                if (isPost) {
+                                  status = item.status
+                                  displayTopic = item.videos?.topic || `${item.platform} Post`
+                                } else {
+                                  status = item.status
+                                  displayTopic = item.topic || formatTime(item.scheduled_time) || 'Item'
+                                }
                                 
                                 return (
                                   <div
@@ -1030,7 +1036,7 @@ export function VideoPlanning() {
                         let timeA = ''
                         let timeB = ''
                         
-                        if (a._isScheduledPost) {
+                        if (isScheduledPost(a)) {
                           // For scheduled posts, extract time from ISO string
                           timeA = a.scheduled_time ? new Date(a.scheduled_time).toISOString().substring(11, 16) : '00:00'
                         } else {
@@ -1038,7 +1044,7 @@ export function VideoPlanning() {
                           timeA = a.scheduled_time || '00:00'
                         }
                         
-                        if (b._isScheduledPost) {
+                        if (isScheduledPost(b)) {
                           timeB = b.scheduled_time ? new Date(b.scheduled_time).toISOString().substring(11, 16) : '00:00'
                         } else {
                           timeB = b.scheduled_time || '00:00'
@@ -1050,6 +1056,7 @@ export function VideoPlanning() {
                         const isPost = isScheduledPost(item)
                         if (isPost) {
                           // Render scheduled post differently
+                          const scheduledTime = item.scheduled_time
                           return (
                             <Card 
                               key={item.id} 
@@ -1060,11 +1067,11 @@ export function VideoPlanning() {
                                   <div className="flex items-center gap-3">
                                     <Clock className="h-4 w-4 text-slate-400" />
                                     <span className="text-sm font-medium text-slate-600">
-                                      {new Date(item.scheduled_time).toLocaleTimeString('en-US', { 
+                                      {scheduledTime ? new Date(scheduledTime).toLocaleTimeString('en-US', { 
                                         hour: 'numeric', 
                                         minute: '2-digit',
                                         hour12: true 
-                                      })}
+                                      }) : 'No time set'}
                                     </span>
                                     <Badge variant={item.status === 'posted' ? 'success' : item.status === 'pending' ? 'warning' : item.status === 'failed' ? 'error' : 'default'}>
                                       {item.status === 'posted' ? 'Posted' : item.status === 'pending' ? 'Scheduled' : item.status === 'failed' ? 'Failed' : item.status}
