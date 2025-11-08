@@ -345,187 +345,377 @@ export class AutomationService {
 
   /**
    * Generate research for items with topics but no research
+   * Only processes today's items after trigger time
    */
   static async generateResearchForReadyItems(): Promise<void> {
-    const { data: items } = await supabase
-      .from('video_plan_items')
-      .select('*, plan:video_plans!inner(enabled, auto_research, user_id)')
-      .eq('plan.enabled', true)
-      .eq('status', 'ready')
-      .not('topic', 'is', null)
-      .is('research_data', null)
-      .limit(10)
+    const now = new Date()
+    
+    // Get all enabled plans with trigger times and auto_research enabled
+    const { data: plans } = await supabase
+      .from('video_plans')
+      .select('id, trigger_time, timezone, user_id, auto_research')
+      .eq('enabled', true)
+      .eq('auto_research', true)
+      .in('auto_schedule_trigger', ['daily', 'time_based'])
+      .not('trigger_time', 'is', null)
 
-    if (!items) return
+    if (!plans || plans.length === 0) return
 
-    for (const item of items) {
+    // Process each plan that has passed its trigger time today
+    for (const plan of plans) {
       try {
-        const plan = item.plan as any
-        if (!plan.auto_research || !item.topic) continue
+        const planTimezone = plan.timezone || 'UTC'
+        const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+          timeZone: planTimezone,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        })
+        const hourFormatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: planTimezone,
+          hour: '2-digit',
+          hour12: false,
+        })
+        const minuteFormatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: planTimezone,
+          minute: '2-digit',
+          hour12: false,
+        })
 
-        // Generate research for the topic
-        await PlanService.generateTopicForItem(item.id, plan.user_id)
+        const today = dateFormatter.format(now)
+        const currentHour = parseInt(hourFormatter.format(now), 10)
+        const currentMinute = parseInt(minuteFormatter.format(now), 10)
+
+        // Check if trigger time has passed
+        if (plan.trigger_time) {
+          const [triggerHourStr, triggerMinuteStr] = plan.trigger_time.split(':')
+          const triggerHour = parseInt(triggerHourStr, 10)
+          const triggerMinute = parseInt(triggerMinuteStr || '0', 10)
+
+          const triggerMinutes = triggerHour * 60 + triggerMinute
+          const currentMinutes = currentHour * 60 + currentMinute
+
+          // Only process if trigger time has passed
+          if (currentMinutes < triggerMinutes) {
+            continue // Skip this plan, trigger time hasn't arrived yet
+          }
+        }
+
+        // Get items with topics but no research for today
+        const query = supabase
+          .from('video_plan_items')
+          .select('*')
+          .eq('plan_id', plan.id)
+          .eq('scheduled_date', today)
+          .eq('status', 'ready')
+          .not('topic', 'is', null)
+          .is('research_data', null)
+        
+        if (plan.trigger_time) {
+          query.eq('scheduled_time', plan.trigger_time)
+        }
+        
+        const { data: items } = await query.limit(10)
+
+        if (!items || items.length === 0) continue
+
+        for (const item of items) {
+          try {
+            if (!item.topic) continue
+
+            // Generate research for the topic
+            await PlanService.generateTopicForItem(item.id, plan.user_id)
+          } catch (error: any) {
+            console.error(`Error generating research for item ${item.id}:`, error)
+          }
+        }
       } catch (error: any) {
-        console.error(`Error generating research for item ${item.id}:`, error)
+        console.error(`Error processing plan ${plan.id} for research generation:`, error)
       }
     }
   }
 
   /**
    * Generate script for items with research but no script
+   * Only processes today's items after trigger time
    */
   static async generateScriptsForReadyItems(): Promise<void> {
-    // First, get items with research data
-    const { data: itemsWithResearch } = await supabase
-      .from('video_plan_items')
-      .select('*, plan:video_plans!inner(enabled, auto_approve)')
-      .eq('plan.enabled', true)
-      .eq('status', 'ready')
-      .is('script', null)
-      .not('research_data', 'is', null)
-      .limit(10)
+    const now = new Date()
+    
+    // Get all enabled plans with trigger times
+    const { data: plans } = await supabase
+      .from('video_plans')
+      .select('id, trigger_time, timezone, auto_approve')
+      .eq('enabled', true)
+      .in('auto_schedule_trigger', ['daily', 'time_based'])
+      .not('trigger_time', 'is', null)
 
-    // Also get items with topics but no research (will use topic directly)
-    const { data: itemsWithTopic } = await supabase
-      .from('video_plan_items')
-      .select('*, plan:video_plans!inner(enabled, auto_approve)')
-      .eq('plan.enabled', true)
-      .eq('status', 'ready')
-      .is('script', null)
-      .is('research_data', null)
-      .not('topic', 'is', null)
-      .limit(10)
+    if (!plans || plans.length === 0) return
 
-    const allItems = [...(itemsWithResearch || []), ...(itemsWithTopic || [])]
-
-    if (allItems.length === 0) return
-
-    for (const item of allItems) {
+    // Process each plan that has passed its trigger time today
+    for (const plan of plans) {
       try {
-        const plan = item.plan as any
-        // Update status to show script generation in progress
-        await supabase
-          .from('video_plan_items')
-          .update({ status: 'draft' }) // Using 'draft' status to indicate script generation
-          .eq('id', item.id)
+        const planTimezone = plan.timezone || 'UTC'
+        const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+          timeZone: planTimezone,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        })
+        const hourFormatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: planTimezone,
+          hour: '2-digit',
+          hour12: false,
+        })
+        const minuteFormatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: planTimezone,
+          minute: '2-digit',
+          hour12: false,
+        })
 
-        const research = item.research_data
+        const today = dateFormatter.format(now)
+        const currentHour = parseInt(hourFormatter.format(now), 10)
+        const currentMinute = parseInt(minuteFormatter.format(now), 10)
 
-        // Prioritize item.topic over research.Idea - user's topic input should always be used
-        const topicToUse = item.topic || research?.Idea || ''
-        if (!topicToUse) {
-          throw new Error('No topic available for script generation')
+        // Check if trigger time has passed
+        if (plan.trigger_time) {
+          const [triggerHourStr, triggerMinuteStr] = plan.trigger_time.split(':')
+          const triggerHour = parseInt(triggerHourStr, 10)
+          const triggerMinute = parseInt(triggerMinuteStr || '0', 10)
+
+          const triggerMinutes = triggerHour * 60 + triggerMinute
+          const currentMinutes = currentHour * 60 + currentMinute
+
+          // Only process if trigger time has passed
+          if (currentMinutes < triggerMinutes) {
+            continue // Skip this plan, trigger time hasn't arrived yet
+          }
         }
 
-        // If no research but has topic, use topic directly
-        const script = await ScriptService.generateScriptCustom({
-          idea: topicToUse, // Always use the item's topic first
-          description: item.description || research?.Description || '',
-          whyItMatters: item.why_important || research?.WhyItMatters || '',
-          usefulTips: item.useful_tips || research?.UsefulTips || '',
-          category: item.category || research?.Category || 'general',
-        })
+        // Get items with research data for today
+        const researchQuery = supabase
+          .from('video_plan_items')
+          .select('*')
+          .eq('plan_id', plan.id)
+          .eq('scheduled_date', today)
+          .eq('status', 'ready')
+          .is('script', null)
+          .not('research_data', 'is', null)
         
-        console.log(`[Script Generation] Generated script for topic: "${topicToUse}" (item topic: "${item.topic || 'N/A'}")`)
+        if (plan.trigger_time) {
+          researchQuery.eq('scheduled_time', plan.trigger_time)
+        }
+        
+        const { data: itemsWithResearch } = await researchQuery.limit(10)
 
-        const newStatus = plan.auto_approve ? 'approved' : 'draft'
-        const scriptStatus = plan.auto_approve ? 'approved' : 'draft'
-
-        await supabase
+        // Get items with topics but no research for today
+        const topicQuery = supabase
           .from('video_plan_items')
-          .update({
-            script,
-            script_status: scriptStatus,
-            status: newStatus,
-          })
-          .eq('id', item.id)
+          .select('*')
+          .eq('plan_id', plan.id)
+          .eq('scheduled_date', today)
+          .eq('status', 'ready')
+          .is('script', null)
+          .is('research_data', null)
+          .not('topic', 'is', null)
+        
+        if (plan.trigger_time) {
+          topicQuery.eq('scheduled_time', plan.trigger_time)
+        }
+        
+        const { data: itemsWithTopic } = await topicQuery.limit(10)
+
+        const allItems = [...(itemsWithResearch || []), ...(itemsWithTopic || [])]
+
+        if (allItems.length === 0) continue
+
+        for (const item of allItems) {
+          try {
+            // Update status to show script generation in progress
+            await supabase
+              .from('video_plan_items')
+              .update({ status: 'draft' }) // Using 'draft' status to indicate script generation
+              .eq('id', item.id)
+
+            const research = item.research_data
+
+            // Prioritize item.topic over research.Idea - user's topic input should always be used
+            const topicToUse = item.topic || research?.Idea || ''
+            if (!topicToUse) {
+              throw new Error('No topic available for script generation')
+            }
+
+            // If no research but has topic, use topic directly
+            const script = await ScriptService.generateScriptCustom({
+              idea: topicToUse, // Always use the item's topic first
+              description: item.description || research?.Description || '',
+              whyItMatters: item.why_important || research?.WhyItMatters || '',
+              usefulTips: item.useful_tips || research?.UsefulTips || '',
+              category: item.category || research?.Category || 'general',
+            })
+            
+            console.log(`[Script Generation] Generated script for today's item ${item.id}, topic: "${topicToUse}"`)
+
+            const newStatus = plan.auto_approve ? 'approved' : 'draft'
+            const scriptStatus = plan.auto_approve ? 'approved' : 'draft'
+
+            await supabase
+              .from('video_plan_items')
+              .update({
+                script,
+                script_status: scriptStatus,
+                status: newStatus,
+              })
+              .eq('id', item.id)
+          } catch (error: any) {
+            console.error(`Error generating script for item ${item.id}:`, error)
+            await supabase
+              .from('video_plan_items')
+              .update({
+                status: 'failed',
+                error_message: error.message,
+              })
+              .eq('id', item.id)
+          }
+        }
       } catch (error: any) {
-        console.error(`Error generating script for item ${item.id}:`, error)
-        await supabase
-          .from('video_plan_items')
-          .update({
-            status: 'failed',
-            error_message: error.message,
-          })
-          .eq('id', item.id)
+        console.error(`Error processing plan ${plan.id} for script generation:`, error)
       }
     }
   }
 
   /**
    * Generate videos for approved scripts
+   * Only processes today's items after trigger time
    */
   static async generateVideosForApprovedItems(): Promise<void> {
-    const { data: items } = await supabase
-      .from('video_plan_items')
-      .select('*, plan:video_plans!inner(enabled, user_id, auto_create)')
-      .eq('plan.enabled', true)
-      .eq('status', 'approved')
-      .eq('script_status', 'approved')
-      .is('video_id', null)
-      .not('script', 'is', null)
-      .limit(5)
+    const now = new Date()
+    
+    // Get all enabled plans with trigger times and auto_create enabled
+    const { data: plans } = await supabase
+      .from('video_plans')
+      .select('id, trigger_time, timezone, user_id, auto_create')
+      .eq('enabled', true)
+      .eq('auto_create', true)
+      .in('auto_schedule_trigger', ['daily', 'time_based'])
+      .not('trigger_time', 'is', null)
 
-    if (!items) return
+    if (!plans || plans.length === 0) return
 
-    for (const item of items) {
+    // Process each plan that has passed its trigger time today
+    for (const plan of plans) {
       try {
-        const plan = item.plan as any
-        // Only auto-create if auto_create is enabled
-        if (!plan.auto_create) {
-          console.log(`[Video Generation] Skipping item ${item.id} - auto_create is disabled`)
-          continue
-        }
-
-        // Update status to show video generation in progress
-        const statusUpdate = await supabase
-          .from('video_plan_items')
-          .update({ status: 'generating' })
-          .eq('id', item.id)
-          .select()
-
-        if (statusUpdate.error) {
-          console.error(`[Video Generation] Failed to update status for item ${item.id}:`, statusUpdate.error)
-        } else {
-          console.log(`[Video Generation] Updated item ${item.id} status to 'generating' (Creating Video)`)
-        }
-
-        if (!item.topic || !item.script) {
-          throw new Error('Missing topic or script for video generation')
-        }
-
-        console.log(`[Video Generation] Creating video for item ${item.id} with topic: ${item.topic}`)
-        const video = await VideoService.requestManualVideo(plan.user_id, {
-          topic: item.topic,
-          script: item.script,
-          style: 'professional',
-          duration: 30,
+        const planTimezone = plan.timezone || 'UTC'
+        const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+          timeZone: planTimezone,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        })
+        const hourFormatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: planTimezone,
+          hour: '2-digit',
+          hour12: false,
+        })
+        const minuteFormatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: planTimezone,
+          minute: '2-digit',
+          hour12: false,
         })
 
-        const finalUpdate = await supabase
-          .from('video_plan_items')
-          .update({
-            video_id: video.id,
-            status: 'completed',
-          })
-          .eq('id', item.id)
-          .select()
+        const today = dateFormatter.format(now)
+        const currentHour = parseInt(hourFormatter.format(now), 10)
+        const currentMinute = parseInt(minuteFormatter.format(now), 10)
 
-        if (finalUpdate.error) {
-          console.error(`[Video Generation] Failed to update video_id for item ${item.id}:`, finalUpdate.error)
-        } else {
-          console.log(`[Video Generation] Generated video for item ${item.id}, video_id: ${video.id}`)
+        // Check if trigger time has passed
+        if (plan.trigger_time) {
+          const [triggerHourStr, triggerMinuteStr] = plan.trigger_time.split(':')
+          const triggerHour = parseInt(triggerHourStr, 10)
+          const triggerMinute = parseInt(triggerMinuteStr || '0', 10)
+
+          const triggerMinutes = triggerHour * 60 + triggerMinute
+          const currentMinutes = currentHour * 60 + currentMinute
+
+          // Only process if trigger time has passed
+          if (currentMinutes < triggerMinutes) {
+            continue // Skip this plan, trigger time hasn't arrived yet
+          }
+        }
+
+        // Get approved items for today that need videos
+        const query = supabase
+          .from('video_plan_items')
+          .select('*')
+          .eq('plan_id', plan.id)
+          .eq('scheduled_date', today)
+          .eq('status', 'approved')
+          .eq('script_status', 'approved')
+          .is('video_id', null)
+          .not('script', 'is', null)
+        
+        if (plan.trigger_time) {
+          query.eq('scheduled_time', plan.trigger_time)
+        }
+        
+        const { data: items } = await query.limit(5)
+
+        if (!items || items.length === 0) continue
+
+        for (const item of items) {
+          try {
+            // Update status to show video generation in progress
+            const statusUpdate = await supabase
+              .from('video_plan_items')
+              .update({ status: 'generating' })
+              .eq('id', item.id)
+              .select()
+
+            if (statusUpdate.error) {
+              console.error(`[Video Generation] Failed to update status for item ${item.id}:`, statusUpdate.error)
+            } else {
+              console.log(`[Video Generation] Updated today's item ${item.id} status to 'generating' (Creating Video)`)
+            }
+
+            if (!item.topic || !item.script) {
+              throw new Error('Missing topic or script for video generation')
+            }
+
+            console.log(`[Video Generation] Creating video for today's item ${item.id} with topic: ${item.topic}`)
+            const video = await VideoService.requestManualVideo(plan.user_id, {
+              topic: item.topic,
+              script: item.script,
+              style: 'professional',
+              duration: 30,
+            })
+
+            const finalUpdate = await supabase
+              .from('video_plan_items')
+              .update({
+                video_id: video.id,
+                status: 'completed',
+              })
+              .eq('id', item.id)
+              .select()
+
+            if (finalUpdate.error) {
+              console.error(`[Video Generation] Failed to update video_id for item ${item.id}:`, finalUpdate.error)
+            } else {
+              console.log(`[Video Generation] Generated video for today's item ${item.id}, video_id: ${video.id}`)
+            }
+          } catch (error: any) {
+            console.error(`Error generating video for item ${item.id}:`, error)
+            const errorMessage = error?.message || 'Failed to create video record'
+            await supabase
+              .from('video_plan_items')
+              .update({
+                status: 'failed',
+                error_message: errorMessage,
+              })
+              .eq('id', item.id)
+          }
         }
       } catch (error: any) {
-        console.error(`Error generating video for item ${item.id}:`, error)
-        const errorMessage = error?.message || 'Failed to create video record'
-        await supabase
-          .from('video_plan_items')
-          .update({
-            status: 'failed',
-            error_message: errorMessage,
-          })
-          .eq('id', item.id)
+        console.error(`Error processing plan ${plan.id} for video generation:`, error)
       }
     }
   }
