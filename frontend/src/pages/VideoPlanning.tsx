@@ -150,6 +150,7 @@ export function VideoPlanning() {
   const [editPlanModal, setEditPlanModal] = useState<VideoPlan | null>(null)
   const [editingPlan, setEditingPlan] = useState(false)
   const [selectedItem, setSelectedItem] = useState<VideoPlanItem | null>(null)
+  const [scheduledPosts, setScheduledPosts] = useState<any[]>([])
 
   // Preset times for quick selection
   const timePresets = [
@@ -202,7 +203,17 @@ export function VideoPlanning() {
     if (selectedPlan) {
       loadPlanItems(selectedPlan.id)
     }
+    loadScheduledPosts()
   }, [selectedPlan])
+
+  useEffect(() => {
+    // Reload scheduled posts periodically to show updates
+    const interval = setInterval(() => {
+      loadScheduledPosts()
+    }, 10000) // Poll every 10 seconds
+    
+    return () => clearInterval(interval)
+  }, [])
 
   // Poll for status updates more frequently for items in progress
   useEffect(() => {
@@ -244,6 +255,18 @@ export function VideoPlanning() {
       }
     } catch (error) {
       console.error('Failed to load plan items:', error)
+    }
+  }
+
+  const loadScheduledPosts = async () => {
+    try {
+      // Don't pass status parameter to get all scheduled posts
+      const response = await api.get('/api/posts')
+      const posts = response.data.posts || []
+      setScheduledPosts(posts)
+      console.log(`[VideoPlanning] Loaded ${posts.length} scheduled posts`)
+    } catch (error) {
+      console.error('Failed to load scheduled posts:', error)
     }
   }
 
@@ -465,14 +488,39 @@ export function VideoPlanning() {
     }
   }
 
-  // Filter items by status
+  // Calendar helper function - defined before use
+  const getDateKey = (date: Date | null) => {
+    if (!date) return ''
+    // Format date as YYYY-MM-DD using local timezone (not UTC)
+    // This matches the format from the database (scheduled_date)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  // Filter items by status (for plan items only, scheduled posts are shown separately)
   const filteredItems =
     statusFilter === 'all'
       ? planItems
+      : statusFilter === 'scheduled' || statusFilter === 'posted'
+      ? planItems.filter((item) => item.status === statusFilter)
       : planItems.filter((item) => item.status === statusFilter)
+  
+  // Filter scheduled posts by status
+  const filteredPosts = 
+    statusFilter === 'all'
+      ? scheduledPosts
+      : statusFilter === 'scheduled' || statusFilter === 'pending'
+      ? scheduledPosts.filter((p) => p.status === 'pending' || p.status === 'scheduled')
+      : statusFilter === 'posted'
+      ? scheduledPosts.filter((p) => p.status === 'posted')
+      : statusFilter === 'failed'
+      ? scheduledPosts.filter((p) => p.status === 'failed')
+      : []
 
-  // Group items by date
-  const itemsByDate = filteredItems.reduce(
+  // Group plan items by date
+  const planItemsByDate = filteredItems.reduce(
     (acc, item) => {
       const date = item.scheduled_date
       if (!date) {
@@ -485,6 +533,44 @@ export function VideoPlanning() {
     },
     {} as Record<string, VideoPlanItem[]>,
   )
+
+  // Group scheduled posts by date (using filtered posts)
+  const postsByDate = filteredPosts.reduce(
+    (acc, post) => {
+      if (!post.scheduled_time) return acc
+      const date = new Date(post.scheduled_time)
+      const dateKey = getDateKey(date)
+      if (!dateKey) return acc
+      if (!acc[dateKey]) acc[dateKey] = []
+      acc[dateKey].push(post)
+      return acc
+    },
+    {} as Record<string, any[]>,
+  )
+
+  // Combine plan items and scheduled posts by date
+  const itemsByDate: Record<string, Array<VideoPlanItem | any>> = {}
+  
+  // Add plan items
+  Object.keys(planItemsByDate).forEach(date => {
+    itemsByDate[date] = [...(planItemsByDate[date] || [])]
+  })
+  
+  // Add scheduled posts
+  Object.keys(postsByDate).forEach(date => {
+    if (!itemsByDate[date]) {
+      itemsByDate[date] = []
+    }
+    // Add scheduled posts to the date, marking them as posts
+    postsByDate[date].forEach(post => {
+      itemsByDate[date].push({
+        ...post,
+        _isScheduledPost: true,
+        scheduled_date: date, // Add scheduled_date for compatibility
+        topic: post.videos?.topic || 'Scheduled Post',
+      })
+    })
+  })
   
   // Debug: Log items by date for current month
   if (selectedPlan && planItems.length > 0) {
@@ -532,29 +618,29 @@ export function VideoPlanning() {
     })
   }
 
-  const getDateKey = (date: Date | null) => {
-    if (!date) return ''
-    // Format date as YYYY-MM-DD using local timezone (not UTC)
-    // This matches the format from the database (scheduled_date)
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    return `${year}-${month}-${day}`
-  }
-
   const getItemsForDate = (date: Date | null) => {
     if (!date) return []
     const dateKey = getDateKey(date)
     return itemsByDate[dateKey] || []
   }
 
+  // Helper to check if an item is a scheduled post
+  const isScheduledPost = (item: any): boolean => {
+    return item._isScheduledPost === true
+  }
+
   const getStatusCounts = () => {
+    const scheduledCount = scheduledPosts.filter((p) => p.status === 'pending' || p.status === 'scheduled').length
+    const postedCount = scheduledPosts.filter((p) => p.status === 'posted').length
+    
     return {
-      all: planItems.length,
-      pending: planItems.filter((i) => i.status === 'pending').length,
+      all: planItems.length + scheduledPosts.length,
+      pending: planItems.filter((i) => i.status === 'pending').length + scheduledCount,
       ready: planItems.filter((i) => i.status === 'ready').length,
       completed: planItems.filter((i) => i.status === 'completed').length,
-      failed: planItems.filter((i) => i.status === 'failed').length,
+      scheduled: planItems.filter((i) => i.status === 'scheduled').length + scheduledCount,
+      posted: planItems.filter((i) => i.status === 'posted').length + postedCount,
+      failed: planItems.filter((i) => i.status === 'failed').length + scheduledPosts.filter((p) => p.status === 'failed').length,
     }
   }
 
@@ -745,6 +831,22 @@ export function VideoPlanning() {
                       {statusCounts.pending}
                     </span>
                   </div>
+                  {statusCounts.scheduled > 0 && (
+                    <div className="text-sm">
+                      <span className="text-slate-600">Scheduled: </span>
+                      <span className="font-semibold text-purple-600">
+                        {statusCounts.scheduled}
+                      </span>
+                    </div>
+                  )}
+                  {statusCounts.posted > 0 && (
+                    <div className="text-sm">
+                      <span className="text-slate-600">Posted: </span>
+                      <span className="font-semibold text-emerald-600">
+                        {statusCounts.posted}
+                      </span>
+                    </div>
+                  )}
                   {statusCounts.failed > 0 && (
                     <div className="text-sm">
                       <span className="text-slate-600">Failed: </span>
@@ -754,7 +856,7 @@ export function VideoPlanning() {
                     </div>
                   )}
                 </div>
-                <Select
+                  <Select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
                   options={[
@@ -762,6 +864,8 @@ export function VideoPlanning() {
                     { value: 'pending', label: 'Pending' },
                     { value: 'ready', label: 'Ready' },
                     { value: 'completed', label: 'Completed' },
+                    { value: 'scheduled', label: 'Scheduled' },
+                    { value: 'posted', label: 'Posted' },
                     { value: 'failed', label: 'Failed' },
                   ]}
                   className="w-40"
@@ -846,26 +950,36 @@ export function VideoPlanning() {
                           </div>
                           {items.length > 0 && (
                             <div className="mt-1 space-y-1">
-                              {items.slice(0, 2).map((item) => (
-                                <div
-                                  key={item.id}
-                                  className={`truncate rounded px-1.5 py-0.5 text-xs ${
-                                    item.status === 'completed' ||
-                                    item.status === 'posted'
-                                      ? 'bg-emerald-100 text-emerald-700'
-                                      : item.status === 'ready'
-                                        ? 'bg-blue-100 text-blue-700'
-                                        : item.status === 'failed'
-                                          ? 'bg-red-100 text-red-700'
-                                          : 'bg-yellow-100 text-yellow-700'
-                                  }`}
-                                  title={item.topic || 'No topic'}
-                                >
-                                  {item.topic ||
-                                    formatTime(item.scheduled_time) ||
-                                    'Item'}
-                                </div>
-                              ))}
+                              {items.slice(0, 2).map((item) => {
+                                const isPost = isScheduledPost(item)
+                                const status = isPost ? item.status : item.status
+                                const displayTopic = isPost 
+                                  ? (item.videos?.topic || `${item.platform} Post`)
+                                  : (item.topic || formatTime(item.scheduled_time) || 'Item')
+                                
+                                return (
+                                  <div
+                                    key={item.id}
+                                    className={`truncate rounded px-1.5 py-0.5 text-xs ${
+                                      status === 'completed' ||
+                                      status === 'posted'
+                                        ? 'bg-emerald-100 text-emerald-700'
+                                        : status === 'scheduled'
+                                          ? 'bg-purple-100 text-purple-700'
+                                        : status === 'ready'
+                                          ? 'bg-blue-100 text-blue-700'
+                                          : status === 'failed'
+                                            ? 'bg-red-100 text-red-700'
+                                            : status === 'pending'
+                                              ? 'bg-yellow-100 text-yellow-700'
+                                              : 'bg-slate-100 text-slate-700'
+                                    }`}
+                                    title={displayTopic}
+                                  >
+                                    {displayTopic}
+                                  </div>
+                                )
+                              })}
                               {items.length > 2 && (
                                 <div className="text-xs text-slate-500">
                                   +{items.length - 2} more
@@ -896,12 +1010,69 @@ export function VideoPlanning() {
 
                   <div className="space-y-3">
                     {itemsByDate[selectedDate]
-                      .sort((a, b) =>
-                        (a.scheduled_time || '').localeCompare(
-                          b.scheduled_time || '',
-                        ),
-                      )
-                      .map((item) => (
+                      .sort((a, b) => {
+                        // Sort by scheduled_time, handling both plan items and scheduled posts
+                        let timeA = ''
+                        let timeB = ''
+                        
+                        if (a._isScheduledPost) {
+                          // For scheduled posts, extract time from ISO string
+                          timeA = a.scheduled_time ? new Date(a.scheduled_time).toISOString().substring(11, 16) : '00:00'
+                        } else {
+                          // For plan items, use scheduled_time directly (HH:MM format)
+                          timeA = a.scheduled_time || '00:00'
+                        }
+                        
+                        if (b._isScheduledPost) {
+                          timeB = b.scheduled_time ? new Date(b.scheduled_time).toISOString().substring(11, 16) : '00:00'
+                        } else {
+                          timeB = b.scheduled_time || '00:00'
+                        }
+                        
+                        return timeA.localeCompare(timeB)
+                      })
+                      .map((item) => {
+                        const isPost = isScheduledPost(item)
+                        if (isPost) {
+                          // Render scheduled post differently
+                          return (
+                            <Card 
+                              key={item.id} 
+                              className="p-5 border-purple-200 bg-purple-50/50"
+                            >
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex-1 space-y-3">
+                                  <div className="flex items-center gap-3">
+                                    <Clock className="h-4 w-4 text-slate-400" />
+                                    <span className="text-sm font-medium text-slate-600">
+                                      {new Date(item.scheduled_time).toLocaleTimeString('en-US', { 
+                                        hour: 'numeric', 
+                                        minute: '2-digit',
+                                        hour12: true 
+                                      })}
+                                    </span>
+                                    <Badge variant={item.status === 'posted' ? 'success' : item.status === 'pending' ? 'warning' : item.status === 'failed' ? 'error' : 'default'}>
+                                      {item.status === 'posted' ? 'Posted' : item.status === 'pending' ? 'Scheduled' : item.status === 'failed' ? 'Failed' : item.status}
+                                    </Badge>
+                                    <Badge variant="info">{item.platform}</Badge>
+                                  </div>
+                                  <div>
+                                    <h3 className="font-semibold text-primary">
+                                      {item.videos?.topic || 'Scheduled Post'}
+                                    </h3>
+                                    {item.videos && (
+                                      <p className="mt-1 text-sm text-slate-600">
+                                        Video ID: {item.video_id}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </Card>
+                          )
+                        }
+                        // Render regular plan item (existing code)
+                        return (
                         <Card 
                           key={item.id} 
                           className="p-5 cursor-pointer transition hover:shadow-md"
@@ -1227,7 +1398,8 @@ export function VideoPlanning() {
                             </div>
                           </div>
                         </Card>
-                      ))}
+                        )
+                      })}
                   </div>
                 </div>
               )}
