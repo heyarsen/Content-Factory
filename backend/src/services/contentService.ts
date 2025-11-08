@@ -126,7 +126,10 @@ export class ContentService {
    * Get content items without research
    */
   static async getContentWithoutResearch(userId?: string, limit = 3): Promise<ContentItem[]> {
-    let query = supabase
+    const { retrySupabaseOperation } = await import('../lib/supabaseRetry.js')
+    
+    return retrySupabaseOperation(async () => {
+      let query = supabase
       .from('content_items')
       .select('*')
       .is('research', null)
@@ -137,14 +140,15 @@ export class ContentService {
       query = query.eq('user_id', userId)
     }
 
-    const { data, error } = await query
+      const { data, error } = await query
 
-    if (error) {
-      console.error('Error fetching content without research:', error)
-      throw new Error(`Failed to fetch content without research: ${error.message}`)
-    }
+      if (error) {
+        console.error('Error fetching content without research:', error)
+        throw new Error(`Failed to fetch content without research: ${error.message}`)
+      }
 
-    return data || []
+      return data || []
+    }, 3, 1000, 'getContentWithoutResearch')
   }
 
   /**

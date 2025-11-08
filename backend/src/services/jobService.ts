@@ -42,23 +42,27 @@ export class JobService {
    * Get pending jobs ready for execution
    */
   static async getPendingJobs(limit = 10): Promise<BackgroundJob[]> {
-    const now = new Date().toISOString()
+    const { retrySupabaseOperation } = await import('../lib/supabaseRetry.js')
+    
+    return retrySupabaseOperation(async () => {
+      const now = new Date().toISOString()
 
-    const { data, error } = await supabase
-      .from('background_jobs')
-      .select('*')
-      .eq('status', 'pending')
-      .lte('scheduled_at', now)
-      .order('scheduled_at', { ascending: true })
-      .limit(limit)
+      const { data, error } = await supabase
+        .from('background_jobs')
+        .select('*')
+        .eq('status', 'pending')
+        .lte('scheduled_at', now)
+        .order('scheduled_at', { ascending: true })
+        .limit(limit)
 
-    if (error) {
-      console.error('Error fetching pending jobs:', error)
-      throw new Error(`Failed to fetch pending jobs: ${error.message}`)
-    }
+      if (error) {
+        console.error('Error fetching pending jobs:', error)
+        throw new Error(`Failed to fetch pending jobs: ${error.message}`)
+      }
 
-    // Filter out jobs that have exceeded max attempts
-    return (data || []).filter(job => job.attempts < job.max_attempts)
+      // Filter out jobs that have exceeded max attempts
+      return (data || []).filter(job => job.attempts < job.max_attempts)
+    }, 3, 1000, 'getPendingJobs')
   }
 
   /**

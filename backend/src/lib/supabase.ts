@@ -2,6 +2,29 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 let supabaseClient: SupabaseClient | null = null
 
+// Helper function to create a fetch with timeout
+function createFetchWithTimeout(timeoutMs: number = 30000) {
+  return async (url: string, options: any = {}) => {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      })
+      clearTimeout(timeoutId)
+      return response
+    } catch (error: any) {
+      clearTimeout(timeoutId)
+      if (error.name === 'AbortError') {
+        throw new Error(`Request timeout after ${timeoutMs}ms`)
+      }
+      throw error
+    }
+  }
+}
+
 function getSupabaseClient(): SupabaseClient {
   if (supabaseClient) {
     return supabaseClient
@@ -16,10 +39,19 @@ function getSupabaseClient(): SupabaseClient {
     )
   }
 
+  // Create fetch with increased timeout (60 seconds)
+  const customFetch = createFetchWithTimeout(60000)
+
   supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
+    },
+    global: {
+      fetch: customFetch as any,
+      headers: {
+        'x-client-info': 'content-factory-backend',
+      },
     },
   })
 
@@ -37,6 +69,9 @@ export function getSupabaseClientForUser(userJWT: string): SupabaseClient {
     )
   }
 
+  // Create fetch with increased timeout (60 seconds)
+  const customFetch = createFetchWithTimeout(60000)
+
   // Create client with user's JWT token in headers for RLS
   const client = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
@@ -44,8 +79,10 @@ export function getSupabaseClientForUser(userJWT: string): SupabaseClient {
       persistSession: false,
     },
     global: {
+      fetch: customFetch as any,
       headers: {
         Authorization: `Bearer ${userJWT}`,
+        'x-client-info': 'content-factory-backend',
       },
     },
   })
