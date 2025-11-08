@@ -82,9 +82,14 @@ export function VideoPlanning() {
   const [planItems, setPlanItems] = useState<VideoPlanItem[]>([])
   const [loading, setLoading] = useState(true)
   const [createModal, setCreateModal] = useState(false)
-  const [selectedDate, setSelectedDate] = useState<string>(
-    new Date().toISOString().split('T')[0],
-  )
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    // Initialize with today's date in YYYY-MM-DD format using local timezone
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = String(today.getMonth() + 1).padStart(2, '0')
+    const day = String(today.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  })
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [scriptPreviewItem, setScriptPreviewItem] =
@@ -231,7 +236,12 @@ export function VideoPlanning() {
   const loadPlanItems = async (planId: string) => {
     try {
       const response = await api.get(`/api/plans/${planId}`)
-      setPlanItems(response.data.items || [])
+      const items = response.data.items || []
+      setPlanItems(items)
+      console.log(`[VideoPlanning] Loaded ${items.length} plan items for plan ${planId}`)
+      if (items.length > 0) {
+        console.log(`[VideoPlanning] Sample item dates:`, items.slice(0, 3).map(item => item.scheduled_date))
+      }
     } catch (error) {
       console.error('Failed to load plan items:', error)
     }
@@ -465,12 +475,25 @@ export function VideoPlanning() {
   const itemsByDate = filteredItems.reduce(
     (acc, item) => {
       const date = item.scheduled_date
+      if (!date) {
+        console.warn(`[VideoPlanning] Item ${item.id} has no scheduled_date`)
+        return acc
+      }
       if (!acc[date]) acc[date] = []
       acc[date].push(item)
       return acc
     },
     {} as Record<string, VideoPlanItem[]>,
   )
+  
+  // Debug: Log items by date for current month
+  if (selectedPlan && planItems.length > 0) {
+    const currentMonthKey = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`
+    const monthItems = Object.keys(itemsByDate).filter(date => date.startsWith(currentMonthKey))
+    if (monthItems.length > 0) {
+      console.log(`[VideoPlanning] Items in current month (${currentMonthKey}):`, monthItems.map(date => ({ date, count: itemsByDate[date].length })))
+    }
+  }
 
   // Calendar helper functions
   const getDaysInMonth = (date: Date) => {
@@ -511,7 +534,12 @@ export function VideoPlanning() {
 
   const getDateKey = (date: Date | null) => {
     if (!date) return ''
-    return date.toISOString().split('T')[0]
+    // Format date as YYYY-MM-DD using local timezone (not UTC)
+    // This matches the format from the database (scheduled_date)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
   }
 
   const getItemsForDate = (date: Date | null) => {
@@ -791,7 +819,7 @@ export function VideoPlanning() {
                   const dateKey = getDateKey(date)
                   const items = getItemsForDate(date)
                   const isToday =
-                    date && dateKey === new Date().toISOString().split('T')[0]
+                    date && dateKey === getDateKey(new Date())
                   const isSelected = date && dateKey === selectedDate
 
                   return (
