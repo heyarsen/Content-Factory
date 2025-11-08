@@ -76,6 +76,20 @@ interface VideoPlanItem {
   updated_at?: string
 }
 
+interface ScheduledPost {
+  id: string
+  video_id: string
+  platform: 'instagram' | 'tiktok' | 'youtube' | 'facebook' | 'twitter'
+  scheduled_time: string | null
+  status: 'pending' | 'posted' | 'failed' | 'cancelled' | 'scheduled'
+  posted_at: string | null
+  error_message: string | null
+  videos?: {
+    topic: string
+    video_url: string | null
+  } | null
+}
+
 export function VideoPlanning() {
   const [plans, setPlans] = useState<VideoPlan[]>([])
   const [selectedPlan, setSelectedPlan] = useState<VideoPlan | null>(null)
@@ -150,7 +164,7 @@ export function VideoPlanning() {
   const [editPlanModal, setEditPlanModal] = useState<VideoPlan | null>(null)
   const [editingPlan, setEditingPlan] = useState(false)
   const [selectedItem, setSelectedItem] = useState<VideoPlanItem | null>(null)
-  const [scheduledPosts, setScheduledPosts] = useState<any[]>([])
+  const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([])
 
   // Preset times for quick selection
   const timePresets = [
@@ -536,7 +550,7 @@ export function VideoPlanning() {
 
   // Group scheduled posts by date (using filtered posts)
   const postsByDate = filteredPosts.reduce(
-    (acc, post) => {
+    (acc, post: ScheduledPost) => {
       if (!post.scheduled_time) return acc
       const date = new Date(post.scheduled_time)
       const dateKey = getDateKey(date)
@@ -545,11 +559,12 @@ export function VideoPlanning() {
       acc[dateKey].push(post)
       return acc
     },
-    {} as Record<string, any[]>,
+    {} as Record<string, ScheduledPost[]>,
   )
 
   // Combine plan items and scheduled posts by date
-  const itemsByDate: Record<string, Array<VideoPlanItem | any>> = {}
+  type CalendarItem = VideoPlanItem | (ScheduledPost & { _isScheduledPost: true; scheduled_date: string; topic: string })
+  const itemsByDate: Record<string, CalendarItem[]> = {}
   
   // Add plan items
   Object.keys(planItemsByDate).forEach(date => {
@@ -562,7 +577,7 @@ export function VideoPlanning() {
       itemsByDate[date] = []
     }
     // Add scheduled posts to the date, marking them as posts
-    postsByDate[date].forEach(post => {
+    postsByDate[date].forEach((post: ScheduledPost) => {
       itemsByDate[date].push({
         ...post,
         _isScheduledPost: true,
@@ -625,8 +640,8 @@ export function VideoPlanning() {
   }
 
   // Helper to check if an item is a scheduled post
-  const isScheduledPost = (item: any): boolean => {
-    return item._isScheduledPost === true
+  const isScheduledPost = (item: CalendarItem): item is ScheduledPost & { _isScheduledPost: true; scheduled_date: string; topic: string } => {
+    return '_isScheduledPost' in item && item._isScheduledPost === true
   }
 
   const getStatusCounts = () => {
@@ -1241,7 +1256,7 @@ export function VideoPlanning() {
                                       {item.platforms &&
                                         item.platforms.length > 0 && (
                                           <div className="mt-2 flex flex-wrap gap-1">
-                                            {item.platforms.map((platform) => (
+                                            {item.platforms.map((platform: string) => (
                                               <span
                                                 key={platform}
                                                 className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700"
