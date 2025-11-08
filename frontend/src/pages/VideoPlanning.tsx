@@ -240,7 +240,7 @@ export function VideoPlanning() {
       setPlanItems(items)
       console.log(`[VideoPlanning] Loaded ${items.length} plan items for plan ${planId}`)
       if (items.length > 0) {
-        console.log(`[VideoPlanning] Sample item dates:`, items.slice(0, 3).map(item => item.scheduled_date))
+        console.log(`[VideoPlanning] Sample item dates:`, items.slice(0, 3).map((item: VideoPlanItem) => item.scheduled_date))
       }
     } catch (error) {
       console.error('Failed to load plan items:', error)
