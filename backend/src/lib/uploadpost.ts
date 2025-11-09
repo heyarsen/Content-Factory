@@ -513,20 +513,59 @@ export async function getUploadStatus(uploadId: string): Promise<UploadPostRespo
     if (response.data.results) {
       // If results is an object with platform keys, convert to array
       if (typeof response.data.results === 'object' && !Array.isArray(response.data.results)) {
-        results = Object.entries(response.data.results).map(([platform, result]: [string, any]) => ({
-          platform,
-          status: result.success ? 'success' : result.error ? 'failed' : 'pending',
-          post_id: result.url || result.container_id || result.post_id || result.video_id,
-          error: result.error || null,
-        }))
+        results = Object.entries(response.data.results).map(([platform, result]: [string, any]) => {
+          // Handle different status formats from Upload-Post API
+          let status = 'pending'
+          if (result.success === true || result.status === 'success' || result.status === 'completed' || result.status === 'posted') {
+            status = 'success'
+          } else if (result.error || result.success === false || result.status === 'failed') {
+            status = 'failed'
+          } else if (result.status) {
+            status = result.status
+          }
+          
+          return {
+            platform,
+            status,
+            success: result.success !== false && (result.success === true || status === 'success' || status === 'completed' || status === 'posted'),
+            post_id: result.url || result.container_id || result.post_id || result.video_id || result.id,
+            error: result.error || null,
+          }
+        })
       } else if (Array.isArray(response.data.results)) {
-        results = response.data.results
+        // Process array results - normalize status values
+        results = response.data.results.map((result: any) => {
+          let status = result.status || 'pending'
+          // Normalize status values
+          if (status === 'completed' || status === 'posted') {
+            status = 'success'
+          }
+          
+          return {
+            ...result,
+            status,
+            success: result.success !== false && (result.success === true || status === 'success' || status === 'completed' || status === 'posted'),
+          }
+        })
       }
     }
 
+    // Normalize overall status
+    let overallStatus = response.data.status || 'unknown'
+    if (overallStatus === 'completed' || overallStatus === 'posted') {
+      overallStatus = 'success'
+    }
+
+    console.log(`[Upload-Post] Parsed upload status:`, {
+      uploadId,
+      overallStatus,
+      resultsCount: results.length,
+      results: results.map((r: any) => ({ platform: r.platform, status: r.status, success: r.success })),
+    })
+
     return {
       upload_id: uploadId,
-      status: response.data.status || 'unknown',
+      status: overallStatus,
       results,
       error: response.data.error,
     }

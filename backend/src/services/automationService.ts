@@ -843,10 +843,45 @@ export class AutomationService {
         // Find the platform-specific result
         const platformResult = uploadStatus.results?.find((r: any) => r.platform === post.platform)
 
+        console.log(`[Distribution] Platform result for ${post.platform}:`, {
+          platformResult: platformResult ? {
+            status: platformResult.status,
+            success: (platformResult as any).success,
+            error: platformResult.error,
+            post_id: platformResult.post_id,
+          } : 'not found',
+          overallStatus: uploadStatus.status,
+          resultsCount: uploadStatus.results?.length || 0,
+        })
+
         if (platformResult) {
-          const newStatus = platformResult.status === 'success' ? 'posted' :
-                           platformResult.status === 'failed' ? 'failed' :
+          // Check multiple possible status values: 'success', 'completed', 'posted'
+          // Also check for success boolean or success property
+          const platformResultAny = platformResult as any
+          const isSuccess = platformResult.status === 'success' || 
+                           platformResult.status === 'completed' || 
+                           platformResult.status === 'posted' ||
+                           platformResultAny.success === true ||
+                           (platformResultAny.success !== false && !platformResult.error && platformResult.post_id)
+          
+          const isFailed = platformResult.status === 'failed' || 
+                          platformResult.error || 
+                          (platformResultAny.success === false)
+
+          const newStatus = isSuccess ? 'posted' :
+                           isFailed ? 'failed' :
                            'pending'
+
+          console.log(`[Distribution] Status determination for post ${post.id}:`, {
+            platformResultStatus: platformResult.status,
+            platformResultSuccess: (platformResult as any).success,
+            hasError: !!platformResult.error,
+            hasPostId: !!platformResult.post_id,
+            isSuccess,
+            isFailed,
+            newStatus,
+            currentStatus: post.status,
+          })
 
           // Only update if status changed
           if (newStatus !== post.status) {
@@ -860,7 +895,7 @@ export class AutomationService {
               })
               .eq('id', post.id)
 
-            console.log(`[Distribution] Updated post ${post.id} (${post.platform}) from ${post.status} to ${newStatus}`)
+            console.log(`[Distribution] ✅ Updated post ${post.id} (${post.platform}) from '${post.status}' to '${newStatus}'`)
 
             // If post succeeded, update plan item status
             if (newStatus === 'posted') {
@@ -883,23 +918,67 @@ export class AutomationService {
                     .from('video_plan_items')
                     .update({ status: 'posted' })
                     .eq('id', item.id)
-                  console.log(`[Distribution] All posts completed for item ${item.id}, updated status to posted`)
+                  console.log(`[Distribution] ✅ All posts completed for item ${item.id}, updated status to 'posted'`)
+                } else {
+                  console.log(`[Distribution] ⏳ Item ${item.id} - not all posts completed yet (${allPosts?.filter((p: any) => p.status !== 'posted' && p.status !== 'failed').length} still pending)`)
                 }
               }
             }
+          } else {
+            console.log(`[Distribution] ⏸️ Post ${post.id} (${post.platform}) status unchanged: '${post.status}'`)
           }
-        } else if (uploadStatus.status === 'success' || uploadStatus.status === 'failed') {
-          // Overall status is known, but no platform-specific result
-          const newStatus = uploadStatus.status === 'success' ? 'posted' : 'failed'
+        } else if (uploadStatus.status === 'success' || uploadStatus.status === 'completed' || uploadStatus.status === 'posted') {
+          // Overall status indicates success, but no platform-specific result
+          // This can happen if the API returns overall status but not platform-specific results
+          console.log(`[Distribution] No platform result found, but overall status is '${uploadStatus.status}', marking as posted`)
+          const newStatus = 'posted'
           await supabase
             .from('scheduled_posts')
             .update({
               status: newStatus,
-              posted_at: newStatus === 'posted' ? new Date().toISOString() : post.posted_at,
+              posted_at: new Date().toISOString(),
               error_message: uploadStatus.error || null,
               updated_at: new Date().toISOString(),
             })
             .eq('id', post.id)
+          console.log(`[Distribution] ✅ Updated post ${post.id} (${post.platform}) to 'posted' based on overall status`)
+          
+          // Update plan item status
+          const { data: item } = await supabase
+            .from('video_plan_items')
+            .select('id, status')
+            .eq('video_id', post.video_id)
+            .single()
+
+          if (item && item.status !== 'posted') {
+            const { data: allPosts } = await supabase
+              .from('scheduled_posts')
+              .select('status')
+              .eq('video_id', post.video_id)
+
+            const allPosted = allPosts?.every((p: any) => p.status === 'posted' || p.status === 'failed')
+            if (allPosted) {
+              await supabase
+                .from('video_plan_items')
+                .update({ status: 'posted' })
+                .eq('id', item.id)
+              console.log(`[Distribution] ✅ All posts completed for item ${item.id}, updated status to 'posted'`)
+            }
+          }
+        } else if (uploadStatus.status === 'failed') {
+          // Overall status indicates failure
+          const newStatus = 'failed'
+          await supabase
+            .from('scheduled_posts')
+            .update({
+              status: newStatus,
+              error_message: uploadStatus.error || null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', post.id)
+          console.log(`[Distribution] ❌ Updated post ${post.id} (${post.platform}) to 'failed' based on overall status`)
+        } else {
+          console.log(`[Distribution] ⚠️ Post ${post.id} (${post.platform}) - no platform result and unclear overall status: '${uploadStatus.status}'`)
         }
       } catch (error: any) {
         console.error(`[Distribution] Error checking upload status for post ${post.id}:`, error.message)

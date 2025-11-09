@@ -128,8 +128,14 @@ async function processVideoGeneration(job: BackgroundJob): Promise<void> {
     throw new Error('Reel must have a script')
   }
 
-  // Generate video
-  const videoData = await VideoService.generateVideoForReel(reel)
+  // Get user_id from reel (required for avatar lookup)
+  const userId = reel.user_id
+  if (!userId) {
+    throw new Error('Reel must have a user_id to generate video')
+  }
+
+  // Generate video with user_id for avatar lookup
+  const videoData = await VideoService.generateVideoForReel(reel, userId)
 
   // Update reel with video information
   await ReelService.updateReelVideo(reel_id, {

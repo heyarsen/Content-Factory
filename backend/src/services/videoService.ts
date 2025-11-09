@@ -381,7 +381,7 @@ export class VideoService {
   /**
    * Generate video for a reel based on category
    */
-  static async generateVideoForReel(reel: Reel): Promise<{ video_id: string; video_url: string | null }> {
+  static async generateVideoForReel(reel: Reel, userId?: string): Promise<{ video_id: string; video_url: string | null }> {
     if (!reel.script) {
       throw new Error('Reel must have a script to generate video')
     }
@@ -389,10 +389,37 @@ export class VideoService {
     const template = reel.template || CATEGORY_TEMPLATES[reel.category] || CATEGORY_TEMPLATES.Trading
 
     try {
-      // For reels, we don't have avatar info, so use default (regular avatar)
-      const response = await requestHeygenVideo(
-        buildHeygenPayload(reel.topic, reel.script, DEFAULT_REEL_STYLE, DEFAULT_REEL_DURATION, undefined, false)
-      )
+      // Get default avatar if userId is provided, otherwise use undefined (will cause error which is handled)
+      let avatarId: string | undefined = undefined
+      let isPhotoAvatar = false
+
+      if (userId) {
+        const { AvatarService } = await import('./avatarService.js')
+        const defaultAvatar = await AvatarService.getDefaultAvatar(userId)
+        if (defaultAvatar) {
+          avatarId = defaultAvatar.heygen_avatar_id
+          isPhotoAvatar = defaultAvatar.avatar_url?.includes('supabase.co/storage') || false
+          console.log(`[Reel Video] Using default avatar for reel: ${avatarId} (isPhotoAvatar: ${isPhotoAvatar})`)
+        } else {
+          console.warn(`[Reel Video] No default avatar found for user ${userId}, video generation may fail`)
+        }
+      }
+
+      if (!avatarId) {
+        throw new Error('No avatar available. Please configure a default avatar in your settings.')
+      }
+
+      // Build payload with avatar
+      const payload = buildHeygenPayload(reel.topic, reel.script, DEFAULT_REEL_STYLE, DEFAULT_REEL_DURATION, avatarId, isPhotoAvatar)
+      
+      console.log(`[Reel Video] Generating video for reel with avatar:`, {
+        topic: reel.topic,
+        hasScript: !!reel.script,
+        avatarId,
+        isPhotoAvatar,
+      })
+
+      const response = await requestHeygenVideo(payload)
 
       // template is currently not sent to HeyGen, but kept for future use
       void template
