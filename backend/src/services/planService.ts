@@ -178,6 +178,14 @@ export class PlanService {
       return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
     }
     
+    // Create a date formatter to ensure consistent YYYY-MM-DD format
+    const formatDateForDB = (date: Date): string => {
+      const year = date.getUTCFullYear()
+      const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+      const day = String(date.getUTCDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    }
+    
     let start = parseDate(startDate)
     
     // Check if trigger_time has passed today (only if start date is today)
@@ -198,19 +206,23 @@ export class PlanService {
       }
     }
     
-    // Calculate end date
-    const end = endDate 
-      ? parseDate(endDate)
-      : new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate() + 30, 23, 59, 59, 999))
+    // Calculate end date - always use adjusted start date to ensure end is after start
+    let end: Date
+    if (endDate) {
+      end = parseDate(endDate)
+      // If end date is before adjusted start date, extend it to be 30 days from start
+      const adjustedStartStr = formatDateForDB(start)
+      const endDateStr = formatDateForDB(end)
+      if (endDateStr < adjustedStartStr) {
+        console.log(`[Plan Service] End date (${endDateStr}) is before adjusted start date (${adjustedStartStr}), extending to 30 days from start`)
+        end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate() + 30, 23, 59, 59, 999))
+      }
+    } else {
+      // Default to 30 days from adjusted start date
+      end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate() + 30, 23, 59, 59, 999))
+    }
     
     const items: VideoPlanItem[] = []
-    // Create a date formatter to ensure consistent YYYY-MM-DD format
-    const formatDateForDB = (date: Date): string => {
-      const year = date.getUTCFullYear()
-      const month = String(date.getUTCMonth() + 1).padStart(2, '0')
-      const day = String(date.getUTCDate()).padStart(2, '0')
-      return `${year}-${month}-${day}`
-    }
     
     // Use custom times if provided, otherwise generate default time slots
     let timeSlots: string[] = []
@@ -250,10 +262,22 @@ export class PlanService {
     const maxDays = 365 // Safety limit
     
     console.log(`[Plan Service] Date range: ${currentDateStr} to ${endDateStr}`)
+    console.log(`[Plan Service] Date comparison: ${currentDateStr} <= ${endDateStr} = ${currentDateStr <= endDateStr}`)
     
     if (currentDateStr > endDateStr) {
       console.error(`[Plan Service] ERROR: Start date (${currentDateStr}) is after end date (${endDateStr})!`)
-      return []
+      console.error(`[Plan Service] This can happen if:`)
+      console.error(`[Plan Service]   1. Trigger time has passed and start was moved to tomorrow, but end_date is today`)
+      console.error(`[Plan Service]   2. End date is before start date`)
+      console.error(`[Plan Service]   3. Date calculation error`)
+      console.error(`[Plan Service] Original startDate parameter: ${startDate}`)
+      console.error(`[Plan Service] Original endDate parameter: ${endDate || 'null (30 days default)'}`)
+      console.error(`[Plan Service] Adjusted start date: ${formatDateForDB(start)}`)
+      console.error(`[Plan Service] Calculated end date: ${formatDateForDB(end)}`)
+      console.error(`[Plan Service] Plan timezone: ${planTimezone}`)
+      console.error(`[Plan Service] Today in plan timezone: ${today}`)
+      console.error(`[Plan Service] Plan trigger_time: ${plan.trigger_time}`)
+      throw new Error(`Start date (${currentDateStr}) is after end date (${endDateStr}). This usually happens when the trigger time has passed and the start date was adjusted, but the end date is set to today or earlier.`)
     }
     
     while (currentDateStr <= endDateStr && dayCount < maxDays) {
@@ -376,11 +400,22 @@ export class PlanService {
         customTimesProvided: customTimes?.length || 0,
         customTopicsProvided: customTopics?.length || 0,
         customCategoriesProvided: customCategories?.length || 0,
+        currentDateStr,
+        endDateStr,
+        dateComparison: currentDateStr <= endDateStr,
+        planTimezone,
+        today,
+        triggerTime: plan.trigger_time,
       }
-      console.error(`[Plan Service] ⚠️ ERROR: No items were created!`, errorDetails)
+      console.error(`[Plan Service] ⚠️ ERROR: No items were created!`, JSON.stringify(errorDetails, null, 2))
+      
+      // Check if we actually processed any days
+      if (dayCount === 0) {
+        throw new Error(`No days were processed. Start date: ${currentDateStr}, End date: ${endDateStr}. This might indicate a date calculation issue.`)
+      }
       
       // Throw an error to ensure the caller knows items failed to create
-      throw new Error(`Failed to create any plan items. Check logs for details. Plan ID: ${planId}, Days processed: ${dayCount}, Time slots: ${timeSlots.length}`)
+      throw new Error(`Failed to create any plan items after processing ${dayCount} days. Start: ${currentDateStr}, End: ${endDateStr}, Time slots: ${timeSlots.length}. Check backend logs for detailed error information.`)
     }
     
     return items

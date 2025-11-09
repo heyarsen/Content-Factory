@@ -69,6 +69,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
 
     // Generate plan items with custom times, topics, categories, and avatars if provided
     let items: any[] = []
+    let itemsGenerationError: string | null = null
     try {
       items = await PlanService.generatePlanItems(
         plan.id, 
@@ -94,16 +95,43 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
           video_categories: video_categories?.length || 0,
           video_avatars: video_avatars?.length || 0,
         })
+        // Try to fetch items from database in case they were created but not returned
+        try {
+          const existingItems = await PlanService.getPlanItems(plan.id, userId)
+          if (existingItems.length > 0) {
+            console.log(`[Plans API] Found ${existingItems.length} existing items in database, using those instead`)
+            items = existingItems
+          }
+        } catch (fetchError) {
+          console.error(`[Plans API] Error fetching existing items:`, fetchError)
+        }
       }
     } catch (itemError: any) {
       console.error(`[Plans API] Error generating plan items:`, itemError)
       console.error(`[Plans API] Error stack:`, itemError?.stack)
       console.error(`[Plans API] Error details:`, JSON.stringify(itemError, null, 2))
-      // Don't fail the plan creation if items fail to generate
-      // Return the plan anyway so user can see it
+      itemsGenerationError = itemError.message || 'Failed to generate plan items'
+      
+      // Try to fetch items from database in case some were created before the error
+      try {
+        const existingItems = await PlanService.getPlanItems(plan.id, userId)
+        if (existingItems.length > 0) {
+          console.log(`[Plans API] Found ${existingItems.length} existing items in database after error, using those`)
+          items = existingItems
+          itemsGenerationError = null // Clear error if we found items
+        }
+      } catch (fetchError) {
+        console.error(`[Plans API] Error fetching existing items after generation error:`, fetchError)
+      }
     }
 
-    return res.json({ plan, items: items || [] })
+    return res.json({ 
+      plan, 
+      items: items || [], 
+      itemsCount: items.length,
+      hasItems: items.length > 0,
+      ...(itemsGenerationError && { warning: itemsGenerationError })
+    })
   } catch (error: any) {
     console.error('Create plan error:', error)
     return res.status(500).json({ error: error.message || 'Failed to create plan' })

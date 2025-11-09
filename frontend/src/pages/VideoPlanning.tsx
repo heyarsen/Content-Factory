@@ -459,9 +459,16 @@ export function VideoPlanning() {
       console.log(`[VideoPlanning] Plan creation response:`, {
         plan: response.data.plan,
         items: response.data.items,
-        itemsCount: response.data.items?.length || 0,
-        hasItems: !!response.data.items && response.data.items.length > 0
+        itemsCount: response.data.itemsCount ?? response.data.items?.length ?? 0,
+        hasItems: response.data.hasItems ?? (!!response.data.items && response.data.items.length > 0),
+        warning: response.data.warning
       })
+
+      // Show warning if items generation had issues
+      if (response.data.warning) {
+        console.warn(`[VideoPlanning] ⚠️ Warning from server:`, response.data.warning)
+        // You could show a toast notification here if you have a toast system
+      }
 
       setPlans([response.data.plan, ...plans])
       setSelectedPlan(response.data.plan)
@@ -476,13 +483,19 @@ export function VideoPlanning() {
         setSelectedDate(`${year}-${month}-${day}`)
       }
       
-      // Load plan items immediately after creation
-      if (response.data.items && Array.isArray(response.data.items) && response.data.items.length > 0) {
+      // Load plan items - use itemsCount/hasItems from response if available, otherwise check items array
+      const itemsCount = response.data.itemsCount ?? response.data.items?.length ?? 0
+      const hasItems = response.data.hasItems ?? (response.data.items && Array.isArray(response.data.items) && response.data.items.length > 0)
+      
+      if (hasItems && response.data.items && Array.isArray(response.data.items) && response.data.items.length > 0) {
         setPlanItems(response.data.items)
-        console.log(`[VideoPlanning] ✓ Plan created with ${response.data.items.length} items`)
+        console.log(`[VideoPlanning] ✓ Plan created with ${itemsCount} items`)
       } else {
-        console.warn(`[VideoPlanning] ⚠️ Plan created but no items in response. Items array:`, response.data.items)
-        // Wait a bit then try to load items (might be async creation)
+        console.warn(`[VideoPlanning] ⚠️ Plan created but no items in response (itemsCount: ${itemsCount}, hasItems: ${hasItems}). Items array:`, response.data.items)
+        if (response.data.warning) {
+          console.warn(`[VideoPlanning] Server warning: ${response.data.warning}`)
+        }
+        // Wait a bit then try to load items (might be async creation or items were created but not returned)
         setTimeout(async () => {
           console.log(`[VideoPlanning] Attempting to load items for plan ${response.data.plan.id}...`)
           await loadPlanItems(response.data.plan.id)
