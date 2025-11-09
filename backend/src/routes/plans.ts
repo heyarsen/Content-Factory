@@ -81,8 +81,24 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
         video_avatars // Pass avatar IDs for each time slot
       )
       console.log(`[Plans API] Generated ${items.length} items for plan ${plan.id}`)
+      if (items.length === 0) {
+        console.error(`[Plans API] WARNING: generatePlanItems returned empty array for plan ${plan.id}`)
+        console.error(`[Plans API] Plan details:`, {
+          planId: plan.id,
+          userId,
+          start_date,
+          end_date,
+          videos_per_day,
+          video_times: video_times?.length || 0,
+          video_topics: video_topics?.length || 0,
+          video_categories: video_categories?.length || 0,
+          video_avatars: video_avatars?.length || 0,
+        })
+      }
     } catch (itemError: any) {
       console.error(`[Plans API] Error generating plan items:`, itemError)
+      console.error(`[Plans API] Error stack:`, itemError?.stack)
+      console.error(`[Plans API] Error details:`, JSON.stringify(itemError, null, 2))
       // Don't fail the plan creation if items fail to generate
       // Return the plan anyway so user can see it
     }

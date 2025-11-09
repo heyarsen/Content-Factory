@@ -122,7 +122,29 @@ export class PlanService {
     customCategories?: Array<string | null>, // Custom categories for each slot
     avatarIds?: string[] // Avatar IDs for each time slot
   ): Promise<VideoPlanItem[]> {
+    console.log(`[Plan Service] ===== generatePlanItems called =====`)
+    console.log(`[Plan Service] Parameters:`, {
+      planId,
+      userId,
+      startDate,
+      endDate: endDate || 'undefined (will use 30 days)',
+      customTimes: customTimes?.length || 0,
+      customTopics: customTopics?.length || 0,
+      customCategories: customCategories?.length || 0,
+      avatarIds: avatarIds?.length || 0,
+    })
+    
     const plan = await this.getPlanById(planId, userId)
+    console.log(`[Plan Service] Plan loaded:`, {
+      id: plan.id,
+      name: plan.name,
+      videos_per_day: plan.videos_per_day,
+      start_date: plan.start_date,
+      end_date: plan.end_date,
+      auto_research: plan.auto_research,
+      timezone: plan.timezone,
+      trigger_time: plan.trigger_time,
+    })
     
     const planTimezone = plan.timezone || 'UTC'
     const now = new Date()
@@ -260,28 +282,50 @@ export class PlanService {
         }
         
         try {
+          const insertData = {
+            plan_id: planId,
+            scheduled_date: currentDateStr, // Use date string directly
+            scheduled_time: timeSlot,
+            topic: topic,
+            category: category,
+            status: status,
+            platforms: plan.default_platforms || null,
+            avatar_id: avatarId,
+          }
+          
+          console.log(`[Plan Service] Inserting item:`, {
+            plan_id: planId,
+            scheduled_date: currentDateStr,
+            scheduled_time: timeSlot,
+            topic: topic || 'null',
+            category: category || 'null',
+            status,
+            platforms: plan.default_platforms,
+            avatar_id: avatarId || 'null',
+          })
+          
           const { data: item, error } = await supabase
             .from('video_plan_items')
-            .insert({
-              plan_id: planId,
-              scheduled_date: currentDateStr, // Use date string directly
-              scheduled_time: timeSlot,
-              topic: topic,
-              category: category,
-              status: status,
-              platforms: plan.default_platforms || null,
-              avatar_id: avatarId,
-            })
+            .insert(insertData)
             .select()
             .single()
 
           if (error) {
-            console.error(`[Plan Service] Error creating item for ${currentDateStr} at ${timeSlot}:`, error)
+            console.error(`[Plan Service] ❌ ERROR creating item for ${currentDateStr} at ${timeSlot}:`, error)
+            console.error(`[Plan Service] Error code:`, error.code)
+            console.error(`[Plan Service] Error message:`, error.message)
             console.error(`[Plan Service] Error details:`, JSON.stringify(error, null, 2))
+            console.error(`[Plan Service] Insert data was:`, JSON.stringify(insertData, null, 2))
+            // Continue to next item instead of failing completely
+            // But log this as a critical error if it's the first item
+            if (items.length === 0 && dayCount === 1 && i === 0) {
+              console.error(`[Plan Service] ⚠️ CRITICAL: First item creation failed! This might indicate a systemic issue.`)
+              throw new Error(`Failed to create plan items: ${error.message} (Code: ${error.code})`)
+            }
           } else if (item) {
             items.push(item)
             if (items.length <= 5 || items.length % 10 === 0) {
-              console.log(`[Plan Service] ✓ Created item ${items.length} for ${currentDateStr} at ${timeSlot}`)
+              console.log(`[Plan Service] ✓ Created item ${items.length} for ${currentDateStr} at ${timeSlot} (ID: ${item.id})`)
             }
             
             // Only auto-generate topic if no custom topic was provided and auto_research is enabled
@@ -291,12 +335,16 @@ export class PlanService {
               })
             }
           } else {
-            console.warn(`[Plan Service] No item returned for ${currentDateStr} at ${timeSlot}`)
+            console.warn(`[Plan Service] ⚠️ No item returned for ${currentDateStr} at ${timeSlot} (no error, but no data either)`)
           }
         } catch (err: any) {
-          console.error(`[Plan Service] Exception creating item for ${currentDateStr} at ${timeSlot}:`, err)
+          console.error(`[Plan Service] ❌ EXCEPTION creating item for ${currentDateStr} at ${timeSlot}:`, err)
           if (err.stack) {
             console.error(`[Plan Service] Exception stack:`, err.stack)
+          }
+          // If this is the first item and we have no items yet, throw to fail fast
+          if (items.length === 0 && dayCount === 1 && i === 0) {
+            throw err
           }
         }
       }
@@ -314,8 +362,9 @@ export class PlanService {
     console.log(`[Plan Service] ✓ Generated ${items.length} plan items total over ${dayCount} days`)
     
     if (items.length === 0) {
-      console.error(`[Plan Service] ⚠️ ERROR: No items were created!`, {
+      const errorDetails = {
         planId,
+        userId,
         startDate: formatDateForDB(start),
         endDate: formatDateForDB(end),
         originalStartDate: startDate,
@@ -323,8 +372,15 @@ export class PlanService {
         timeSlots,
         videosPerDay: plan.videos_per_day,
         dayCount,
-        timeSlotsLength: timeSlots.length
-      })
+        timeSlotsLength: timeSlots.length,
+        customTimesProvided: customTimes?.length || 0,
+        customTopicsProvided: customTopics?.length || 0,
+        customCategoriesProvided: customCategories?.length || 0,
+      }
+      console.error(`[Plan Service] ⚠️ ERROR: No items were created!`, errorDetails)
+      
+      // Throw an error to ensure the caller knows items failed to create
+      throw new Error(`Failed to create any plan items. Check logs for details. Plan ID: ${planId}, Days processed: ${dayCount}, Time slots: ${timeSlots.length}`)
     }
     
     return items
