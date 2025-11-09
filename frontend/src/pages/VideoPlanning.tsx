@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -374,14 +374,21 @@ export function VideoPlanning() {
 
   const loadPlanItems = async (planId: string) => {
     try {
+      console.log(`[VideoPlanning] Loading plan items for plan ${planId}...`)
       const response = await api.get(`/api/plans/${planId}`)
       const items = response.data.items || []
+      console.log(`[VideoPlanning] API response:`, {
+        planId,
+        itemsCount: items.length,
+        responseData: response.data
+      })
       setPlanItems(items)
-      console.log(`[VideoPlanning] Loaded ${items.length} plan items for plan ${planId}`)
+      console.log(`[VideoPlanning] ✓ Loaded ${items.length} plan items for plan ${planId}`)
       if (items.length > 0) {
-        console.log(`[VideoPlanning] Sample item dates:`, items.slice(0, 5).map((item: VideoPlanItem) => ({
+        console.log(`[VideoPlanning] Sample items:`, items.slice(0, 5).map((item: VideoPlanItem) => ({
           id: item.id,
           date: item.scheduled_date,
+          dateType: typeof item.scheduled_date,
           time: item.scheduled_time,
           topic: item.topic,
           status: item.status
@@ -391,12 +398,18 @@ export function VideoPlanning() {
         if (dates.length > 0) {
           const sortedDates = [...new Set(dates)].sort()
           console.log(`[VideoPlanning] Date range: ${sortedDates[0]} to ${sortedDates[sortedDates.length - 1]} (${sortedDates.length} unique dates)`)
+          console.log(`[VideoPlanning] All dates:`, sortedDates.slice(0, 10))
         }
       } else {
-        console.warn(`[VideoPlanning] No plan items found for plan ${planId}`)
+        console.warn(`[VideoPlanning] ⚠️ No plan items found for plan ${planId}. Plan might not have items created yet.`)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load plan items:', error)
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      })
     }
   }
 
@@ -688,118 +701,117 @@ export function VideoPlanning() {
       : []
 
   // Group plan items by date
-  // Normalize date format to ensure matching (handle both DATE and timestamp formats)
+  // Normalize date format - database returns DATE type as YYYY-MM-DD string
   const normalizeDate = (dateStr: string | null | undefined): string => {
     if (!dateStr) return ''
-    // If it's already in YYYY-MM-DD format, return as is
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-      return dateStr
+    // PostgreSQL DATE type is returned as YYYY-MM-DD string, use it directly
+    // Handle both DATE string and ISO timestamp formats
+    const dateMatch = dateStr.match(/^(\d{4}-\d{2}-\d{2})/)
+    if (dateMatch) {
+      return dateMatch[1] // Return YYYY-MM-DD format
     }
-    // If it's a timestamp, extract the date part
+    // Fallback: try to parse as date
     try {
       const date = new Date(dateStr)
+      if (isNaN(date.getTime())) return ''
       const year = date.getFullYear()
       const month = String(date.getMonth() + 1).padStart(2, '0')
       const day = String(date.getDate()).padStart(2, '0')
       return `${year}-${month}-${day}`
     } catch (e) {
-      console.warn(`[VideoPlanning] Failed to parse date: ${dateStr}`, e)
-      return dateStr.split('T')[0] // Try to extract date part from ISO string
+      console.warn(`[VideoPlanning] Failed to parse date: ${dateStr}`)
+      return ''
     }
   }
   
-  const planItemsByDate = filteredItems.reduce(
-    (acc, item) => {
-      const date = normalizeDate(item.scheduled_date)
-      if (!date) {
-        console.warn(`[VideoPlanning] Item ${item.id} has no valid scheduled_date:`, item.scheduled_date)
+  // Use useMemo to avoid recalculating on every render
+  const planItemsByDate = useMemo(() => {
+    const grouped = filteredItems.reduce(
+      (acc, item) => {
+        // Database returns scheduled_date as YYYY-MM-DD string, use it directly
+        const dateKey = normalizeDate(item.scheduled_date)
+        if (!dateKey) {
+          console.warn(`[VideoPlanning] Item ${item.id} has invalid scheduled_date:`, item.scheduled_date)
+          return acc
+        }
+        if (!acc[dateKey]) acc[dateKey] = []
+        acc[dateKey].push(item)
         return acc
-      }
-      if (!acc[date]) acc[date] = []
-      acc[date].push(item)
-      return acc
-    },
-    {} as Record<string, VideoPlanItem[]>,
-  )
+      },
+      {} as Record<string, VideoPlanItem[]>,
+    )
+    
+    // Debug logging (only log once when items change)
+    if (Object.keys(grouped).length > 0 && filteredItems.length > 0) {
+      const dateKeys = Object.keys(grouped).sort()
+      console.log(`[VideoPlanning] Grouped ${filteredItems.length} items into ${dateKeys.length} dates`, {
+        firstDate: dateKeys[0],
+        lastDate: dateKeys[dateKeys.length - 1],
+        sampleDates: dateKeys.slice(0, 3).map(d => ({ date: d, count: grouped[d].length }))
+      })
+    }
+    
+    return grouped
+  }, [filteredItems])
   
-  // Debug: Log items by date for debugging
-  console.log(`[VideoPlanning] Debug info:`, {
-    totalPlanItems: planItems.length,
-    filteredItems: filteredItems.length,
-    statusFilter,
-    datesWithItems: Object.keys(planItemsByDate).length,
-    sampleDates: Object.keys(planItemsByDate).slice(0, 5),
-    currentMonth: `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`,
-    selectedPlan: selectedPlan?.name,
-    planStartDate: selectedPlan?.start_date,
-    planEndDate: selectedPlan?.end_date
-  })
-  
-  if (Object.keys(planItemsByDate).length > 0) {
-    const dateKeys = Object.keys(planItemsByDate).sort()
-    console.log(`[VideoPlanning] Items grouped by date: ${dateKeys.length} dates with items`, {
-      firstDate: dateKeys[0],
-      lastDate: dateKeys[dateKeys.length - 1],
-      totalItems: filteredItems.length,
-      itemsPerDate: dateKeys.slice(0, 5).map(date => ({ date, count: planItemsByDate[date].length }))
-    })
-  } else if (planItems.length > 0) {
-    console.warn(`[VideoPlanning] WARNING: ${planItems.length} items loaded but none grouped by date!`)
-    console.warn(`[VideoPlanning] Sample item dates:`, planItems.slice(0, 5).map(item => ({
-      id: item.id,
-      scheduled_date: item.scheduled_date,
-      normalized: normalizeDate(item.scheduled_date),
-      status: item.status
-    })))
-  }
+  // Debug warning if items exist but none are grouped
+  useEffect(() => {
+    if (planItems.length > 0 && Object.keys(planItemsByDate).length === 0) {
+      console.warn(`[VideoPlanning] WARNING: ${planItems.length} items but none grouped!`, {
+        sampleItems: planItems.slice(0, 3).map(item => ({
+          id: item.id,
+          scheduled_date: item.scheduled_date,
+          normalized: normalizeDate(item.scheduled_date),
+          status: item.status
+        }))
+      })
+    }
+  }, [planItems, planItemsByDate])
 
   // Group scheduled posts by date (using filtered posts)
-  const postsByDate = filteredPosts.reduce(
-    (acc, post: ScheduledPost) => {
-      if (!post.scheduled_time) return acc
-      const date = new Date(post.scheduled_time)
-      const dateKey = getDateKey(date)
-      if (!dateKey) return acc
-      if (!acc[dateKey]) acc[dateKey] = []
-      acc[dateKey].push(post)
-      return acc
-    },
-    {} as Record<string, ScheduledPost[]>,
-  )
+  const postsByDate = useMemo(() => {
+    return filteredPosts.reduce(
+      (acc, post: ScheduledPost) => {
+        if (!post.scheduled_time) return acc
+        const date = new Date(post.scheduled_time)
+        const dateKey = getDateKey(date)
+        if (!dateKey) return acc
+        if (!acc[dateKey]) acc[dateKey] = []
+        acc[dateKey].push(post)
+        return acc
+      },
+      {} as Record<string, ScheduledPost[]>,
+    )
+  }, [filteredPosts])
 
   // Combine plan items and scheduled posts by date
   type CalendarItem = VideoPlanItem | (ScheduledPost & { _isScheduledPost: true; scheduled_date: string; topic: string })
-  const itemsByDate: Record<string, CalendarItem[]> = {}
-  
-  // Add plan items
-  Object.keys(planItemsByDate).forEach(date => {
-    itemsByDate[date] = [...(planItemsByDate[date] || [])]
-  })
-  
-  // Add scheduled posts
-  Object.keys(postsByDate).forEach(date => {
-    if (!itemsByDate[date]) {
-      itemsByDate[date] = []
-    }
-    // Add scheduled posts to the date, marking them as posts
-    postsByDate[date].forEach((post: ScheduledPost) => {
-      itemsByDate[date].push({
-        ...post,
-        _isScheduledPost: true,
-        scheduled_date: date, // Add scheduled_date for compatibility
-        topic: post.videos?.topic || 'Scheduled Post',
+  const itemsByDate = useMemo(() => {
+    const combined: Record<string, CalendarItem[]> = {}
+    
+    // Add plan items
+    Object.keys(planItemsByDate).forEach(date => {
+      combined[date] = [...(planItemsByDate[date] || [])]
+    })
+    
+    // Add scheduled posts
+    Object.keys(postsByDate).forEach(date => {
+      if (!combined[date]) {
+        combined[date] = []
+      }
+      // Add scheduled posts to the date, marking them as posts
+      postsByDate[date].forEach((post: ScheduledPost) => {
+        combined[date].push({
+          ...post,
+          _isScheduledPost: true,
+          scheduled_date: date, // Add scheduled_date for compatibility
+          topic: post.videos?.topic || 'Scheduled Post',
+        })
       })
     })
-  })
-  
-  // Debug: Log items by date for current month
-  if (selectedPlan && planItems.length > 0) {
-    const currentMonthKey = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`
-    const monthItems = Object.keys(itemsByDate).filter(date => date.startsWith(currentMonthKey))
-    if (monthItems.length > 0) {
-      console.log(`[VideoPlanning] Items in current month (${currentMonthKey}):`, monthItems.map(date => ({ date, count: itemsByDate[date].length })))
-    }
-  }
+    
+    return combined
+  }, [planItemsByDate, postsByDate])
 
   // Calendar helper functions
   const getDaysInMonth = (date: Date) => {
@@ -841,27 +853,7 @@ export function VideoPlanning() {
   const getItemsForDate = (date: Date | null) => {
     if (!date) return []
     const dateKey = getDateKey(date)
-    const items = itemsByDate[dateKey] || []
-    
-    // Debug: Log if we're looking for items on a specific date
-    if (selectedPlan && planItems.length > 0 && items.length === 0) {
-      // Check if any items exist for this date (even if filtered)
-      const allItemsForDate = planItems.filter(item => {
-        const itemDate = normalizeDate(item.scheduled_date)
-        return itemDate === dateKey
-      })
-      if (allItemsForDate.length > 0) {
-        console.log(`[VideoPlanning] Date ${dateKey} has ${allItemsForDate.length} items but ${items.length} after filtering`, {
-          dateKey,
-          allItemsCount: allItemsForDate.length,
-          filteredCount: items.length,
-          statusFilter,
-          itemStatuses: allItemsForDate.map(i => i.status)
-        })
-      }
-    }
-    
-    return items
+    return itemsByDate[dateKey] || []
   }
 
   // Helper to check if an item is a scheduled post
@@ -1166,16 +1158,8 @@ export function VideoPlanning() {
                     date && dateKey === getDateKey(new Date())
                   const isSelected = date && dateKey === selectedDate
                   
-                  // Check if this date should have items (even if filtered out)
-                  // Check unfiltered items to see if anything exists for this date
-                  const hasItemsOnDate = planItems.some(item => {
-                    const itemDate = normalizeDate(item.scheduled_date)
-                    return itemDate === dateKey
-                  }) || scheduledPosts.some(post => {
-                    if (!post.scheduled_time) return false
-                    const postDate = getDateKey(new Date(post.scheduled_time))
-                    return postDate === dateKey
-                  })
+                  // Check if items exist for this date (already filtered by status)
+                  const hasItemsOnDate = items.length > 0
 
                   return (
                     <button
@@ -1188,12 +1172,10 @@ export function VideoPlanning() {
                             ? 'border-brand-500 bg-brand-50 shadow-md'
                             : isToday
                               ? 'border-brand-300 bg-brand-50/70 shadow-sm'
-                              : hasItemsOnDate && items.length === 0
-                                ? 'border-amber-200 bg-amber-50/30'
                               : 'border-slate-200 bg-white hover:border-brand-300 hover:bg-slate-50 hover:shadow-sm'
                       }`}
                       disabled={!date}
-                      title={hasItemsOnDate && items.length === 0 ? 'Items exist but are filtered out' : ''}
+                      title={items.length > 0 ? `${items.length} item(s) scheduled` : ''}
                     >
                       {date && (
                         <>
@@ -1209,11 +1191,6 @@ export function VideoPlanning() {
                                 <span className="text-xs font-medium text-slate-600">
                                   {items.length}
                                 </span>
-                              </div>
-                            )}
-                            {hasItemsOnDate && items.length === 0 && (
-                              <div className="flex items-center gap-1" title="Items filtered out">
-                                <div className="h-1.5 w-1.5 rounded-full bg-amber-400"></div>
                               </div>
                             )}
                           </div>
