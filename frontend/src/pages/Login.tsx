@@ -65,8 +65,13 @@ export function Login() {
         errorMessage = 'Network error. Please check your internet connection and ensure the backend server is running.'
       }
       
-      // Add more context for 401 errors
-      if (err.response?.status === 401) {
+      // Handle 503 Service Unavailable (Supabase down or circuit breaker open)
+      if (err.response?.status === 503) {
+        const retryAfter = err.response?.data?.retryAfter || 30
+        errorMessage = `Authentication service is temporarily unavailable. Please try again in ${retryAfter} seconds.`
+        console.error('503 Service Unavailable - Backend response:', err.response?.data)
+      } else if (err.response?.status === 401) {
+        // Handle 401 Unauthorized (invalid credentials)
         if (!errorMessage || errorMessage === 'Request failed with status code 401') {
           errorMessage = 'Invalid email or password. Please check your credentials and try again.'
         }

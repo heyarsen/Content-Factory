@@ -78,102 +78,115 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
     let error: any = null
     let authClient = supabase
 
+    // Check Supabase health before attempting authentication
+    const { checkSupabaseHealth, getSupabaseClientWithHealthCheck } = await import('../lib/supabaseConnection.js')
+    const { circuitBreaker } = await import('../lib/circuitBreaker.js')
+
+    // Check circuit breaker first
+    if (circuitBreaker.isOpen('supabase')) {
+      const state = circuitBreaker.getState('supabase')
+      const nextAttempt = state?.nextAttemptTime ? new Date(state.nextAttemptTime).toISOString() : 'unknown'
+      console.log(`[Auth] Circuit breaker is open, rejecting login attempt. Next attempt: ${nextAttempt}`)
+      return res.status(503).json({
+        error: 'Authentication service is temporarily unavailable. Please try again in a few moments.',
+        retryAfter: Math.max(0, Math.ceil((state?.nextAttemptTime || Date.now()) - Date.now()) / 1000),
+        details: process.env.NODE_ENV === 'development' ? {
+          circuitBreakerState: 'open',
+          nextAttemptTime: nextAttempt,
+        } : undefined,
+      })
+    }
+
+    // Perform quick health check
+    const isHealthy = await checkSupabaseHealth()
+    if (!isHealthy) {
+      console.log(`[Auth] Supabase health check failed, rejecting login attempt`)
+      return res.status(503).json({
+        error: 'Authentication service is currently unavailable. Please try again in a few moments.',
+        retryAfter: 30,
+      })
+    }
+
     // For signInWithPassword, we can use either service role or anon key
     // Anon key is actually preferred for user authentication operations
     const supabaseUrl = process.env.SUPABASE_URL
     const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
     
-    // Helper function to create a fetch with increased timeout for connection issues
-    const createFetchWithTimeout = (timeoutMs: number = 90000) => {
-      return async (url: string, options: any = {}) => {
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
-
-        try {
-          const response = await fetch(url, {
-            ...options,
-            signal: controller.signal,
-          })
-          clearTimeout(timeoutId)
-          return response
-        } catch (error: any) {
-          clearTimeout(timeoutId)
-          if (error.name === 'AbortError') {
-            throw new Error(`Request timeout after ${timeoutMs}ms`)
-          }
-          throw error
-        }
-      }
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error(`[Auth] Missing Supabase configuration`)
+      return res.status(500).json({
+        error: 'Server configuration error. Please contact support.',
+      })
     }
-    
-    if (supabaseUrl && supabaseAnonKey) {
-      // Create a client with anon key for authentication (preferred for user auth)
-      const { createClient } = await import('@supabase/supabase-js')
-      // Use custom fetch with increased timeout (90 seconds) for connection issues
-      const customFetch = createFetchWithTimeout(90000)
-      authClient = createClient(supabaseUrl, supabaseAnonKey, {
+
+    // Get Supabase client with health check and circuit breaker
+    const { client: healthCheckedClient, error: clientError } = await getSupabaseClientWithHealthCheck(
+      supabaseUrl,
+      supabaseAnonKey,
+      {
         auth: {
           autoRefreshToken: false,
           persistSession: false,
         },
-        global: {
-          fetch: customFetch as any,
-          headers: {
-            'x-client-info': 'content-factory-backend-auth',
-          },
-        },
+      }
+    )
+
+    if (clientError || !healthCheckedClient) {
+      console.error(`[Auth] Failed to create Supabase client: ${clientError}`)
+      return res.status(503).json({
+        error: 'Authentication service is currently unavailable. Please try again in a few moments.',
+        retryAfter: 30,
       })
-      console.log(`[Auth] Using anon key for authentication with 90s timeout`)
-    } else {
-      console.log(`[Auth] Using service role key for authentication (anon key not available)`)
     }
 
-    // Retry logic for connection timeout errors
-    let lastError: any = null
-    const maxRetries = 3
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        const result = await authClient.auth.signInWithPassword({
-          email,
-          password,
-        })
-        data = result.data
-        error = result.error
-        break // Success, exit retry loop
-      } catch (authError: any) {
-        lastError = authError
-        
-        // Check if it's a connection timeout error
-        const isTimeoutError = 
-          authError?.cause?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
-          authError?.message?.includes('timeout') ||
-          authError?.message?.includes('fetch failed') ||
-          authError?.message?.includes('Connect Timeout') ||
-          authError?.name === 'AuthRetryableFetchError'
-        
-        if (isTimeoutError && attempt < maxRetries - 1) {
-          const waitTime = 2000 * Math.pow(2, attempt) // Exponential backoff: 2s, 4s, 8s
-          console.log(`[Auth] Connection timeout on attempt ${attempt + 1}/${maxRetries}, retrying in ${waitTime}ms...`)
-          await new Promise(resolve => setTimeout(resolve, waitTime))
-          continue
-        }
-        
-        // For non-timeout errors or last attempt, log and break
-        console.error(`[Auth] Exception during signInWithPassword (attempt ${attempt + 1}/${maxRetries}):`, {
+    authClient = healthCheckedClient
+    console.log(`[Auth] Using anon key for authentication with health check and circuit breaker`)
+
+    // Single attempt with the health-checked client
+    // If health check passed, the connection should work
+    try {
+      const result = await authClient.auth.signInWithPassword({
+        email,
+        password,
+      })
+      data = result.data
+      error = result.error
+      
+      // Record success in circuit breaker
+      if (!error) {
+        circuitBreaker.recordSuccess('supabase')
+      }
+    } catch (authError: any) {
+      // Check if it's a connection timeout error
+      const isTimeoutError = 
+        authError?.cause?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
+        authError?.message?.includes('timeout') ||
+        authError?.message?.includes('fetch failed') ||
+        authError?.message?.includes('Connect Timeout') ||
+        authError?.name === 'AuthRetryableFetchError'
+      
+      if (isTimeoutError) {
+        // Record failure in circuit breaker
+        circuitBreaker.recordFailure('supabase')
+        console.error(`[Auth] Connection timeout error:`, {
           message: authError.message,
-          stack: authError.stack,
-          name: authError.name,
-          code: authError.code,
-          cause: authError.cause,
+          code: authError.cause?.code,
         })
-        
-        // Convert exception to error format
-        error = {
-          message: authError.message || 'Authentication failed',
-          status: authError.status || 500,
-          name: authError.name || 'AuthError',
-        }
-        break
+      }
+      
+      console.error(`[Auth] Exception during signInWithPassword:`, {
+        message: authError.message,
+        stack: authError.stack,
+        name: authError.name,
+        code: authError.code,
+        cause: authError.cause,
+      })
+      
+      // Convert exception to error format
+      error = {
+        message: authError.message || 'Authentication failed',
+        status: authError.status || 500,
+        name: authError.name || 'AuthError',
       }
     }
 
@@ -192,7 +205,52 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
       const errorMsg = error.message || String(error) || 'Unknown error'
       const errorMsgLower = errorMsg.toLowerCase()
       
-      // Provide more user-friendly error messages
+      // Check if this is a connection/timeout error - should have been caught by health check
+      // But if it still happens, treat it as service unavailable
+      const isConnectionError = 
+        errorMsgLower.includes('network') || 
+        errorMsgLower.includes('fetch') ||
+        errorMsgLower.includes('failed to fetch') ||
+        errorMsgLower.includes('connection') ||
+        errorMsgLower.includes('timeout') ||
+        errorMsgLower.includes('econnrefused') ||
+        errorMsgLower.includes('connect timeout') ||
+        (error as any).cause?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
+        error.name === 'AuthRetryableFetchError'
+      
+      if (isConnectionError) {
+        // Record failure in circuit breaker
+        circuitBreaker.recordFailure('supabase')
+        
+        // Return 503 Service Unavailable instead of 401
+        const state = circuitBreaker.getState('supabase')
+        const retryAfter = state?.nextAttemptTime 
+          ? Math.max(0, Math.ceil((state.nextAttemptTime - Date.now()) / 1000))
+          : 30
+        
+        console.error(`[Auth] CRITICAL: Connection error after health check!`, {
+          supabaseUrl: process.env.SUPABASE_URL,
+          hasAnonKey: !!process.env.SUPABASE_ANON_KEY,
+          hasServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+          errorCode: (error as any).cause?.code,
+          errorMessage: errorMsg,
+          circuitBreakerState: state?.state,
+          retryAfter,
+        })
+        
+        return res.status(503).json({
+          error: 'Authentication service is temporarily unavailable. Please try again in a few moments.',
+          retryAfter,
+          details: process.env.NODE_ENV === 'development' ? {
+            originalMessage: errorMsg,
+            errorType: error.name,
+            errorCode: (error as any).code,
+            circuitBreakerState: state?.state,
+          } : undefined,
+        })
+      }
+      
+      // Provide more user-friendly error messages for other errors
       let errorMessage = errorMsg
       if (errorMsgLower.includes('invalid login credentials') || 
           errorMsgLower.includes('invalid credentials') ||
@@ -207,22 +265,6 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
                  errorMsgLower.includes('too_many_requests') ||
                  errorMsgLower.includes('too many')) {
         errorMessage = 'Too many login attempts. Please try again in a few minutes.'
-      } else if (errorMsgLower.includes('network') || 
-                 errorMsgLower.includes('fetch') ||
-                 errorMsgLower.includes('failed to fetch') ||
-                 errorMsgLower.includes('connection') ||
-                 errorMsgLower.includes('timeout') ||
-                 errorMsgLower.includes('econnrefused') ||
-                 errorMsgLower.includes('connect timeout')) {
-        errorMessage = 'Unable to connect to authentication service. The connection timed out. This might be a temporary network issue. Please try again in a few moments.'
-        // Log this as a critical error
-        console.error(`[Auth] CRITICAL: Backend cannot connect to Supabase (connection timeout)!`, {
-          supabaseUrl: process.env.SUPABASE_URL,
-          hasAnonKey: !!process.env.SUPABASE_ANON_KEY,
-          hasServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-          errorCode: (error as any).cause?.code,
-          errorMessage: errorMsg,
-        })
       }
       
       return res.status(401).json({ 

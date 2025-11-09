@@ -52,47 +52,52 @@ app.get('/health', async (req, res) => {
     },
   }
 
-  // Test Supabase connectivity if URL is set
-  if (process.env.SUPABASE_URL) {
-    try {
-      const supabaseUrl = process.env.SUPABASE_URL
-      // Simple connectivity test - just try to reach the Supabase API
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout for health check
-      
-      try {
-        const response = await fetch(`${supabaseUrl}/rest/v1/`, {
-          method: 'HEAD',
-          signal: controller.signal,
-          headers: {
-            'apikey': process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-          },
-        })
-        clearTimeout(timeoutId)
-        health.supabase = {
-          reachable: response.status < 500,
-          status: response.status,
-          url: supabaseUrl,
-        }
-      } catch (fetchError: any) {
-        clearTimeout(timeoutId)
-        health.supabase = {
-          reachable: false,
-          error: fetchError.message,
-          errorCode: fetchError.cause?.code,
-          url: supabaseUrl,
-        }
+  // Use connection health check with circuit breaker
+  try {
+    const { checkSupabaseHealth, getConnectionHealth } = await import('./lib/supabaseConnection.js')
+    const connectionHealth = getConnectionHealth()
+    const isHealthy = await checkSupabaseHealth()
+
+    health.supabase = {
+      reachable: isHealthy,
+      connectionHealth: {
+        isHealthy: connectionHealth.isHealthy,
+        consecutiveFailures: connectionHealth.consecutiveFailures,
+        circuitBreakerState: connectionHealth.circuitBreakerState,
+        lastCheck: new Date(connectionHealth.lastCheck).toISOString(),
+      },
+      url: process.env.SUPABASE_URL ? `${process.env.SUPABASE_URL.substring(0, 20)}...` : 'Not set',
+    }
+
+    // If circuit breaker is open, include next attempt time
+    if (connectionHealth.circuitBreakerState === 'open') {
+      const { circuitBreaker } = await import('./lib/circuitBreaker.js')
+      const state = circuitBreaker.getState('supabase')
+      if (state?.nextAttemptTime) {
+        health.supabase.nextAttemptTime = new Date(state.nextAttemptTime).toISOString()
+        health.supabase.retryAfter = Math.max(0, Math.ceil((state.nextAttemptTime - Date.now()) / 1000))
       }
-    } catch (error: any) {
-      health.supabase = {
-        reachable: false,
-        error: error.message,
-      }
+    }
+  } catch (error: any) {
+    health.supabase = {
+      reachable: false,
+      error: error.message,
     }
   }
 
   const statusCode = health.supabase?.reachable === false ? 503 : 200
   res.status(statusCode).json(health)
+})
+
+// Circuit breaker status endpoint
+app.get('/diagnostics/circuit-breaker', async (req, res) => {
+  try {
+    const { getConnectionHealth } = await import('./lib/supabaseConnection.js')
+    const health = getConnectionHealth()
+    res.json(health)
+  } catch (error: any) {
+    res.status(500).json({ error: error.message })
+  }
 })
 
 // Diagnostic endpoint for Supabase connectivity (more detailed than health check)
