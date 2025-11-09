@@ -1165,9 +1165,6 @@ export function VideoPlanning() {
                   const isToday =
                     date && dateKey === getDateKey(new Date())
                   const isSelected = date && dateKey === selectedDate
-                  
-                  // Check if items exist for this date (already filtered by status)
-                  const hasItemsOnDate = items.length > 0
 
                   return (
                     <button
