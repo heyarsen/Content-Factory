@@ -266,21 +266,22 @@ export class AutomationService {
                     .update({ status: 'generating' })
                     .eq('id', item.id)
                   
-                  // Get avatar_id from plan item
+                  // Get avatar_id from plan item (optional - will fall back to default avatar if not provided)
                   const avatarId = (updatedItem as any).avatar_id
                   
-                  if (!avatarId) {
-                    throw new Error('No avatar_id found for plan item')
-                  }
+                  console.log(`[Video Generation] Immediately generating video for item ${item.id}`, {
+                    topic: updatedItem.topic,
+                    hasAvatarId: !!avatarId,
+                    avatarId: avatarId || 'will use default avatar'
+                  })
                   
-                  console.log(`[Video Generation] Immediately generating video for item ${item.id} with avatar_id: ${avatarId}`)
-                  
+                  // VideoService.requestManualVideo will automatically use default avatar if avatar_id is not provided
                   const video = await VideoService.requestManualVideo(plan.user_id, {
                     topic: updatedItem.topic || 'Video Content',
                     script: updatedItem.script || '',
                     style: 'professional',
                     duration: 30,
-                    avatar_id: avatarId,
+                    avatar_id: avatarId, // Can be undefined - will fall back to default
                   })
                   
                   await supabase
@@ -368,24 +369,25 @@ export class AutomationService {
           throw new Error('Missing topic or script for video generation')
         }
 
-        // Get avatar_id from plan item
+        // Get avatar_id from plan item (optional - will fall back to default avatar if not provided)
         const avatarId = (item as any).avatar_id
         
-        if (!avatarId) {
-          throw new Error('No avatar_id found for plan item. Please select an avatar for this time slot.')
-        }
+        console.log(`[Video Generation] Creating video for item ${item.id}`, {
+          topic: item.topic,
+          scriptLength: item.script?.length || 0,
+          hasAvatarId: !!avatarId,
+          avatarId: avatarId || 'will use default avatar'
+        })
         
-        console.log(`[Video Generation] Creating video for item ${item.id} with topic: "${item.topic}", script length: ${item.script?.length || 0}, avatar_id: ${avatarId}`)
-        
+        // VideoService.requestManualVideo will automatically use default avatar if avatar_id is not provided
         // Ensure we're using the correct topic - use item.topic as the primary topic
         // The script should already be based on this topic, but we pass both for clarity
-        // Pass avatar_id from plan item
         const video = await VideoService.requestManualVideo(userId, {
           topic: item.topic || 'Video Content', // Ensure topic is never empty
           script: item.script, // Script should match the topic
           style: 'professional',
           duration: 30,
-          avatar_id: avatarId, // Use avatar from plan item
+          avatar_id: avatarId, // Can be undefined - will fall back to default avatar
         })
 
         console.log(`[Video Generation] Video created with ID: ${video.id}, topic: "${video.topic}"`)
