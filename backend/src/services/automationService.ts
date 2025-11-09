@@ -288,11 +288,11 @@ export class AutomationService {
                     .from('video_plan_items')
                     .update({
                       video_id: video.id,
-                      status: 'completed',
+                      status: 'generating', // Keep as generating until video is ready
                     })
                     .eq('id', item.id)
                   
-                  console.log(`[Video Generation] Immediately generated video ${video.id} for item ${item.id}`)
+                  console.log(`[Video Generation] Video generation started for item ${item.id}, video_id: ${video.id}. Status: generating (will update to completed when video is ready)`)
                 }
               } catch (videoError: any) {
                 console.error(`[Video Generation] Error immediately generating video for item ${item.id}:`, videoError)
@@ -392,11 +392,13 @@ export class AutomationService {
 
         console.log(`[Video Generation] Video created with ID: ${video.id}, topic: "${video.topic}"`)
 
+        // Keep status as 'generating' until video is actually completed
+        // The video status will be checked by checkVideoStatusAndScheduleDistribution
         const finalUpdate = await supabase
           .from('video_plan_items')
           .update({
             video_id: video.id,
-            status: 'completed',
+            status: 'generating', // Keep as generating until video is ready
           })
           .eq('id', item.id)
           .select()
@@ -404,7 +406,7 @@ export class AutomationService {
         if (finalUpdate.error) {
           console.error(`[Video Generation] Failed to update video_id for item ${item.id}:`, finalUpdate.error)
         } else {
-          console.log(`[Video Generation] Generated video for today's item ${item.id}, video_id: ${video.id}`)
+          console.log(`[Video Generation] Video generation started for item ${item.id}, video_id: ${video.id}. Status: generating (will update to completed when video is ready)`)
         }
       } catch (error: any) {
         console.error(`Error generating video for today's item ${item.id}:`, error)
@@ -1048,21 +1050,50 @@ export class AutomationService {
           const postMinutesTotal = postHour * 60 + postMinute
           const currentMinutesTotal = currentHour * 60 + currentMinute
           
-          // Check if it's the exact post time (within 1 minute window for cron timing)
-          // Only post if scheduled_date is today and scheduled_time matches current time
-          if (item.scheduled_date === today && Math.abs(currentMinutesTotal - postMinutesTotal) <= 1) {
-            // It's time to post now (at exact scheduled_time)
+          // Check if scheduled date is today or in the past
+          const scheduledDate = new Date(item.scheduled_date + 'T00:00:00')
+          const todayDate = new Date(today + 'T00:00:00')
+          const isScheduledDateTodayOrPast = scheduledDate <= todayDate
+          
+          // Calculate time difference in minutes
+          const timeDiffMinutes = (item.scheduled_date === today) 
+            ? (postMinutesTotal - currentMinutesTotal)
+            : (item.scheduled_date < today ? -999999 : 999999) // Past date = negative, future date = positive
+          
+          // Check if it's time to post (within 1 minute window for cron timing)
+          if (isScheduledDateTodayOrPast && timeDiffMinutes <= 1) {
+            // It's time to post now (at exact scheduled_time or slightly past)
             scheduledTime = undefined // Post immediately
-            console.log(`[Distribution] Posting item ${item.id} now - scheduled time (${item.scheduled_time}) reached`)
+            console.log(`[Distribution] Posting item ${item.id} now - scheduled time (${item.scheduled_time}) reached or passed`)
+          } else if (timeDiffMinutes > 1 && item.scheduled_date >= today) {
+            // Future scheduled time - build ISO string for scheduling
+            // Create date string in format: YYYY-MM-DDTHH:MM:SS
+            const scheduledDateTimeStr = `${item.scheduled_date}T${item.scheduled_time}:00`
+            // Parse as if it's in the plan's timezone, then convert to ISO
+            try {
+              // Use a more reliable method to create the scheduled time
+              const scheduledDateObj = new Date(scheduledDateTimeStr)
+              // Check if date is valid
+              if (isNaN(scheduledDateObj.getTime())) {
+                // Fallback: build ISO string manually
+                scheduledTime = `${item.scheduled_date}T${item.scheduled_time}:00.000Z`
+              } else {
+                scheduledTime = scheduledDateObj.toISOString()
+              }
+            } catch (e) {
+              // Fallback: use simple ISO string format
+              scheduledTime = `${item.scheduled_date}T${item.scheduled_time}:00.000Z`
+            }
+            console.log(`[Distribution] Scheduling item ${item.id} for ${scheduledTime} (${timeDiffMinutes} minutes from now)`)
           } else {
             // Not time yet, skip this item (will be processed when time matches)
-            console.log(`[Distribution] Skipping item ${item.id} - scheduled time (${item.scheduled_time}) not reached yet (current: ${currentHour}:${currentMinute.toString().padStart(2, '0')})`)
+            console.log(`[Distribution] Skipping item ${item.id} - scheduled time (${item.scheduled_time}) not reached yet (current: ${currentHour}:${currentMinute.toString().padStart(2, '0')}, scheduled: ${postHour}:${postMinute.toString().padStart(2, '0')})`)
             continue
           }
         } else {
-          // No scheduled time, skip (should have scheduled_time set)
-          console.log(`[Distribution] Skipping item ${item.id} - no scheduled_time set`)
-          continue
+          // No scheduled time - post immediately if video is ready
+          scheduledTime = undefined
+          console.log(`[Distribution] Posting item ${item.id} immediately - no scheduled time set`)
         }
 
         // Call upload-post.com API
@@ -1166,15 +1197,20 @@ export class AutomationService {
 
         // Update plan item status
         if (postIds.length > 0) {
-          // If all platforms posted immediately, mark as posted
-          // Otherwise, mark as completed (video is ready, posts are pending/completed)
+          // Determine status based on posting result and schedule
           let itemStatus: string
           if (allImmediateSuccess && !scheduledTime) {
+            // All platforms posted immediately
             itemStatus = 'posted'
           } else if (scheduledTime) {
+            // Scheduled for future posting
             itemStatus = 'scheduled'
+          } else if (isAsyncUpload || hasImmediateResults) {
+            // Posts are in progress (async) or have results pending
+            // Keep as 'completed' - video is ready, posts are being processed
+            itemStatus = 'completed'
           } else {
-            // Video is ready, posts are in progress (async) or pending
+            // Video is ready, posts are pending
             itemStatus = 'completed'
           }
 

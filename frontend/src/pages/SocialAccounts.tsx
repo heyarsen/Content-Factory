@@ -15,6 +15,11 @@ interface SocialAccount {
   platform: 'instagram' | 'tiktok' | 'youtube' | 'facebook' | 'x' | 'linkedin' | 'pinterest' | 'threads'
   status: 'connected' | 'disconnected' | 'error' | 'pending'
   connected_at: string
+  account_info?: {
+    username?: string | null
+    display_name?: string | null
+    avatar_url?: string | null
+  } | null
 }
 
 const platformIcons = {
@@ -245,8 +250,37 @@ export function SocialAccounts() {
                   )}
 
                   {isConnected && account && (
-                    <div className="rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-xs text-slate-500">
-                      Connected on {new Date(account.connected_at).toLocaleDateString()}.
+                    <div className="space-y-3">
+                      {account.account_info && (account.account_info.username || account.account_info.avatar_url) && (
+                        <div className="flex items-center gap-3 rounded-2xl border border-white/60 bg-white/70 px-4 py-3">
+                          {account.account_info.avatar_url && (
+                            <img 
+                              src={account.account_info.avatar_url} 
+                              alt={account.account_info.display_name || account.account_info.username || platformNames[platform]}
+                              className="h-8 w-8 rounded-full object-cover"
+                              onError={(e) => {
+                                // Hide image if it fails to load
+                                (e.target as HTMLImageElement).style.display = 'none'
+                              }}
+                            />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            {account.account_info.display_name && (
+                              <div className="text-sm font-medium text-slate-700 truncate">
+                                {account.account_info.display_name}
+                              </div>
+                            )}
+                            {account.account_info.username && (
+                              <div className="text-xs text-slate-500 truncate">
+                                @{account.account_info.username}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      <div className="rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-xs text-slate-500">
+                        Connected on {new Date(account.connected_at).toLocaleDateString()}.
+                      </div>
                     </div>
                   )}
 

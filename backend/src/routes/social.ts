@@ -106,7 +106,49 @@ router.get('/accounts', authenticate, async (req: AuthRequest, res: Response) =>
       return res.status(500).json({ error: 'Failed to fetch social accounts' })
     }
 
-    res.json({ accounts: data || [] })
+    // Fetch account info from Upload-Post for connected accounts
+    const accountsWithInfo = await Promise.all(
+      (data || []).map(async (account) => {
+        if (account.status === 'connected' && account.platform_account_id) {
+          try {
+            const profile = await getUserProfile(account.platform_account_id)
+            const actualProfile = profile.profile || profile
+            
+            // Extract account info from Upload-Post profile
+            const socialAccounts = actualProfile?.social_accounts || profile?.social_accounts || {}
+            const platformName = mapPlatformToUploadPost(account.platform)
+            const platformAccount = socialAccounts[platformName] || 
+                                   socialAccounts[account.platform] ||
+                                   socialAccounts[platformName.toLowerCase()] ||
+                                   socialAccounts[account.platform.toLowerCase()]
+            
+            if (platformAccount && typeof platformAccount === 'object') {
+              return {
+                ...account,
+                account_info: {
+                  username: platformAccount.username || platformAccount.display_name || null,
+                  display_name: platformAccount.display_name || platformAccount.username || null,
+                  avatar_url: platformAccount.social_images?.profile_picture || 
+                             platformAccount.profile_picture ||
+                             platformAccount.avatar_url ||
+                             null,
+                },
+              }
+            }
+          } catch (profileError: any) {
+            console.error(`Failed to fetch profile for ${account.platform}:`, profileError.message)
+            // Continue without account info if profile fetch fails
+          }
+        }
+        
+        return {
+          ...account,
+          account_info: null,
+        }
+      })
+    )
+
+    res.json({ accounts: accountsWithInfo || [] })
   } catch (error: any) {
     console.error('List accounts error:', error)
     res.status(500).json({ error: 'Internal server error' })

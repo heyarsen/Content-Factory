@@ -899,7 +899,7 @@ export function VideoPlanning() {
 
   const statusCounts = getStatusCounts()
 
-  const getStatusBadge = (status: string, scriptStatus?: string | null) => {
+  const getStatusBadge = (status: string, scriptStatus?: string | null, item?: VideoPlanItem) => {
     // Clear, user-friendly status labels that explain what's happening in the workflow
     
     // Handle rejected scripts first (highest priority)
@@ -910,6 +910,7 @@ export function VideoPlanning() {
     // Determine the most descriptive label based on status and script_status
     let label = ''
     let variant: 'default' | 'success' | 'error' | 'warning' | 'info' = 'default'
+    let showLoader = false
 
     switch (status) {
       case 'pending':
@@ -919,6 +920,7 @@ export function VideoPlanning() {
       case 'researching':
         label = 'Gathering Research'
         variant = 'info'
+        showLoader = true
         break
       case 'ready':
         label = 'Ready for Script'
@@ -927,6 +929,7 @@ export function VideoPlanning() {
       case 'draft':
         if (scriptStatus === 'draft') {
           label = 'Writing Script'
+          showLoader = true
         } else {
           label = 'Draft'
         }
@@ -943,12 +946,30 @@ export function VideoPlanning() {
         variant = 'success'
         break
       case 'generating':
-        label = 'Rendering Video'
+        label = 'Generating Video'
         variant = 'info'
+        showLoader = true
         break
       case 'completed':
-        label = 'Video Ready'
-        variant = 'success'
+        // Check if video is ready and if there's a scheduled time
+        if (item?.scheduled_date && item?.scheduled_time) {
+          const now = new Date()
+          const scheduledDateTime = new Date(`${item.scheduled_date}T${item.scheduled_time}`)
+          
+          if (scheduledDateTime > now) {
+            // Video is ready but waiting for post time
+            label = 'Waiting for Post Time'
+            variant = 'success'
+          } else {
+            // Post time has passed or is now
+            label = 'Ready to Publish'
+            variant = 'success'
+          }
+        } else {
+          // No scheduled time, video is ready
+          label = 'Video Ready'
+          variant = 'success'
+        }
         break
       case 'scheduled':
         label = 'Scheduled to Post'
@@ -969,6 +990,7 @@ export function VideoPlanning() {
     
     return (
       <Badge variant={variant}>
+        {showLoader && <Loader className="h-3 w-3 animate-spin" />}
         {label}
       </Badge>
     )
@@ -1436,6 +1458,7 @@ export function VideoPlanning() {
                                 {getStatusBadge(
                                   item.status,
                                   item.script_status,
+                                  item,
                                 )}
                               </div>
 
@@ -2471,7 +2494,7 @@ export function VideoPlanning() {
                     Status
                   </label>
                   <div className="mt-1">
-                    {getStatusBadge(selectedItem.status, selectedItem.script_status)}
+                    {getStatusBadge(selectedItem.status, selectedItem.script_status, selectedItem)}
                   </div>
                 </div>
               </div>
