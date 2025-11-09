@@ -83,39 +83,97 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
     const supabaseUrl = process.env.SUPABASE_URL
     const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
     
+    // Helper function to create a fetch with increased timeout for connection issues
+    const createFetchWithTimeout = (timeoutMs: number = 90000) => {
+      return async (url: string, options: any = {}) => {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+        try {
+          const response = await fetch(url, {
+            ...options,
+            signal: controller.signal,
+          })
+          clearTimeout(timeoutId)
+          return response
+        } catch (error: any) {
+          clearTimeout(timeoutId)
+          if (error.name === 'AbortError') {
+            throw new Error(`Request timeout after ${timeoutMs}ms`)
+          }
+          throw error
+        }
+      }
+    }
+    
     if (supabaseUrl && supabaseAnonKey) {
       // Create a client with anon key for authentication (preferred for user auth)
       const { createClient } = await import('@supabase/supabase-js')
+      // Use custom fetch with increased timeout (90 seconds) for connection issues
+      const customFetch = createFetchWithTimeout(90000)
       authClient = createClient(supabaseUrl, supabaseAnonKey, {
         auth: {
           autoRefreshToken: false,
           persistSession: false,
         },
+        global: {
+          fetch: customFetch as any,
+          headers: {
+            'x-client-info': 'content-factory-backend-auth',
+          },
+        },
       })
-      console.log(`[Auth] Using anon key for authentication`)
+      console.log(`[Auth] Using anon key for authentication with 90s timeout`)
     } else {
       console.log(`[Auth] Using service role key for authentication (anon key not available)`)
     }
 
-    try {
-      const result = await authClient.auth.signInWithPassword({
-        email,
-        password,
-      })
-      data = result.data
-      error = result.error
-    } catch (authError: any) {
-      console.error(`[Auth] Exception during signInWithPassword:`, {
-        message: authError.message,
-        stack: authError.stack,
-        name: authError.name,
-        code: authError.code,
-      })
-      // Convert exception to error format
-      error = {
-        message: authError.message || 'Authentication failed',
-        status: authError.status || 500,
-        name: authError.name || 'AuthError',
+    // Retry logic for connection timeout errors
+    let lastError: any = null
+    const maxRetries = 3
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const result = await authClient.auth.signInWithPassword({
+          email,
+          password,
+        })
+        data = result.data
+        error = result.error
+        break // Success, exit retry loop
+      } catch (authError: any) {
+        lastError = authError
+        
+        // Check if it's a connection timeout error
+        const isTimeoutError = 
+          authError?.cause?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
+          authError?.message?.includes('timeout') ||
+          authError?.message?.includes('fetch failed') ||
+          authError?.message?.includes('Connect Timeout') ||
+          authError?.name === 'AuthRetryableFetchError'
+        
+        if (isTimeoutError && attempt < maxRetries - 1) {
+          const waitTime = 2000 * Math.pow(2, attempt) // Exponential backoff: 2s, 4s, 8s
+          console.log(`[Auth] Connection timeout on attempt ${attempt + 1}/${maxRetries}, retrying in ${waitTime}ms...`)
+          await new Promise(resolve => setTimeout(resolve, waitTime))
+          continue
+        }
+        
+        // For non-timeout errors or last attempt, log and break
+        console.error(`[Auth] Exception during signInWithPassword (attempt ${attempt + 1}/${maxRetries}):`, {
+          message: authError.message,
+          stack: authError.stack,
+          name: authError.name,
+          code: authError.code,
+          cause: authError.cause,
+        })
+        
+        // Convert exception to error format
+        error = {
+          message: authError.message || 'Authentication failed',
+          status: authError.status || 500,
+          name: authError.name || 'AuthError',
+        }
+        break
       }
     }
 
@@ -154,13 +212,16 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
                  errorMsgLower.includes('failed to fetch') ||
                  errorMsgLower.includes('connection') ||
                  errorMsgLower.includes('timeout') ||
-                 errorMsgLower.includes('econnrefused')) {
-        errorMessage = 'Unable to connect to authentication service. This might be a temporary issue. Please try again in a few moments.'
+                 errorMsgLower.includes('econnrefused') ||
+                 errorMsgLower.includes('connect timeout')) {
+        errorMessage = 'Unable to connect to authentication service. The connection timed out. This might be a temporary network issue. Please try again in a few moments.'
         // Log this as a critical error
-        console.error(`[Auth] CRITICAL: Backend cannot connect to Supabase!`, {
+        console.error(`[Auth] CRITICAL: Backend cannot connect to Supabase (connection timeout)!`, {
           supabaseUrl: process.env.SUPABASE_URL,
           hasAnonKey: !!process.env.SUPABASE_ANON_KEY,
           hasServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+          errorCode: (error as any).cause?.code,
+          errorMessage: errorMsg,
         })
       }
       

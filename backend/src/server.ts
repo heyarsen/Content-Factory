@@ -40,8 +40,59 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 app.use(apiLimiter)
 
 // Health check (before static files)
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() })
+app.get('/health', async (req, res) => {
+  const health: any = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    environment: {
+      nodeEnv: process.env.NODE_ENV || 'development',
+      hasSupabaseUrl: !!process.env.SUPABASE_URL,
+      hasSupabaseAnonKey: !!process.env.SUPABASE_ANON_KEY,
+      hasSupabaseServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+    },
+  }
+
+  // Test Supabase connectivity if URL is set
+  if (process.env.SUPABASE_URL) {
+    try {
+      const supabaseUrl = process.env.SUPABASE_URL
+      // Simple connectivity test - just try to reach the Supabase API
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout for health check
+      
+      try {
+        const response = await fetch(`${supabaseUrl}/rest/v1/`, {
+          method: 'HEAD',
+          signal: controller.signal,
+          headers: {
+            'apikey': process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+          },
+        })
+        clearTimeout(timeoutId)
+        health.supabase = {
+          reachable: response.status < 500,
+          status: response.status,
+          url: supabaseUrl,
+        }
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId)
+        health.supabase = {
+          reachable: false,
+          error: fetchError.message,
+          errorCode: fetchError.cause?.code,
+          url: supabaseUrl,
+        }
+      }
+    } catch (error: any) {
+      health.supabase = {
+        reachable: false,
+        error: error.message,
+      }
+    }
+  }
+
+  const statusCode = health.supabase?.reachable === false ? 503 : 200
+  res.status(statusCode).json(health)
 })
 
 // API Routes (before static files)
