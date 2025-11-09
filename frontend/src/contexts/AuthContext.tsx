@@ -56,15 +56,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signIn = async (email: string, password: string) => {
-    const { data } = await api.post('/api/auth/login', { email, password })
-    if (data.access_token) {
-      localStorage.setItem('access_token', data.access_token)
-      setUser(data.user)
-      // Set session in Supabase client
-      await supabase.auth.setSession({
-        access_token: data.access_token,
-        refresh_token: data.refresh_token,
-      })
+    try {
+      const { data } = await api.post('/api/auth/login', { email, password })
+      if (data.access_token) {
+        localStorage.setItem('access_token', data.access_token)
+        setUser(data.user)
+        // Set session in Supabase client
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: data.access_token,
+          refresh_token: data.refresh_token || data.access_token,
+        })
+        if (sessionError) {
+          console.error('Failed to set Supabase session:', sessionError)
+          // Continue anyway since we have the token
+        }
+      } else {
+        throw new Error('No access token received from server')
+      }
+    } catch (error: any) {
+      console.error('Sign in error:', error)
+      // Re-throw to let the Login component handle the error
+      throw error
     }
   }
 

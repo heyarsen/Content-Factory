@@ -59,23 +59,44 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Email and password are required' })
     }
 
+    console.log(`[Auth] Login attempt for email: ${email}`)
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
 
     if (error) {
-      return res.status(401).json({ error: error.message })
+      console.error(`[Auth] Login failed for ${email}:`, error.message)
+      
+      // Provide more user-friendly error messages
+      let errorMessage = error.message
+      if (error.message.includes('Invalid login credentials')) {
+        errorMessage = 'Invalid email or password'
+      } else if (error.message.includes('Email not confirmed')) {
+        errorMessage = 'Please verify your email before signing in. Check your inbox for a verification link.'
+      } else if (error.message.includes('rate limit')) {
+        errorMessage = 'Too many login attempts. Please try again in a few minutes.'
+      }
+      
+      return res.status(401).json({ error: errorMessage })
     }
 
+    if (!data.session) {
+      console.error(`[Auth] Login succeeded but no session for ${email}`)
+      return res.status(500).json({ error: 'Failed to create session' })
+    }
+
+    console.log(`[Auth] Login successful for ${email}`)
+
     res.json({
-      access_token: data.session?.access_token,
-      refresh_token: data.session?.refresh_token,
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
       user: data.user,
     })
   } catch (error: any) {
-    console.error('Login error:', error)
-    res.status(500).json({ error: 'Internal server error' })
+    console.error('[Auth] Login exception:', error)
+    res.status(500).json({ error: error.message || 'Internal server error' })
   }
 })
 
@@ -169,18 +190,47 @@ router.post('/reset-password/confirm', authLimiter, async (req: Request, res: Re
       return res.status(400).json({ error: 'Password and access token are required' })
     }
 
-    const { error } = await supabase.auth.updateUser({
+    // Create a Supabase client with the user's access token
+    const { createClient } = await import('@supabase/supabase-js')
+    const supabaseUrl = process.env.SUPABASE_URL
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return res.status(500).json({ error: 'Server configuration error' })
+    }
+
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+      global: {
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+        },
+      },
+    })
+
+    // Set the session with the access token
+    await userClient.auth.setSession({
+      access_token,
+      refresh_token: access_token, // Use access_token as fallback
+    })
+
+    // Update password using the authenticated client
+    const { error } = await userClient.auth.updateUser({
       password,
     })
 
     if (error) {
+      console.error('Password reset error:', error)
       return res.status(400).json({ error: error.message })
     }
 
     res.json({ message: 'Password reset successful' })
   } catch (error: any) {
     console.error('Confirm password reset error:', error)
-    res.status(500).json({ error: 'Internal server error' })
+    res.status(500).json({ error: error.message || 'Internal server error' })
   }
 })
 

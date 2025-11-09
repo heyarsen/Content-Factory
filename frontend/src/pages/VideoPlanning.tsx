@@ -462,7 +462,7 @@ export function VideoPlanning() {
         itemsCount: response.data.items?.length || 0,
         hasItems: !!response.data.items && response.data.items.length > 0
       })
-      
+
       setPlans([response.data.plan, ...plans])
       setSelectedPlan(response.data.plan)
       
@@ -735,19 +735,19 @@ export function VideoPlanning() {
   // Use useMemo to avoid recalculating on every render
   const planItemsByDate = useMemo(() => {
     const grouped = filteredItems.reduce(
-      (acc, item) => {
+    (acc, item) => {
         // Database returns scheduled_date as YYYY-MM-DD string, use it directly
         const dateKey = normalizeDate(item.scheduled_date)
         if (!dateKey) {
           console.warn(`[VideoPlanning] Item ${item.id} has invalid scheduled_date:`, item.scheduled_date)
-          return acc
-        }
+        return acc
+      }
         if (!acc[dateKey]) acc[dateKey] = []
         acc[dateKey].push(item)
-        return acc
-      },
-      {} as Record<string, VideoPlanItem[]>,
-    )
+      return acc
+    },
+    {} as Record<string, VideoPlanItem[]>,
+  )
     
     // Debug logging (only log once when items change)
     if (Object.keys(grouped).length > 0 && filteredItems.length > 0) {
@@ -779,45 +779,45 @@ export function VideoPlanning() {
   // Group scheduled posts by date (using filtered posts)
   const postsByDate = useMemo(() => {
     return filteredPosts.reduce(
-      (acc, post: ScheduledPost) => {
-        if (!post.scheduled_time) return acc
-        const date = new Date(post.scheduled_time)
-        const dateKey = getDateKey(date)
-        if (!dateKey) return acc
-        if (!acc[dateKey]) acc[dateKey] = []
-        acc[dateKey].push(post)
-        return acc
-      },
-      {} as Record<string, ScheduledPost[]>,
-    )
+    (acc, post: ScheduledPost) => {
+      if (!post.scheduled_time) return acc
+      const date = new Date(post.scheduled_time)
+      const dateKey = getDateKey(date)
+      if (!dateKey) return acc
+      if (!acc[dateKey]) acc[dateKey] = []
+      acc[dateKey].push(post)
+      return acc
+    },
+    {} as Record<string, ScheduledPost[]>,
+  )
   }, [filteredPosts])
 
   // Combine plan items and scheduled posts by date
   type CalendarItem = VideoPlanItem | (ScheduledPost & { _isScheduledPost: true; scheduled_date: string; topic: string })
   const itemsByDate = useMemo(() => {
     const combined: Record<string, CalendarItem[]> = {}
-    
-    // Add plan items
-    Object.keys(planItemsByDate).forEach(date => {
+  
+  // Add plan items
+  Object.keys(planItemsByDate).forEach(date => {
       combined[date] = [...(planItemsByDate[date] || [])]
-    })
-    
-    // Add scheduled posts
-    Object.keys(postsByDate).forEach(date => {
+  })
+  
+  // Add scheduled posts
+  Object.keys(postsByDate).forEach(date => {
       if (!combined[date]) {
         combined[date] = []
-      }
-      // Add scheduled posts to the date, marking them as posts
-      postsByDate[date].forEach((post: ScheduledPost) => {
+    }
+    // Add scheduled posts to the date, marking them as posts
+    postsByDate[date].forEach((post: ScheduledPost) => {
         combined[date].push({
-          ...post,
-          _isScheduledPost: true,
-          scheduled_date: date, // Add scheduled_date for compatibility
-          topic: post.videos?.topic || 'Scheduled Post',
-        })
+        ...post,
+        _isScheduledPost: true,
+        scheduled_date: date, // Add scheduled_date for compatibility
+        topic: post.videos?.topic || 'Scheduled Post',
       })
     })
-    
+  })
+  
     return combined
   }, [planItemsByDate, postsByDate])
 
@@ -1185,12 +1185,12 @@ export function VideoPlanning() {
                       {date && (
                         <>
                           <div className="flex items-center justify-between mb-1">
-                            <div
+                          <div
                               className={`text-sm font-semibold ${isToday ? 'text-brand-600' : 'text-slate-700'}`}
-                            >
-                              {date.getDate()}
-                            </div>
-                            {items.length > 0 && (
+                          >
+                            {date.getDate()}
+                          </div>
+                          {items.length > 0 && (
                               <div className="flex items-center gap-1">
                                 <div className="h-1.5 w-1.5 rounded-full bg-brand-500"></div>
                                 <span className="text-xs font-medium text-slate-600">
@@ -1262,7 +1262,7 @@ export function VideoPlanning() {
                                         </span>
                                       )}
                                       <span className="flex-1 truncate font-medium">
-                                        {displayTopic}
+                                    {displayTopic}
                                       </span>
                                     </div>
                                   </div>

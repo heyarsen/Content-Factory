@@ -24,7 +24,17 @@ export function Login() {
       await signIn(email, password)
       navigate('/dashboard')
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to sign in')
+      console.error('Login error:', err)
+      // Extract error message from various possible error formats
+      let errorMessage = 'Failed to sign in'
+      if (err.response?.data?.error) {
+        errorMessage = err.response.data.error
+      } else if (err.message) {
+        errorMessage = err.message
+      } else if (err.request && !err.response) {
+        errorMessage = 'Unable to connect to server. Please check your connection.'
+      }
+      setError(errorMessage)
       // Don't clear password on error - keep it so user can see what they typed
     } finally {
       setLoading(false)
