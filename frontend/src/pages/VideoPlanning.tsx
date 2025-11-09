@@ -216,6 +216,16 @@ export function VideoPlanning() {
   useEffect(() => {
     if (selectedPlan) {
       loadPlanItems(selectedPlan.id)
+      // Navigate calendar to plan start date so items are visible
+      if (selectedPlan.start_date) {
+        const planStartDate = new Date(selectedPlan.start_date)
+        setCurrentMonth(planStartDate)
+        // Set selected date to plan start date
+        const year = planStartDate.getFullYear()
+        const month = String(planStartDate.getMonth() + 1).padStart(2, '0')
+        const day = String(planStartDate.getDate()).padStart(2, '0')
+        setSelectedDate(`${year}-${month}-${day}`)
+      }
     }
     loadScheduledPosts()
   }, [selectedPlan])
@@ -435,9 +445,27 @@ export function VideoPlanning() {
       if (response.data.items && response.data.items.length > 0) {
         setPlanItems(response.data.items)
         console.log(`[VideoPlanning] Plan created with ${response.data.items.length} items`)
+        // Navigate to plan start date to show items
+        if (response.data.plan.start_date) {
+          const planStartDate = new Date(response.data.plan.start_date)
+          setCurrentMonth(planStartDate)
+          const year = planStartDate.getFullYear()
+          const month = String(planStartDate.getMonth() + 1).padStart(2, '0')
+          const day = String(planStartDate.getDate()).padStart(2, '0')
+          setSelectedDate(`${year}-${month}-${day}`)
+        }
       } else {
         // If no items returned, load them
-        loadPlanItems(response.data.plan.id)
+        await loadPlanItems(response.data.plan.id)
+        // Navigate to plan start date
+        if (response.data.plan.start_date) {
+          const planStartDate = new Date(response.data.plan.start_date)
+          setCurrentMonth(planStartDate)
+          const year = planStartDate.getFullYear()
+          const month = String(planStartDate.getMonth() + 1).padStart(2, '0')
+          const day = String(planStartDate.getDate()).padStart(2, '0')
+          setSelectedDate(`${year}-${month}-${day}`)
+        }
       }
       setCreateModal(false)
       setPlanName('')
@@ -695,13 +723,34 @@ export function VideoPlanning() {
   )
   
   // Debug: Log items by date for debugging
+  console.log(`[VideoPlanning] Debug info:`, {
+    totalPlanItems: planItems.length,
+    filteredItems: filteredItems.length,
+    statusFilter,
+    datesWithItems: Object.keys(planItemsByDate).length,
+    sampleDates: Object.keys(planItemsByDate).slice(0, 5),
+    currentMonth: `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`,
+    selectedPlan: selectedPlan?.name,
+    planStartDate: selectedPlan?.start_date,
+    planEndDate: selectedPlan?.end_date
+  })
+  
   if (Object.keys(planItemsByDate).length > 0) {
     const dateKeys = Object.keys(planItemsByDate).sort()
     console.log(`[VideoPlanning] Items grouped by date: ${dateKeys.length} dates with items`, {
       firstDate: dateKeys[0],
       lastDate: dateKeys[dateKeys.length - 1],
-      totalItems: filteredItems.length
+      totalItems: filteredItems.length,
+      itemsPerDate: dateKeys.slice(0, 5).map(date => ({ date, count: planItemsByDate[date].length }))
     })
+  } else if (planItems.length > 0) {
+    console.warn(`[VideoPlanning] WARNING: ${planItems.length} items loaded but none grouped by date!`)
+    console.warn(`[VideoPlanning] Sample item dates:`, planItems.slice(0, 5).map(item => ({
+      id: item.id,
+      scheduled_date: item.scheduled_date,
+      normalized: normalizeDate(item.scheduled_date),
+      status: item.status
+    })))
   }
 
   // Group scheduled posts by date (using filtered posts)
@@ -792,7 +841,27 @@ export function VideoPlanning() {
   const getItemsForDate = (date: Date | null) => {
     if (!date) return []
     const dateKey = getDateKey(date)
-    return itemsByDate[dateKey] || []
+    const items = itemsByDate[dateKey] || []
+    
+    // Debug: Log if we're looking for items on a specific date
+    if (selectedPlan && planItems.length > 0 && items.length === 0) {
+      // Check if any items exist for this date (even if filtered)
+      const allItemsForDate = planItems.filter(item => {
+        const itemDate = normalizeDate(item.scheduled_date)
+        return itemDate === dateKey
+      })
+      if (allItemsForDate.length > 0) {
+        console.log(`[VideoPlanning] Date ${dateKey} has ${allItemsForDate.length} items but ${items.length} after filtering`, {
+          dateKey,
+          allItemsCount: allItemsForDate.length,
+          filteredCount: items.length,
+          statusFilter,
+          itemStatuses: allItemsForDate.map(i => i.status)
+        })
+      }
+    }
+    
+    return items
   }
 
   // Helper to check if an item is a scheduled post
@@ -1096,6 +1165,17 @@ export function VideoPlanning() {
                   const isToday =
                     date && dateKey === getDateKey(new Date())
                   const isSelected = date && dateKey === selectedDate
+                  
+                  // Check if this date should have items (even if filtered out)
+                  // Check unfiltered items to see if anything exists for this date
+                  const hasItemsOnDate = planItems.some(item => {
+                    const itemDate = normalizeDate(item.scheduled_date)
+                    return itemDate === dateKey
+                  }) || scheduledPosts.some(post => {
+                    if (!post.scheduled_time) return false
+                    const postDate = getDateKey(new Date(post.scheduled_time))
+                    return postDate === dateKey
+                  })
 
                   return (
                     <button
@@ -1108,9 +1188,12 @@ export function VideoPlanning() {
                             ? 'border-brand-500 bg-brand-50 shadow-md'
                             : isToday
                               ? 'border-brand-300 bg-brand-50/70 shadow-sm'
+                              : hasItemsOnDate && items.length === 0
+                                ? 'border-amber-200 bg-amber-50/30'
                               : 'border-slate-200 bg-white hover:border-brand-300 hover:bg-slate-50 hover:shadow-sm'
                       }`}
                       disabled={!date}
+                      title={hasItemsOnDate && items.length === 0 ? 'Items exist but are filtered out' : ''}
                     >
                       {date && (
                         <>
@@ -1126,6 +1209,11 @@ export function VideoPlanning() {
                                 <span className="text-xs font-medium text-slate-600">
                                   {items.length}
                                 </span>
+                              </div>
+                            )}
+                            {hasItemsOnDate && items.length === 0 && (
+                              <div className="flex items-center gap-1" title="Items filtered out">
+                                <div className="h-1.5 w-1.5 rounded-full bg-amber-400"></div>
                               </div>
                             )}
                           </div>
@@ -1149,7 +1237,14 @@ export function VideoPlanning() {
                                     : ''
                                 } else {
                                   status = item.status
-                                  displayTopic = item.topic || 'No topic'
+                                  // Show "Planned" or time if no topic, otherwise show topic
+                                  if (item.topic) {
+                                    displayTopic = item.topic
+                                  } else if (item.scheduled_time) {
+                                    displayTopic = `Planned (${formatTime(item.scheduled_time)})`
+                                  } else {
+                                    displayTopic = 'Planned'
+                                  }
                                   displayTime = item.scheduled_time ? formatTime(item.scheduled_time) : ''
                                 }
                                 
