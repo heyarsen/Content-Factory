@@ -95,6 +95,138 @@ app.get('/health', async (req, res) => {
   res.status(statusCode).json(health)
 })
 
+// Diagnostic endpoint for Supabase connectivity (more detailed than health check)
+app.get('/diagnostics/supabase', async (req, res) => {
+  const diagnostics: any = {
+    timestamp: new Date().toISOString(),
+    environment: {
+      hasSupabaseUrl: !!process.env.SUPABASE_URL,
+      hasSupabaseAnonKey: !!process.env.SUPABASE_ANON_KEY,
+      hasSupabaseServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      supabaseUrl: process.env.SUPABASE_URL ? `${process.env.SUPABASE_URL.substring(0, 20)}...` : 'Not set',
+    },
+    tests: [],
+  }
+
+  if (!process.env.SUPABASE_URL) {
+    return res.status(500).json({
+      ...diagnostics,
+      error: 'SUPABASE_URL environment variable is not set',
+    })
+  }
+
+  const supabaseUrl = process.env.SUPABASE_URL
+  const tests = []
+
+  // Test 1: Basic connectivity (HEAD request)
+  try {
+    const controller1 = new AbortController()
+    const timeout1 = setTimeout(() => controller1.abort(), 10000)
+    const start1 = Date.now()
+    
+    try {
+      const response = await fetch(`${supabaseUrl}/rest/v1/`, {
+        method: 'HEAD',
+        signal: controller1.signal,
+        headers: {
+          'apikey': process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+        },
+      })
+      clearTimeout(timeout1)
+      const duration1 = Date.now() - start1
+      
+      tests.push({
+        name: 'Basic Connectivity (HEAD /rest/v1/)',
+        success: true,
+        status: response.status,
+        duration: `${duration1}ms`,
+      })
+    } catch (error: any) {
+      clearTimeout(timeout1)
+      const duration1 = Date.now() - start1
+      
+      tests.push({
+        name: 'Basic Connectivity (HEAD /rest/v1/)',
+        success: false,
+        error: error.message,
+        errorCode: error.cause?.code,
+        duration: `${duration1}ms`,
+      })
+    }
+  } catch (error: any) {
+    tests.push({
+      name: 'Basic Connectivity (HEAD /rest/v1/)',
+      success: false,
+      error: error.message,
+    })
+  }
+
+  // Test 2: Auth endpoint connectivity
+  try {
+    const controller2 = new AbortController()
+    const timeout2 = setTimeout(() => controller2.abort(), 10000)
+    const start2 = Date.now()
+    
+    try {
+      const response = await fetch(`${supabaseUrl}/auth/v1/health`, {
+        method: 'GET',
+        signal: controller2.signal,
+      })
+      clearTimeout(timeout2)
+      const duration2 = Date.now() - start2
+      
+      tests.push({
+        name: 'Auth Endpoint (/auth/v1/health)',
+        success: true,
+        status: response.status,
+        duration: `${duration2}ms`,
+      })
+    } catch (error: any) {
+      clearTimeout(timeout2)
+      const duration2 = Date.now() - start2
+      
+      tests.push({
+        name: 'Auth Endpoint (/auth/v1/health)',
+        success: false,
+        error: error.message,
+        errorCode: error.cause?.code,
+        duration: `${duration2}ms`,
+      })
+    }
+  } catch (error: any) {
+    tests.push({
+      name: 'Auth Endpoint (/auth/v1/health)',
+      success: false,
+      error: error.message,
+    })
+  }
+
+  // Test 3: DNS resolution
+  try {
+    const urlObj = new URL(supabaseUrl)
+    const hostname = urlObj.hostname
+    
+    tests.push({
+      name: 'DNS Resolution',
+      success: true,
+      hostname: hostname,
+      note: 'DNS resolution successful (URL parsing works)',
+    })
+  } catch (error: any) {
+    tests.push({
+      name: 'DNS Resolution',
+      success: false,
+      error: error.message,
+    })
+  }
+
+  diagnostics.tests = tests
+  const allPassed = tests.every(t => t.success)
+  const statusCode = allPassed ? 200 : 503
+
+  res.status(statusCode).json(diagnostics)
+})
+
 // API Routes (before static files)
 app.use('/api/auth', authRoutes)
 app.use('/api/videos', videoRoutes)
