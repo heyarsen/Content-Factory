@@ -79,6 +79,8 @@ export function ForgotPassword() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <Input
               type="email"
+              id="email"
+              name="email"
               label="Work email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}

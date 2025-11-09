@@ -1,4 +1,4 @@
-import { InputHTMLAttributes, forwardRef } from 'react'
+import { InputHTMLAttributes, forwardRef, useId } from 'react'
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string
@@ -6,16 +6,27 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, className = '', ...props }, ref) => {
+  ({ label, error, className = '', id, name, ...props }, ref) => {
+    const generatedId = useId()
+    // Use provided id, or generate one if label exists, or undefined if no label
+    const finalId = id || (label ? `input-${generatedId}` : undefined)
+    // Use provided name, or derive from id/autocomplete, or undefined
+    const finalName = name || (finalId ? finalId : (props.autoComplete || undefined))
+
     return (
       <div className="w-full">
-        {label && (
-          <label className="mb-2 block text-sm font-semibold text-slate-500">
+        {label && finalId && (
+          <label 
+            htmlFor={finalId}
+            className="mb-2 block text-sm font-semibold text-slate-500"
+          >
             {label}
           </label>
         )}
         <input
           ref={ref}
+          id={finalId}
+          name={finalName}
           className={`w-full rounded-2xl border text-sm transition-shadow duration-200 focus:outline-none ${
             error
               ? 'border-red-300 bg-white focus:border-red-300 focus:ring-2 focus:ring-red-200'

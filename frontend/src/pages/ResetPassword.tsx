@@ -108,6 +108,8 @@ export function ResetPassword() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <Input
               type="password"
+              id="password"
+              name="password"
               label="New password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -116,6 +118,8 @@ export function ResetPassword() {
             />
             <Input
               type="password"
+              id="confirmPassword"
+              name="confirmPassword"
               label="Confirm new password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
