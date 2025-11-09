@@ -57,19 +57,37 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
 
     if (planError) throw planError
 
-    // Generate plan items with custom times, topics, categories, and avatars if provided
-    const items = await PlanService.generatePlanItems(
-      plan.id, 
-      userId, 
-      start_date, 
-      end_date || undefined,
-      video_times, // Pass custom times
-      video_topics, // Pass custom topics
-      video_categories, // Pass custom categories
-      video_avatars // Pass avatar IDs for each time slot
-    )
+    console.log(`[Plans API] Creating plan ${plan.id} for user ${userId}`, {
+      name,
+      videos_per_day,
+      start_date,
+      end_date,
+      video_times,
+      video_topics: video_topics?.length,
+      video_avatars: video_avatars?.length
+    })
 
-    return res.json({ plan, items })
+    // Generate plan items with custom times, topics, categories, and avatars if provided
+    let items: any[] = []
+    try {
+      items = await PlanService.generatePlanItems(
+        plan.id, 
+        userId, 
+        start_date, 
+        end_date || undefined,
+        video_times, // Pass custom times
+        video_topics, // Pass custom topics
+        video_categories, // Pass custom categories
+        video_avatars // Pass avatar IDs for each time slot
+      )
+      console.log(`[Plans API] Generated ${items.length} items for plan ${plan.id}`)
+    } catch (itemError: any) {
+      console.error(`[Plans API] Error generating plan items:`, itemError)
+      // Don't fail the plan creation if items fail to generate
+      // Return the plan anyway so user can see it
+    }
+
+    return res.json({ plan, items: items || [] })
   } catch (error: any) {
     console.error('Create plan error:', error)
     return res.status(500).json({ error: error.message || 'Failed to create plan' })

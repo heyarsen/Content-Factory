@@ -149,8 +149,16 @@ export class PlanService {
     const currentHour = parseInt(hourFormatter.format(now), 10)
     const currentMinute = parseInt(minuteFormatter.format(now), 10)
     
-    // Check if trigger_time has passed today
-    let start = new Date(startDate)
+    // Parse start date - handle YYYY-MM-DD format
+    // Create date in UTC to avoid timezone issues
+    const parseDate = (dateStr: string): Date => {
+      const [year, month, day] = dateStr.split('-').map(Number)
+      return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
+    }
+    
+    let start = parseDate(startDate)
+    
+    // Check if trigger_time has passed today (only if start date is today)
     if (plan.trigger_time && startDate === today) {
       const [triggerHourStr, triggerMinuteStr] = plan.trigger_time.split(':')
       const triggerHour = parseInt(triggerHourStr, 10)
@@ -162,43 +170,76 @@ export class PlanService {
       // If trigger time has passed today, skip today and start from tomorrow
       if (currentMinutes >= triggerMinutes) {
         start = new Date(start)
-        start.setDate(start.getDate() + 1)
+        start.setUTCDate(start.getUTCDate() + 1)
+        start.setUTCHours(0, 0, 0, 0)
         console.log(`[Plan Service] Trigger time (${plan.trigger_time}) has passed today, skipping today and starting from tomorrow`)
       }
     }
     
-    const end = endDate ? new Date(endDate) : new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000) // Default 30 days
+    // Calculate end date
+    const end = endDate 
+      ? parseDate(endDate)
+      : new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate() + 30, 23, 59, 59, 999))
     
     const items: VideoPlanItem[] = []
-    // Create a date formatter to ensure consistent YYYY-MM-DD format regardless of timezone
+    // Create a date formatter to ensure consistent YYYY-MM-DD format
     const formatDateForDB = (date: Date): string => {
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const day = String(date.getDate()).padStart(2, '0')
+      const year = date.getUTCFullYear()
+      const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+      const day = String(date.getUTCDate()).padStart(2, '0')
       return `${year}-${month}-${day}`
     }
     
     // Use custom times if provided, otherwise generate default time slots
-    const timeSlots = customTimes && customTimes.length > 0 
-      ? customTimes.map(t => {
+    let timeSlots: string[] = []
+    if (customTimes && customTimes.length > 0) {
+      timeSlots = customTimes
+        .filter(t => t && t.trim().length > 0) // Filter out empty times
+        .map(t => {
+          const cleanTime = t.trim()
           // Ensure HH:MM:SS format for database
-          if (t.length === 5) return `${t}:00`
-          if (t.length === 8) return t
-          return t.substring(0, 5) + ':00'
+          if (cleanTime.length === 5) return `${cleanTime}:00`
+          if (cleanTime.length === 8) return cleanTime
+          return cleanTime.substring(0, 5) + ':00'
         })
-      : this.generateTimeSlots(plan.videos_per_day)
+    }
     
-    // Iterate through each day from start to end
-    const currentDate = new Date(start)
-    // Reset time to avoid timezone issues
-    currentDate.setHours(0, 0, 0, 0)
-    const endDateObj = new Date(end)
-    endDateObj.setHours(23, 59, 59, 999)
+    // If no custom times or all were empty, generate default time slots
+    if (timeSlots.length === 0) {
+      timeSlots = this.generateTimeSlots(plan.videos_per_day)
+    }
     
-    console.log(`[Plan Service] Generating items from ${formatDateForDB(currentDate)} to ${formatDateForDB(endDateObj)}`)
+    // Ensure we have at least one time slot
+    if (timeSlots.length === 0) {
+      console.error(`[Plan Service] ERROR: No time slots available! videos_per_day: ${plan.videos_per_day}`)
+      return []
+    }
     
-    while (currentDate <= endDateObj) {
-      const dateStr = formatDateForDB(currentDate)
+    console.log(`[Plan Service] Generating items from ${formatDateForDB(start)} to ${formatDateForDB(end)}`)
+    console.log(`[Plan Service] Time slots (${timeSlots.length}):`, timeSlots)
+    console.log(`[Plan Service] Videos per day:`, plan.videos_per_day)
+    console.log(`[Plan Service] Start date:`, start.toISOString(), `(${formatDateForDB(start)})`)
+    console.log(`[Plan Service] End date:`, end.toISOString(), `(${formatDateForDB(end)})`)
+    
+    // Iterate through each day from start to end using date strings
+    let currentDateStr = formatDateForDB(start)
+    const endDateStr = formatDateForDB(end)
+    let dayCount = 0
+    const maxDays = 365 // Safety limit
+    
+    console.log(`[Plan Service] Date range: ${currentDateStr} to ${endDateStr}`)
+    
+    if (currentDateStr > endDateStr) {
+      console.error(`[Plan Service] ERROR: Start date (${currentDateStr}) is after end date (${endDateStr})!`)
+      return []
+    }
+    
+    while (currentDateStr <= endDateStr && dayCount < maxDays) {
+      dayCount++
+      
+      if (dayCount === 1 || dayCount % 10 === 0 || dayCount <= 5) {
+        console.log(`[Plan Service] Processing day ${dayCount}: ${currentDateStr}`)
+      }
       
       for (let i = 0; i < timeSlots.length; i++) {
         const timeSlot = timeSlots[i]
@@ -215,8 +256,6 @@ export class PlanService {
         if (customTopic) {
           topic = customTopic
           category = customCategory
-          // If auto_research is enabled, still set topic but mark as ready for script generation
-          // The topic provided by user should ALWAYS be used, not overwritten by research
           status = plan.auto_research ? 'ready' : 'ready'
         }
         
@@ -225,41 +264,68 @@ export class PlanService {
             .from('video_plan_items')
             .insert({
               plan_id: planId,
-              scheduled_date: dateStr, // Use formatted date string
+              scheduled_date: currentDateStr, // Use date string directly
               scheduled_time: timeSlot,
               topic: topic,
               category: category,
               status: status,
-              platforms: plan.default_platforms || null, // Set platforms from plan's default_platforms
-              avatar_id: avatarId, // Store avatar_id for this time slot
+              platforms: plan.default_platforms || null,
+              avatar_id: avatarId,
             })
             .select()
             .single()
 
           if (error) {
-            console.error(`[Plan Service] Error creating item for ${dateStr} at ${timeSlot}:`, error)
+            console.error(`[Plan Service] Error creating item for ${currentDateStr} at ${timeSlot}:`, error)
+            console.error(`[Plan Service] Error details:`, JSON.stringify(error, null, 2))
           } else if (item) {
             items.push(item)
-            console.log(`[Plan Service] Created item for ${dateStr} at ${timeSlot} (${items.length} total)`)
+            if (items.length <= 5 || items.length % 10 === 0) {
+              console.log(`[Plan Service] ✓ Created item ${items.length} for ${currentDateStr} at ${timeSlot}`)
+            }
             
             // Only auto-generate topic if no custom topic was provided and auto_research is enabled
-            // If user provided a topic, we should NOT generate a new one - use the user's topic
             if (!customTopic && plan.auto_research) {
-              // No topic provided, generate one
-              this.generateTopicForItem(item.id, userId).catch(console.error)
+              this.generateTopicForItem(item.id, userId).catch((err) => {
+                console.error(`[Plan Service] Error generating topic for item ${item.id}:`, err)
+              })
             }
-            // If customTopic exists, it's already set and should be preserved
+          } else {
+            console.warn(`[Plan Service] No item returned for ${currentDateStr} at ${timeSlot}`)
           }
-        } catch (err) {
-          console.error(`[Plan Service] Exception creating item for ${dateStr} at ${timeSlot}:`, err)
+        } catch (err: any) {
+          console.error(`[Plan Service] Exception creating item for ${currentDateStr} at ${timeSlot}:`, err)
+          if (err.stack) {
+            console.error(`[Plan Service] Exception stack:`, err.stack)
+          }
         }
       }
       
-      // Move to next day
-      currentDate.setDate(currentDate.getDate() + 1)
+      // Move to next day by incrementing the date string
+      const [year, month, day] = currentDateStr.split('-').map(Number)
+      const nextDate = new Date(Date.UTC(year, month - 1, day + 1, 0, 0, 0, 0))
+      currentDateStr = formatDateForDB(nextDate)
     }
     
-    console.log(`[Plan Service] Generated ${items.length} plan items total`)
+    if (dayCount >= maxDays) {
+      console.warn(`[Plan Service] Stopped after ${maxDays} days (safety limit)`)
+    }
+    
+    console.log(`[Plan Service] ✓ Generated ${items.length} plan items total over ${dayCount} days`)
+    
+    if (items.length === 0) {
+      console.error(`[Plan Service] ⚠️ ERROR: No items were created!`, {
+        planId,
+        startDate: formatDateForDB(start),
+        endDate: formatDateForDB(end),
+        originalStartDate: startDate,
+        originalEndDate: endDate || 'null (30 days default)',
+        timeSlots,
+        videosPerDay: plan.videos_per_day,
+        dayCount,
+        timeSlotsLength: timeSlots.length
+      })
+    }
     
     return items
   }
@@ -547,3 +613,4 @@ export class PlanService {
     return data || []
   }
 }
+

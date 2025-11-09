@@ -447,38 +447,46 @@ export function VideoPlanning() {
         auto_approve: autoApprove,
         auto_create: autoCreate,
         timezone: timezone,
-        video_times: videoTimes.map((time: string) => `${time}:00`), // Send custom times
+        video_times: videoTimes.map((time: string) => {
+          // Ensure time is in HH:MM format (remove :00 if present, then add it back)
+          const cleanTime = time.replace(/:00$/, '')
+          return cleanTime.length === 5 ? cleanTime : time
+        }), // Send custom times in HH:MM format
         video_topics: videoTopics, // Send topics for each slot
         video_avatars: videoAvatars, // Send avatar IDs for each slot
       })
 
+      console.log(`[VideoPlanning] Plan creation response:`, {
+        plan: response.data.plan,
+        items: response.data.items,
+        itemsCount: response.data.items?.length || 0,
+        hasItems: !!response.data.items && response.data.items.length > 0
+      })
+      
       setPlans([response.data.plan, ...plans])
       setSelectedPlan(response.data.plan)
+      
+      // Navigate to plan start date
+      if (response.data.plan.start_date) {
+        const planStartDate = new Date(response.data.plan.start_date + 'T00:00:00') // Add time to avoid timezone issues
+        setCurrentMonth(planStartDate)
+        const year = planStartDate.getFullYear()
+        const month = String(planStartDate.getMonth() + 1).padStart(2, '0')
+        const day = String(planStartDate.getDate()).padStart(2, '0')
+        setSelectedDate(`${year}-${month}-${day}`)
+      }
+      
       // Load plan items immediately after creation
-      if (response.data.items && response.data.items.length > 0) {
+      if (response.data.items && Array.isArray(response.data.items) && response.data.items.length > 0) {
         setPlanItems(response.data.items)
-        console.log(`[VideoPlanning] Plan created with ${response.data.items.length} items`)
-        // Navigate to plan start date to show items
-        if (response.data.plan.start_date) {
-          const planStartDate = new Date(response.data.plan.start_date)
-          setCurrentMonth(planStartDate)
-          const year = planStartDate.getFullYear()
-          const month = String(planStartDate.getMonth() + 1).padStart(2, '0')
-          const day = String(planStartDate.getDate()).padStart(2, '0')
-          setSelectedDate(`${year}-${month}-${day}`)
-        }
+        console.log(`[VideoPlanning] ✓ Plan created with ${response.data.items.length} items`)
       } else {
-        // If no items returned, load them
-        await loadPlanItems(response.data.plan.id)
-        // Navigate to plan start date
-        if (response.data.plan.start_date) {
-          const planStartDate = new Date(response.data.plan.start_date)
-          setCurrentMonth(planStartDate)
-          const year = planStartDate.getFullYear()
-          const month = String(planStartDate.getMonth() + 1).padStart(2, '0')
-          const day = String(planStartDate.getDate()).padStart(2, '0')
-          setSelectedDate(`${year}-${month}-${day}`)
-        }
+        console.warn(`[VideoPlanning] ⚠️ Plan created but no items in response. Items array:`, response.data.items)
+        // Wait a bit then try to load items (might be async creation)
+        setTimeout(async () => {
+          console.log(`[VideoPlanning] Attempting to load items for plan ${response.data.plan.id}...`)
+          await loadPlanItems(response.data.plan.id)
+        }, 1000)
       }
       setCreateModal(false)
       setPlanName('')
