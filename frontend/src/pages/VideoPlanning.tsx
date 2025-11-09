@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -222,27 +222,131 @@ export function VideoPlanning() {
 
   useEffect(() => {
     // Reload scheduled posts periodically to show updates
+    // Use a longer interval to reduce API calls
     const interval = setInterval(() => {
       loadScheduledPosts()
-    }, 10000) // Poll every 10 seconds
+    }, 30000) // Poll every 30 seconds (reduced from 10 seconds)
     
     return () => clearInterval(interval)
   }, [])
 
-  // Poll for status updates more frequently for items in progress
+  // Smart polling for plan items - only poll frequently when items are in progress
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const lastPollTimeRef = useRef<number>(0)
+  
   useEffect(() => {
-    if (!selectedPlan) return
+    if (!selectedPlan) {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
+      return
+    }
 
-    // Set up polling interval - poll more frequently to show status updates quickly
-    // The backend will handle checking if updates are needed
     const planId = selectedPlan.id
-    const interval = setInterval(() => {
-      loadPlanItems(planId)
-    }, 3000) // Poll every 3 seconds for faster status updates
+    
+    // Check if there are items in active states that need frequent updates
+    const hasActiveItems = () => {
+      return planItems.some(item => 
+        ['pending', 'researching', 'generating', 'ready', 'draft', 'approved'].includes(item.status)
+      )
+    }
+    
+    // Determine polling interval based on item states
+    // If items are active, poll more frequently; otherwise poll less frequently
+    const getPollInterval = () => {
+      if (hasActiveItems()) {
+        return 15000 // Poll every 15 seconds when items are active (reduced from 3 seconds)
+      }
+      return 60000 // Poll every 60 seconds when all items are stable
+    }
+    
+    // Clear existing interval
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current)
+      pollingIntervalRef.current = null
+    }
+    
+    const poll = async () => {
+      const now = Date.now()
+      // Throttle: don't poll more than once every 10 seconds
+      if (now - lastPollTimeRef.current < 10000) {
+        return
+      }
+      lastPollTimeRef.current = now
+      
+      await loadPlanItems(planId)
+      
+      // After loading, check if we need to adjust polling interval
+      // Use a timeout to check after state updates
+      setTimeout(() => {
+        const newInterval = getPollInterval()
+        // Only restart if interval changed significantly (more than 5 seconds difference)
+        const currentInterval = pollingIntervalRef.current ? getPollInterval() : null
+        if (!currentInterval || Math.abs(newInterval - currentInterval) > 5000) {
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current)
+          }
+          pollingIntervalRef.current = setInterval(poll, newInterval)
+        }
+      }, 1000)
+    }
+    
+    // Start polling with initial interval
+    const initialInterval = getPollInterval()
+    pollingIntervalRef.current = setInterval(poll, initialInterval)
+    
+    // Initial load
+    poll()
 
-    return () => clearInterval(interval)
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPlan?.id])
+  
+  // Update polling interval when planItems change (but don't recreate the effect)
+  useEffect(() => {
+    if (!selectedPlan || !pollingIntervalRef.current) return
+    
+    const hasActiveItems = () => {
+      return planItems.some(item => 
+        ['pending', 'researching', 'generating', 'ready', 'draft', 'approved'].includes(item.status)
+      )
+    }
+    
+    const getPollInterval = () => {
+      if (hasActiveItems()) {
+        return 15000
+      }
+      return 60000
+    }
+    
+    // Debounce the interval update
+    const timeoutId = setTimeout(() => {
+      const newInterval = getPollInterval()
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        
+        const poll = async () => {
+          const now = Date.now()
+          if (now - lastPollTimeRef.current < 10000) {
+            return
+          }
+          lastPollTimeRef.current = now
+          await loadPlanItems(selectedPlan.id)
+        }
+        
+        pollingIntervalRef.current = setInterval(poll, newInterval)
+      }
+    }, 2000)
+    
+    return () => clearTimeout(timeoutId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planItems, selectedPlan?.id])
 
   const loadPlans = async () => {
     try {
@@ -265,7 +369,21 @@ export function VideoPlanning() {
       setPlanItems(items)
       console.log(`[VideoPlanning] Loaded ${items.length} plan items for plan ${planId}`)
       if (items.length > 0) {
-        console.log(`[VideoPlanning] Sample item dates:`, items.slice(0, 3).map((item: VideoPlanItem) => item.scheduled_date))
+        console.log(`[VideoPlanning] Sample item dates:`, items.slice(0, 5).map((item: VideoPlanItem) => ({
+          id: item.id,
+          date: item.scheduled_date,
+          time: item.scheduled_time,
+          topic: item.topic,
+          status: item.status
+        })))
+        // Log date range
+        const dates = items.map((item: VideoPlanItem) => item.scheduled_date).filter(Boolean)
+        if (dates.length > 0) {
+          const sortedDates = [...new Set(dates)].sort()
+          console.log(`[VideoPlanning] Date range: ${sortedDates[0]} to ${sortedDates[sortedDates.length - 1]} (${sortedDates.length} unique dates)`)
+        }
+      } else {
+        console.warn(`[VideoPlanning] No plan items found for plan ${planId}`)
       }
     } catch (error) {
       console.error('Failed to load plan items:', error)
@@ -313,6 +431,14 @@ export function VideoPlanning() {
 
       setPlans([response.data.plan, ...plans])
       setSelectedPlan(response.data.plan)
+      // Load plan items immediately after creation
+      if (response.data.items && response.data.items.length > 0) {
+        setPlanItems(response.data.items)
+        console.log(`[VideoPlanning] Plan created with ${response.data.items.length} items`)
+      } else {
+        // If no items returned, load them
+        loadPlanItems(response.data.plan.id)
+      }
       setCreateModal(false)
       setPlanName('')
       setVideosPerDay(3)
@@ -534,11 +660,31 @@ export function VideoPlanning() {
       : []
 
   // Group plan items by date
+  // Normalize date format to ensure matching (handle both DATE and timestamp formats)
+  const normalizeDate = (dateStr: string | null | undefined): string => {
+    if (!dateStr) return ''
+    // If it's already in YYYY-MM-DD format, return as is
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      return dateStr
+    }
+    // If it's a timestamp, extract the date part
+    try {
+      const date = new Date(dateStr)
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    } catch (e) {
+      console.warn(`[VideoPlanning] Failed to parse date: ${dateStr}`, e)
+      return dateStr.split('T')[0] // Try to extract date part from ISO string
+    }
+  }
+  
   const planItemsByDate = filteredItems.reduce(
     (acc, item) => {
-      const date = item.scheduled_date
+      const date = normalizeDate(item.scheduled_date)
       if (!date) {
-        console.warn(`[VideoPlanning] Item ${item.id} has no scheduled_date`)
+        console.warn(`[VideoPlanning] Item ${item.id} has no valid scheduled_date:`, item.scheduled_date)
         return acc
       }
       if (!acc[date]) acc[date] = []
@@ -547,6 +693,16 @@ export function VideoPlanning() {
     },
     {} as Record<string, VideoPlanItem[]>,
   )
+  
+  // Debug: Log items by date for debugging
+  if (Object.keys(planItemsByDate).length > 0) {
+    const dateKeys = Object.keys(planItemsByDate).sort()
+    console.log(`[VideoPlanning] Items grouped by date: ${dateKeys.length} dates with items`, {
+      firstDate: dateKeys[0],
+      lastDate: dateKeys[dateKeys.length - 1],
+      totalItems: filteredItems.length
+    })
+  }
 
   // Group scheduled posts by date (using filtered posts)
   const postsByDate = filteredPosts.reduce(

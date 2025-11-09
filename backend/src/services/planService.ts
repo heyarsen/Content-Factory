@@ -170,14 +170,36 @@ export class PlanService {
     const end = endDate ? new Date(endDate) : new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000) // Default 30 days
     
     const items: VideoPlanItem[] = []
-    const currentDate = new Date(start)
+    // Create a date formatter to ensure consistent YYYY-MM-DD format regardless of timezone
+    const formatDateForDB = (date: Date): string => {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    }
     
     // Use custom times if provided, otherwise generate default time slots
     const timeSlots = customTimes && customTimes.length > 0 
-      ? customTimes.map(t => t.length === 5 ? t : t.substring(0, 5)) // Ensure HH:MM format
+      ? customTimes.map(t => {
+          // Ensure HH:MM:SS format for database
+          if (t.length === 5) return `${t}:00`
+          if (t.length === 8) return t
+          return t.substring(0, 5) + ':00'
+        })
       : this.generateTimeSlots(plan.videos_per_day)
     
-    while (currentDate <= end) {
+    // Iterate through each day from start to end
+    const currentDate = new Date(start)
+    // Reset time to avoid timezone issues
+    currentDate.setHours(0, 0, 0, 0)
+    const endDateObj = new Date(end)
+    endDateObj.setHours(23, 59, 59, 999)
+    
+    console.log(`[Plan Service] Generating items from ${formatDateForDB(currentDate)} to ${formatDateForDB(endDateObj)}`)
+    
+    while (currentDate <= endDateObj) {
+      const dateStr = formatDateForDB(currentDate)
+      
       for (let i = 0; i < timeSlots.length; i++) {
         const timeSlot = timeSlots[i]
         const customTopic = customTopics && customTopics[i] ? customTopics[i].trim() : null
@@ -198,36 +220,46 @@ export class PlanService {
           status = plan.auto_research ? 'ready' : 'ready'
         }
         
-        const { data: item, error } = await supabase
-          .from('video_plan_items')
-          .insert({
-            plan_id: planId,
-            scheduled_date: currentDate.toISOString().split('T')[0],
-            scheduled_time: timeSlot,
-            topic: topic,
-            category: category,
-            status: status,
-            platforms: plan.default_platforms || null, // Set platforms from plan's default_platforms
-            avatar_id: avatarId, // Store avatar_id for this time slot
-          })
-          .select()
-          .single()
+        try {
+          const { data: item, error } = await supabase
+            .from('video_plan_items')
+            .insert({
+              plan_id: planId,
+              scheduled_date: dateStr, // Use formatted date string
+              scheduled_time: timeSlot,
+              topic: topic,
+              category: category,
+              status: status,
+              platforms: plan.default_platforms || null, // Set platforms from plan's default_platforms
+              avatar_id: avatarId, // Store avatar_id for this time slot
+            })
+            .select()
+            .single()
 
-        if (!error && item) {
-          items.push(item)
-          
-          // Only auto-generate topic if no custom topic was provided and auto_research is enabled
-          // If user provided a topic, we should NOT generate a new one - use the user's topic
-          if (!customTopic && plan.auto_research) {
-            // No topic provided, generate one
-            this.generateTopicForItem(item.id, userId).catch(console.error)
+          if (error) {
+            console.error(`[Plan Service] Error creating item for ${dateStr} at ${timeSlot}:`, error)
+          } else if (item) {
+            items.push(item)
+            console.log(`[Plan Service] Created item for ${dateStr} at ${timeSlot} (${items.length} total)`)
+            
+            // Only auto-generate topic if no custom topic was provided and auto_research is enabled
+            // If user provided a topic, we should NOT generate a new one - use the user's topic
+            if (!customTopic && plan.auto_research) {
+              // No topic provided, generate one
+              this.generateTopicForItem(item.id, userId).catch(console.error)
+            }
+            // If customTopic exists, it's already set and should be preserved
           }
-          // If customTopic exists, it's already set and should be preserved
+        } catch (err) {
+          console.error(`[Plan Service] Exception creating item for ${dateStr} at ${timeSlot}:`, err)
         }
       }
       
+      // Move to next day
       currentDate.setDate(currentDate.getDate() + 1)
     }
+    
+    console.log(`[Plan Service] Generated ${items.length} plan items total`)
     
     return items
   }
