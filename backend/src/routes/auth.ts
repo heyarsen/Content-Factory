@@ -71,11 +71,53 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
     console.log(`[Auth] Login attempt for email: ${email}`)
     console.log(`[Auth] Supabase URL: ${process.env.SUPABASE_URL ? 'Set' : 'Missing'}`)
     console.log(`[Auth] Service role key: ${process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Set (length: ' + process.env.SUPABASE_SERVICE_ROLE_KEY.length + ')' : 'Missing'}`)
+    console.log(`[Auth] Anon key: ${process.env.SUPABASE_ANON_KEY ? 'Set (length: ' + process.env.SUPABASE_ANON_KEY.length + ')' : 'Missing'}`)
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    // Try with service role key first, then fallback to anon key if needed
+    let data: any = null
+    let error: any = null
+    let authClient = supabase
+
+    // For signInWithPassword, we can use either service role or anon key
+    // Anon key is actually preferred for user authentication operations
+    const supabaseUrl = process.env.SUPABASE_URL
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
+    
+    if (supabaseUrl && supabaseAnonKey) {
+      // Create a client with anon key for authentication (preferred for user auth)
+      const { createClient } = await import('@supabase/supabase-js')
+      authClient = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      })
+      console.log(`[Auth] Using anon key for authentication`)
+    } else {
+      console.log(`[Auth] Using service role key for authentication (anon key not available)`)
+    }
+
+    try {
+      const result = await authClient.auth.signInWithPassword({
+        email,
+        password,
+      })
+      data = result.data
+      error = result.error
+    } catch (authError: any) {
+      console.error(`[Auth] Exception during signInWithPassword:`, {
+        message: authError.message,
+        stack: authError.stack,
+        name: authError.name,
+        code: authError.code,
+      })
+      // Convert exception to error format
+      error = {
+        message: authError.message || 'Authentication failed',
+        status: authError.status || 500,
+        name: authError.name || 'AuthError',
+      }
+    }
 
     if (error) {
       console.error(`[Auth] Login failed for ${email}:`, {
@@ -83,32 +125,52 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
         status: error.status,
         name: error.name,
         code: (error as any).code,
-        fullError: JSON.stringify(error, null, 2),
+        errorString: String(error),
+        errorType: typeof error,
+        fullError: JSON.stringify(error, Object.getOwnPropertyNames(error), 2),
       })
       
+      // Check for specific error types
+      const errorMsg = error.message || String(error) || 'Unknown error'
+      const errorMsgLower = errorMsg.toLowerCase()
+      
       // Provide more user-friendly error messages
-      let errorMessage = error.message
-      if (error.message.includes('Invalid login credentials') || 
-          error.message.includes('Invalid credentials') ||
-          error.message.includes('invalid_credentials')) {
+      let errorMessage = errorMsg
+      if (errorMsgLower.includes('invalid login credentials') || 
+          errorMsgLower.includes('invalid credentials') ||
+          errorMsgLower.includes('invalid_credentials') ||
+          errorMsgLower.includes('invalid_grant')) {
         errorMessage = 'Invalid email or password. Please check your credentials and try again.'
-      } else if (error.message.includes('Email not confirmed') || 
-                 error.message.includes('email not confirmed') ||
-                 error.message.includes('email_not_confirmed')) {
+      } else if (errorMsgLower.includes('email not confirmed') || 
+                 errorMsgLower.includes('email_not_confirmed') ||
+                 errorMsgLower.includes('confirmation')) {
         errorMessage = 'Please verify your email before signing in. Check your inbox for a verification link.'
-      } else if (error.message.includes('rate limit') || 
-                 error.message.includes('Rate limit') ||
-                 error.message.includes('too_many_requests')) {
+      } else if (errorMsgLower.includes('rate limit') || 
+                 errorMsgLower.includes('too_many_requests') ||
+                 errorMsgLower.includes('too many')) {
         errorMessage = 'Too many login attempts. Please try again in a few minutes.'
-      } else if (error.message.includes('network') || 
-                 error.message.includes('fetch') ||
-                 error.message.includes('Failed to fetch')) {
-        errorMessage = 'Unable to connect to authentication service. Please check your connection and try again.'
+      } else if (errorMsgLower.includes('network') || 
+                 errorMsgLower.includes('fetch') ||
+                 errorMsgLower.includes('failed to fetch') ||
+                 errorMsgLower.includes('connection') ||
+                 errorMsgLower.includes('timeout') ||
+                 errorMsgLower.includes('econnrefused')) {
+        errorMessage = 'Unable to connect to authentication service. This might be a temporary issue. Please try again in a few moments.'
+        // Log this as a critical error
+        console.error(`[Auth] CRITICAL: Backend cannot connect to Supabase!`, {
+          supabaseUrl: process.env.SUPABASE_URL,
+          hasAnonKey: !!process.env.SUPABASE_ANON_KEY,
+          hasServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+        })
       }
       
       return res.status(401).json({ 
         error: errorMessage,
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+        details: process.env.NODE_ENV === 'development' ? {
+          originalMessage: errorMsg,
+          errorType: error.name,
+          errorCode: (error as any).code,
+        } : undefined,
       })
     }
 
