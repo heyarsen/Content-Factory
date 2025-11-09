@@ -907,6 +907,13 @@ export function VideoPlanning() {
       return <Badge variant="error">Script Rejected</Badge>
     }
 
+    // Check if there are pending scheduled posts for this item (indicates publishing in progress)
+    const itemScheduledPosts = item?.video_id 
+      ? scheduledPosts.filter(p => p.video_id === item.video_id)
+      : []
+    const hasPendingPosts = itemScheduledPosts.some(p => p.status === 'pending' || p.status === 'scheduled')
+    const allPostsPublished = itemScheduledPosts.length > 0 && itemScheduledPosts.every(p => p.status === 'posted')
+
     // Determine the most descriptive label based on status and script_status
     let label = ''
     let variant: 'default' | 'success' | 'error' | 'warning' | 'info' = 'default'
@@ -951,8 +958,16 @@ export function VideoPlanning() {
         showLoader = true
         break
       case 'completed':
-        // Check if video is ready and if there's a scheduled time
-        if (item?.scheduled_date && item?.scheduled_time) {
+        // Check if there are pending posts (publishing in progress)
+        if (hasPendingPosts) {
+          label = 'Publishing'
+          variant = 'info'
+          showLoader = true
+        } else if (allPostsPublished) {
+          // All posts are published, but status might not be updated yet
+          label = 'Published'
+          variant = 'success'
+        } else if (item?.scheduled_date && item?.scheduled_time) {
           const now = new Date()
           const scheduledDateTime = new Date(`${item.scheduled_date}T${item.scheduled_time}`)
           
@@ -961,9 +976,10 @@ export function VideoPlanning() {
             label = 'Waiting for Post Time'
             variant = 'success'
           } else {
-            // Post time has passed or is now
-            label = 'Ready to Publish'
-            variant = 'success'
+            // Post time has passed - likely publishing or about to publish
+            label = 'Publishing'
+            variant = 'info'
+            showLoader = true
           }
         } else {
           // No scheduled time, video is ready
@@ -976,7 +992,7 @@ export function VideoPlanning() {
         variant = 'success'
         break
       case 'posted':
-        label = 'Posted Successfully'
+        label = 'Published'
         variant = 'success'
         break
       case 'failed':
@@ -2469,8 +2485,59 @@ export function VideoPlanning() {
           title="Plan Item Details"
           size="lg"
         >
-          {selectedItem && (
+          {selectedItem && (() => {
+            // Get all items for the selected item's date
+            const itemDate = selectedItem.scheduled_date
+            const itemsForDate = planItems.filter(item => item.scheduled_date === itemDate)
+              .sort((a, b) => {
+                // Sort by scheduled_time
+                const timeA = a.scheduled_time || '00:00'
+                const timeB = b.scheduled_time || '00:00'
+                return timeA.localeCompare(timeB)
+              })
+            
+            // Find current item index
+            const currentIndex = itemsForDate.findIndex(item => item.id === selectedItem.id)
+            const hasPrev = currentIndex > 0
+            const hasNext = currentIndex < itemsForDate.length - 1
+            
+            const navigateToItem = (direction: 'prev' | 'next') => {
+              if (direction === 'prev' && hasPrev) {
+                setSelectedItem(itemsForDate[currentIndex - 1])
+              } else if (direction === 'next' && hasNext) {
+                setSelectedItem(itemsForDate[currentIndex + 1])
+              }
+            }
+            
+            return (
             <div className="space-y-6">
+              {/* Pagination Navigation - matching calendar style */}
+              {itemsForDate.length > 1 && (
+                <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-2">
+                  <div className="text-sm text-slate-600">
+                    Item {currentIndex + 1} of {itemsForDate.length}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => navigateToItem('prev')}
+                      disabled={!hasPrev}
+                    >
+                      ← Prev
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => navigateToItem('next')}
+                      disabled={!hasNext}
+                    >
+                      Next →
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
               {/* Header Info */}
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                 <div>
@@ -2768,7 +2835,8 @@ export function VideoPlanning() {
                 )}
               </div>
             </div>
-          )}
+            )
+          })()}
         </Modal>
       </div>
     </Layout>
