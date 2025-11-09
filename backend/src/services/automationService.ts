@@ -260,16 +260,24 @@ export class AutomationService {
                   .single()
                 
                 if (updatedItem) {
-                  // Update status to generating
-                  await supabase
+                  // ATOMIC UPDATE: Only update if video_id is still null to prevent duplicate video creation
+                  const statusUpdate = await supabase
                     .from('video_plan_items')
                     .update({ status: 'generating' })
                     .eq('id', item.id)
+                    .is('video_id', null) // CRITICAL: Only update if video_id is still null
+                    .select()
+                  
+                  // Check if update actually succeeded (item might have been claimed by another process)
+                  if (!statusUpdate.data || statusUpdate.data.length === 0 || statusUpdate.data[0].video_id) {
+                    console.log(`[Video Generation] Item ${item.id} was already claimed by another process (video_id already set), skipping immediate generation`)
+                    continue // Another process already claimed this item
+                  }
                   
                   // Get avatar_id from plan item (optional - will fall back to default avatar if not provided)
                   const avatarId = (updatedItem as any).avatar_id
                   
-                  console.log(`[Video Generation] Immediately generating video for item ${item.id}`, {
+                  console.log(`[Video Generation] ✓ Claimed item ${item.id} for immediate video generation`, {
                     topic: updatedItem.topic,
                     hasAvatarId: !!avatarId,
                     avatarId: avatarId || 'will use default avatar'
@@ -284,15 +292,24 @@ export class AutomationService {
                     avatar_id: avatarId, // Can be undefined - will fall back to default
                   })
                   
-                  await supabase
+                  // ATOMIC UPDATE: Set video_id and keep status as 'generating'
+                  const finalUpdate = await supabase
                     .from('video_plan_items')
                     .update({
                       video_id: video.id,
                       status: 'generating', // Keep as generating until video is ready
                     })
                     .eq('id', item.id)
+                    .eq('status', 'generating') // Only update if still in generating state
+                    .select()
                   
-                  console.log(`[Video Generation] Video generation started for item ${item.id}, video_id: ${video.id}. Status: generating (will update to completed when video is ready)`)
+                  if (finalUpdate.error) {
+                    console.error(`[Video Generation] Failed to update video_id for item ${item.id}:`, finalUpdate.error)
+                  } else if (!finalUpdate.data || finalUpdate.data.length === 0) {
+                    console.warn(`[Video Generation] ⚠️ Item ${item.id} status changed before video_id could be set (race condition prevented)`)
+                  } else {
+                    console.log(`[Video Generation] ✅ Video generation started for item ${item.id}, video_id: ${video.id}. Status: generating (will update to completed when video is ready)`)
+                  }
                 }
               } catch (videoError: any) {
                 console.error(`[Video Generation] Error immediately generating video for item ${item.id}:`, videoError)
@@ -348,8 +365,8 @@ export class AutomationService {
 
     for (const item of items) {
       try {
-        // Update status to show video generation in progress IMMEDIATELY
-        // This ensures the UI shows "Creating Video" right away
+        // ATOMIC UPDATE: Only update if video_id is still null to prevent duplicate video creation
+        // This ensures only one process can claim this item for video generation
         const statusUpdate = await supabase
           .from('video_plan_items')
           .update({ 
@@ -357,13 +374,27 @@ export class AutomationService {
             updated_at: new Date().toISOString()
           })
           .eq('id', item.id)
+          .is('video_id', null) // CRITICAL: Only update if video_id is still null
           .select()
 
         if (statusUpdate.error) {
           console.error(`[Video Generation] Failed to update status for item ${item.id}:`, statusUpdate.error)
-        } else {
-          console.log(`[Video Generation] Updated item ${item.id} status to 'generating' (Creating Video) - Topic: "${item.topic || 'N/A'}"`)
+          continue // Skip this item
         }
+
+        // Check if update actually succeeded (item might have been claimed by another process)
+        if (!statusUpdate.data || statusUpdate.data.length === 0) {
+          console.log(`[Video Generation] Item ${item.id} was already claimed by another process (video_id already set), skipping`)
+          continue // Another process already claimed this item
+        }
+
+        const updatedItem = statusUpdate.data[0]
+        if (updatedItem.video_id) {
+          console.log(`[Video Generation] Item ${item.id} already has video_id ${updatedItem.video_id}, skipping duplicate creation`)
+          continue // Item already has a video
+        }
+
+        console.log(`[Video Generation] ✓ Claimed item ${item.id} for video generation - Topic: "${item.topic || 'N/A'}"`)
 
         if (!item.topic || !item.script) {
           throw new Error('Missing topic or script for video generation')
@@ -392,8 +423,8 @@ export class AutomationService {
 
         console.log(`[Video Generation] Video created with ID: ${video.id}, topic: "${video.topic}"`)
 
-        // Keep status as 'generating' until video is actually completed
-        // The video status will be checked by checkVideoStatusAndScheduleDistribution
+        // ATOMIC UPDATE: Set video_id and keep status as 'generating'
+        // Only update if status is still 'generating' (prevent overwriting if another process changed it)
         const finalUpdate = await supabase
           .from('video_plan_items')
           .update({
@@ -401,12 +432,15 @@ export class AutomationService {
             status: 'generating', // Keep as generating until video is ready
           })
           .eq('id', item.id)
+          .eq('status', 'generating') // Only update if still in generating state
           .select()
 
         if (finalUpdate.error) {
           console.error(`[Video Generation] Failed to update video_id for item ${item.id}:`, finalUpdate.error)
+        } else if (!finalUpdate.data || finalUpdate.data.length === 0) {
+          console.warn(`[Video Generation] ⚠️ Item ${item.id} status changed before video_id could be set (race condition prevented)`)
         } else {
-          console.log(`[Video Generation] Video generation started for item ${item.id}, video_id: ${video.id}. Status: generating (will update to completed when video is ready)`)
+          console.log(`[Video Generation] ✅ Video generation started for item ${item.id}, video_id: ${video.id}. Status: generating (will update to completed when video is ready)`)
         }
       } catch (error: any) {
         console.error(`Error generating video for today's item ${item.id}:`, error)
@@ -742,22 +776,39 @@ export class AutomationService {
 
     for (const item of items) {
       try {
-            // Update status to show video generation in progress
+            // ATOMIC UPDATE: Only update if video_id is still null to prevent duplicate video creation
             const statusUpdate = await supabase
           .from('video_plan_items')
           .update({ status: 'generating' })
           .eq('id', item.id)
+          .is('video_id', null) // CRITICAL: Only update if video_id is still null
               .select()
 
             if (statusUpdate.error) {
               console.error(`[Video Generation] Failed to update status for item ${item.id}:`, statusUpdate.error)
-            } else {
-              console.log(`[Video Generation] Updated today's item ${item.id} status to 'generating' (Creating Video)`)
+              continue // Skip this item
             }
+
+            // Check if update actually succeeded (item might have been claimed by another process)
+            if (!statusUpdate.data || statusUpdate.data.length === 0) {
+              console.log(`[Video Generation] Item ${item.id} was already claimed by another process (video_id already set), skipping`)
+              continue // Another process already claimed this item
+            }
+
+            const updatedItem = statusUpdate.data[0]
+            if (updatedItem.video_id) {
+              console.log(`[Video Generation] Item ${item.id} already has video_id ${updatedItem.video_id}, skipping duplicate creation`)
+              continue // Item already has a video
+            }
+
+            console.log(`[Video Generation] ✓ Claimed item ${item.id} for video generation`)
 
             if (!item.topic || !item.script) {
               throw new Error('Missing topic or script for video generation')
             }
+
+            // Get avatar_id from plan item
+            const avatarId = (item as any).avatar_id
 
             console.log(`[Video Generation] Creating video for today's item ${item.id} with topic: ${item.topic}`)
         const video = await VideoService.requestManualVideo(plan.user_id, {
@@ -765,21 +816,26 @@ export class AutomationService {
               script: item.script,
           style: 'professional',
           duration: 30,
+          avatar_id: avatarId, // Can be undefined - will fall back to default avatar
         })
 
+            // ATOMIC UPDATE: Set video_id and keep status as 'generating' until video is ready
             const finalUpdate = await supabase
           .from('video_plan_items')
           .update({
             video_id: video.id,
-            status: 'completed',
+            status: 'generating', // Keep as generating until video is ready
           })
           .eq('id', item.id)
+          .eq('status', 'generating') // Only update if still in generating state
               .select()
 
             if (finalUpdate.error) {
               console.error(`[Video Generation] Failed to update video_id for item ${item.id}:`, finalUpdate.error)
+            } else if (!finalUpdate.data || finalUpdate.data.length === 0) {
+              console.warn(`[Video Generation] ⚠️ Item ${item.id} status changed before video_id could be set (race condition prevented)`)
             } else {
-              console.log(`[Video Generation] Generated video for today's item ${item.id}, video_id: ${video.id}`)
+              console.log(`[Video Generation] ✅ Generated video for today's item ${item.id}, video_id: ${video.id}. Status: generating (will update to completed when video is ready)`)
             }
       } catch (error: any) {
         console.error(`Error generating video for item ${item.id}:`, error)
@@ -1686,6 +1742,12 @@ export class AutomationService {
       throw new Error('Plan item not found')
     }
 
+    // Check if video already exists
+    if (item.video_id) {
+      console.log(`[Video Generation] Item ${itemId} already has video_id ${item.video_id}, skipping duplicate creation`)
+      return // Video already exists, don't create another one
+    }
+
     if (item.status !== 'approved' || item.script_status !== 'approved') {
       throw new Error('Item must be approved to generate video')
     }
@@ -1694,26 +1756,49 @@ export class AutomationService {
       throw new Error('Item must have a script')
     }
 
-    await supabase
+    // ATOMIC UPDATE: Only update if video_id is still null
+    const statusUpdate = await supabase
       .from('video_plan_items')
       .update({ status: 'generating' })
       .eq('id', itemId)
+      .is('video_id', null) // CRITICAL: Only update if video_id is still null
+      .select()
+
+    // Check if update actually succeeded (item might have been claimed by another process)
+    if (!statusUpdate.data || statusUpdate.data.length === 0 || statusUpdate.data[0].video_id) {
+      console.log(`[Video Generation] Item ${itemId} was already claimed by another process (video_id already set), skipping`)
+      return // Another process already claimed this item
+    }
 
     const plan = item.plan as any
+    const avatarId = (item as any).avatar_id
+    
     const video = await VideoService.requestManualVideo(plan.user_id, {
       topic: item.topic!,
       script: item.script,
       style: 'professional',
       duration: 30,
+      avatar_id: avatarId, // Can be undefined - will fall back to default avatar
     })
 
-    await supabase
+    // ATOMIC UPDATE: Set video_id and keep status as 'generating' until video is ready
+    const finalUpdate = await supabase
       .from('video_plan_items')
       .update({
         video_id: video.id,
-        status: 'completed',
+        status: 'generating', // Keep as generating until video is ready
       })
       .eq('id', itemId)
+      .eq('status', 'generating') // Only update if still in generating state
+      .select()
+
+    if (finalUpdate.error) {
+      console.error(`[Video Generation] Failed to update video_id for item ${itemId}:`, finalUpdate.error)
+    } else if (!finalUpdate.data || finalUpdate.data.length === 0) {
+      console.warn(`[Video Generation] ⚠️ Item ${itemId} status changed before video_id could be set (race condition prevented)`)
+    } else {
+      console.log(`[Video Generation] ✅ Video generation started for item ${itemId}, video_id: ${video.id}. Status: generating (will update to completed when video is ready)`)
+    }
   }
 
   /**
