@@ -21,6 +21,20 @@ export function Login() {
     setLoading(true)
 
     try {
+      // Check backend connectivity first
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+      try {
+        const healthCheck = await fetch(`${API_URL}/health`)
+        if (!healthCheck.ok) {
+          throw new Error('Backend server is not responding correctly')
+        }
+      } catch (healthError) {
+        console.error('Backend health check failed:', healthError)
+        setError(`Unable to connect to server at ${API_URL}. Please ensure the backend server is running.`)
+        setLoading(false)
+        return
+      }
+
       await signIn(email, password)
       navigate('/dashboard')
     } catch (err: any) {
@@ -32,7 +46,11 @@ export function Login() {
       } else if (err.message) {
         errorMessage = err.message
       } else if (err.request && !err.response) {
-        errorMessage = 'Unable to connect to server. Please check your connection.'
+        errorMessage = 'Unable to connect to server. Please check your connection and ensure the backend server is running.'
+      } else if (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT') {
+        errorMessage = 'Request timed out. The server may be overloaded or unavailable.'
+      } else if (err.code === 'ERR_NETWORK') {
+        errorMessage = 'Network error. Please check your internet connection and ensure the backend server is running.'
       }
       setError(errorMessage)
       // Don't clear password on error - keep it so user can see what they typed

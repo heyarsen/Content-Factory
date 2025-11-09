@@ -56,10 +56,13 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
     const { email, password } = req.body
 
     if (!email || !password) {
+      console.log('[Auth] Login failed: Missing email or password')
       return res.status(400).json({ error: 'Email and password are required' })
     }
 
     console.log(`[Auth] Login attempt for email: ${email}`)
+    console.log(`[Auth] Supabase URL: ${process.env.SUPABASE_URL ? 'Set' : 'Missing'}`)
+    console.log(`[Auth] Service role key: ${process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Set' : 'Missing'}`)
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -67,27 +70,40 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
     })
 
     if (error) {
-      console.error(`[Auth] Login failed for ${email}:`, error.message)
+      console.error(`[Auth] Login failed for ${email}:`, {
+        message: error.message,
+        status: error.status,
+        name: error.name,
+      })
       
       // Provide more user-friendly error messages
       let errorMessage = error.message
-      if (error.message.includes('Invalid login credentials')) {
+      if (error.message.includes('Invalid login credentials') || error.message.includes('Invalid credentials')) {
         errorMessage = 'Invalid email or password'
-      } else if (error.message.includes('Email not confirmed')) {
+      } else if (error.message.includes('Email not confirmed') || error.message.includes('email not confirmed')) {
         errorMessage = 'Please verify your email before signing in. Check your inbox for a verification link.'
-      } else if (error.message.includes('rate limit')) {
+      } else if (error.message.includes('rate limit') || error.message.includes('Rate limit')) {
         errorMessage = 'Too many login attempts. Please try again in a few minutes.'
+      } else if (error.message.includes('network') || error.message.includes('fetch')) {
+        errorMessage = 'Unable to connect to authentication service. Please check your connection and try again.'
       }
       
       return res.status(401).json({ error: errorMessage })
     }
 
     if (!data.session) {
-      console.error(`[Auth] Login succeeded but no session for ${email}`)
+      console.error(`[Auth] Login succeeded but no session for ${email}`, {
+        hasUser: !!data.user,
+        hasSession: !!data.session,
+      })
       return res.status(500).json({ error: 'Failed to create session' })
     }
 
-    console.log(`[Auth] Login successful for ${email}`)
+    console.log(`[Auth] Login successful for ${email}`, {
+      userId: data.user?.id,
+      hasAccessToken: !!data.session.access_token,
+      hasRefreshToken: !!data.session.refresh_token,
+    })
 
     res.json({
       access_token: data.session.access_token,
@@ -95,7 +111,12 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
       user: data.user,
     })
   } catch (error: any) {
-    console.error('[Auth] Login exception:', error)
+    console.error('[Auth] Login exception:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      code: error.code,
+    })
     res.status(500).json({ error: error.message || 'Internal server error' })
   }
 })

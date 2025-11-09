@@ -57,7 +57,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
+      console.log('[Auth] Attempting to sign in...')
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+      console.log('[Auth] API URL:', API_URL)
+      
       const { data } = await api.post('/api/auth/login', { email, password })
+      console.log('[Auth] Login response received:', { hasToken: !!data.access_token, hasUser: !!data.user })
+      
       if (data.access_token) {
         localStorage.setItem('access_token', data.access_token)
         setUser(data.user)
@@ -67,14 +73,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           refresh_token: data.refresh_token || data.access_token,
         })
         if (sessionError) {
-          console.error('Failed to set Supabase session:', sessionError)
+          console.error('[Auth] Failed to set Supabase session:', sessionError)
           // Continue anyway since we have the token
+        } else {
+          console.log('[Auth] Supabase session set successfully')
         }
       } else {
+        console.error('[Auth] No access token in response:', data)
         throw new Error('No access token received from server')
       }
     } catch (error: any) {
-      console.error('Sign in error:', error)
+      console.error('[Auth] Sign in error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        code: error.code,
+        isNetworkError: !error.response,
+        config: {
+          url: error.config?.url,
+          baseURL: error.config?.baseURL,
+          method: error.config?.method,
+        }
+      })
       // Re-throw to let the Login component handle the error
       throw error
     }
