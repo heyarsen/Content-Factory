@@ -945,65 +945,99 @@ export function VideoPlanning() {
                     <button
                       key={index}
                       onClick={() => date && setSelectedDate(dateKey)}
-                      className={`min-h-[80px] rounded-lg border p-2 text-left transition ${
+                      className={`min-h-[120px] rounded-lg border p-2 text-left transition relative ${
                         !date
-                          ? 'border-transparent bg-transparent'
+                          ? 'border-transparent bg-transparent cursor-default'
                           : isSelected
-                            ? 'border-brand-500 bg-brand-50'
+                            ? 'border-brand-500 bg-brand-50 shadow-md'
                             : isToday
-                              ? 'border-brand-200 bg-brand-50/50'
-                              : 'border-slate-200 bg-white hover:border-brand-200 hover:bg-slate-50'
+                              ? 'border-brand-300 bg-brand-50/70 shadow-sm'
+                              : 'border-slate-200 bg-white hover:border-brand-300 hover:bg-slate-50 hover:shadow-sm'
                       }`}
                       disabled={!date}
                     >
                       {date && (
                         <>
-                          <div
-                            className={`text-sm font-medium ${isToday ? 'text-brand-600' : 'text-slate-700'}`}
-                          >
-                            {date.getDate()}
+                          <div className="flex items-center justify-between mb-1">
+                            <div
+                              className={`text-sm font-semibold ${isToday ? 'text-brand-600' : 'text-slate-700'}`}
+                            >
+                              {date.getDate()}
+                            </div>
+                            {items.length > 0 && (
+                              <div className="flex items-center gap-1">
+                                <div className="h-1.5 w-1.5 rounded-full bg-brand-500"></div>
+                                <span className="text-xs font-medium text-slate-600">
+                                  {items.length}
+                                </span>
+                              </div>
+                            )}
                           </div>
                           {items.length > 0 && (
-                            <div className="mt-1 space-y-1">
-                              {items.slice(0, 2).map((item) => {
+                            <div className="mt-1 space-y-1 max-h-[88px] overflow-y-auto">
+                              {items.slice(0, 4).map((item) => {
                                 const isPost = isScheduledPost(item)
                                 let status: string
                                 let displayTopic: string
+                                let displayTime: string
                                 
                                 if (isPost) {
                                   status = item.status
                                   displayTopic = item.videos?.topic || `${item.platform} Post`
+                                  displayTime = item.scheduled_time 
+                                    ? new Date(item.scheduled_time).toLocaleTimeString('en-US', { 
+                                        hour: 'numeric', 
+                                        minute: '2-digit',
+                                        hour12: true 
+                                      })
+                                    : ''
                                 } else {
                                   status = item.status
-                                  displayTopic = item.topic || formatTime(item.scheduled_time) || 'Item'
+                                  displayTopic = item.topic || 'No topic'
+                                  displayTime = item.scheduled_time ? formatTime(item.scheduled_time) : ''
                                 }
                                 
                                 return (
                                   <div
                                     key={item.id}
-                                    className={`truncate rounded px-1.5 py-0.5 text-xs ${
+                                    className={`truncate rounded px-1.5 py-1 text-xs border ${
                                       status === 'completed' ||
                                       status === 'posted'
-                                        ? 'bg-emerald-100 text-emerald-700'
+                                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
                                         : status === 'scheduled'
-                                          ? 'bg-purple-100 text-purple-700'
+                                          ? 'bg-purple-50 border-purple-200 text-purple-800'
                                         : status === 'ready'
-                                          ? 'bg-blue-100 text-blue-700'
+                                          ? 'bg-blue-50 border-blue-200 text-blue-800'
+                                          : status === 'generating'
+                                            ? 'bg-indigo-50 border-indigo-200 text-indigo-800'
+                                          : status === 'approved'
+                                            ? 'bg-teal-50 border-teal-200 text-teal-800'
                                           : status === 'failed'
-                                            ? 'bg-red-100 text-red-700'
+                                            ? 'bg-red-50 border-red-200 text-red-800'
                                             : status === 'pending'
-                                              ? 'bg-yellow-100 text-yellow-700'
-                                              : 'bg-slate-100 text-slate-700'
+                                              ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
+                                              : status === 'researching'
+                                                ? 'bg-cyan-50 border-cyan-200 text-cyan-800'
+                                              : 'bg-slate-50 border-slate-200 text-slate-700'
                                     }`}
-                                    title={displayTopic}
+                                    title={`${displayTime ? displayTime + ' - ' : ''}${displayTopic} (${status})`}
                                   >
-                                    {displayTopic}
+                                    <div className="flex items-center gap-1">
+                                      {displayTime && (
+                                        <span className="text-[10px] font-medium opacity-75">
+                                          {displayTime}
+                                        </span>
+                                      )}
+                                      <span className="flex-1 truncate font-medium">
+                                        {displayTopic}
+                                      </span>
+                                    </div>
                                   </div>
                                 )
                               })}
-                              {items.length > 2 && (
-                                <div className="text-xs text-slate-500">
-                                  +{items.length - 2} more
+                              {items.length > 4 && (
+                                <div className="text-xs font-medium text-slate-500 px-1.5 py-0.5 bg-slate-100 rounded">
+                                  +{items.length - 4} more
                                 </div>
                               )}
                             </div>
@@ -1013,6 +1047,45 @@ export function VideoPlanning() {
                     </button>
                   )
                 })}
+              </div>
+
+              {/* Status Legend */}
+              <div className="mt-6 pt-6 border-t border-slate-200">
+                <h3 className="text-sm font-semibold text-slate-700 mb-3">Status Legend</h3>
+                <div className="flex flex-wrap gap-3 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-3 rounded border border-yellow-200 bg-yellow-50"></div>
+                    <span className="text-slate-600">Pending</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-3 rounded border border-cyan-200 bg-cyan-50"></div>
+                    <span className="text-slate-600">Researching</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-3 rounded border border-blue-200 bg-blue-50"></div>
+                    <span className="text-slate-600">Ready</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-3 rounded border border-teal-200 bg-teal-50"></div>
+                    <span className="text-slate-600">Approved</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-3 rounded border border-indigo-200 bg-indigo-50"></div>
+                    <span className="text-slate-600">Generating</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-3 rounded border border-emerald-200 bg-emerald-50"></div>
+                    <span className="text-slate-600">Completed/Posted</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-3 rounded border border-purple-200 bg-purple-50"></div>
+                    <span className="text-slate-600">Scheduled</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-3 rounded border border-red-200 bg-red-50"></div>
+                    <span className="text-slate-600">Failed</span>
+                  </div>
+                </div>
               </div>
             </Card>
 
