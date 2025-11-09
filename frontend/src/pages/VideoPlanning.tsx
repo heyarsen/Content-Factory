@@ -25,6 +25,7 @@ import {
   FileText,
   ExternalLink,
   User,
+  RefreshCw,
 } from 'lucide-react'
 import api from '../lib/api'
 
@@ -2810,6 +2811,32 @@ export function VideoPlanning() {
                 >
                   Edit
                 </Button>
+                {(selectedItem.status === 'completed' || selectedItem.status === 'scheduled' || selectedItem.status === 'generating') && selectedItem.video_id && (
+                  <Button
+                    variant="ghost"
+                    onClick={async () => {
+                      try {
+                        const response = await api.post(`/api/plans/items/${selectedItem.id}/refresh-status`)
+                        if (response.data.item) {
+                          // Update the item in the planItems array
+                          setPlanItems(prevItems => 
+                            prevItems.map(item => 
+                              item.id === selectedItem.id ? response.data.item : item
+                            )
+                          )
+                          // Update selectedItem
+                          setSelectedItem(response.data.item)
+                          console.log('[VideoPlanning] Status refreshed:', response.data.message)
+                        }
+                      } catch (error: any) {
+                        console.error('[VideoPlanning] Error refreshing status:', error)
+                      }
+                    }}
+                    leftIcon={<RefreshCw className="h-4 w-4" />}
+                  >
+                    Refresh Status
+                  </Button>
+                )}
                 {selectedItem.script && selectedItem.script_status === 'draft' && (
                   <>
                     <Button

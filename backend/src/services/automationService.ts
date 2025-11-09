@@ -953,7 +953,226 @@ export class AutomationService {
       }
     }
 
-    // Now get items with completed videos
+    // Check status of items that already have scheduled posts (might be stuck in 'completed' or 'scheduled' status)
+    // This handles items that have posts created but status wasn't updated properly
+    const { data: itemsWithPosts } = await supabase
+      .from('video_plan_items')
+      .select('*, plan:video_plans!inner(enabled, user_id)')
+      .eq('plan.enabled', true)
+      .in('status', ['completed', 'scheduled'])
+      .not('video_id', 'is', null)
+      .limit(50) // Check more items to catch stuck ones
+
+    if (itemsWithPosts && itemsWithPosts.length > 0) {
+      console.log(`[Distribution] Checking status of ${itemsWithPosts.length} items with completed/scheduled status`)
+      
+      for (const item of itemsWithPosts) {
+        try {
+          // Get all scheduled posts for this video
+          const { data: posts } = await supabase
+            .from('scheduled_posts')
+            .select('*')
+            .eq('video_id', item.video_id)
+            .order('created_at', { ascending: false })
+
+          if (!posts || posts.length === 0) {
+            // No posts found - item should be available for posting
+            // Check if it's time to post
+            const now = new Date()
+            const planTimezone = (item.plan as any).timezone || 'UTC'
+            
+            const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+              timeZone: planTimezone,
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+            })
+            const hourFormatter = new Intl.DateTimeFormat('en-US', {
+              timeZone: planTimezone,
+              hour: '2-digit',
+              hour12: false,
+            })
+            const minuteFormatter = new Intl.DateTimeFormat('en-US', {
+              timeZone: planTimezone,
+              minute: '2-digit',
+              hour12: false,
+            })
+            
+            const today = dateFormatter.format(now)
+            const currentHour = parseInt(hourFormatter.format(now), 10)
+            const currentMinute = parseInt(minuteFormatter.format(now), 10)
+            
+            if (item.scheduled_date && item.scheduled_time) {
+              const [postHours, postMinutes] = item.scheduled_time.split(':')
+              const postHour = parseInt(postHours, 10)
+              const postMinute = parseInt(postMinutes || '0', 10)
+              
+              const postMinutesTotal = postHour * 60 + postMinute
+              const currentMinutesTotal = currentHour * 60 + currentMinute
+              const timeDiffMinutes = (item.scheduled_date === today) 
+                ? (postMinutesTotal - currentMinutesTotal)
+                : (item.scheduled_date < today ? -999999 : 999999)
+              
+              // If scheduled time has passed, this item should be processed for posting
+              // Reset scheduled_post_id so it can be picked up
+              if (timeDiffMinutes <= 1 && item.scheduled_date <= today) {
+                console.log(`[Distribution] Item ${item.id} has no posts but scheduled time passed, will be processed for posting`)
+                // Don't reset here - let it be processed in the next section
+              }
+            }
+            continue
+          }
+
+          console.log(`[Distribution] Item ${item.id} has ${posts.length} scheduled post(s):`, 
+            posts.map(p => `${p.platform}:${p.status}`).join(', '))
+
+          // Check if all posts are posted
+          const allPosted = posts.every(p => p.status === 'posted')
+          const anyFailed = posts.some(p => p.status === 'failed')
+          const anyPending = posts.some(p => p.status === 'pending' || p.status === 'scheduled')
+          const allFailed = posts.every(p => p.status === 'failed')
+
+          if (allPosted) {
+            // All posts are posted, update item status
+            if (item.status !== 'posted') {
+              await supabase
+                .from('video_plan_items')
+                .update({ status: 'posted' })
+                .eq('id', item.id)
+              console.log(`[Distribution] ✅ Updated item ${item.id} status from '${item.status}' to 'posted' - all ${posts.length} posts are posted`)
+            }
+          } else if (allFailed) {
+            // All posts failed, update status
+            if (item.status !== 'failed') {
+              await supabase
+                .from('video_plan_items')
+                .update({ status: 'failed', error_message: 'All posts failed' })
+                .eq('id', item.id)
+              console.log(`[Distribution] ❌ Updated item ${item.id} status to 'failed' - all ${posts.length} posts failed`)
+            }
+          } else if (anyPending) {
+            // Some posts are still pending - check their status via Upload-Post API
+            const pendingPostsToCheck = posts.filter(p => p.status === 'pending' || p.status === 'scheduled')
+            console.log(`[Distribution] ⏳ Item ${item.id} has ${pendingPostsToCheck.length} pending post(s), checking status...`)
+            
+            // Check status for posts with upload_post_id
+            for (const post of pendingPostsToCheck) {
+              if (post.upload_post_id) {
+                try {
+                  const { getUploadStatus } = await import('../lib/uploadpost.js')
+                  const uploadStatus = await getUploadStatus(post.upload_post_id)
+                  
+                  console.log(`[Distribution] Upload status for post ${post.id} (${post.platform}):`, {
+                    status: uploadStatus.status,
+                    resultsCount: uploadStatus.results?.length || 0,
+                  })
+
+                  // Find the platform-specific result
+                  const platformResult = uploadStatus.results?.find((r: any) => r.platform === post.platform)
+
+                  if (platformResult) {
+                    const newStatus = platformResult.status === 'success' ? 'posted' :
+                                     platformResult.status === 'failed' ? 'failed' :
+                                     'pending'
+
+                    if (newStatus !== post.status) {
+                      await supabase
+                        .from('scheduled_posts')
+                        .update({
+                          status: newStatus,
+                          posted_at: newStatus === 'posted' ? new Date().toISOString() : post.posted_at,
+                          error_message: platformResult.error || null,
+                          updated_at: new Date().toISOString(),
+                        })
+                        .eq('id', post.id)
+
+                      console.log(`[Distribution] Updated post ${post.id} (${post.platform}) from ${post.status} to ${newStatus}`)
+                      
+                      // Re-check all posts after update
+                      const { data: updatedPosts } = await supabase
+                        .from('scheduled_posts')
+                        .select('status')
+                        .eq('video_id', item.video_id)
+                      
+                      if (updatedPosts) {
+                        const allNowPosted = updatedPosts.every((p: any) => p.status === 'posted')
+                        const allNowFailed = updatedPosts.every((p: any) => p.status === 'failed')
+                        
+                        if (allNowPosted && item.status !== 'posted') {
+                          await supabase
+                            .from('video_plan_items')
+                            .update({ status: 'posted' })
+                            .eq('id', item.id)
+                          console.log(`[Distribution] ✅ Updated item ${item.id} status to 'posted' - all posts completed`)
+                        } else if (allNowFailed && item.status !== 'failed') {
+                          await supabase
+                            .from('video_plan_items')
+                            .update({ status: 'failed', error_message: 'All posts failed' })
+                            .eq('id', item.id)
+                          console.log(`[Distribution] ❌ Updated item ${item.id} status to 'failed' - all posts failed`)
+                        }
+                      }
+                    }
+                  }
+                } catch (statusError: any) {
+                  console.error(`[Distribution] Error checking upload status for post ${post.id}:`, statusError.message)
+                }
+              }
+            }
+            
+            // Update item status to 'scheduled' if it has pending posts and scheduled time is in future
+            if (item.status === 'completed' && item.scheduled_date && item.scheduled_time) {
+              const now = new Date()
+              const planTimezone = (item.plan as any).timezone || 'UTC'
+              
+              const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+                timeZone: planTimezone,
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+              })
+              const hourFormatter = new Intl.DateTimeFormat('en-US', {
+                timeZone: planTimezone,
+                hour: '2-digit',
+                hour12: false,
+              })
+              const minuteFormatter = new Intl.DateTimeFormat('en-US', {
+                timeZone: planTimezone,
+                minute: '2-digit',
+                hour12: false,
+              })
+              
+              const today = dateFormatter.format(now)
+              const currentHour = parseInt(hourFormatter.format(now), 10)
+              const currentMinute = parseInt(minuteFormatter.format(now), 10)
+              
+              const [postHours, postMinutes] = item.scheduled_time.split(':')
+              const postHour = parseInt(postHours, 10)
+              const postMinute = parseInt(postMinutes || '0', 10)
+              
+              const postMinutesTotal = postHour * 60 + postMinute
+              const currentMinutesTotal = currentHour * 60 + currentMinute
+              const timeDiffMinutes = (item.scheduled_date === today) 
+                ? (postMinutesTotal - currentMinutesTotal)
+                : (item.scheduled_date < today ? -999999 : 999999)
+              
+              // If scheduled time is in the future and we have scheduled posts, update status to 'scheduled'
+              if (timeDiffMinutes > 1 && item.scheduled_date >= today) {
+                await supabase
+                  .from('video_plan_items')
+                  .update({ status: 'scheduled' })
+                  .eq('id', item.id)
+                console.log(`[Distribution] Updated item ${item.id} status to 'scheduled' - posts scheduled for future`)
+              }
+            }
+          }
+        } catch (error: any) {
+          console.error(`[Distribution] Error checking status for item ${item.id}:`, error)
+        }
+      }
+    }
+
+    // Now get items with completed videos that don't have scheduled posts yet
     const { data: items } = await supabase
       .from('video_plan_items')
       .select('*, plan:video_plans!inner(enabled, user_id, default_platforms), videos(*)')

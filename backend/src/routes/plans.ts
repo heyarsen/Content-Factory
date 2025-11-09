@@ -445,4 +445,173 @@ router.post('/items/:id/create-video', authenticate, async (req: AuthRequest, re
   }
 })
 
+// Refresh posting status for a plan item (check scheduled posts and update status)
+router.post('/items/:id/refresh-status', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { id } = req.params
+
+    // Get the plan item
+    const { data: item } = await supabase
+      .from('video_plan_items')
+      .select('*, plan:video_plans!inner(user_id), videos(*)')
+      .eq('id', id)
+      .single()
+
+    if (!item || (item.plan as any).user_id !== userId) {
+      return res.status(404).json({ error: 'Plan item not found' })
+    }
+
+    // Check scheduled posts for this video
+    const { data: posts } = await supabase
+      .from('scheduled_posts')
+      .select('*')
+      .eq('video_id', item.video_id)
+      .order('created_at', { ascending: false })
+
+    console.log(`[Status Refresh] Item ${id} has ${posts?.length || 0} scheduled post(s)`)
+
+    let statusUpdated = false
+    let newStatus = item.status
+
+    if (!posts || posts.length === 0) {
+      // No posts - if video is completed and scheduled time has passed, it should be posted
+      if (item.status === 'completed' && item.video_id && item.scheduled_date && item.scheduled_time) {
+        // Check if it's time to post
+        const now = new Date()
+        const planTimezone = (item.plan as any).timezone || 'UTC'
+        
+        const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+          timeZone: planTimezone,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        })
+        const hourFormatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: planTimezone,
+          hour: '2-digit',
+          hour12: false,
+        })
+        const minuteFormatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: planTimezone,
+          minute: '2-digit',
+          hour12: false,
+        })
+        
+        const today = dateFormatter.format(now)
+        const currentHour = parseInt(hourFormatter.format(now), 10)
+        const currentMinute = parseInt(minuteFormatter.format(now), 10)
+        
+        const [postHours, postMinutes] = item.scheduled_time.split(':')
+        const postHour = parseInt(postHours, 10)
+        const postMinute = parseInt(postMinutes || '0', 10)
+        
+        const postMinutesTotal = postHour * 60 + postMinute
+        const currentMinutesTotal = currentHour * 60 + currentMinute
+        const timeDiffMinutes = (item.scheduled_date === today) 
+          ? (postMinutesTotal - currentMinutesTotal)
+          : (item.scheduled_date < today ? -999999 : 999999)
+        
+        // If scheduled time has passed, trigger posting
+        if (timeDiffMinutes <= 1 && item.scheduled_date <= today) {
+          console.log(`[Status Refresh] Item ${id} scheduled time passed, triggering posting...`)
+          // Trigger the distribution service
+          await AutomationService.scheduleDistributionForCompletedVideos()
+          statusUpdated = true
+        }
+      }
+    } else {
+      // Check post statuses
+      const allPosted = posts.every((p: any) => p.status === 'posted')
+      const allFailed = posts.every((p: any) => p.status === 'failed')
+      const anyPending = posts.some((p: any) => p.status === 'pending' || p.status === 'scheduled')
+
+      console.log(`[Status Refresh] Post statuses: allPosted=${allPosted}, allFailed=${allFailed}, anyPending=${anyPending}`)
+
+      // Check status of pending posts via Upload-Post API
+      if (anyPending) {
+        const { getUploadStatus } = await import('../lib/uploadpost.js')
+        for (const post of posts) {
+          if ((post.status === 'pending' || post.status === 'scheduled') && post.upload_post_id) {
+            try {
+              const uploadStatus = await getUploadStatus(post.upload_post_id)
+              const platformResult = uploadStatus.results?.find((r: any) => r.platform === post.platform)
+
+              if (platformResult) {
+                const newPostStatus = platformResult.status === 'success' ? 'posted' :
+                                     platformResult.status === 'failed' ? 'failed' :
+                                     'pending'
+
+                if (newPostStatus !== post.status) {
+                  await supabase
+                    .from('scheduled_posts')
+                    .update({
+                      status: newPostStatus,
+                      posted_at: newPostStatus === 'posted' ? new Date().toISOString() : post.posted_at,
+                      error_message: platformResult.error || null,
+                      updated_at: new Date().toISOString(),
+                    })
+                    .eq('id', post.id)
+
+                  console.log(`[Status Refresh] Updated post ${post.id} (${post.platform}) from ${post.status} to ${newPostStatus}`)
+                }
+              }
+            } catch (error: any) {
+              console.error(`[Status Refresh] Error checking upload status for post ${post.id}:`, error.message)
+            }
+          }
+        }
+
+        // Re-fetch posts after updates
+        const { data: updatedPosts } = await supabase
+          .from('scheduled_posts')
+          .select('status')
+          .eq('video_id', item.video_id)
+
+        if (updatedPosts) {
+          const allNowPosted = updatedPosts.every((p: any) => p.status === 'posted')
+          const allNowFailed = updatedPosts.every((p: any) => p.status === 'failed')
+
+          if (allNowPosted) {
+            newStatus = 'posted'
+          } else if (allNowFailed) {
+            newStatus = 'failed'
+          }
+        }
+      } else if (allPosted) {
+        newStatus = 'posted'
+      } else if (allFailed) {
+        newStatus = 'failed'
+      }
+
+      // Update item status if it changed
+      if (newStatus !== item.status) {
+        await supabase
+          .from('video_plan_items')
+          .update({ status: newStatus })
+          .eq('id', id)
+        statusUpdated = true
+        console.log(`[Status Refresh] Updated item ${id} status from '${item.status}' to '${newStatus}'`)
+      }
+    }
+
+    // Return updated item
+    const { data: updatedItem } = await supabase
+      .from('video_plan_items')
+      .select('*, plan:video_plans!inner(user_id), videos(*)')
+      .eq('id', id)
+      .single()
+
+    return res.json({
+      item: updatedItem,
+      statusUpdated,
+      posts: posts || [],
+      message: statusUpdated ? `Status updated to '${newStatus}'` : `Status is '${item.status}' (no change)`,
+    })
+  } catch (error: any) {
+    console.error('Refresh status error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to refresh status' })
+  }
+})
+
 export default router
