@@ -6,6 +6,7 @@ This guide will help you set up the video planning tables in your Supabase datab
 
 1. `database/migrations/002_video_plans_tables.sql` - Creates the base video_plans and video_plan_items tables
 2. `database/migrations/003_add_automation_fields.sql` - Adds automation fields to existing tables (safe to run if tables already exist)
+3. `database/migrations/007_add_avatar_to_plan_items.sql` - Adds avatar_id column to video_plan_items table (optional, but recommended if using avatars)
 
 ## Steps to Run Migrations
 
@@ -16,6 +17,7 @@ This guide will help you set up the video planning tables in your Supabase datab
 3. Copy and paste the contents of `database/migrations/002_video_plans_tables.sql`
 4. Click **Run** to execute
 5. Repeat for `database/migrations/003_add_automation_fields.sql`
+6. (Optional) Run `database/migrations/007_add_avatar_to_plan_items.sql` if you want to use avatars with plan items
 
 ### Option 2: Using Supabase CLI
 
@@ -60,12 +62,21 @@ This error occurs when:
 
 ### Error: "column already exists"
 
-This is normal when running `003_add_automation_fields.sql` on tables that already have some fields. The migration uses `IF NOT EXISTS` checks, so it's safe to run multiple times.
+This is normal when running `003_add_automation_fields.sql` or `007_add_avatar_to_plan_items.sql` on tables that already have some fields. The migrations use `IF NOT EXISTS` checks, so it's safe to run multiple times.
+
+### Error: "Could not find the 'avatar_id' column" (PGRST204)
+
+This error occurs when the `avatar_id` column doesn't exist in the `video_plan_items` table. The application will work without this column, but if you want to use avatars with plan items, you should run migration `007_add_avatar_to_plan_items.sql`.
+
+**Solution:**
+1. Run the migration file `database/migrations/007_add_avatar_to_plan_items.sql` in the Supabase SQL Editor
+2. The application code will automatically handle this gracefully if the column doesn't exist (it will skip avatar_id when inserting items)
 
 ## Production Checklist
 
 - [ ] Run migration 002 to create base tables
 - [ ] Run migration 003 to add automation fields
+- [ ] (Optional) Run migration 007 to add avatar_id column if using avatars
 - [ ] Verify RLS policies are active
 - [ ] Test creating a plan via the UI
 - [ ] Verify indexes are created for performance

@@ -291,7 +291,14 @@ export class PlanService {
         const timeSlot = timeSlots[i]
         const customTopic = customTopics && customTopics[i] ? customTopics[i].trim() : null
         const customCategory = customCategories && customCategories[i] ? customCategories[i] : null
-        const avatarId = avatarIds && avatarIds[i] ? avatarIds[i] : null
+        // Extract avatarId, ensuring it's a valid non-empty string or null
+        let avatarId: string | null = null
+        if (avatarIds && avatarIds[i]) {
+          const rawAvatarId = avatarIds[i]
+          if (typeof rawAvatarId === 'string' && rawAvatarId.trim().length > 0) {
+            avatarId = rawAvatarId.trim()
+          }
+        }
         
         // Determine initial status and topic
         let status: string = 'pending'
@@ -306,7 +313,9 @@ export class PlanService {
         }
         
         try {
-          const insertData = {
+          // Build insert data object, only including avatar_id if it's provided
+          // This makes the code work even if the avatar_id column doesn't exist yet
+          const insertData: any = {
             plan_id: planId,
             scheduled_date: currentDateStr, // Use date string directly
             scheduled_time: timeSlot,
@@ -314,7 +323,13 @@ export class PlanService {
             category: category,
             status: status,
             platforms: plan.default_platforms || null,
-            avatar_id: avatarId,
+          }
+          
+          // Only include avatar_id if it's provided and not empty
+          // This prevents errors if the column doesn't exist in the database
+          // Check if avatarId is a non-empty string
+          if (avatarId && typeof avatarId === 'string' && avatarId.trim().length > 0) {
+            insertData.avatar_id = avatarId.trim()
           }
           
           console.log(`[Plan Service] Inserting item:`, {
@@ -325,14 +340,31 @@ export class PlanService {
             category: category || 'null',
             status,
             platforms: plan.default_platforms,
-            avatar_id: avatarId || 'null',
+            avatar_id: avatarId || 'null (not included)',
           })
           
-          const { data: item, error } = await supabase
+          let { data: item, error } = await supabase
             .from('video_plan_items')
             .insert(insertData)
             .select()
             .single()
+
+          // If error is about avatar_id column not existing, retry without it
+          if (error && error.message && error.message.includes('avatar_id') && error.code === 'PGRST204') {
+            console.warn(`[Plan Service] ⚠️ avatar_id column doesn't exist in database, retrying without it`)
+            // Remove avatar_id from insert data and retry
+            const insertDataWithoutAvatar = { ...insertData }
+            delete insertDataWithoutAvatar.avatar_id
+            
+            const retryResult = await supabase
+              .from('video_plan_items')
+              .insert(insertDataWithoutAvatar)
+              .select()
+              .single()
+            
+            item = retryResult.data
+            error = retryResult.error
+          }
 
           if (error) {
             console.error(`[Plan Service] ❌ ERROR creating item for ${currentDateStr} at ${timeSlot}:`, error)
