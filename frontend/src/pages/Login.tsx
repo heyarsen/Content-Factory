@@ -39,10 +39,22 @@ export function Login() {
       navigate('/dashboard')
     } catch (err: any) {
       console.error('Login error:', err)
+      console.error('Login error details:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        url: err.config?.url,
+        baseURL: err.config?.baseURL,
+        fullURL: err.config?.url ? `${err.config.baseURL}${err.config.url}` : 'unknown',
+      })
+      
       // Extract error message from various possible error formats
       let errorMessage = 'Failed to sign in'
       if (err.response?.data?.error) {
         errorMessage = err.response.data.error
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message
       } else if (err.message) {
         errorMessage = err.message
       } else if (err.request && !err.response) {
@@ -52,6 +64,16 @@ export function Login() {
       } else if (err.code === 'ERR_NETWORK') {
         errorMessage = 'Network error. Please check your internet connection and ensure the backend server is running.'
       }
+      
+      // Add more context for 401 errors
+      if (err.response?.status === 401) {
+        if (!errorMessage || errorMessage === 'Request failed with status code 401') {
+          errorMessage = 'Invalid email or password. Please check your credentials and try again.'
+        }
+        // Log the actual backend error for debugging
+        console.error('401 Unauthorized - Backend response:', err.response?.data)
+      }
+      
       setError(errorMessage)
       // Don't clear password on error - keep it so user can see what they typed
     } finally {

@@ -15,11 +15,20 @@ export const apiLimiter = rateLimit({
 
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // limit each IP to 5 requests per windowMs
+  max: 10, // limit each IP to 10 requests per windowMs (increased to reduce false positives)
   message: 'Too many authentication requests, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
   validate: {
     trustProxy: false,
     xForwardedForHeader: false,
+  },
+  // Custom handler to return proper JSON response
+  handler: (req, res) => {
+    res.status(429).json({ 
+      error: 'Too many authentication requests, please try again later.',
+      message: 'You have made too many login attempts. Please wait 15 minutes before trying again.',
+    })
   },
 })
 

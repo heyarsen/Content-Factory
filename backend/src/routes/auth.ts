@@ -55,6 +55,14 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body
 
+    console.log(`[Auth] Login request received:`, {
+      hasEmail: !!email,
+      hasPassword: !!password,
+      email: email ? `${email.substring(0, 3)}***` : 'missing',
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    })
+
     if (!email || !password) {
       console.log('[Auth] Login failed: Missing email or password')
       return res.status(400).json({ error: 'Email and password are required' })
@@ -62,7 +70,7 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
 
     console.log(`[Auth] Login attempt for email: ${email}`)
     console.log(`[Auth] Supabase URL: ${process.env.SUPABASE_URL ? 'Set' : 'Missing'}`)
-    console.log(`[Auth] Service role key: ${process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Set' : 'Missing'}`)
+    console.log(`[Auth] Service role key: ${process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Set (length: ' + process.env.SUPABASE_SERVICE_ROLE_KEY.length + ')' : 'Missing'}`)
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -74,21 +82,34 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
         message: error.message,
         status: error.status,
         name: error.name,
+        code: (error as any).code,
+        fullError: JSON.stringify(error, null, 2),
       })
       
       // Provide more user-friendly error messages
       let errorMessage = error.message
-      if (error.message.includes('Invalid login credentials') || error.message.includes('Invalid credentials')) {
-        errorMessage = 'Invalid email or password'
-      } else if (error.message.includes('Email not confirmed') || error.message.includes('email not confirmed')) {
+      if (error.message.includes('Invalid login credentials') || 
+          error.message.includes('Invalid credentials') ||
+          error.message.includes('invalid_credentials')) {
+        errorMessage = 'Invalid email or password. Please check your credentials and try again.'
+      } else if (error.message.includes('Email not confirmed') || 
+                 error.message.includes('email not confirmed') ||
+                 error.message.includes('email_not_confirmed')) {
         errorMessage = 'Please verify your email before signing in. Check your inbox for a verification link.'
-      } else if (error.message.includes('rate limit') || error.message.includes('Rate limit')) {
+      } else if (error.message.includes('rate limit') || 
+                 error.message.includes('Rate limit') ||
+                 error.message.includes('too_many_requests')) {
         errorMessage = 'Too many login attempts. Please try again in a few minutes.'
-      } else if (error.message.includes('network') || error.message.includes('fetch')) {
+      } else if (error.message.includes('network') || 
+                 error.message.includes('fetch') ||
+                 error.message.includes('Failed to fetch')) {
         errorMessage = 'Unable to connect to authentication service. Please check your connection and try again.'
       }
       
-      return res.status(401).json({ error: errorMessage })
+      return res.status(401).json({ 
+        error: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      })
     }
 
     if (!data.session) {
