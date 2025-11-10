@@ -265,6 +265,7 @@ export class AutomationService {
                     .from('video_plan_items')
                     .update({ status: 'generating' })
                     .eq('id', item.id)
+                    .eq('status', 'approved')
                     .is('video_id', null) // CRITICAL: Only update if video_id is still null
                     .select()
                   
@@ -290,6 +291,7 @@ export class AutomationService {
                     style: 'professional',
                     duration: 30,
                     avatar_id: avatarId, // Can be undefined - will fall back to default
+                    plan_item_id: item.id,
                   })
                   
                   // ATOMIC UPDATE: Set video_id and keep status as 'generating'
@@ -374,6 +376,7 @@ export class AutomationService {
             updated_at: new Date().toISOString()
           })
           .eq('id', item.id)
+          .eq('status', 'approved')
           .is('video_id', null) // CRITICAL: Only update if video_id is still null
           .select()
 
@@ -419,6 +422,7 @@ export class AutomationService {
           style: 'professional',
           duration: 30,
           avatar_id: avatarId, // Can be undefined - will fall back to default avatar
+          plan_item_id: item.id,
         })
 
         console.log(`[Video Generation] Video created with ID: ${video.id}, topic: "${video.topic}"`)
@@ -781,6 +785,7 @@ export class AutomationService {
           .from('video_plan_items')
           .update({ status: 'generating' })
           .eq('id', item.id)
+          .eq('status', 'approved')
           .is('video_id', null) // CRITICAL: Only update if video_id is still null
               .select()
 
@@ -817,6 +822,7 @@ export class AutomationService {
           style: 'professional',
           duration: 30,
           avatar_id: avatarId, // Can be undefined - will fall back to default avatar
+          plan_item_id: item.id,
         })
 
             // ATOMIC UPDATE: Set video_id and keep status as 'generating' until video is ready
@@ -1761,6 +1767,7 @@ export class AutomationService {
       .from('video_plan_items')
       .update({ status: 'generating' })
       .eq('id', itemId)
+      .eq('status', 'approved')
       .is('video_id', null) // CRITICAL: Only update if video_id is still null
       .select()
 
@@ -1779,6 +1786,7 @@ export class AutomationService {
       style: 'professional',
       duration: 30,
       avatar_id: avatarId, // Can be undefined - will fall back to default avatar
+      plan_item_id: item.id,
     })
 
     // ATOMIC UPDATE: Set video_id and keep status as 'generating' until video is ready

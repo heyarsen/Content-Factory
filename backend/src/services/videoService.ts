@@ -26,6 +26,7 @@ export interface ManualVideoInput {
   style?: VideoStyle
   duration?: number
   avatar_id?: string | null
+  plan_item_id?: string | null
   output_resolution?: string
   generate_caption?: boolean
 }
@@ -123,7 +124,8 @@ async function runHeygenGeneration(
   video: Video,
   avatarId?: string,
   isPhotoAvatar: boolean = false,
-  outputResolution: string = DEFAULT_HEYGEN_RESOLUTION
+  outputResolution: string = DEFAULT_HEYGEN_RESOLUTION,
+  planItemId?: string | null
 ): Promise<void> {
   try {
     if (!avatarId) {
@@ -156,6 +158,15 @@ async function runHeygenGeneration(
     
     const response = await requestHeygenVideo(payload)
     await applyManualGenerationSuccess(video.id, response)
+    if (planItemId) {
+      await supabase
+        .from('video_plan_items')
+        .update({
+          status: mapHeygenStatus(response.status),
+          error_message: null,
+        })
+        .eq('id', planItemId)
+    }
   } catch (error: any) {
     console.error('HeyGen generation error:', error)
     
@@ -180,6 +191,16 @@ async function runHeygenGeneration(
     
     const enhancedError = new Error(errorMessage)
     await applyManualGenerationFailure(video.id, enhancedError)
+    if (planItemId) {
+      await supabase
+        .from('video_plan_items')
+        .update({
+          status: 'failed',
+          error_message: errorMessage,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', planItemId)
+    }
   }
 }
 
@@ -250,7 +271,13 @@ export class VideoService {
     
     const video = await this.createVideoRecord(userId, input, avatarRecordId)
     const outputResolution = input.output_resolution || DEFAULT_HEYGEN_RESOLUTION
-    void runHeygenGeneration(video, avatarId, isPhotoAvatar, outputResolution)
+    void runHeygenGeneration(
+      video,
+      avatarId,
+      isPhotoAvatar,
+      outputResolution,
+      input.plan_item_id || null
+    )
     return video
   }
 

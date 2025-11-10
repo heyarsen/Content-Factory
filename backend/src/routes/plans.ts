@@ -400,10 +400,19 @@ router.post('/items/:id/create-video', authenticate, async (req: AuthRequest, re
     }
 
     // Update status
-    await supabase
+    const claimResult = await supabase
       .from('video_plan_items')
       .update({ status: 'generating' })
       .eq('id', id)
+      .eq('status', 'approved')
+      .is('video_id', null)
+      .select()
+
+    if (!claimResult.data || claimResult.data.length === 0) {
+      return res.status(409).json({
+        error: 'Video is already being generated or has been generated for this plan item.',
+      })
+    }
 
     // Create video using existing endpoint logic
     const { VideoService } = await import('../services/videoService.js')
@@ -413,6 +422,7 @@ router.post('/items/:id/create-video', authenticate, async (req: AuthRequest, re
       script: item.script!,
       style: style || 'professional',
       duration: duration || 30,
+      plan_item_id: id,
     })
 
     // Update plan item with video
