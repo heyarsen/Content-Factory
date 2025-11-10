@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -26,6 +26,7 @@ import {
 
 export function Videos() {
   const { addNotification } = useNotifications()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [videos, setVideos] = useState<VideoRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -55,6 +56,67 @@ export function Videos() {
   useEffect(() => {
     loadVideos()
   }, [loadVideos])
+
+  // Handle videoId query parameter - open video modal if videoId is in URL
+  useEffect(() => {
+    const videoId = searchParams.get('videoId')
+    if (videoId && !loading && !loadingVideo) {
+      // Check if video is already selected with this ID
+      if (selectedVideo?.id === videoId) {
+        // Already showing this video, just clean up URL
+        setSearchParams({}, { replace: true })
+        return
+      }
+      
+      // Try to find video in current list first
+      const video = videos.find(v => v.id === videoId)
+      if (video) {
+        // Video found in list, load details and show modal
+        setLoadingVideo(true)
+        getVideo(videoId)
+          .then((videoData) => {
+            setSelectedVideo(videoData)
+            // Remove videoId from URL to clean it up
+            setSearchParams({}, { replace: true })
+          })
+          .catch((error) => {
+            console.error('Failed to load video details:', error)
+            addNotification({
+              type: 'error',
+              title: 'Video Not Found',
+              message: 'The requested video could not be found.',
+            })
+            // Remove videoId from URL even on error
+            setSearchParams({}, { replace: true })
+          })
+          .finally(() => {
+            setLoadingVideo(false)
+          })
+      } else {
+        // Video not in current list, try to load it directly (might be filtered out or list might be empty)
+        setLoadingVideo(true)
+        getVideo(videoId)
+          .then((videoData) => {
+            setSelectedVideo(videoData)
+            // Remove videoId from URL to clean it up
+            setSearchParams({}, { replace: true })
+          })
+          .catch((error) => {
+            console.error('Failed to load video details:', error)
+            addNotification({
+              type: 'error',
+              title: 'Video Not Found',
+              message: 'The requested video could not be found. It may have been deleted or you may not have permission to view it.',
+            })
+            // Remove videoId from URL even on error
+            setSearchParams({}, { replace: true })
+          })
+          .finally(() => {
+            setLoadingVideo(false)
+          })
+      }
+    }
+  }, [searchParams, videos, selectedVideo, loading, loadingVideo, setSearchParams, addNotification])
 
   useEffect(() => {
     // Poll for status updates on generating videos with rate limit handling

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -92,6 +93,7 @@ interface ScheduledPost {
 }
 
 export function VideoPlanning() {
+  const navigate = useNavigate()
   const [plans, setPlans] = useState<VideoPlan[]>([])
   const [selectedPlan, setSelectedPlan] = useState<VideoPlan | null>(null)
   const [planItems, setPlanItems] = useState<VideoPlanItem[]>([])
@@ -1447,6 +1449,20 @@ export function VideoPlanning() {
                                     )}
                                   </div>
                                 </div>
+                                <div className="flex flex-wrap gap-2">
+                                  {item.video_id && (
+                                    <Button
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        navigate(`/videos?videoId=${item.video_id}`)
+                                      }}
+                                      className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-600"
+                                    >
+                                      View Video
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
                             </Card>
                           )
@@ -1769,12 +1785,16 @@ export function VideoPlanning() {
                                 <Loader className="h-4 w-4 animate-spin text-brand-500" />
                               ) : null}
                               {item.video_id && (
-                                <a
-                                  href={`/videos`}
+                                <Button
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    navigate(`/videos?videoId=${item.video_id}`)
+                                  }}
                                   className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-600"
                                 >
                                   View Video
-                                </a>
+                                </Button>
                               )}
                             </div>
                           </div>
@@ -2743,7 +2763,7 @@ export function VideoPlanning() {
                     <Button
                       variant="secondary"
                       size="sm"
-                      onClick={() => window.open(`/videos`, '_blank')}
+                      onClick={() => navigate(`/videos?videoId=${selectedItem.video_id}`)}
                       leftIcon={<ExternalLink className="h-4 w-4" />}
                     >
                       View Video
