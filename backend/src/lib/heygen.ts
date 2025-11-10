@@ -10,6 +10,11 @@ function getHeyGenKey(): string {
   return key
 }
 
+const DEFAULT_HEYGEN_RESOLUTION =
+  process.env.HEYGEN_OUTPUT_RESOLUTION && process.env.HEYGEN_OUTPUT_RESOLUTION.trim().length > 0
+    ? process.env.HEYGEN_OUTPUT_RESOLUTION.trim()
+    : '720p'
+
 export interface GenerateVideoRequest {
   topic: string
   script?: string
@@ -18,6 +23,7 @@ export interface GenerateVideoRequest {
   avatar_id?: string
   talking_photo_id?: string // For photo avatars
   template_id?: string
+  output_resolution?: string
 }
 
 export interface HeyGenVideoResponse {
@@ -230,6 +236,10 @@ export async function generateVideo(
   try {
     const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
     const apiKey = getHeyGenKey()
+    const outputResolution =
+      request.output_resolution && request.output_resolution.trim().length > 0
+        ? request.output_resolution.trim()
+        : DEFAULT_HEYGEN_RESOLUTION
     
     // Always use v2 API - https://docs.heygen.com/reference/create-an-avatar-video-v2
     // Build payload with video_inputs array format
@@ -244,6 +254,12 @@ export async function generateVideo(
           },
         },
       ],
+    }
+
+    if (outputResolution) {
+      payload.video_config = {
+        output_resolution: outputResolution,
+      }
     }
 
     // Determine if this is a photo avatar (talking_photo) or regular avatar
@@ -302,17 +318,52 @@ export async function generateVideo(
       payload: JSON.stringify(payload, null, 2),
     })
     
-    const response = await axios.post(
-      requestUrl,
-      payload,
-      {
-        headers: {
-          'X-Api-Key': apiKey,
-          'Content-Type': 'application/json',
-        },
-        timeout: 30000,
+    let response
+    try {
+      response = await axios.post(
+        requestUrl,
+        payload,
+        {
+          headers: {
+            'X-Api-Key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          timeout: 30000,
+        }
+      )
+    } catch (err: any) {
+      const errorStatus = err?.response?.status
+      const errorMessage = err?.response?.data?.message || err?.response?.data?.error
+      const shouldRetryWithoutConfig =
+        !!payload.video_config &&
+        errorStatus === 400 &&
+        errorMessage &&
+        typeof errorMessage === 'string' &&
+        (errorMessage.toLowerCase().includes('output_resolution') ||
+          errorMessage.toLowerCase().includes('video_config') ||
+          errorMessage.toLowerCase().includes('resolution'))
+
+      if (shouldRetryWithoutConfig) {
+        console.warn(
+          '[HeyGen] Output resolution not supported, retrying without video_config:',
+          err.response?.data
+        )
+        delete payload.video_config
+        response = await axios.post(
+          requestUrl,
+          payload,
+          {
+            headers: {
+              'X-Api-Key': apiKey,
+              'Content-Type': 'application/json',
+            },
+            timeout: 30000,
+          }
+        )
+      } else {
+        throw err
       }
-    )
+    }
 
     console.log('HeyGen v2 API response:', {
       status: response.status,

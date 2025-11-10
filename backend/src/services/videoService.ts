@@ -15,12 +15,18 @@ const DEFAULT_REEL_DURATION = 30
 
 type VideoStyle = Video['style']
 
+const DEFAULT_HEYGEN_RESOLUTION =
+  process.env.HEYGEN_OUTPUT_RESOLUTION && process.env.HEYGEN_OUTPUT_RESOLUTION.trim().length > 0
+    ? process.env.HEYGEN_OUTPUT_RESOLUTION.trim()
+    : '720p'
+
 export interface ManualVideoInput {
   topic: string
   script?: string
   style?: VideoStyle
   duration?: number
   avatar_id?: string | null
+  output_resolution?: string
   generate_caption?: boolean
 }
 
@@ -42,14 +48,28 @@ function mapHeygenStatus(status: string): Video['status'] {
   return 'generating'
 }
 
-function buildHeygenPayload(topic: string, script: string | undefined, style: VideoStyle, duration: number, avatarId?: string, isPhotoAvatar: boolean = false) {
-  return {
+function buildHeygenPayload(
+  topic: string,
+  script: string | undefined,
+  style: VideoStyle,
+  duration: number,
+  avatarId?: string,
+  isPhotoAvatar: boolean = false,
+  outputResolution: string = DEFAULT_HEYGEN_RESOLUTION
+) {
+  const payload: any = {
     topic,
     script: script || topic,
     style,
     duration,
     ...(isPhotoAvatar ? { talking_photo_id: avatarId } : { avatar_id: avatarId }),
   }
+
+  if (outputResolution) {
+    payload.output_resolution = outputResolution
+  }
+
+  return payload
 }
 
 async function applyManualGenerationSuccess(videoId: string, response: HeyGenVideoResponse): Promise<void> {
@@ -99,19 +119,28 @@ async function applyManualGenerationFailure(videoId: string, error: Error): Prom
   }
 }
 
-async function runHeygenGeneration(video: Video, avatarId?: string, isPhotoAvatar: boolean = false): Promise<void> {
+async function runHeygenGeneration(
+  video: Video,
+  avatarId?: string,
+  isPhotoAvatar: boolean = false,
+  outputResolution: string = DEFAULT_HEYGEN_RESOLUTION
+): Promise<void> {
   try {
     if (!avatarId) {
       throw new Error('No avatar available. Please configure an avatar in your settings.')
     }
     
     // Build payload with proper avatar type
-    const payload = {
+    const payload: any = {
       topic: video.topic,
       script: video.script || undefined,
       style: video.style,
       duration: video.duration,
       ...(isPhotoAvatar ? { talking_photo_id: avatarId } : { avatar_id: avatarId }),
+    }
+
+    if (outputResolution) {
+      payload.output_resolution = outputResolution
     }
     
     console.log('Calling HeyGen API with payload:', {
@@ -122,6 +151,7 @@ async function runHeygenGeneration(video: Video, avatarId?: string, isPhotoAvata
       scriptLength: payload.script?.length,
       style: payload.style,
       duration: payload.duration,
+      outputResolution,
     })
     
     const response = await requestHeygenVideo(payload)
@@ -219,7 +249,8 @@ export class VideoService {
     }
     
     const video = await this.createVideoRecord(userId, input, avatarRecordId)
-    void runHeygenGeneration(video, avatarId, isPhotoAvatar)
+    const outputResolution = input.output_resolution || DEFAULT_HEYGEN_RESOLUTION
+    void runHeygenGeneration(video, avatarId, isPhotoAvatar, outputResolution)
     return video
   }
 
@@ -410,7 +441,15 @@ export class VideoService {
       }
 
       // Build payload with avatar
-      const payload = buildHeygenPayload(reel.topic, reel.script, DEFAULT_REEL_STYLE, DEFAULT_REEL_DURATION, avatarId, isPhotoAvatar)
+      const payload = buildHeygenPayload(
+        reel.topic,
+        reel.script,
+        DEFAULT_REEL_STYLE,
+        DEFAULT_REEL_DURATION,
+        avatarId,
+        isPhotoAvatar,
+        DEFAULT_HEYGEN_RESOLUTION
+      )
       
       console.log(`[Reel Video] Generating video for reel with avatar:`, {
         topic: reel.topic,

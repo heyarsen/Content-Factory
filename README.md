@@ -49,6 +49,7 @@ A production-ready SaaS platform for AI-powered video generation with social med
    SUPABASE_URL=your_supabase_url
    SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
    HEYGEN_KEY=your_heygen_api_key
+HEYGEN_OUTPUT_RESOLUTION=720p
    UPLOADPOST_KEY=your_upload_post_api_key
    CORS_ORIGIN=http://localhost:5173
    ```
@@ -154,6 +155,7 @@ CREATE POLICY "Users can delete own scheduled posts" ON scheduled_posts FOR DELE
    - `SUPABASE_URL`
    - `SUPABASE_SERVICE_ROLE_KEY`
    - `HEYGEN_KEY`
+   - `HEYGEN_OUTPUT_RESOLUTION` (optional, default `720p`)
    - `UPLOADPOST_KEY`
    - `CORS_ORIGIN` (your frontend URL - e.g., `https://your-frontend.vercel.app`)
    - `NODE_ENV=production`

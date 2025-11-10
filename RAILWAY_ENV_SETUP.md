@@ -27,6 +27,7 @@ UPLOADPOST_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImluZm9zcG9sb2su
 ### HeyGen API
 ```
 HEYGEN_KEY=your_heygen_api_key_here
+HEYGEN_OUTPUT_RESOLUTION=720p
 ```
 
 ### Server Configuration
@@ -53,6 +54,7 @@ SUPABASE_SERVICE_ROLE_KEY=<get from Supabase Dashboard - Settings > API > servic
 SUPABASE_ANON_KEY=<get from Supabase Dashboard - Settings > API > anon public>
 UPLOADPOST_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImluZm9zcG9sb2sub2ZmaWNlQGdtYWlsLmNvbSIsImV4cCI6NDkxMjQzMzIxNiwianRpIjoiNDA2NDI2ZTUtNWUxNi00Mjc5LThmYzQtZDUzMDlhNTQwNzIwIn0.EylwU51ZDhLFIXBL6hf49pdxCLAiwTY6tf_SW-6FktA
 HEYGEN_KEY=<add your key>
+HEYGEN_OUTPUT_RESOLUTION=720p
 NODE_ENV=production
 CORS_ORIGIN=https://your-frontend-url.vercel.app
 ```

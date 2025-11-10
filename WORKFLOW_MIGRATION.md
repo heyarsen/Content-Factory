@@ -25,6 +25,7 @@ Add these to your `.env` file:
 OPENAI_API_KEY=your_openai_key
 PERPLEXITY_API_KEY=your_perplexity_key
 HEYGEN_KEY=your_heygen_key (already exists)
+HEYGEN_OUTPUT_RESOLUTION=720p
 UPLOADPOST_KEY=your_uploadpost_key (already exists)
 ```
 
