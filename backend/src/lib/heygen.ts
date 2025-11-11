@@ -1,9 +1,6 @@
 import axios from 'axios'
 
 const HEYGEN_API_URL = 'https://api.heygen.com/v1'
-// Last-resort fallback voice ID to ensure requests can proceed without config.
-// Replace this with a preferred voice later if needed.
-const BUILTIN_FALLBACK_HEYGEN_VOICE_ID = 'heygen_en_us_001'
 
 function getHeyGenKey(): string {
   const key = process.env.HEYGEN_KEY
@@ -79,10 +76,10 @@ async function getDefaultHeygenVoiceId(): Promise<string> {
     throw new Error('No voices returned from HeyGen')
   } catch (e: any) {
     console.error('[HeyGen] Failed to fetch default voice list:', e.response?.data || e.message)
-    // Fall back to a built-in default so generation can proceed
-    console.warn('[HeyGen] Falling back to built-in default voice id:', BUILTIN_FALLBACK_HEYGEN_VOICE_ID)
-    cachedDefaultHeygenVoiceId = BUILTIN_FALLBACK_HEYGEN_VOICE_ID
-    return cachedDefaultHeygenVoiceId
+    // Do not guess an invalid voice; require configuration
+    throw new Error(
+      'Unable to fetch default voices from HeyGen. Please set a valid HEYGEN_VOICE_ID (see List All Voices V2).'
+    )
   }
 }
 
@@ -446,8 +443,16 @@ export async function generateVideo(
     
     // Extract detailed error message
     let errorMessage = 'Failed to generate video'
+    // Map HeyGen error code 400116 (Voice not found) with actionable guidance
+    const errorCode =
+      error.response?.data?.code ||
+      error.response?.data?.error_code ||
+      error.response?.data?.error?.code
     
-    if (error.response?.status === 404) {
+    if (errorCode === 400116 || /voice not found/i.test(error.response?.data?.message || '')) {
+      errorMessage =
+        'Voice not found. Please use a valid HEYGEN_VOICE_ID from List All Voices (V2).'
+    } else if (error.response?.status === 404) {
       const avatarId = request.avatar_id || request.talking_photo_id
       errorMessage = `HeyGen API endpoint not found (404). The avatar ID "${avatarId}" may not exist or may not be accessible. Please verify the avatar ID is correct and belongs to your HeyGen account.`
     } else if (error.response?.status === 401) {
