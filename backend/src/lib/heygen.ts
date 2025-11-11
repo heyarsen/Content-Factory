@@ -296,8 +296,13 @@ export async function generateVideo(
     if (!envVoiceId) {
       envVoiceId = await getDefaultHeygenVoiceId()
     }
+    // Provide both the current and legacy fields to satisfy different validators:
+    // - voice.text.voice_id + voice.text.text (current)
+    // - voice.voice_id + voice.input_text (legacy-compatible)
     payload.video_inputs[0].voice = {
       type: 'text',
+      input_text: request.script || request.topic,
+      voice_id: envVoiceId,
       text: {
         voice_id: envVoiceId,
         text: request.script || request.topic,
