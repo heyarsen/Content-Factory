@@ -247,18 +247,22 @@ export async function generateVideo(
       video_inputs: [
         {
           character: {},
-          voice: {
-            type: 'text',
-            input_text: request.script || request.topic,
-          },
         },
       ],
     }
 
-    // Optional voice selection: use HEYGEN_VOICE_ID if provided; otherwise rely on HeyGen default
+    // Voice is required by HeyGen v2 schema under voice.text.voice_id
+    // We require a valid HeyGen voice id via env to avoid provider mismatch errors
     const envVoiceId = process.env.HEYGEN_VOICE_ID?.trim()
-    if (envVoiceId && envVoiceId.length > 0) {
-      payload.video_inputs[0].voice.voice_id = envVoiceId
+    if (!envVoiceId) {
+      throw new Error('Missing HEYGEN_VOICE_ID. Please set a valid HeyGen voice ID in HEYGEN_VOICE_ID.')
+    }
+    payload.video_inputs[0].voice = {
+      type: 'text',
+      text: {
+        voice_id: envVoiceId,
+        text: request.script || request.topic,
+      },
     }
 
     if (outputResolution) {
