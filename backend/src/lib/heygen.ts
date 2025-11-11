@@ -1,6 +1,9 @@
 import axios from 'axios'
 
 const HEYGEN_API_URL = 'https://api.heygen.com/v1'
+// Last-resort fallback voice ID to ensure requests can proceed without config.
+// Replace this with a preferred voice later if needed.
+const BUILTIN_FALLBACK_HEYGEN_VOICE_ID = 'heygen_en_us_001'
 
 function getHeyGenKey(): string {
   const key = process.env.HEYGEN_KEY
@@ -76,7 +79,10 @@ async function getDefaultHeygenVoiceId(): Promise<string> {
     throw new Error('No voices returned from HeyGen')
   } catch (e: any) {
     console.error('[HeyGen] Failed to fetch default voice list:', e.response?.data || e.message)
-    throw new Error('HEYGEN_VOICE_ID not set and default voice fetch failed. Please set HEYGEN_VOICE_ID.')
+    // Fall back to a built-in default so generation can proceed
+    console.warn('[HeyGen] Falling back to built-in default voice id:', BUILTIN_FALLBACK_HEYGEN_VOICE_ID)
+    cachedDefaultHeygenVoiceId = BUILTIN_FALLBACK_HEYGEN_VOICE_ID
+    return cachedDefaultHeygenVoiceId
   }
 }
 
