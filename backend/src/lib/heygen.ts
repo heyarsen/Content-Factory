@@ -47,6 +47,39 @@ export interface HeyGenAvatarsResponse {
   avatars: HeyGenAvatar[]
 }
 
+// Cache default voice id to avoid extra API calls
+let cachedDefaultHeygenVoiceId: string | null = null
+
+async function getDefaultHeygenVoiceId(): Promise<string> {
+  if (cachedDefaultHeygenVoiceId) return cachedDefaultHeygenVoiceId
+  const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
+  const apiKey = getHeyGenKey()
+  try {
+    // List voices - prefer HeyGen-provided voices
+    const response = await axios.get(`${HEYGEN_V2_API_URL}/voice.list`, {
+      headers: { 'X-Api-Key': apiKey, 'Content-Type': 'application/json' },
+      timeout: 15000,
+    })
+    const voices = response.data?.data?.voice_list || response.data?.data || response.data?.voice_list || []
+    if (Array.isArray(voices) && voices.length > 0) {
+      // Prefer English US or first available
+      const preferred = voices.find((v: any) =>
+        (v?.locale || '').toLowerCase().startsWith('en') ||
+        (v?.language || '').toLowerCase().includes('english')
+      ) || voices[0]
+      const vid = preferred?.id || preferred?.voice_id
+      if (vid) {
+        cachedDefaultHeygenVoiceId = String(vid)
+        return cachedDefaultHeygenVoiceId
+      }
+    }
+    throw new Error('No voices returned from HeyGen')
+  } catch (e: any) {
+    console.error('[HeyGen] Failed to fetch default voice list:', e.response?.data || e.message)
+    throw new Error('HEYGEN_VOICE_ID not set and default voice fetch failed. Please set HEYGEN_VOICE_ID.')
+  }
+}
+
 /**
  * List available avatars from HeyGen
  */
@@ -252,10 +285,10 @@ export async function generateVideo(
     }
 
     // Voice is required by HeyGen v2 schema under voice.text.voice_id
-    // We require a valid HeyGen voice id via env to avoid provider mismatch errors
-    const envVoiceId = process.env.HEYGEN_VOICE_ID?.trim()
+    // Use env voice if provided, otherwise fetch a default HeyGen voice id
+    let envVoiceId = process.env.HEYGEN_VOICE_ID?.trim()
     if (!envVoiceId) {
-      throw new Error('Missing HEYGEN_VOICE_ID. Please set a valid HeyGen voice ID in HEYGEN_VOICE_ID.')
+      envVoiceId = await getDefaultHeygenVoiceId()
     }
     payload.video_inputs[0].voice = {
       type: 'text',
