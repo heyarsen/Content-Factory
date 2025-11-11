@@ -128,6 +128,15 @@ async function runHeygenGeneration(
   planItemId?: string | null
 ): Promise<void> {
   try {
+    // Idempotency guard: if a HeyGen video was already created for this record, do not create again
+    if (video.heygen_video_id) {
+      console.log('Skipping HeyGen generation because heygen_video_id already exists for video:', {
+        videoId: video.id,
+        heygenVideoId: video.heygen_video_id,
+      })
+      return
+    }
+    
     if (!avatarId) {
       throw new Error('No avatar available. Please configure an avatar in your settings.')
     }
@@ -267,6 +276,60 @@ export class VideoService {
     // Validate avatar before creating video record
     if (!avatarId) {
       throw new Error('No avatar configured. Please set up an avatar in your settings before generating videos.')
+    }
+    
+    // Idempotency 1: If tied to a plan item, and it already has a video_id, reuse that video
+    if (input.plan_item_id) {
+      const { data: existingItem } = await supabase
+        .from('video_plan_items')
+        .select('video_id')
+        .eq('id', input.plan_item_id)
+        .single()
+      if (existingItem?.video_id) {
+        const { data: existingVideo } = await supabase
+          .from('videos')
+          .select('*')
+          .eq('id', existingItem.video_id)
+          .single()
+        if (existingVideo) {
+          console.log('[Idempotency] Reusing existing video for plan item:', {
+            planItemId: input.plan_item_id,
+            videoId: existingItem.video_id,
+          })
+          return existingVideo as Video
+        }
+      }
+    }
+    
+    // Idempotency 2: Reuse a very recent, equivalent request by same user to avoid duplicates
+    const recentWindowMs = 6 * 60 * 60 * 1000 // 6 hours
+    const sinceIso = new Date(Date.now() - recentWindowMs).toISOString()
+    const equivalentQuery = supabase
+      .from('videos')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('topic', input.topic)
+      .eq('style', input.style || DEFAULT_REEL_STYLE)
+      .eq('duration', input.duration || DEFAULT_REEL_DURATION)
+      .gte('created_at', sinceIso)
+      .in('status', ['pending', 'generating', 'completed'] as any)
+      .order('created_at', { ascending: false })
+      .limit(1)
+    
+    const { data: maybeDuplicate } = await equivalentQuery
+    if (maybeDuplicate && maybeDuplicate.length > 0) {
+      const candidate = maybeDuplicate[0] as Video
+      const scriptMatches =
+        (candidate.script || '') === (input.script || '')
+      const avatarMatches =
+        !avatarRecordId || candidate.avatar_id === avatarRecordId
+      if (scriptMatches && avatarMatches) {
+        console.log('[Idempotency] Reusing recent equivalent video request:', {
+          existingVideoId: candidate.id,
+          status: candidate.status,
+        })
+        return candidate
+      }
     }
     
     const video = await this.createVideoRecord(userId, input, avatarRecordId)
