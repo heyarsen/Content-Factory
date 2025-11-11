@@ -503,6 +503,14 @@ export class VideoService {
    * Generate video for a reel based on category
    */
   static async generateVideoForReel(reel: Reel, userId?: string): Promise<{ video_id: string; video_url: string | null }> {
+    // Idempotency: if reel already has a HeyGen video or URL, reuse it
+    if (reel.heygen_video_id || reel.video_url) {
+      return {
+        video_id: reel.heygen_video_id || '',
+        video_url: reel.video_url ?? null,
+      }
+    }
+    
     if (!reel.script) {
       throw new Error('Reel must have a script to generate video')
     }

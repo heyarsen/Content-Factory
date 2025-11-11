@@ -120,6 +120,16 @@ async function processVideoGeneration(job: BackgroundJob): Promise<void> {
     throw new Error('Reel not found')
   }
 
+  // Idempotency: if the reel already has a video assigned, skip generation
+  if (reel.heygen_video_id || reel.video_url) {
+    console.log('[Reel Generation] Skipping: reel already has video', {
+      reelId: reel_id,
+      heygen_video_id: reel.heygen_video_id,
+      hasVideoUrl: !!reel.video_url,
+    })
+    return
+  }
+
   if (reel.status !== 'approved') {
     throw new Error(`Reel is not approved (status: ${reel.status})`)
   }
