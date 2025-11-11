@@ -250,10 +250,15 @@ export async function generateVideo(
           voice: {
             type: 'text',
             input_text: request.script || request.topic,
-            voice_id: 'd7bbcdd6964c47bdaae26decade4a933', // Default voice
           },
         },
       ],
+    }
+
+    // Optional voice selection: use HEYGEN_VOICE_ID if provided; otherwise rely on HeyGen default
+    const envVoiceId = process.env.HEYGEN_VOICE_ID?.trim()
+    if (envVoiceId && envVoiceId.length > 0) {
+      payload.video_inputs[0].voice.voice_id = envVoiceId
     }
 
     if (outputResolution) {
