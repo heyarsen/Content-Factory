@@ -312,25 +312,9 @@ export async function postVideo(
     // Always use async upload to avoid timeouts
     formData.append('async_upload', String(request.asyncUpload ?? true))
 
-    // Try both endpoints - /upload and /uploadposts/upload
-    // The API might use either depending on version
-    const endpoints = [
-      `${UPLOADPOST_API_URL}/uploadposts/upload`,
-      `${UPLOADPOST_API_URL}/upload`,
-    ]
-    
-    let endpoint = endpoints[0]
-    let lastError: any = null
-    
-    // Try the first endpoint, fallback to second if it fails
-    for (const tryEndpoint of endpoints) {
-      try {
-        endpoint = tryEndpoint
-        break // Use first endpoint by default
-      } catch (e) {
-        lastError = e
-      }
-    }
+    // According to Upload-Post API docs: https://docs.upload-post.com/api/upload-video
+    // The correct endpoint is: POST /api/upload
+    const endpoint = `${UPLOADPOST_API_URL}/upload`
 
     console.log('Upload-Post API request:', {
       endpoint,
@@ -370,29 +354,40 @@ export async function postVideo(
           timeout: 30000, // 30 second timeout
         }
       )
-    } catch (firstError: any) {
-      // If first endpoint fails with 404, try the alternative endpoint
-      if (firstError.response?.status === 404 && endpoints.length > 1) {
-        console.log(`[Upload-Post] First endpoint failed with 404, trying alternative endpoint`)
-        endpoint = endpoints[1]
-        try {
-          response = await axios.post(
-            endpoint,
-            formData,
-            {
-              headers: {
-                'Authorization': getAuthHeader(),
-                ...formData.getHeaders(),
-              },
-              timeout: 30000,
-            }
-          )
-        } catch (secondError: any) {
-          // Both endpoints failed, throw the original error
-          throw firstError
-        }
+    } catch (error: any) {
+      // Enhanced error handling with better diagnostics
+      const status = error.response?.status
+      const statusText = error.response?.statusText
+      const errorData = error.response?.data
+      
+      console.error('[Upload-Post] API request failed:', {
+        endpoint,
+        status,
+        statusText,
+        errorData,
+        message: error.message,
+        hasApiKey: !!getUploadPostKey(),
+      })
+      
+      if (status === 404) {
+        throw new Error(
+          `Upload-Post API endpoint not found (404). Please verify the endpoint is correct: ${endpoint}. ` +
+          `Check the Upload-Post API documentation: https://docs.upload-post.com/api/upload-video`
+        )
+      } else if (status === 401) {
+        throw new Error('Upload-Post API authentication failed. Please check your UPLOADPOST_KEY environment variable.')
+      } else if (status === 403) {
+        throw new Error(errorData?.message || 'Upload-Post API access forbidden. Please check your plan limits.')
+      } else if (status === 429) {
+        throw new Error('Upload-Post API rate limit exceeded. Please try again later.')
+      } else if (status >= 500) {
+        throw new Error('Upload-Post API server error. Please try again later.')
       } else {
-        throw firstError
+        throw new Error(
+          errorData?.message || 
+          errorData?.error || 
+          `Upload-Post API error: ${statusText || error.message}`
+        )
       }
     }
 
@@ -476,6 +471,11 @@ export async function postVideo(
       error: 'Unexpected response format from upload-post API',
     }
   } catch (error: any) {
+    // If error was already handled and thrown with a descriptive message, re-throw it
+    if (error.message && error.message.includes('Upload-Post API')) {
+      throw error
+    }
+    
     console.error('Upload-post API error:', {
       message: error.message,
       response: error.response?.data,
@@ -484,7 +484,7 @@ export async function postVideo(
       url: error.config?.url,
     })
     
-    // Provide more detailed error message
+    // Provide more detailed error message for unhandled errors
     let errorMessage = 'Failed to post video'
     
     if (error.response?.status === 404) {
