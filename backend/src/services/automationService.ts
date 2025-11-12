@@ -1590,22 +1590,51 @@ export class AutomationService {
             console.log(`[Distribution] Posting item ${item.id} now - scheduled time (${item.scheduled_time}) reached or passed`)
           } else if (timeDiffMinutes > 1 && item.scheduled_date >= today) {
             // Future scheduled time - build ISO string for scheduling
+            // Ensure scheduled_time has proper format (HH:MM or HH:MM:SS)
+            let timeStr = item.scheduled_time
+            if (!timeStr.includes(':')) {
+              console.error(`[Distribution] Invalid scheduled_time format for item ${item.id}: ${timeStr}`)
+              continue
+            }
+            
+            // Normalize time format to HH:MM:SS
+            const timeParts = timeStr.split(':')
+            if (timeParts.length === 2) {
+              // Add seconds if missing
+              timeStr = `${timeStr}:00`
+            } else if (timeParts.length > 3) {
+              // Too many parts, take first 3
+              timeStr = timeParts.slice(0, 3).join(':')
+            }
+            
             // Create date string in format: YYYY-MM-DDTHH:MM:SS
-            const scheduledDateTimeStr = `${item.scheduled_date}T${item.scheduled_time}:00`
-            // Parse as if it's in the plan's timezone, then convert to ISO
+            const scheduledDateTimeStr = `${item.scheduled_date}T${timeStr}`
+            
+            // Parse and validate the date
             try {
-              // Use a more reliable method to create the scheduled time
               const scheduledDateObj = new Date(scheduledDateTimeStr)
+              
               // Check if date is valid
               if (isNaN(scheduledDateObj.getTime())) {
-                // Fallback: build ISO string manually
-                scheduledTime = `${item.scheduled_date}T${item.scheduled_time}:00.000Z`
+                // Fallback: build ISO string manually with UTC timezone
+                // Format: YYYY-MM-DDTHH:MM:SS.000Z
+                scheduledTime = `${item.scheduled_date}T${timeStr}.000Z`
+                console.warn(`[Distribution] Date parsing failed for ${scheduledDateTimeStr}, using fallback: ${scheduledTime}`)
               } else {
+                // Convert to ISO string (this will convert to UTC)
                 scheduledTime = scheduledDateObj.toISOString()
               }
-            } catch (e) {
-              // Fallback: use simple ISO string format
-              scheduledTime = `${item.scheduled_date}T${item.scheduled_time}:00.000Z`
+              
+              // Validate the resulting ISO string
+              const validateDate = new Date(scheduledTime)
+              if (isNaN(validateDate.getTime())) {
+                throw new Error(`Invalid ISO date generated: ${scheduledTime}`)
+              }
+            } catch (e: any) {
+              console.error(`[Distribution] Error creating scheduled time for item ${item.id}:`, e.message)
+              // Final fallback: use UTC timezone explicitly
+              scheduledTime = `${item.scheduled_date}T${timeStr}.000Z`
+              console.log(`[Distribution] Using fallback scheduled time: ${scheduledTime}`)
             }
             console.log(`[Distribution] Scheduling item ${item.id} for ${scheduledTime} (${timeDiffMinutes} minutes from now)`)
           } else {
@@ -2025,7 +2054,22 @@ export class AutomationService {
     // Build scheduled time
     let scheduledTime: string | undefined
     if (item.scheduled_date && item.scheduled_time) {
-      scheduledTime = `${item.scheduled_date}T${item.scheduled_time}`
+      // Normalize time format to ensure proper ISO format
+      let timeStr = item.scheduled_time
+      if (!timeStr.includes(':')) {
+        console.error(`[Distribution] Invalid scheduled_time format: ${timeStr}`)
+        scheduledTime = undefined
+      } else {
+        // Normalize to HH:MM:SS format
+        const timeParts = timeStr.split(':')
+        if (timeParts.length === 2) {
+          timeStr = `${timeStr}:00`
+        } else if (timeParts.length > 3) {
+          timeStr = timeParts.slice(0, 3).join(':')
+        }
+        // Create ISO format string with UTC timezone
+        scheduledTime = `${item.scheduled_date}T${timeStr}.000Z`
+      }
     }
 
     // Call upload-post.com API

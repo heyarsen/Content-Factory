@@ -288,8 +288,25 @@ export async function postVideo(
 
     if (request.scheduledTime) {
       // Convert to ISO-8601 format if needed
-      const scheduledDate = new Date(request.scheduledTime).toISOString()
-      formData.append('scheduled_date', scheduledDate)
+      try {
+        // Check if already in ISO format
+        let scheduledDate: string
+        if (typeof request.scheduledTime === 'string' && request.scheduledTime.includes('T') && request.scheduledTime.endsWith('Z')) {
+          // Already in ISO format with Z
+          scheduledDate = request.scheduledTime
+        } else {
+          // Try to parse and convert
+          const dateObj = new Date(request.scheduledTime)
+          if (isNaN(dateObj.getTime())) {
+            throw new Error(`Invalid scheduled time format: ${request.scheduledTime}`)
+          }
+          scheduledDate = dateObj.toISOString()
+        }
+        formData.append('scheduled_date', scheduledDate)
+      } catch (error: any) {
+        console.error('[Upload-Post] Invalid scheduled time:', request.scheduledTime, error.message)
+        throw new Error(`Invalid scheduled time format: ${request.scheduledTime}. ${error.message}`)
+      }
     }
 
     // Always use async upload to avoid timeouts
