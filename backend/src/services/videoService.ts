@@ -75,6 +75,16 @@ function buildHeygenPayload(
     payload.aspect_ratio = aspectRatio
   }
 
+  // Log payload details including aspect ratio
+  if (aspectRatio) {
+    console.log(`[HeyGen Payload] Built payload with aspect_ratio: ${aspectRatio}`, {
+      hasAspectRatio: !!aspectRatio,
+      aspectRatio,
+      outputResolution,
+      hasAvatar: !!avatarId,
+    })
+  }
+
   return payload
 }
 
@@ -556,6 +566,9 @@ export class VideoService {
       }
 
       // Build payload with avatar and vertical aspect ratio for Reels/TikTok (9:16)
+      const aspectRatio = '9:16' // Vertical aspect ratio for Reels/TikTok
+      console.log(`[Reel Video] Building payload with vertical aspect ratio: ${aspectRatio}`)
+      
       const payload = buildHeygenPayload(
         reel.topic,
         reel.script,
@@ -564,7 +577,7 @@ export class VideoService {
         avatarId,
         isPhotoAvatar,
         DEFAULT_HEYGEN_RESOLUTION,
-        '9:16' // Vertical aspect ratio for Reels/TikTok
+        aspectRatio
       )
       
       console.log(`[Reel Video] Generating video for reel with avatar:`, {
@@ -572,6 +585,8 @@ export class VideoService {
         hasScript: !!reel.script,
         avatarId,
         isPhotoAvatar,
+        aspectRatio: payload.aspect_ratio,
+        outputResolution: payload.output_resolution,
       })
 
       const response = await requestHeygenVideo(payload)

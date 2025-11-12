@@ -527,6 +527,15 @@ export async function getUploadStatus(uploadId: string): Promise<UploadPostRespo
     // Parse results from the response
     let results: any[] = []
     
+    // Log raw response for debugging
+    console.log(`[Upload-Post] Raw API response for ${uploadId}:`, {
+      hasResults: !!response.data.results,
+      resultsType: typeof response.data.results,
+      isArray: Array.isArray(response.data.results),
+      resultsKeys: response.data.results && typeof response.data.results === 'object' ? Object.keys(response.data.results) : null,
+      overallStatus: response.data.status,
+    })
+    
     if (response.data.results) {
       // If results is an object with platform keys, convert to array
       if (typeof response.data.results === 'object' && !Array.isArray(response.data.results)) {
@@ -542,7 +551,7 @@ export async function getUploadStatus(uploadId: string): Promise<UploadPostRespo
           }
           
           return {
-            platform,
+            platform: platform.toLowerCase(), // Normalize platform name to lowercase
             status,
             success: result.success !== false && (result.success === true || status === 'success' || status === 'completed' || status === 'posted'),
             post_id: result.url || result.container_id || result.post_id || result.video_id || result.id,
@@ -550,7 +559,7 @@ export async function getUploadStatus(uploadId: string): Promise<UploadPostRespo
           }
         })
       } else if (Array.isArray(response.data.results)) {
-        // Process array results - normalize status values
+        // Process array results - normalize status values and ensure platform field exists
         results = response.data.results.map((result: any) => {
           let status = result.status || 'pending'
           // Normalize status values
@@ -558,10 +567,18 @@ export async function getUploadStatus(uploadId: string): Promise<UploadPostRespo
             status = 'success'
           }
           
+          // Ensure platform field exists and is normalized to lowercase
+          const platform = result.platform ? result.platform.toLowerCase() : 
+                          result.platform_name ? result.platform_name.toLowerCase() :
+                          result.name ? result.name.toLowerCase() :
+                          'unknown'
+          
           return {
             ...result,
+            platform, // Ensure platform field is set and normalized
             status,
             success: result.success !== false && (result.success === true || status === 'success' || status === 'completed' || status === 'posted'),
+            post_id: result.post_id || result.url || result.container_id || result.video_id || result.id,
           }
         })
       }

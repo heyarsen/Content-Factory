@@ -951,18 +951,27 @@ export class AutomationService {
           resultsCount: uploadStatus.results?.length || 0,
         })
 
-        // Find the platform-specific result
-        const platformResult = uploadStatus.results?.find((r: any) => r.platform === post.platform)
+        // Find the platform-specific result using case-insensitive matching
+        const postPlatformLower = post.platform?.toLowerCase()
+        const platformResult = uploadStatus.results?.find((r: any) => {
+          const resultPlatformLower = r.platform?.toLowerCase()
+          return resultPlatformLower === postPlatformLower
+        })
 
+        // Log all available platforms for debugging
+        const availablePlatforms = uploadStatus.results?.map((r: any) => r.platform) || []
         console.log(`[Distribution] Platform result for ${post.platform}:`, {
           platformResult: platformResult ? {
             status: platformResult.status,
             success: (platformResult as any).success,
             error: platformResult.error,
             post_id: platformResult.post_id,
+            platform: platformResult.platform,
           } : 'not found',
           overallStatus: uploadStatus.status,
           resultsCount: uploadStatus.results?.length || 0,
+          availablePlatforms,
+          searchingFor: postPlatformLower,
         })
 
         if (platformResult) {
