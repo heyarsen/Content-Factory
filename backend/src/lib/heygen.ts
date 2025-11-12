@@ -58,7 +58,13 @@ async function getDefaultHeygenVoiceId(): Promise<string> {
 
   const endpoints = [
     {
-      type: 'v2-list',
+      type: 'v2-voices',
+      method: 'GET' as const,
+      url: `${HEYGEN_V2_API_URL}/voices`,
+      useXApiKey: true,
+    },
+    {
+      type: 'v2-voice-list',
       method: 'GET' as const,
       url: `${HEYGEN_V2_API_URL}/voice.list`,
       useXApiKey: true,
@@ -82,11 +88,12 @@ async function getDefaultHeygenVoiceId(): Promise<string> {
   const extractVoices = (data: any): any[] => {
     if (!data) return []
     if (Array.isArray(data)) return data
-    if (Array.isArray(data?.data?.voice_list)) return data.data.voice_list
+    // Handle v2 API response: { error: null, data: { voices: [...] } }
     if (Array.isArray(data?.data?.voices)) return data.data.voices
+    if (Array.isArray(data?.data?.voice_list)) return data.data.voice_list
     if (Array.isArray(data?.data)) return data.data
-    if (Array.isArray(data?.voice_list)) return data.voice_list
     if (Array.isArray(data?.voices)) return data.voices
+    if (Array.isArray(data?.voice_list)) return data.voice_list
     return []
   }
 
@@ -119,7 +126,8 @@ async function getDefaultHeygenVoiceId(): Promise<string> {
             return locale.startsWith('en') || locale.includes('english')
           }) || voices[0]
 
-        const vid = preferred?.id || preferred?.voice_id || preferred?.voiceId
+        // Extract voice_id - v2 API uses 'voice_id', v1 may use 'id' or 'voice_id'
+        const vid = preferred?.voice_id || preferred?.id || preferred?.voiceId
         if (vid) {
           cachedDefaultHeygenVoiceId = String(vid)
           console.log(`[HeyGen] Using default voice ${cachedDefaultHeygenVoiceId} from ${endpoint.type}`)
@@ -541,9 +549,6 @@ export async function generateVideo(
   }
 }
 
-/**
- * Create avatar from photo using HeyGen v2 API
- */
 /**
  * Upload image to HeyGen Asset Storage
  * Returns the image_key needed for avatar group creation
