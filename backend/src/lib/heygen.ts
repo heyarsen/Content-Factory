@@ -24,6 +24,7 @@ export interface GenerateVideoRequest {
   talking_photo_id?: string // For photo avatars
   template_id?: string
   output_resolution?: string
+  aspect_ratio?: string // e.g., "9:16" for vertical videos (Reels/TikTok)
 }
 
 export interface HeyGenVideoResponse {
@@ -378,9 +379,14 @@ export async function generateVideo(
       },
     }
 
-    if (outputResolution) {
-      payload.video_config = {
-        output_resolution: outputResolution,
+    // Build video_config with resolution and optional aspect ratio
+    if (outputResolution || request.aspect_ratio) {
+      payload.video_config = {}
+      if (outputResolution) {
+        payload.video_config.output_resolution = outputResolution
+      }
+      if (request.aspect_ratio) {
+        payload.video_config.aspect_ratio = request.aspect_ratio
       }
     }
 

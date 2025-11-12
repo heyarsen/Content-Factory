@@ -56,7 +56,8 @@ function buildHeygenPayload(
   duration: number,
   avatarId?: string,
   isPhotoAvatar: boolean = false,
-  outputResolution: string = DEFAULT_HEYGEN_RESOLUTION
+  outputResolution: string = DEFAULT_HEYGEN_RESOLUTION,
+  aspectRatio?: string // e.g., "9:16" for vertical videos
 ) {
   const payload: any = {
     topic,
@@ -68,6 +69,10 @@ function buildHeygenPayload(
 
   if (outputResolution) {
     payload.output_resolution = outputResolution
+  }
+
+  if (aspectRatio) {
+    payload.aspect_ratio = aspectRatio
   }
 
   return payload
@@ -515,22 +520,34 @@ export class VideoService {
       throw new Error('Reel must have a script to generate video')
     }
 
+    // Ensure userId is available - use from reel if not provided
+    const effectiveUserId = userId || reel.user_id
+    if (!effectiveUserId) {
+      throw new Error('User ID is required to generate video. Please ensure the reel has a user_id.')
+    }
+
     const template = reel.template || CATEGORY_TEMPLATES[reel.category] || CATEGORY_TEMPLATES.Trading
 
     try {
-      // Get default avatar if userId is provided, otherwise use undefined (will cause error which is handled)
+      // Get default avatar - userId is guaranteed to be available at this point
       let avatarId: string | undefined = undefined
       let isPhotoAvatar = false
 
-      if (userId) {
-        const { AvatarService } = await import('./avatarService.js')
-        const defaultAvatar = await AvatarService.getDefaultAvatar(userId)
-        if (defaultAvatar) {
-          avatarId = defaultAvatar.heygen_avatar_id
-          isPhotoAvatar = defaultAvatar.avatar_url?.includes('supabase.co/storage') || false
-          console.log(`[Reel Video] Using default avatar for reel: ${avatarId} (isPhotoAvatar: ${isPhotoAvatar})`)
-        } else {
-          console.warn(`[Reel Video] No default avatar found for user ${userId}, video generation may fail`)
+      const { AvatarService } = await import('./avatarService.js')
+      const defaultAvatar = await AvatarService.getDefaultAvatar(effectiveUserId)
+      if (defaultAvatar) {
+        avatarId = defaultAvatar.heygen_avatar_id
+        isPhotoAvatar = defaultAvatar.avatar_url?.includes('supabase.co/storage') || false
+        console.log(`[Reel Video] Using default avatar for reel: ${avatarId} (isPhotoAvatar: ${isPhotoAvatar})`)
+      } else {
+        console.warn(`[Reel Video] No default avatar found for user ${effectiveUserId}`)
+        // Try to get any active avatar as fallback
+        const userAvatars = await AvatarService.getUserAvatars(effectiveUserId)
+        const activeAvatar = userAvatars.find(a => a.status === 'active')
+        if (activeAvatar) {
+          avatarId = activeAvatar.heygen_avatar_id
+          isPhotoAvatar = activeAvatar.avatar_url?.includes('supabase.co/storage') || false
+          console.log(`[Reel Video] Using fallback active avatar: ${avatarId} (isPhotoAvatar: ${isPhotoAvatar})`)
         }
       }
 
@@ -538,7 +555,7 @@ export class VideoService {
         throw new Error('No avatar available. Please configure a default avatar in your settings.')
       }
 
-      // Build payload with avatar
+      // Build payload with avatar and vertical aspect ratio for Reels/TikTok (9:16)
       const payload = buildHeygenPayload(
         reel.topic,
         reel.script,
@@ -546,7 +563,8 @@ export class VideoService {
         DEFAULT_REEL_DURATION,
         avatarId,
         isPhotoAvatar,
-        DEFAULT_HEYGEN_RESOLUTION
+        DEFAULT_HEYGEN_RESOLUTION,
+        '9:16' // Vertical aspect ratio for Reels/TikTok
       )
       
       console.log(`[Reel Video] Generating video for reel with avatar:`, {
