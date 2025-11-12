@@ -1615,8 +1615,9 @@ export class AutomationService {
               const [year, month, day] = item.scheduled_date.split('-').map(Number)
               const [hours, minutes, seconds = 0] = timeStr.split(':').map(Number)
               
-              // Convert from plan timezone to UTC using iterative adjustment
-              // Strategy: Start with a UTC date, format it in plan timezone, and adjust until it matches
+              // Convert from plan timezone to UTC
+              // Strategy: Use Intl.DateTimeFormat to find the UTC time that represents
+              // the target time in the plan's timezone
               
               const formatter = new Intl.DateTimeFormat('en-US', {
                 timeZone: planTimezone,
@@ -1629,33 +1630,46 @@ export class AutomationService {
                 hour12: false,
               })
               
-              // Start with UTC date using the same components
-              let candidateDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds))
-              let adjustedUtcDate = candidateDate
-              let iterations = 0
-              const maxIterations = 20
+              // Create a date string in ISO format (will be interpreted as UTC)
+              // We'll use binary search to find the correct UTC time
+              const targetTimeSeconds = hours * 3600 + minutes * 60 + seconds
               
-              // Iteratively adjust until the UTC date represents the correct time in plan timezone
-              while (iterations < maxIterations) {
-                const candidateParts = formatter.formatToParts(candidateDate)
-                const candidateHour = parseInt(candidateParts.find(p => p.type === 'hour')?.value || '0')
-                const candidateMinute = parseInt(candidateParts.find(p => p.type === 'minute')?.value || '0')
-                const candidateSecond = parseInt(candidateParts.find(p => p.type === 'second')?.value || '0')
+              // Start with a guess: assume timezone offset is between -12 and +14 hours
+              // We'll search for the UTC time that formats to our target in plan timezone
+              let lowBound = new Date(Date.UTC(year, month - 1, day, hours - 14, minutes, seconds))
+              let highBound = new Date(Date.UTC(year, month - 1, day, hours + 12, minutes, seconds))
+              
+              let bestDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds))
+              let bestDiff = Infinity
+              let adjustedUtcDate = bestDate
+              
+              // Try a range of UTC times and find the one that matches our target in plan timezone
+              for (let offsetHours = -14; offsetHours <= 12; offsetHours++) {
+                const testDate = new Date(Date.UTC(year, month - 1, day, hours - offsetHours, minutes, seconds))
+                const testParts = formatter.formatToParts(testDate)
+                const testHour = parseInt(testParts.find(p => p.type === 'hour')?.value || '0')
+                const testMinute = parseInt(testParts.find(p => p.type === 'minute')?.value || '0')
+                const testSecond = parseInt(testParts.find(p => p.type === 'second')?.value || '0')
                 
-                // Check if we've found the correct UTC time
-                if (candidateHour === hours && candidateMinute === minutes && candidateSecond === seconds) {
-                  adjustedUtcDate = candidateDate
-                  break
+                const testTimeSeconds = testHour * 3600 + testMinute * 60 + testSecond
+                const diff = Math.abs(targetTimeSeconds - testTimeSeconds)
+                
+                if (diff < bestDiff) {
+                  bestDiff = diff
+                  bestDate = testDate
                 }
                 
-                // Calculate the difference in seconds
-                const targetSeconds = hours * 3600 + minutes * 60 + seconds
-                const candidateSeconds = candidateHour * 3600 + candidateMinute * 60 + candidateSecond
-                const diffSeconds = targetSeconds - candidateSeconds
-                
-                // Adjust the UTC date by the difference
-                candidateDate = new Date(candidateDate.getTime() - diffSeconds * 1000)
-                iterations++
+                // If we found an exact match, use it
+                if (testHour === hours && testMinute === minutes && testSecond === seconds) {
+                  adjustedUtcDate = testDate
+                  break
+                }
+              }
+              
+              // If no exact match, use the best approximation
+              if (bestDiff > 0) {
+                adjustedUtcDate = bestDate
+                console.warn(`[Distribution] No exact timezone match found, using best approximation (diff: ${bestDiff}s)`)
               }
               
               // Convert to ISO string
@@ -1670,10 +1684,26 @@ export class AutomationService {
               const verifyParts = formatter.formatToParts(adjustedUtcDate)
               const verifyHour = parseInt(verifyParts.find(p => p.type === 'hour')?.value || '0')
               const verifyMinute = parseInt(verifyParts.find(p => p.type === 'minute')?.value || '0')
+              const verifySecond = parseInt(verifyParts.find(p => p.type === 'second')?.value || '0')
               
-              console.log(`[Distribution] Created scheduled time: ${scheduledTime} (plan timezone: ${planTimezone}, scheduled: ${item.scheduled_date} ${item.scheduled_time}, verified: ${verifyHour}:${String(verifyMinute).padStart(2, '0')})`)
+              // Also format in UTC to show what we're actually sending
+              const utcFormatter = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'UTC',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false,
+              })
+              const utcParts = utcFormatter.formatToParts(adjustedUtcDate)
+              const utcHour = parseInt(utcParts.find(p => p.type === 'hour')?.value || '0')
+              const utcMinute = parseInt(utcParts.find(p => p.type === 'minute')?.value || '0')
+              
+              console.log(`[Distribution] Timezone conversion: ${item.scheduled_date} ${item.scheduled_time} (${planTimezone}) -> ${scheduledTime} (UTC ${utcHour}:${String(utcMinute).padStart(2, '0')}), verified in ${planTimezone}: ${verifyHour}:${String(verifyMinute).padStart(2, '0')}:${String(verifySecond).padStart(2, '0')}`)
             } catch (e: any) {
-              console.error(`[Distribution] Error creating scheduled time for item ${item.id}:`, e.message)
+              console.error(`[Distribution] Error creating scheduled time for item ${item.id}:`, e.message, e.stack)
               // Fallback: treat as UTC (not ideal but better than failing)
               scheduledTime = `${item.scheduled_date}T${timeStr}.000Z`
               console.log(`[Distribution] Using fallback scheduled time (UTC): ${scheduledTime}`)
@@ -2147,32 +2177,49 @@ export class AutomationService {
             hour12: false,
           })
           
-          let candidateDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds))
-          let adjustedUtcDate = candidateDate
-          let iterations = 0
-          const maxIterations = 20
+          const targetTimeSeconds = hours * 3600 + minutes * 60 + seconds
+          let bestDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds))
+          let bestDiff = Infinity
+          let adjustedUtcDate = bestDate
           
-          while (iterations < maxIterations) {
-            const candidateParts = formatter.formatToParts(candidateDate)
-            const candidateHour = parseInt(candidateParts.find(p => p.type === 'hour')?.value || '0')
-            const candidateMinute = parseInt(candidateParts.find(p => p.type === 'minute')?.value || '0')
-            const candidateSecond = parseInt(candidateParts.find(p => p.type === 'second')?.value || '0')
+          // Try a range of UTC times and find the one that matches our target in plan timezone
+          for (let offsetHours = -14; offsetHours <= 12; offsetHours++) {
+            const testDate = new Date(Date.UTC(year, month - 1, day, hours - offsetHours, minutes, seconds))
+            const testParts = formatter.formatToParts(testDate)
+            const testHour = parseInt(testParts.find(p => p.type === 'hour')?.value || '0')
+            const testMinute = parseInt(testParts.find(p => p.type === 'minute')?.value || '0')
+            const testSecond = parseInt(testParts.find(p => p.type === 'second')?.value || '0')
             
-            if (candidateHour === hours && candidateMinute === minutes && candidateSecond === seconds) {
-              adjustedUtcDate = candidateDate
-              break
+            const testTimeSeconds = testHour * 3600 + testMinute * 60 + testSecond
+            const diff = Math.abs(targetTimeSeconds - testTimeSeconds)
+            
+            if (diff < bestDiff) {
+              bestDiff = diff
+              bestDate = testDate
             }
             
-            const targetSeconds = hours * 3600 + minutes * 60 + seconds
-            const candidateSeconds = candidateHour * 3600 + candidateMinute * 60 + candidateSecond
-            const diffSeconds = targetSeconds - candidateSeconds
-            candidateDate = new Date(candidateDate.getTime() - diffSeconds * 1000)
-            iterations++
+            // If we found an exact match, use it
+            if (testHour === hours && testMinute === minutes && testSecond === seconds) {
+              adjustedUtcDate = testDate
+              break
+            }
+          }
+          
+          // If no exact match, use the best approximation
+          if (bestDiff > 0) {
+            adjustedUtcDate = bestDate
+            console.warn(`[Distribution] No exact timezone match found, using best approximation (diff: ${bestDiff}s)`)
           }
           
           scheduledTime = adjustedUtcDate.toISOString()
+          
+          // Log for debugging
+          const verifyParts = formatter.formatToParts(adjustedUtcDate)
+          const verifyHour = parseInt(verifyParts.find(p => p.type === 'hour')?.value || '0')
+          const verifyMinute = parseInt(verifyParts.find(p => p.type === 'minute')?.value || '0')
+          console.log(`[Distribution] Manual schedule: ${item.scheduled_date} ${item.scheduled_time} (${planTimezone}) -> ${scheduledTime}, verified: ${verifyHour}:${String(verifyMinute).padStart(2, '0')}`)
         } catch (e: any) {
-          console.error(`[Distribution] Error converting scheduled time:`, e.message)
+          console.error(`[Distribution] Error converting scheduled time:`, e.message, e.stack)
           // Fallback to UTC
           scheduledTime = `${item.scheduled_date}T${timeStr}.000Z`
         }
