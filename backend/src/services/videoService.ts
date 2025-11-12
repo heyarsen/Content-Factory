@@ -565,9 +565,11 @@ export class VideoService {
         throw new Error('No avatar available. Please configure a default avatar in your settings.')
       }
 
-      // Build payload with avatar and vertical aspect ratio for Reels/TikTok (9:16)
-      const aspectRatio = '9:16' // Vertical aspect ratio for Reels/TikTok
-      console.log(`[Reel Video] Building payload with vertical aspect ratio: ${aspectRatio}`)
+      // Build payload with avatar and vertical resolution for Reels/TikTok (9:16)
+      // Use vertical resolution format (1080x1920) instead of aspect_ratio
+      // HeyGen API doesn't support aspect_ratio field - resolution defines the aspect ratio
+      const verticalResolution = '1080x1920' // Vertical resolution for Reels/TikTok (9:16 aspect ratio)
+      console.log(`[Reel Video] Building payload with vertical resolution: ${verticalResolution} (9:16 aspect ratio)`)
       
       const payload = buildHeygenPayload(
         reel.topic,
@@ -576,8 +578,8 @@ export class VideoService {
         DEFAULT_REEL_DURATION,
         avatarId,
         isPhotoAvatar,
-        DEFAULT_HEYGEN_RESOLUTION,
-        aspectRatio
+        verticalResolution, // Use vertical resolution instead of default horizontal resolution
+        undefined // Don't use aspect_ratio - resolution format defines it
       )
       
       console.log(`[Reel Video] Generating video for reel with avatar:`, {
@@ -585,8 +587,8 @@ export class VideoService {
         hasScript: !!reel.script,
         avatarId,
         isPhotoAvatar,
-        aspectRatio: payload.aspect_ratio,
         outputResolution: payload.output_resolution,
+        isVertical: payload.output_resolution === verticalResolution,
       })
 
       const response = await requestHeygenVideo(payload)
