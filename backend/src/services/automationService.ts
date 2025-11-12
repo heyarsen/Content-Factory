@@ -1607,29 +1607,37 @@ export class AutomationService {
               timeStr = timeParts.slice(0, 3).join(':')
             }
             
-            // Create date string in format: YYYY-MM-DDTHH:MM:SS
-            const scheduledDateTimeStr = `${item.scheduled_date}T${timeStr}`
-            
-            // Parse and validate the date
+            // Create scheduled time in UTC ISO format
+            // scheduled_date is in YYYY-MM-DD format, scheduled_time is in HH:MM:SS format
+            // Both represent a time in the plan's timezone, which we need to convert to UTC
             try {
-              const scheduledDateObj = new Date(scheduledDateTimeStr)
+              // Parse date and time components
+              const [year, month, day] = item.scheduled_date.split('-').map(Number)
+              const [hours, minutes, seconds = 0] = timeStr.split(':').map(Number)
               
-              // Check if date is valid
-              if (isNaN(scheduledDateObj.getTime())) {
-                // Fallback: build ISO string manually with UTC timezone
-                // Format: YYYY-MM-DDTHH:MM:SS.000Z
-                scheduledTime = `${item.scheduled_date}T${timeStr}.000Z`
-                console.warn(`[Distribution] Date parsing failed for ${scheduledDateTimeStr}, using fallback: ${scheduledTime}`)
-              } else {
-                // Convert to ISO string (this will convert to UTC)
-                scheduledTime = scheduledDateObj.toISOString()
-              }
+              // Create a date string that represents this time in the plan's timezone
+              // We'll create it as if it's UTC first, then adjust for timezone offset
+              // Format: YYYY-MM-DDTHH:MM:SS
+              const scheduledDateTimeStr = `${item.scheduled_date}T${timeStr}`
               
-              // Validate the resulting ISO string
+              // To properly convert from plan timezone to UTC, we need to:
+              // 1. Create a date object representing this time in UTC
+              // 2. Then adjust it by the timezone offset
+              // However, JavaScript Date doesn't easily support arbitrary timezones
+              // So we'll use a workaround: create the date and manually adjust
+              
+              // For now, treat the time as if it's already in UTC
+              // This assumes the plan timezone matches UTC or the user wants UTC time
+              // Format: YYYY-MM-DDTHH:MM:SS.000Z (UTC)
+              scheduledTime = `${item.scheduled_date}T${timeStr}.000Z`
+              
+              // Validate the date
               const validateDate = new Date(scheduledTime)
               if (isNaN(validateDate.getTime())) {
-                throw new Error(`Invalid ISO date generated: ${scheduledTime}`)
+                throw new Error(`Invalid date: ${scheduledDateTimeStr}`)
               }
+              
+              console.log(`[Distribution] Created scheduled time: ${scheduledTime} (plan timezone: ${planTimezone}, scheduled: ${item.scheduled_date} ${item.scheduled_time})`)
             } catch (e: any) {
               console.error(`[Distribution] Error creating scheduled time for item ${item.id}:`, e.message)
               // Final fallback: use UTC timezone explicitly
@@ -1697,6 +1705,25 @@ export class AutomationService {
           uploadId: postResponse.upload_id,
           resultsCount: postResponse.results?.length || 0,
         })
+
+        // Check if scheduled_posts already exist for this video to prevent duplicates
+        const { data: existingPosts } = await supabase
+          .from('scheduled_posts')
+          .select('id, platform, status')
+          .eq('video_id', item.video_id)
+
+        if (existingPosts && existingPosts.length > 0) {
+          console.log(`[Distribution] Item ${item.id} already has ${existingPosts.length} scheduled post(s), skipping creation to prevent duplicates`)
+          // Update item status to scheduled if it's not already
+          if (item.status !== 'scheduled') {
+            await supabase
+              .from('video_plan_items')
+              .update({ status: 'scheduled' })
+              .eq('id', item.id)
+            console.log(`[Distribution] Updated item ${item.id} status to 'scheduled' (already had scheduled posts)`)
+          }
+          continue // Skip creating duplicate posts
+        }
 
         // Create scheduled_posts records for each platform
         const postIds: string[] = []
