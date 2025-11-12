@@ -1363,23 +1363,84 @@ export class AutomationService {
     }
 
     // Now get items with completed videos that don't have scheduled posts yet
+    // Also include items with failed posts that should be retried
     const { data: items } = await supabase
       .from('video_plan_items')
       .select('*, plan:video_plans!inner(enabled, user_id, default_platforms), videos(*)')
       .eq('plan.enabled', true)
-      .eq('status', 'completed')
+      .in('status', ['completed', 'failed']) // Include failed items for retry
       .not('video_id', 'is', null)
-      .is('scheduled_post_id', null) // Only schedule if not already scheduled
       .limit(10)
 
-    if (!items || items.length === 0) {
+    // Filter to only items without scheduled_post_id OR items with failed posts
+    const itemsToProcess = items?.filter(item => {
+      // Include if no scheduled_post_id
+      if (!item.scheduled_post_id) return true
+      
+      // Include if status is failed (allow retry)
+      if (item.status === 'failed') return true
+      
+      // Check if all scheduled posts failed - allow retry
+      // This will be checked more thoroughly below, but quick filter here
+      return false
+    }) || []
+
+    if (itemsToProcess.length === 0) {
       console.log('[Distribution] No completed items found for posting')
       return
     }
 
-    console.log(`[Distribution] Found ${items.length} completed items to post`)
+    const allItemsCount = items?.length || 0
+    console.log(`[Distribution] Found ${itemsToProcess.length} items to process for posting (out of ${allItemsCount} total)`)
 
-    for (const item of items) {
+    // Check if items have existing failed posts that should prevent retry
+    for (const item of itemsToProcess) {
+      if (item.scheduled_post_id) {
+        // Check if there are any scheduled posts for this item
+        const { data: existingPosts } = await supabase
+          .from('scheduled_posts')
+          .select('status')
+          .eq('video_id', item.video_id)
+        
+        // If all posts failed and it's been less than 1 hour, skip retry to avoid spam
+        if (existingPosts && existingPosts.length > 0) {
+          const allFailed = existingPosts.every(p => p.status === 'failed')
+          const anyPending = existingPosts.some(p => p.status === 'pending' || p.status === 'scheduled')
+          
+          if (allFailed) {
+            // Check when posts were created - if recent (< 1 hour), don't retry yet
+            const { data: postDetails } = await supabase
+              .from('scheduled_posts')
+              .select('created_at')
+              .eq('video_id', item.video_id)
+              .order('created_at', { ascending: false })
+              .limit(1)
+            
+            if (postDetails && postDetails.length > 0) {
+              const postAge = Date.now() - new Date(postDetails[0].created_at).getTime()
+              const oneHour = 60 * 60 * 1000
+              if (postAge < oneHour) {
+                console.log(`[Distribution] Skipping item ${item.id} - all posts failed recently, waiting before retry`)
+                itemsToProcess.splice(itemsToProcess.indexOf(item), 1)
+                continue
+              }
+            }
+          } else if (anyPending) {
+            // Has pending posts, don't create new ones
+            console.log(`[Distribution] Skipping item ${item.id} - has pending posts`)
+            itemsToProcess.splice(itemsToProcess.indexOf(item), 1)
+            continue
+          }
+        }
+      }
+    }
+
+    if (itemsToProcess.length === 0) {
+      console.log('[Distribution] No items to process after filtering')
+      return
+    }
+
+    for (const item of itemsToProcess) {
       try {
         const plan = item.plan as any
         const video = item.videos as any
@@ -1389,11 +1450,64 @@ export class AutomationService {
         // Fetch video to check status and URL
         const { data: videoData } = await supabase
           .from('videos')
-          .select('video_url, status, topic')
+          .select('video_url, status, topic, heygen_video_id')
           .eq('id', item.video_id)
           .single()
 
-        if (!videoData || videoData.status !== 'completed' || !videoData.video_url) {
+        if (!videoData) {
+          console.log(`[Distribution] Skipping item ${item.id} - video ${item.video_id} not found`)
+          continue
+        }
+
+        // If video is still generating, check HeyGen status
+        if (videoData.status === 'generating' || videoData.status === 'pending') {
+          if (videoData.heygen_video_id) {
+            try {
+              const { getVideoStatus } = await import('../lib/heygen.js')
+              const heygenStatus = await getVideoStatus(videoData.heygen_video_id)
+              
+              if (heygenStatus.status === 'completed' && heygenStatus.video_url) {
+                // Update video status
+                await supabase
+                  .from('videos')
+                  .update({
+                    status: 'completed',
+                    video_url: heygenStatus.video_url,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', item.video_id)
+                
+                // Update videoData for use below
+                videoData.status = 'completed'
+                videoData.video_url = heygenStatus.video_url
+                
+                console.log(`[Distribution] Video ${item.video_id} completed, updated status`)
+              } else if (heygenStatus.status === 'failed') {
+                console.log(`[Distribution] Video ${item.video_id} failed, skipping posting`)
+                await supabase
+                  .from('video_plan_items')
+                  .update({
+                    status: 'failed',
+                    error_message: heygenStatus.error || 'Video generation failed',
+                  })
+                  .eq('id', item.id)
+                continue
+              } else {
+                console.log(`[Distribution] Video ${item.video_id} still generating (status: ${heygenStatus.status}), skipping`)
+                continue
+              }
+            } catch (statusError: any) {
+              console.error(`[Distribution] Error checking video status for ${item.video_id}:`, statusError.message)
+              continue
+            }
+          } else {
+            console.log(`[Distribution] Video ${item.video_id} still generating, skipping`)
+            continue
+          }
+        }
+
+        if (videoData.status !== 'completed' || !videoData.video_url) {
+          console.log(`[Distribution] Skipping item ${item.id} - video status: ${videoData.status}, has URL: ${!!videoData.video_url}`)
           continue
         }
 
