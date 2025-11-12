@@ -52,35 +52,99 @@ let cachedDefaultHeygenVoiceId: string | null = null
 
 async function getDefaultHeygenVoiceId(): Promise<string> {
   if (cachedDefaultHeygenVoiceId) return cachedDefaultHeygenVoiceId
+
   const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
   const apiKey = getHeyGenKey()
-  try {
-    // List voices - prefer HeyGen-provided voices
-    const response = await axios.get(`${HEYGEN_V2_API_URL}/voice.list`, {
-      headers: { 'X-Api-Key': apiKey, 'Content-Type': 'application/json' },
-      timeout: 15000,
-    })
-    const voices = response.data?.data?.voice_list || response.data?.data || response.data?.voice_list || []
-    if (Array.isArray(voices) && voices.length > 0) {
-      // Prefer English US or first available
-      const preferred = voices.find((v: any) =>
-        (v?.locale || '').toLowerCase().startsWith('en') ||
-        (v?.language || '').toLowerCase().includes('english')
-      ) || voices[0]
-      const vid = preferred?.id || preferred?.voice_id
-      if (vid) {
-        cachedDefaultHeygenVoiceId = String(vid)
-        return cachedDefaultHeygenVoiceId
-      }
-    }
-    throw new Error('No voices returned from HeyGen')
-  } catch (e: any) {
-    console.error('[HeyGen] Failed to fetch default voice list:', e.response?.data || e.message)
-    // Do not guess an invalid voice; require configuration
-    throw new Error(
-      'Unable to fetch default voices from HeyGen. Please set a valid HEYGEN_VOICE_ID (see List All Voices V2).'
-    )
+
+  const endpoints = [
+    {
+      type: 'v2-list',
+      method: 'GET' as const,
+      url: `${HEYGEN_V2_API_URL}/voice.list`,
+      useXApiKey: true,
+    },
+    {
+      type: 'v1-list',
+      method: 'POST' as const,
+      url: `${HEYGEN_API_URL}/voice.list`,
+      useXApiKey: false,
+    },
+    {
+      type: 'v1-voices',
+      method: 'GET' as const,
+      url: `${HEYGEN_API_URL}/voices`,
+      useXApiKey: false,
+    },
+  ]
+
+  let lastError: any = null
+
+  const extractVoices = (data: any): any[] => {
+    if (!data) return []
+    if (Array.isArray(data)) return data
+    if (Array.isArray(data?.data?.voice_list)) return data.data.voice_list
+    if (Array.isArray(data?.data?.voices)) return data.data.voices
+    if (Array.isArray(data?.data)) return data.data
+    if (Array.isArray(data?.voice_list)) return data.voice_list
+    if (Array.isArray(data?.voices)) return data.voices
+    return []
   }
+
+  for (const endpoint of endpoints) {
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
+      if (endpoint.useXApiKey) {
+        headers['X-Api-Key'] = apiKey
+      } else {
+        headers['Authorization'] = `Bearer ${apiKey}`
+      }
+
+      const requestConfig = {
+        headers,
+        timeout: 15000,
+      }
+
+      const response =
+        endpoint.method === 'POST'
+          ? await axios.post(endpoint.url, {}, requestConfig)
+          : await axios.get(endpoint.url, requestConfig)
+
+      const voices = extractVoices(response.data)
+      if (Array.isArray(voices) && voices.length > 0) {
+        const preferred =
+          voices.find((v: any) => {
+            const locale = String(v?.locale || v?.language || '').toLowerCase()
+            return locale.startsWith('en') || locale.includes('english')
+          }) || voices[0]
+
+        const vid = preferred?.id || preferred?.voice_id || preferred?.voiceId
+        if (vid) {
+          cachedDefaultHeygenVoiceId = String(vid)
+          console.log(`[HeyGen] Using default voice ${cachedDefaultHeygenVoiceId} from ${endpoint.type}`)
+          return cachedDefaultHeygenVoiceId
+        }
+      }
+
+      console.warn(`[HeyGen] ${endpoint.type} returned no voices. Response keys:`, Object.keys(response.data || {}))
+    } catch (err: any) {
+      lastError = err
+      console.warn(
+        `[HeyGen] Failed to fetch voices from ${endpoint.url} (${endpoint.type}):`,
+        err.response?.data || err.message
+      )
+    }
+  }
+
+  console.error('[HeyGen] Failed to fetch default voice list from all endpoints', {
+    lastError: lastError?.response?.data || lastError?.message,
+    status: lastError?.response?.status,
+  })
+
+  throw new Error(
+    'Unable to fetch default voices from HeyGen. Please set a valid HEYGEN_VOICE_ID (see List All Voices V2).'
+  )
 }
 
 /**
