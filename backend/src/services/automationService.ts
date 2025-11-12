@@ -1615,34 +1615,68 @@ export class AutomationService {
               const [year, month, day] = item.scheduled_date.split('-').map(Number)
               const [hours, minutes, seconds = 0] = timeStr.split(':').map(Number)
               
-              // Create a date string that represents this time in the plan's timezone
-              // We'll create it as if it's UTC first, then adjust for timezone offset
-              // Format: YYYY-MM-DDTHH:MM:SS
-              const scheduledDateTimeStr = `${item.scheduled_date}T${timeStr}`
+              // Convert from plan timezone to UTC using iterative adjustment
+              // Strategy: Start with a UTC date, format it in plan timezone, and adjust until it matches
               
-              // To properly convert from plan timezone to UTC, we need to:
-              // 1. Create a date object representing this time in UTC
-              // 2. Then adjust it by the timezone offset
-              // However, JavaScript Date doesn't easily support arbitrary timezones
-              // So we'll use a workaround: create the date and manually adjust
+              const formatter = new Intl.DateTimeFormat('en-US', {
+                timeZone: planTimezone,
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false,
+              })
               
-              // For now, treat the time as if it's already in UTC
-              // This assumes the plan timezone matches UTC or the user wants UTC time
-              // Format: YYYY-MM-DDTHH:MM:SS.000Z (UTC)
-              scheduledTime = `${item.scheduled_date}T${timeStr}.000Z`
+              // Start with UTC date using the same components
+              let candidateDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds))
+              let adjustedUtcDate = candidateDate
+              let iterations = 0
+              const maxIterations = 20
               
-              // Validate the date
-              const validateDate = new Date(scheduledTime)
-              if (isNaN(validateDate.getTime())) {
-                throw new Error(`Invalid date: ${scheduledDateTimeStr}`)
+              // Iteratively adjust until the UTC date represents the correct time in plan timezone
+              while (iterations < maxIterations) {
+                const candidateParts = formatter.formatToParts(candidateDate)
+                const candidateHour = parseInt(candidateParts.find(p => p.type === 'hour')?.value || '0')
+                const candidateMinute = parseInt(candidateParts.find(p => p.type === 'minute')?.value || '0')
+                const candidateSecond = parseInt(candidateParts.find(p => p.type === 'second')?.value || '0')
+                
+                // Check if we've found the correct UTC time
+                if (candidateHour === hours && candidateMinute === minutes && candidateSecond === seconds) {
+                  adjustedUtcDate = candidateDate
+                  break
+                }
+                
+                // Calculate the difference in seconds
+                const targetSeconds = hours * 3600 + minutes * 60 + seconds
+                const candidateSeconds = candidateHour * 3600 + candidateMinute * 60 + candidateSecond
+                const diffSeconds = targetSeconds - candidateSeconds
+                
+                // Adjust the UTC date by the difference
+                candidateDate = new Date(candidateDate.getTime() - diffSeconds * 1000)
+                iterations++
               }
               
-              console.log(`[Distribution] Created scheduled time: ${scheduledTime} (plan timezone: ${planTimezone}, scheduled: ${item.scheduled_date} ${item.scheduled_time})`)
+              // Convert to ISO string
+              scheduledTime = adjustedUtcDate.toISOString()
+              
+              // Validate the date
+              if (isNaN(adjustedUtcDate.getTime())) {
+                throw new Error(`Invalid date generated`)
+              }
+              
+              // Verify the conversion worked
+              const verifyParts = formatter.formatToParts(adjustedUtcDate)
+              const verifyHour = parseInt(verifyParts.find(p => p.type === 'hour')?.value || '0')
+              const verifyMinute = parseInt(verifyParts.find(p => p.type === 'minute')?.value || '0')
+              
+              console.log(`[Distribution] Created scheduled time: ${scheduledTime} (plan timezone: ${planTimezone}, scheduled: ${item.scheduled_date} ${item.scheduled_time}, verified: ${verifyHour}:${String(verifyMinute).padStart(2, '0')})`)
             } catch (e: any) {
               console.error(`[Distribution] Error creating scheduled time for item ${item.id}:`, e.message)
-              // Final fallback: use UTC timezone explicitly
+              // Fallback: treat as UTC (not ideal but better than failing)
               scheduledTime = `${item.scheduled_date}T${timeStr}.000Z`
-              console.log(`[Distribution] Using fallback scheduled time: ${scheduledTime}`)
+              console.log(`[Distribution] Using fallback scheduled time (UTC): ${scheduledTime}`)
             }
             console.log(`[Distribution] Scheduling item ${item.id} for ${scheduledTime} (${timeDiffMinutes} minutes from now)`)
           } else {
@@ -2078,7 +2112,7 @@ export class AutomationService {
 
     const uploadPostUserId = accounts[0].platform_account_id
 
-    // Build scheduled time
+    // Build scheduled time - convert from plan timezone to UTC
     let scheduledTime: string | undefined
     if (item.scheduled_date && item.scheduled_time) {
       // Normalize time format to ensure proper ISO format
@@ -2094,8 +2128,54 @@ export class AutomationService {
         } else if (timeParts.length > 3) {
           timeStr = timeParts.slice(0, 3).join(':')
         }
-        // Create ISO format string with UTC timezone
-        scheduledTime = `${item.scheduled_date}T${timeStr}.000Z`
+        
+        // Convert from plan timezone to UTC
+        try {
+          const plan = item.plan as any
+          const planTimezone = plan?.timezone || 'UTC'
+          const [year, month, day] = item.scheduled_date.split('-').map(Number)
+          const [hours, minutes, seconds = 0] = timeStr.split(':').map(Number)
+          
+          const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: planTimezone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false,
+          })
+          
+          let candidateDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds))
+          let adjustedUtcDate = candidateDate
+          let iterations = 0
+          const maxIterations = 20
+          
+          while (iterations < maxIterations) {
+            const candidateParts = formatter.formatToParts(candidateDate)
+            const candidateHour = parseInt(candidateParts.find(p => p.type === 'hour')?.value || '0')
+            const candidateMinute = parseInt(candidateParts.find(p => p.type === 'minute')?.value || '0')
+            const candidateSecond = parseInt(candidateParts.find(p => p.type === 'second')?.value || '0')
+            
+            if (candidateHour === hours && candidateMinute === minutes && candidateSecond === seconds) {
+              adjustedUtcDate = candidateDate
+              break
+            }
+            
+            const targetSeconds = hours * 3600 + minutes * 60 + seconds
+            const candidateSeconds = candidateHour * 3600 + candidateMinute * 60 + candidateSecond
+            const diffSeconds = targetSeconds - candidateSeconds
+            candidateDate = new Date(candidateDate.getTime() - diffSeconds * 1000)
+            iterations++
+          }
+          
+          scheduledTime = adjustedUtcDate.toISOString()
+        } catch (e: any) {
+          console.error(`[Distribution] Error converting scheduled time:`, e.message)
+          // Fallback to UTC
+          scheduledTime = `${item.scheduled_date}T${timeStr}.000Z`
+        }
       }
     }
 
