@@ -2017,7 +2017,7 @@ export function VideoPlanning() {
                             </div>
                             <Button
                               type="button"
-                              variant="outline"
+                              variant="secondary"
                               size="sm"
                               onClick={() => {
                                 setAvatarModalIndex(index)
@@ -2030,7 +2030,7 @@ export function VideoPlanning() {
                         ) : (
                           <Button
                             type="button"
-                            variant="outline"
+                            variant="secondary"
                             onClick={() => {
                               setAvatarModalIndex(index)
                               setAvatarModalOpen(true)
