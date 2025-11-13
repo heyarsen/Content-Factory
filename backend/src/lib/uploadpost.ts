@@ -350,54 +350,96 @@ export async function postVideo(
       // Continue anyway - Upload-Post might handle it
     }
 
+    // Retry logic with exponential backoff for rate limits and server errors
+    const maxRetries = 3
+    const initialDelay = 2000 // Start with 2 seconds
     let response
-    try {
-      response = await axios.post(
-        endpoint,
-        formData,
-        {
-          headers: {
-            'Authorization': getAuthHeader(),
-            ...formData.getHeaders(), // Important: form-data needs proper headers
-          },
-          timeout: 30000, // 30 second timeout
-        }
-      )
-    } catch (error: any) {
-      // Enhanced error handling with better diagnostics
-      const status = error.response?.status
-      const statusText = error.response?.statusText
-      const errorData = error.response?.data
-      
-      console.error('[Upload-Post] API request failed:', {
-        endpoint,
-        status,
-        statusText,
-        errorData,
-        message: error.message,
-        hasApiKey: !!getUploadPostKey(),
-      })
-      
-      if (status === 404) {
-        throw new Error(
-          `Upload-Post API endpoint not found (404). Please verify the endpoint is correct: ${endpoint}. ` +
-          `Check the Upload-Post API documentation: https://docs.upload-post.com/api/upload-video`
+    let lastError: any
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        response = await axios.post(
+          endpoint,
+          formData,
+          {
+            headers: {
+              'Authorization': getAuthHeader(),
+              ...formData.getHeaders(), // Important: form-data needs proper headers
+            },
+            timeout: 30000, // 30 second timeout
+          }
         )
-      } else if (status === 401) {
-        throw new Error('Upload-Post API authentication failed. Please check your UPLOADPOST_KEY environment variable.')
-      } else if (status === 403) {
-        throw new Error(errorData?.message || 'Upload-Post API access forbidden. Please check your plan limits.')
-      } else if (status === 429) {
-        throw new Error('Upload-Post API rate limit exceeded. Please try again later.')
-      } else if (status >= 500) {
-        throw new Error('Upload-Post API server error. Please try again later.')
-      } else {
+        // Success - break out of retry loop
+        break
+      } catch (error: any) {
+        lastError = error
+        const status = error.response?.status
+        const statusText = error.response?.statusText
+        const errorData = error.response?.data
+        
+        console.error(`[Upload-Post] API request failed (attempt ${attempt + 1}/${maxRetries}):`, {
+          endpoint,
+          status,
+          statusText,
+          errorData,
+          message: error.message,
+          hasApiKey: !!getUploadPostKey(),
+        })
+        
+        // Handle non-retryable errors immediately
+        if (status === 404) {
+          throw new Error(
+            `Upload-Post API endpoint not found (404). Please verify the endpoint is correct: ${endpoint}. ` +
+            `Check the Upload-Post API documentation: https://docs.upload-post.com/api/upload-video`
+          )
+        } else if (status === 401) {
+          throw new Error('Upload-Post API authentication failed. Please check your UPLOADPOST_KEY environment variable.')
+        } else if (status === 403) {
+          throw new Error(errorData?.message || 'Upload-Post API access forbidden. Please check your plan limits.')
+        }
+        
+        // Retry on rate limit (429) or server errors (5xx)
+        if (status === 429 || (status >= 500 && status < 600)) {
+          if (attempt < maxRetries - 1) {
+            // Calculate delay with exponential backoff
+            const delay = initialDelay * Math.pow(2, attempt)
+            
+            // If 429, try to use retry-after header if available
+            const retryAfter = error.response?.headers?.['retry-after'] || 
+                             error.response?.headers?.['x-ratelimit-reset']
+            const waitTime = retryAfter ? parseInt(retryAfter, 10) * 1000 : delay
+            
+            console.log(`[Upload-Post] Rate limit or server error (${status}), retrying in ${waitTime}ms (attempt ${attempt + 1}/${maxRetries})`)
+            await new Promise(resolve => setTimeout(resolve, waitTime))
+            continue
+          } else {
+            // Last attempt failed - throw appropriate error
+            if (status === 429) {
+              throw new Error('Upload-Post API rate limit exceeded. Please try again later.')
+            } else {
+              throw new Error('Upload-Post API server error. Please try again later.')
+            }
+          }
+        }
+        
+        // For other errors, throw immediately
         throw new Error(
           errorData?.message || 
           errorData?.error || 
           `Upload-Post API error: ${statusText || error.message}`
         )
       }
+    }
+
+    // If we exhausted retries without success
+    if (!response && lastError) {
+      const status = lastError.response?.status
+      if (status === 429) {
+        throw new Error('Upload-Post API rate limit exceeded. Please try again later.')
+      } else if (status >= 500) {
+        throw new Error('Upload-Post API server error. Please try again later.')
+      }
+      throw lastError
     }
 
     console.log('Upload-Post API response:', {
