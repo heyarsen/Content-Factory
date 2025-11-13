@@ -380,33 +380,17 @@ export async function generateVideo(
     }
 
     // Build video_config with resolution and optional aspect ratio
-    // For vertical videos (Reels/TikTok), use dimension parameter with width/height
+    // For vertical videos (Reels/TikTok), try output_resolution as string first
+    // If that fails, we'll try dimension parameter as fallback
     // Based on HeyGen API docs: https://docs.heygen.com/reference/create-an-avatar-video-v2
     if (outputResolution || request.aspect_ratio) {
       payload.video_config = {}
       
-      // Check if outputResolution is in format "WIDTHxHEIGHT" (e.g., "1080x1920")
-      if (outputResolution && outputResolution.includes('x')) {
-        const parts = outputResolution.split('x')
-        const width = parseInt(parts[0], 10)
-        const height = parseInt(parts[1], 10)
-        
-        if (!isNaN(width) && !isNaN(height)) {
-          // Use dimension parameter for explicit width/height (vertical videos)
-          payload.video_config.dimension = {
-            width: width,
-            height: height
-          }
-          // Set fit to "crop" to avoid white frames
-          payload.video_config.fit = 'crop'
-          console.log(`[HeyGen] Using dimension parameter for vertical video: ${width}x${height} with fit=crop`)
-        } else {
-          // Fallback to output_resolution if parsing fails
-          payload.video_config.output_resolution = outputResolution
-        }
-      } else if (outputResolution) {
-        // Use output_resolution for standard formats like "720p", "1080p"
+      // For vertical videos, try output_resolution as string format first (simpler approach)
+      // HeyGen may accept "1080x1920" as output_resolution string
+      if (outputResolution) {
         payload.video_config.output_resolution = outputResolution
+        console.log(`[HeyGen] Setting output_resolution: ${outputResolution}`)
       }
       
       if (request.aspect_ratio) {
@@ -501,118 +485,67 @@ export async function generateVideo(
       const errorMessage = err?.response?.data?.message || err?.response?.data?.error
       const errorMessageStr = typeof errorMessage === 'string' ? errorMessage : String(errorMessage || '')
       
-      // Check if it's a resolution/dimension format error - try alternative vertical formats
-      const isResolutionError = errorStatus === 400 && errorMessageStr &&
+      // Log the actual error for debugging
+      console.error(`[HeyGen] API Error Details:`, {
+        status: errorStatus,
+        errorMessage: errorMessageStr,
+        responseData: err.response?.data,
+        videoConfig: payload.video_config,
+      })
+      
+      // Check if it's a resolution/config format error or server error
+      const isConfigError = (errorStatus === 400 || errorStatus >= 500) && errorMessageStr &&
         (errorMessageStr.toLowerCase().includes('output_resolution') ||
          errorMessageStr.toLowerCase().includes('dimension') ||
+         errorMessageStr.toLowerCase().includes('fit') ||
          errorMessageStr.toLowerCase().includes('resolution') ||
          errorMessageStr.toLowerCase().includes('invalid') ||
-         errorMessageStr.toLowerCase().includes('not supported'))
+         errorMessageStr.toLowerCase().includes('not supported') ||
+         errorMessageStr.toLowerCase().includes('server error'))
       
-      // If using vertical dimension/resolution and it fails, try alternative vertical formats
-      const hasVerticalDimension = payload.video_config?.dimension && 
-        payload.video_config.dimension.height > payload.video_config.dimension.width
+      // If using vertical resolution and it fails, try alternative approaches
       const verticalResolutions = ['1080x1920', '720x1280', '1080p_vertical', 'vertical_1080p', '1080p']
       const isVerticalResolution = payload.video_config?.output_resolution && 
         verticalResolutions.includes(payload.video_config.output_resolution)
       
-      if (isResolutionError && (hasVerticalDimension || isVerticalResolution)) {
-        const currentConfig = payload.video_config?.dimension 
-          ? `${payload.video_config.dimension.width}x${payload.video_config.dimension.height}`
-          : payload.video_config?.output_resolution
-        console.warn(`[HeyGen] Video config format '${currentConfig}' not supported, trying alternative vertical formats...`)
+      // If vertical resolution causes errors, try alternative formats
+      if ((isConfigError || errorStatus >= 500) && isVerticalResolution) {
+        const currentRes = payload.video_config?.output_resolution
+        console.warn(`[HeyGen] Vertical resolution '${currentRes}' failed, trying alternative formats...`)
         
-        // Try alternative vertical dimension formats
-        const alternativeDimensions = [
-          { width: 720, height: 1280 },
-          { width: 1080, height: 1920 },
-          { width: 540, height: 960 }
-        ]
+        // Try alternative resolution formats (simpler approach - no dimension parameter)
+        const alternativeResolutions = ['720x1280', '1080x1920', '1080p', '720p']
+        const filteredResolutions = alternativeResolutions.filter(r => r !== currentRes)
         
-        // If we were using dimension, try alternative dimensions
-        if (hasVerticalDimension) {
-          for (const altDim of alternativeDimensions) {
-            // Skip the dimension that just failed
-            if (payload.video_config?.dimension?.width === altDim.width && 
-                payload.video_config?.dimension?.height === altDim.height) {
-              continue
+        for (const altResolution of filteredResolutions) {
+          try {
+            console.log(`[HeyGen] Trying alternative resolution: ${altResolution}`)
+            payload.video_config.output_resolution = altResolution
+            // Remove any dimension/fit if they exist
+            if (payload.video_config.dimension) {
+              delete payload.video_config.dimension
+            }
+            if (payload.video_config.fit) {
+              delete payload.video_config.fit
             }
             
-            try {
-              console.log(`[HeyGen] Trying alternative dimension: ${altDim.width}x${altDim.height}`)
-              payload.video_config.dimension = { width: altDim.width, height: altDim.height }
-              payload.video_config.fit = 'crop'
-              // Remove output_resolution if it exists
-              if (payload.video_config.output_resolution) {
-                delete payload.video_config.output_resolution
+            response = await axios.post(
+              requestUrl,
+              payload,
+              {
+                headers: {
+                  'X-Api-Key': apiKey,
+                  'Content-Type': 'application/json',
+                },
+                timeout: 30000,
               }
-              
-              response = await axios.post(
-                requestUrl,
-                payload,
-                {
-                  headers: {
-                    'X-Api-Key': apiKey,
-                    'Content-Type': 'application/json',
-                  },
-                  timeout: 30000,
-                }
-              )
-              console.log(`[HeyGen] ✅ Successfully used alternative dimension: ${altDim.width}x${altDim.height}`)
-              break // Success, exit retry loop
-            } catch (retryErr: any) {
-              console.log(`[HeyGen] Dimension ${altDim.width}x${altDim.height} also failed, trying next...`)
-              if (altDim === alternativeDimensions[alternativeDimensions.length - 1]) {
-                console.warn(`[HeyGen] All vertical dimension formats failed, falling back to default resolution`)
-              }
-            }
-          }
-        } else {
-          // Try alternative resolution formats
-          const alternativeResolutions = ['720x1280', '1080x1920', '1080p', '720p']
-          const currentRes = payload.video_config?.output_resolution
-          const filteredResolutions = alternativeResolutions.filter(r => r !== currentRes)
-          
-          for (const altResolution of filteredResolutions) {
-            try {
-              console.log(`[HeyGen] Trying alternative resolution: ${altResolution}`)
-              // If it's a dimension format, convert to dimension parameter
-              if (altResolution.includes('x')) {
-                const parts = altResolution.split('x')
-                const width = parseInt(parts[0], 10)
-                const height = parseInt(parts[1], 10)
-                if (!isNaN(width) && !isNaN(height)) {
-                  payload.video_config.dimension = { width, height }
-                  payload.video_config.fit = 'crop'
-                  delete payload.video_config.output_resolution
-                } else {
-                  payload.video_config.output_resolution = altResolution
-                }
-              } else {
-                payload.video_config.output_resolution = altResolution
-                if (payload.video_config.dimension) {
-                  delete payload.video_config.dimension
-                }
-              }
-              
-              response = await axios.post(
-                requestUrl,
-                payload,
-                {
-                  headers: {
-                    'X-Api-Key': apiKey,
-                    'Content-Type': 'application/json',
-                  },
-                  timeout: 30000,
-                }
-              )
-              console.log(`[HeyGen] ✅ Successfully used alternative resolution: ${altResolution}`)
-              break // Success, exit retry loop
-            } catch (retryErr: any) {
-              console.log(`[HeyGen] Resolution ${altResolution} also failed, trying next...`)
-              if (altResolution === filteredResolutions[filteredResolutions.length - 1]) {
-                console.warn(`[HeyGen] All vertical resolution formats failed, falling back to default resolution`)
-              }
+            )
+            console.log(`[HeyGen] ✅ Successfully used alternative resolution: ${altResolution}`)
+            break // Success, exit retry loop
+          } catch (retryErr: any) {
+            console.log(`[HeyGen] Resolution ${altResolution} also failed:`, retryErr.response?.status, retryErr.response?.data?.message)
+            if (altResolution === filteredResolutions[filteredResolutions.length - 1]) {
+              console.warn(`[HeyGen] All vertical resolution formats failed`)
             }
           }
         }
@@ -621,22 +554,25 @@ export async function generateVideo(
         if (response) {
           // Continue to success path below
         } else {
-          // All alternatives failed, continue with original retry logic
+          // All alternatives failed, try removing video_config entirely as last resort
           const shouldRetryWithoutConfig = !!payload.video_config
           if (shouldRetryWithoutConfig) {
+            const hadDimension = !!payload.video_config?.dimension
             const hadAspectRatio = !!payload.video_config?.aspect_ratio
             console.warn(
-              '[HeyGen] All resolution formats failed, retrying without video_config:',
+              '[HeyGen] All vertical video formats failed, retrying without video_config:',
               {
                 error: err.response?.data,
+                errorStatus: err.response?.status,
+                errorMessage: errorMessageStr,
+                hadDimension,
                 hadAspectRatio,
+                dimension: payload.video_config?.dimension,
                 aspectRatio: payload.video_config?.aspect_ratio,
                 outputResolution: payload.video_config?.output_resolution,
               }
             )
-            if (hadAspectRatio) {
-              console.warn(`[HeyGen] ⚠️ Aspect ratio ${payload.video_config.aspect_ratio} may not be supported by HeyGen API. Video will be generated without aspect ratio setting.`)
-            }
+            console.warn(`[HeyGen] ⚠️ Vertical video parameters may not be supported. Video will be generated in default format (likely horizontal).`)
             delete payload.video_config
             response = await axios.post(
               requestUrl,
@@ -649,15 +585,16 @@ export async function generateVideo(
                 timeout: 30000,
               }
             )
+            console.warn(`[HeyGen] ⚠️ Video generated without vertical format - may have white frames on sides for Reels/TikTok`)
           } else {
             throw err
           }
         }
       } else {
-        // Original retry logic for non-resolution errors
-      const shouldRetryWithoutConfig =
-        !!payload.video_config &&
-        errorStatus === 400 &&
+        // Original retry logic for non-resolution/config errors
+        const shouldRetryWithoutConfig =
+          !!payload.video_config &&
+          errorStatus === 400 &&
           errorMessageStr &&
           (errorMessageStr.toLowerCase().includes('output_resolution') ||
             errorMessageStr.toLowerCase().includes('video_config') ||
@@ -665,41 +602,50 @@ export async function generateVideo(
             errorMessageStr.toLowerCase().includes('aspect') ||
             errorMessageStr.toLowerCase().includes('ratio'))
 
-      if (shouldRetryWithoutConfig) {
+        if (shouldRetryWithoutConfig) {
           const hadAspectRatio = !!payload.video_config?.aspect_ratio
-        console.warn(
-            '[HeyGen] Output resolution/aspect_ratio not supported, retrying without video_config:',
+          const hadDimension = !!payload.video_config?.dimension
+          console.warn(
+            '[HeyGen] Output resolution/aspect_ratio/dimension not supported, retrying without video_config:',
             {
               error: err.response?.data,
+              errorStatus: err.response?.status,
               hadAspectRatio,
+              hadDimension,
               aspectRatio: payload.video_config?.aspect_ratio,
+              dimension: payload.video_config?.dimension,
               outputResolution: payload.video_config?.output_resolution,
             }
           )
           if (hadAspectRatio) {
             console.warn(`[HeyGen] ⚠️ Aspect ratio ${payload.video_config.aspect_ratio} may not be supported by HeyGen API. Video will be generated without aspect ratio setting.`)
           }
-        delete payload.video_config
-        response = await axios.post(
-          requestUrl,
-          payload,
-          {
-            headers: {
-              'X-Api-Key': apiKey,
-              'Content-Type': 'application/json',
-            },
-            timeout: 30000,
+          if (hadDimension) {
+            console.warn(`[HeyGen] ⚠️ Dimension parameter may not be supported by HeyGen API. Video will be generated without dimension setting.`)
           }
-        )
-      } else {
-          // Check if error is specifically about aspect_ratio
-          if (errorMessageStr.toLowerCase().includes('aspect') || errorMessageStr.toLowerCase().includes('ratio')) {
-            console.error(`[HeyGen] ❌ Aspect ratio error:`, {
+          delete payload.video_config
+          response = await axios.post(
+            requestUrl,
+            payload,
+            {
+              headers: {
+                'X-Api-Key': apiKey,
+                'Content-Type': 'application/json',
+              },
+              timeout: 30000,
+            }
+          )
+        } else {
+          // Check if error is specifically about aspect_ratio or dimension
+          if (errorMessageStr.toLowerCase().includes('aspect') || errorMessageStr.toLowerCase().includes('ratio') || errorMessageStr.toLowerCase().includes('dimension')) {
+            console.error(`[HeyGen] ❌ Video config error:`, {
               aspectRatio: request.aspect_ratio,
+              outputResolution: outputResolution,
               error: err.response?.data,
+              errorStatus: err.response?.status,
             })
           }
-        throw err
+          throw err
         }
       }
     }
