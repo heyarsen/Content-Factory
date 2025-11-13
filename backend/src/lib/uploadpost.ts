@@ -442,6 +442,11 @@ export async function postVideo(
       throw lastError
     }
 
+    // Type guard: response must be defined at this point
+    if (!response) {
+      throw new Error('Upload-Post API request failed: no response received')
+    }
+
     console.log('Upload-Post API response:', {
       status: response.status,
       statusText: response.statusText,
