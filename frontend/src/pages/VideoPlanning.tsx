@@ -27,6 +27,8 @@ import {
   ExternalLink,
   User,
   RefreshCw,
+  CheckCircle2,
+  Users,
 } from 'lucide-react'
 import api from '../lib/api'
 
@@ -160,8 +162,11 @@ export function VideoPlanning() {
   ]) // Default times for 3 videos
   const [videoTopics, setVideoTopics] = useState<string[]>(['', '', '']) // Topics for each video slot
   const [videoAvatars, setVideoAvatars] = useState<string[]>(['', '', '']) // Avatar IDs for each video slot
-  const [avatars, setAvatars] = useState<Array<{ id: string; avatar_name: string; thumbnail_url: string | null; preview_url: string | null }>>([])
+  const [avatars, setAvatars] = useState<Array<{ id: string; avatar_name: string; thumbnail_url: string | null; preview_url: string | null; is_default?: boolean }>>([])
   const [loadingAvatars, setLoadingAvatars] = useState(false)
+  const [defaultAvatarId, setDefaultAvatarId] = useState<string | null>(null)
+  const [avatarModalOpen, setAvatarModalOpen] = useState(false)
+  const [avatarModalIndex, setAvatarModalIndex] = useState<number>(0) // Track which video slot is selecting avatar
   const [deleteModal, setDeleteModal] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [editPlanModal, setEditPlanModal] = useState<VideoPlan | null>(null)
@@ -189,6 +194,20 @@ export function VideoPlanning() {
       setLoadingAvatars(true)
       const response = await api.get('/api/avatars', { params: { all: 'true' } })
       setAvatars(response.data.avatars || [])
+      setDefaultAvatarId(response.data.default_avatar_id || null)
+      
+      // Set default avatar for all video slots that don't have an avatar selected
+      if (response.data.default_avatar_id) {
+        setVideoAvatars(prev => {
+          const newAvatars = [...prev]
+          for (let i = 0; i < newAvatars.length; i++) {
+            if (!newAvatars[i]) {
+              newAvatars[i] = response.data.default_avatar_id
+            }
+          }
+          return newAvatars
+        })
+      }
     } catch (error) {
       console.error('Failed to load avatars:', error)
     } finally {
@@ -203,10 +222,19 @@ export function VideoPlanning() {
       // If we need more times, add defaults. If fewer, keep first N.
       setVideoTimes(defaultTimes.slice(0, videosPerDay))
       setVideoTopics(Array(videosPerDay).fill(''))
-      setVideoAvatars(Array(videosPerDay).fill(''))
+      // Set default avatar for new slots
+      const newAvatars = Array(videosPerDay).fill('')
+      for (let i = 0; i < videosPerDay; i++) {
+        if (i < videoAvatars.length && videoAvatars[i]) {
+          newAvatars[i] = videoAvatars[i]
+        } else if (defaultAvatarId) {
+          newAvatars[i] = defaultAvatarId
+        }
+      }
+      setVideoAvatars(newAvatars)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videosPerDay])
+  }, [videosPerDay, defaultAvatarId])
 
   // Available platforms
   const availablePlatforms = ['instagram', 'youtube', 'tiktok', 'twitter']
@@ -509,6 +537,12 @@ export function VideoPlanning() {
       setVideosPerDay(3)
       setStartDate(new Date().toISOString().split('T')[0])
       setEndDate('')
+      // Reset avatars to default
+      if (defaultAvatarId) {
+        setVideoAvatars(Array(3).fill(defaultAvatarId))
+      } else {
+        setVideoAvatars(['', '', ''])
+      }
       setAutoScheduleTrigger('daily')
       setTriggerTime('09:00')
       setDefaultPlatforms([])
@@ -1957,49 +1991,56 @@ export function VideoPlanning() {
                         <div className="text-sm text-amber-600">
                           No avatars available. Please create an avatar first.
                         </div>
-                      ) : (
-                        <div className="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto">
-                          {avatars.map((avatar) => {
-                            const isSelected = videoAvatars[index] === avatar.id
-                            return (
-                              <button
-                                key={avatar.id}
-                                type="button"
-                                onClick={() => {
-                                  const newAvatars = [...videoAvatars]
-                                  newAvatars[index] = avatar.id
-                                  setVideoAvatars(newAvatars)
-                                }}
-                                className={`relative rounded-lg border-2 p-2 transition-all ${
-                                  isSelected
-                                    ? 'border-brand-500 bg-brand-50'
-                                    : 'border-slate-200 bg-white hover:border-brand-300'
-                                }`}
-                              >
-                                {avatar.thumbnail_url || avatar.preview_url ? (
-                                  <img
-                                    src={avatar.thumbnail_url || avatar.preview_url || ''}
-                                    alt={avatar.avatar_name}
-                                    className="w-full h-16 object-contain rounded mb-1 bg-slate-50"
-                                  />
-                                ) : (
-                                  <div className="w-full h-16 bg-gradient-to-br from-brand-400 to-brand-600 rounded flex items-center justify-center mb-1">
-                                    <User className="h-6 w-6 text-white opacity-50" />
-                                  </div>
-                                )}
-                                <p className="text-xs font-medium text-slate-700 truncate text-center">
-                                  {avatar.avatar_name}
-                                </p>
-                                {isSelected && (
-                                  <div className="absolute top-1 right-1 bg-brand-500 text-white rounded-full p-0.5">
-                                    <Check className="h-3 w-3" />
-                                  </div>
-                                )}
-                              </button>
-                            )
-                          })}
-                        </div>
-                      )}
+                      ) : (() => {
+                        const selectedAvatarId = videoAvatars[index]
+                        const selectedAvatar = avatars.find(a => a.id === selectedAvatarId)
+                        return selectedAvatar ? (
+                          <div className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg bg-white">
+                            {selectedAvatar.thumbnail_url || selectedAvatar.preview_url ? (
+                              <img
+                                src={selectedAvatar.thumbnail_url || selectedAvatar.preview_url || ''}
+                                alt={selectedAvatar.avatar_name}
+                                className="w-16 h-16 object-contain rounded bg-slate-50 flex-shrink-0"
+                              />
+                            ) : (
+                              <div className="w-16 h-16 bg-gradient-to-br from-brand-400 to-brand-600 rounded flex items-center justify-center flex-shrink-0">
+                                <User className="h-8 w-8 text-white opacity-50" />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-slate-700 truncate">
+                                {selectedAvatar.avatar_name}
+                              </p>
+                              {selectedAvatar.is_default && (
+                                <p className="text-xs text-slate-500 mt-0.5">Default Avatar</p>
+                              )}
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setAvatarModalIndex(index)
+                                setAvatarModalOpen(true)
+                              }}
+                            >
+                              Change
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              setAvatarModalIndex(index)
+                              setAvatarModalOpen(true)
+                            }}
+                            className="w-full"
+                          >
+                            Select Avatar
+                          </Button>
+                        )
+                      })()}
                     </div>
                   </div>
                 ))}
@@ -2884,6 +2925,81 @@ export function VideoPlanning() {
             </div>
             )
           })()}
+        </Modal>
+
+        {/* Avatar Selection Modal */}
+        <Modal
+          isOpen={avatarModalOpen}
+          onClose={() => setAvatarModalOpen(false)}
+          title="Select Avatar"
+          size="xl"
+        >
+          <div className="space-y-6">
+            <p className="text-sm text-slate-500">
+              Choose an avatar for video {avatarModalIndex + 1}. The avatar will appear in the generated video.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 max-h-[65vh] overflow-y-auto pr-2 -mr-2">
+              {avatars.length === 0 ? (
+                <div className="col-span-full text-center py-12 text-slate-500">
+                  <Users className="h-12 w-12 mx-auto mb-3 text-slate-300" />
+                  <p>No avatars available</p>
+                </div>
+              ) : (
+                avatars.map((avatar) => {
+                  const isSelected = videoAvatars[avatarModalIndex] === avatar.id
+                  return (
+                    <button
+                      key={avatar.id}
+                      type="button"
+                      onClick={() => {
+                        const newAvatars = [...videoAvatars]
+                        newAvatars[avatarModalIndex] = avatar.id
+                        setVideoAvatars(newAvatars)
+                        setAvatarModalOpen(false)
+                      }}
+                      className={`relative rounded-xl border-2 p-3 transition-all hover:scale-105 ${
+                        isSelected
+                          ? 'border-brand-500 bg-brand-50 shadow-lg ring-2 ring-brand-200'
+                          : 'border-slate-200 bg-white hover:border-brand-300 hover:shadow-md'
+                      }`}
+                    >
+                      {avatar.thumbnail_url || avatar.preview_url ? (
+                        <img
+                          src={avatar.thumbnail_url || avatar.preview_url || ''}
+                          alt={avatar.avatar_name}
+                          className="w-full h-36 object-contain rounded-lg mb-2 bg-slate-50"
+                        />
+                      ) : (
+                        <div className="w-full h-36 bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center mb-2">
+                          <Users className="h-12 w-12 text-white opacity-50" />
+                        </div>
+                      )}
+                      <p className="text-xs font-medium text-slate-700 truncate text-center">
+                        {avatar.avatar_name}
+                      </p>
+                      {isSelected && (
+                        <div className="absolute top-2 right-2 bg-brand-500 text-white rounded-full p-1.5 shadow-lg ring-2 ring-white">
+                          <CheckCircle2 className="h-4 w-4" />
+                        </div>
+                      )}
+                    </button>
+                  )
+                })
+              )}
+            </div>
+            <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+              <p className="text-xs text-slate-400">
+                {avatars.length} avatar{avatars.length !== 1 ? 's' : ''} available
+              </p>
+              <Button
+                variant="ghost"
+                onClick={() => setAvatarModalOpen(false)}
+                className="border border-white/60 bg-white/70 text-slate-500 hover:border-slate-200 hover:bg-white"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
         </Modal>
       </div>
     </Layout>
