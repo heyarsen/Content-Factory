@@ -566,10 +566,12 @@ export class VideoService {
       }
 
       // Build payload with avatar and vertical resolution for Reels/TikTok (9:16)
-      // Use vertical resolution format (1080x1920) instead of aspect_ratio
-      // HeyGen API doesn't support aspect_ratio field - resolution defines the aspect ratio
-      const verticalResolution = '1080x1920' // Vertical resolution for Reels/TikTok (9:16 aspect ratio)
+      // Try multiple vertical resolution formats - HeyGen may support different formats
+      // Priority: Try explicit dimensions first, then fallback formats
+      const verticalResolutions = ['1080x1920', '720x1280', '1080p_vertical', 'vertical_1080p']
+      const verticalResolution = verticalResolutions[0] // Start with 1080x1920
       console.log(`[Reel Video] Building payload with vertical resolution: ${verticalResolution} (9:16 aspect ratio)`)
+      console.log(`[Reel Video] Will try fallback formats if needed: ${verticalResolutions.slice(1).join(', ')}`)
       
       const payload = buildHeygenPayload(
         reel.topic,

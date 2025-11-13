@@ -1980,7 +1980,7 @@ export function VideoPlanning() {
                                   <img
                                     src={avatar.thumbnail_url || avatar.preview_url || ''}
                                     alt={avatar.avatar_name}
-                                    className="w-full h-16 object-cover rounded mb-1"
+                                    className="w-full h-16 object-contain rounded mb-1 bg-slate-50"
                                   />
                                 ) : (
                                   <div className="w-full h-16 bg-gradient-to-br from-brand-400 to-brand-600 rounded flex items-center justify-center mb-1">
@@ -2624,7 +2624,7 @@ export function VideoPlanning() {
                         <img
                           src={itemAvatar.thumbnail_url || itemAvatar.preview_url || ''}
                           alt={itemAvatar.avatar_name}
-                          className="h-16 w-16 rounded-lg object-cover border-2 border-brand-200"
+                          className="h-16 w-16 rounded-lg object-contain border-2 border-brand-200 bg-slate-50"
                         />
                       ) : (
                         <div className="h-16 w-16 rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">

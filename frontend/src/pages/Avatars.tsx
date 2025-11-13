@@ -721,7 +721,7 @@ export default function Avatars() {
                     <img
                       src={avatar.thumbnail_url || avatar.preview_url || ''}
                       alt={avatar.avatar_name}
-                      className="w-full h-48 object-cover"
+                      className="w-full h-48 object-contain bg-slate-50"
                     />
                   ) : (
                     <div className="w-full h-48 bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">

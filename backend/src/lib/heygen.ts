@@ -380,10 +380,26 @@ export async function generateVideo(
     }
 
     // Build video_config with resolution and optional aspect ratio
+    // For vertical videos (Reels/TikTok), try multiple approaches:
+    // 1. Use vertical resolution format (e.g., "1080x1920")
+    // 2. Add video_ratio parameter if resolution format is vertical
     if (outputResolution || request.aspect_ratio) {
       payload.video_config = {}
-      if (outputResolution) {
+    if (outputResolution) {
         payload.video_config.output_resolution = outputResolution
+        
+        // If using vertical resolution format, also try adding video_ratio
+        // Some APIs use video_ratio instead of/as well as resolution
+        if (outputResolution.includes('x')) {
+          const parts = outputResolution.split('x')
+          const width = parseInt(parts[0], 10)
+          const height = parseInt(parts[1], 10)
+          if (!isNaN(width) && !isNaN(height) && height > width) {
+            // Vertical format detected (height > width)
+            payload.video_config.video_ratio = '9:16'
+            console.log(`[HeyGen] Detected vertical resolution ${outputResolution}, adding video_ratio: 9:16`)
+          }
+        }
       }
       if (request.aspect_ratio) {
         payload.video_config.aspect_ratio = request.aspect_ratio
@@ -396,7 +412,9 @@ export async function generateVideo(
       console.log(`[HeyGen] Video config:`, {
         output_resolution: payload.video_config.output_resolution,
         aspect_ratio: payload.video_config.aspect_ratio,
+        video_ratio: payload.video_config.video_ratio,
         hasAspectRatio: !!payload.video_config.aspect_ratio,
+        hasVideoRatio: !!payload.video_config.video_ratio,
       })
     }
 
@@ -481,12 +499,17 @@ export async function generateVideo(
          errorMessageStr.toLowerCase().includes('invalid') ||
          errorMessageStr.toLowerCase().includes('not supported'))
       
-      // If using vertical resolution (1080x1920) and it fails, try alternative formats
-      if (isResolutionError && payload.video_config?.output_resolution === '1080x1920') {
-        console.warn(`[HeyGen] Resolution format '1080x1920' not supported, trying alternative vertical formats...`)
+      // If using vertical resolution and it fails, try alternative vertical formats
+      const verticalResolutions = ['1080x1920', '720x1280', '1080p_vertical', 'vertical_1080p', '1080p']
+      const isVerticalResolution = payload.video_config?.output_resolution && 
+        verticalResolutions.includes(payload.video_config.output_resolution)
+      
+      if (isResolutionError && isVerticalResolution) {
+        const currentResolution = payload.video_config?.output_resolution
+        console.warn(`[HeyGen] Resolution format '${currentResolution}' not supported, trying alternative vertical formats...`)
         
-        // Try alternative vertical resolution formats
-        const alternativeResolutions = ['1080p', '720x1280', '1080p_vertical']
+        // Try alternative vertical resolution formats (exclude the one that just failed)
+        const alternativeResolutions = verticalResolutions.filter(r => r !== currentResolution)
         
         for (const altResolution of alternativeResolutions) {
           try {
@@ -556,9 +579,9 @@ export async function generateVideo(
         }
       } else {
         // Original retry logic for non-resolution errors
-        const shouldRetryWithoutConfig =
-          !!payload.video_config &&
-          errorStatus === 400 &&
+      const shouldRetryWithoutConfig =
+        !!payload.video_config &&
+        errorStatus === 400 &&
           errorMessageStr &&
           (errorMessageStr.toLowerCase().includes('output_resolution') ||
             errorMessageStr.toLowerCase().includes('video_config') ||
@@ -566,9 +589,9 @@ export async function generateVideo(
             errorMessageStr.toLowerCase().includes('aspect') ||
             errorMessageStr.toLowerCase().includes('ratio'))
 
-        if (shouldRetryWithoutConfig) {
+      if (shouldRetryWithoutConfig) {
           const hadAspectRatio = !!payload.video_config?.aspect_ratio
-          console.warn(
+        console.warn(
             '[HeyGen] Output resolution/aspect_ratio not supported, retrying without video_config:',
             {
               error: err.response?.data,
@@ -580,19 +603,19 @@ export async function generateVideo(
           if (hadAspectRatio) {
             console.warn(`[HeyGen] ⚠️ Aspect ratio ${payload.video_config.aspect_ratio} may not be supported by HeyGen API. Video will be generated without aspect ratio setting.`)
           }
-          delete payload.video_config
-          response = await axios.post(
-            requestUrl,
-            payload,
-            {
-              headers: {
-                'X-Api-Key': apiKey,
-                'Content-Type': 'application/json',
-              },
-              timeout: 30000,
-            }
-          )
-        } else {
+        delete payload.video_config
+        response = await axios.post(
+          requestUrl,
+          payload,
+          {
+            headers: {
+              'X-Api-Key': apiKey,
+              'Content-Type': 'application/json',
+            },
+            timeout: 30000,
+          }
+        )
+      } else {
           // Check if error is specifically about aspect_ratio
           if (errorMessageStr.toLowerCase().includes('aspect') || errorMessageStr.toLowerCase().includes('ratio')) {
             console.error(`[HeyGen] ❌ Aspect ratio error:`, {
@@ -600,7 +623,7 @@ export async function generateVideo(
               error: err.response?.data,
             })
           }
-          throw err
+        throw err
         }
       }
     }

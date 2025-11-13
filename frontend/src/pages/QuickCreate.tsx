@@ -917,7 +917,7 @@ export function QuickCreate() {
                       <img
                         src={avatar.thumbnail_url || avatar.preview_url || ''}
                         alt={avatar.avatar_name}
-                        className="w-full h-36 object-cover rounded-lg mb-2"
+                        className="w-full h-36 object-contain rounded-lg mb-2 bg-slate-50"
                       />
                     ) : (
                       <div className="w-full h-36 bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center mb-2">
