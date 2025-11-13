@@ -286,7 +286,12 @@ export async function postVideo(
       formData.append('description', request.caption)
     }
 
-    if (request.scheduledTime) {
+    // Option to skip scheduling in Upload-Post and send at the right time instead
+    // Default to true to avoid timezone issues - local scheduler will send at correct time
+    // Set UPLOADPOST_SKIP_SCHEDULING=false to use Upload-Post scheduling (may have timezone issues)
+    const skipScheduling = process.env.UPLOADPOST_SKIP_SCHEDULING !== 'false'
+    
+    if (request.scheduledTime && !skipScheduling) {
       // Convert to ISO-8601 format if needed
       try {
         // Check if already in ISO format
@@ -303,10 +308,14 @@ export async function postVideo(
           scheduledDate = dateObj.toISOString()
         }
         formData.append('scheduled_date', scheduledDate)
+        console.log('[Upload-Post] Scheduling post for:', scheduledDate)
       } catch (error: any) {
         console.error('[Upload-Post] Invalid scheduled time:', request.scheduledTime, error.message)
         throw new Error(`Invalid scheduled time format: ${request.scheduledTime}. ${error.message}`)
       }
+    } else if (request.scheduledTime && skipScheduling) {
+      console.log('[Upload-Post] Skipping scheduled_date parameter - will send at scheduled time via local scheduler')
+      // Don't append scheduled_date - the request will be sent at the right time by our scheduler
     }
 
     // Always use async upload to avoid timeouts

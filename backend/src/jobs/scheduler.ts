@@ -196,6 +196,18 @@ export function initializeScheduler(): void {
     }
   })
 
+  // Send scheduled posts to Upload-Post at the right time (when UPLOADPOST_SKIP_SCHEDULING=true)
+  // Runs every minute to check for due posts
+  cron.schedule('* * * * *', async () => {
+    console.log('[Cron] Running automation: send scheduled posts...')
+    try {
+      await AutomationService.sendScheduledPosts()
+      console.log('[Automation] Sent scheduled posts')
+    } catch (error: any) {
+      console.error('[Automation] Error sending scheduled posts:', error)
+    }
+  })
+
   console.log('Job scheduler initialized successfully')
 }
 

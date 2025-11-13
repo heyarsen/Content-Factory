@@ -2253,32 +2253,56 @@ export class AutomationService {
       }
     }
 
-    // Call upload-post.com API
-    const postResponse = await postVideo({
-      videoUrl: videoData.video_url,
-      platforms: platforms as string[],
-      caption: item.caption || item.topic || '',
-      scheduledTime,
-      userId: uploadPostUserId,
-      asyncUpload: true,
-    })
+    // Check if we should skip Upload-Post scheduling (default is true to avoid timezone issues)
+    const skipScheduling = process.env.UPLOADPOST_SKIP_SCHEDULING !== 'false'
+    
+    if (skipScheduling && scheduledTime) {
+      // Don't send to Upload-Post now - create pending scheduled_posts records
+      // A cron job will send them at the scheduled time
+      console.log(`[Distribution] Skipping Upload-Post scheduling - will send at scheduled time: ${scheduledTime}`)
+      
+      for (const platform of platforms) {
+        await supabase
+          .from('scheduled_posts')
+          .insert({
+            video_id: item.video_id,
+            user_id: userId,
+            platform: platform,
+            scheduled_time: scheduledTime ? new Date(scheduledTime).toISOString() : null,
+            status: 'pending',
+            upload_post_id: null,
+            posted_at: null,
+            error_message: null,
+          })
+      }
+    } else {
+      // Send to Upload-Post immediately (with or without scheduled_date)
+      const postResponse = await postVideo({
+        videoUrl: videoData.video_url,
+        platforms: platforms as string[],
+        caption: item.caption || item.topic || '',
+        scheduledTime: skipScheduling ? undefined : scheduledTime,
+        userId: uploadPostUserId,
+        asyncUpload: true,
+      })
 
-    // Create scheduled_posts records
-    for (const platform of platforms) {
-      const platformResult = postResponse.results?.find((r: any) => r.platform === platform)
+      // Create scheduled_posts records
+      for (const platform of platforms) {
+        const platformResult = postResponse.results?.find((r: any) => r.platform === platform)
 
-      await supabase
-        .from('scheduled_posts')
-        .insert({
-          video_id: item.video_id,
-          user_id: userId,
-          platform: platform,
-          scheduled_time: scheduledTime ? new Date(scheduledTime).toISOString() : null,
-          status: platformResult?.status === 'success' ? 'posted' : 'pending',
-          upload_post_id: postResponse.upload_id || platformResult?.post_id,
-          posted_at: platformResult?.status === 'success' ? new Date().toISOString() : null,
-          error_message: platformResult?.error || null,
-        })
+        await supabase
+          .from('scheduled_posts')
+          .insert({
+            video_id: item.video_id,
+            user_id: userId,
+            platform: platform,
+            scheduled_time: scheduledTime ? new Date(scheduledTime).toISOString() : null,
+            status: platformResult?.status === 'success' ? 'posted' : 'pending',
+            upload_post_id: postResponse.upload_id || platformResult?.post_id,
+            posted_at: platformResult?.status === 'success' ? new Date().toISOString() : null,
+            error_message: platformResult?.error || null,
+          })
+      }
     }
 
     // Update plan item status
@@ -2286,6 +2310,157 @@ export class AutomationService {
       .from('video_plan_items')
       .update({ status: 'scheduled' })
       .eq('id', itemId)
+  }
+
+  /**
+   * Send scheduled posts to Upload-Post at the right time
+   * This is used when UPLOADPOST_SKIP_SCHEDULING=true to avoid timezone issues
+   */
+  static async sendScheduledPosts(): Promise<void> {
+    const skipScheduling = process.env.UPLOADPOST_SKIP_SCHEDULING !== 'false'
+    if (!skipScheduling) {
+      return // Only run if skip scheduling is enabled
+    }
+
+    const now = new Date()
+    const nowISO = now.toISOString()
+
+    // Find scheduled posts that are due (scheduled_time <= now) and still pending
+    const { data: duePosts, error } = await supabase
+      .from('scheduled_posts')
+      .select('*')
+      .eq('status', 'pending')
+      .not('scheduled_time', 'is', null)
+      .lte('scheduled_time', nowISO)
+      .limit(10) // Process up to 10 at a time
+
+    if (error) {
+      console.error('[Scheduled Posts] Error fetching due posts:', error)
+      return
+    }
+
+    if (!duePosts || duePosts.length === 0) {
+      return
+    }
+
+    console.log(`[Scheduled Posts] Found ${duePosts.length} posts due to be sent`)
+
+    // Group by video_id to send all platforms together
+    const postsByVideo = new Map<string, typeof duePosts>()
+    for (const post of duePosts) {
+      const key = `${post.video_id}_${post.user_id}`
+      if (!postsByVideo.has(key)) {
+        postsByVideo.set(key, [])
+      }
+      postsByVideo.get(key)!.push(post)
+    }
+
+    for (const [key, videoPosts] of postsByVideo) {
+      try {
+        const firstPost = videoPosts[0]
+        
+        // Get video URL
+        const { data: video } = await supabase
+          .from('videos')
+          .select('video_url')
+          .eq('id', firstPost.video_id)
+          .single()
+
+        if (!video || !video.video_url) {
+          console.error(`[Scheduled Posts] No video URL for post ${firstPost.id}`)
+          await supabase
+            .from('scheduled_posts')
+            .update({ 
+              status: 'failed',
+              error_message: 'Video URL not found'
+            })
+            .in('id', videoPosts.map(p => p.id))
+          continue
+        }
+
+        const platforms = videoPosts.map(p => p.platform)
+        
+        // Get upload_post_user_id from social_accounts
+        const { data: account } = await supabase
+          .from('social_accounts')
+          .select('platform_account_id')
+          .eq('user_id', firstPost.user_id)
+          .eq('platform', platforms[0])
+          .eq('status', 'connected')
+          .single()
+
+        if (!account || !account.platform_account_id) {
+          console.error(`[Scheduled Posts] No upload_post_user_id for post ${firstPost.id}`)
+          await supabase
+            .from('scheduled_posts')
+            .update({ 
+              status: 'failed',
+              error_message: 'Upload-Post user ID not found'
+            })
+            .in('id', videoPosts.map(p => p.id))
+          continue
+        }
+
+        // Get caption from video or plan item
+        let caption = ''
+        const { data: planItem } = await supabase
+          .from('video_plan_items')
+          .select('caption, topic')
+          .eq('video_id', firstPost.video_id)
+          .single()
+        if (planItem) {
+          caption = planItem.caption || planItem.topic || ''
+        } else {
+          const { data: videoData } = await supabase
+            .from('videos')
+            .select('topic')
+            .eq('id', firstPost.video_id)
+            .single()
+          if (videoData) {
+            caption = videoData.topic || ''
+          }
+        }
+
+        console.log(`[Scheduled Posts] Sending ${platforms.length} posts for video ${firstPost.video_id} to Upload-Post`)
+
+        // Send to Upload-Post without scheduled_date (posts immediately)
+        const { postVideo } = await import('../lib/uploadpost.js')
+        const postResponse = await postVideo({
+          videoUrl: video.video_url,
+          platforms,
+          caption,
+          scheduledTime: undefined, // Don't schedule - post immediately
+          userId: account.platform_account_id,
+          asyncUpload: true,
+        })
+
+        // Update all related scheduled_posts
+        for (const videoPost of videoPosts) {
+          const platformResult = postResponse.results?.find((r: any) => r.platform === videoPost.platform)
+
+          await supabase
+            .from('scheduled_posts')
+            .update({
+              status: platformResult?.status === 'success' ? 'posted' : 'pending',
+              upload_post_id: postResponse.upload_id || platformResult?.post_id,
+              posted_at: platformResult?.status === 'success' ? new Date().toISOString() : null,
+              error_message: platformResult?.error || null,
+            })
+            .eq('id', videoPost.id)
+        }
+
+        console.log(`[Scheduled Posts] Successfully sent posts for video ${firstPost.video_id}`)
+      } catch (error: any) {
+        console.error(`[Scheduled Posts] Error sending posts:`, error)
+        await supabase
+          .from('scheduled_posts')
+          .update({ 
+            status: 'failed',
+            error_message: error.message || 'Failed to send to Upload-Post'
+          })
+          .in('id', videoPosts.map(p => p.id))
+      }
+    }
   }
 }
 

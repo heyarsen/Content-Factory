@@ -379,36 +379,38 @@ export async function generateVideo(
       },
     }
 
-    // Build video_config with resolution and optional aspect ratio
-    // For vertical videos (Reels/TikTok), try output_resolution as string first
-    // If that fails, we'll try dimension parameter as fallback
-    // Based on HeyGen API docs: https://docs.heygen.com/reference/create-an-avatar-video-v2
-    if (outputResolution || request.aspect_ratio) {
-      payload.video_config = {}
-      
-      // For vertical videos, try output_resolution as string format first (simpler approach)
-      // HeyGen may accept "1080x1920" as output_resolution string
-      if (outputResolution) {
-        payload.video_config.output_resolution = outputResolution
-        console.log(`[HeyGen] Setting output_resolution: ${outputResolution}`)
+    // Build video_config - HeyGen API v2 may not support custom resolutions for vertical videos
+    // According to docs: https://docs.heygen.com/reference/create-an-avatar-video-v2
+    // Only include video_config if using standard resolution formats (720p, 1080p)
+    // For vertical videos (Reels/TikTok), HeyGen may need templates or default to vertical format
+    // Skip video_config for vertical formats to avoid API errors
+    const isVerticalFormat = outputResolution && (
+      outputResolution.includes('x') || 
+      outputResolution.includes('1920') || 
+      outputResolution.includes('1280') ||
+      outputResolution.toLowerCase().includes('vertical')
+    )
+    
+    if (!isVerticalFormat && outputResolution && outputResolution !== DEFAULT_HEYGEN_RESOLUTION) {
+      // Only set video_config for standard horizontal resolutions
+      payload.video_config = {
+        output_resolution: outputResolution
       }
-      
-      if (request.aspect_ratio) {
-        payload.video_config.aspect_ratio = request.aspect_ratio
-        console.log(`[HeyGen] Setting aspect_ratio in video_config: ${request.aspect_ratio}`)
-      }
+      console.log(`[HeyGen] Setting output_resolution for horizontal video: ${outputResolution}`)
+    } else if (isVerticalFormat) {
+      // For vertical videos, don't set video_config - let HeyGen handle it
+      // OR use a vertical template if available
+      console.log(`[HeyGen] Vertical video format detected (${outputResolution}) - skipping video_config to use HeyGen defaults`)
+      // Note: If HeyGen still generates horizontal videos, we may need to use vertical templates
     }
     
     // Log video_config details
     if (payload.video_config) {
       console.log(`[HeyGen] Video config:`, {
         output_resolution: payload.video_config.output_resolution,
-        dimension: payload.video_config.dimension,
-        fit: payload.video_config.fit,
-        aspect_ratio: payload.video_config.aspect_ratio,
-        hasDimension: !!payload.video_config.dimension,
-        hasAspectRatio: !!payload.video_config.aspect_ratio,
       })
+    } else {
+      console.log(`[HeyGen] No video_config set - using HeyGen defaults (may be vertical for Reels/TikTok)`)
     }
 
     // Determine if this is a photo avatar (talking_photo) or regular avatar
