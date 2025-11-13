@@ -197,14 +197,17 @@ export function initializeScheduler(): void {
   })
 
   // Send scheduled posts to Upload-Post at the right time (when UPLOADPOST_SKIP_SCHEDULING=true)
-  // Runs every minute to check for due posts
-  cron.schedule('* * * * *', async () => {
-    console.log('[Cron] Running automation: send scheduled posts...')
+  // Runs every 2 minutes to avoid rate limits (can be adjusted via env var)
+  // Set UPLOADPOST_SEND_INTERVAL_MINUTES to change interval (default: 2)
+  const sendInterval = parseInt(process.env.UPLOADPOST_SEND_INTERVAL_MINUTES || '2', 10)
+  cron.schedule(`*/${sendInterval} * * * *`, async () => {
+    console.log(`[Cron] Running automation: send scheduled posts (every ${sendInterval} minutes)...`)
     try {
       await AutomationService.sendScheduledPosts()
       console.log('[Automation] Sent scheduled posts')
     } catch (error: any) {
       console.error('[Automation] Error sending scheduled posts:', error)
+      // Don't throw - let it retry on next run
     }
   })
 

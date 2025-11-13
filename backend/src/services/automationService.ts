@@ -2315,6 +2315,7 @@ export class AutomationService {
   /**
    * Send scheduled posts to Upload-Post at the right time
    * This is used when UPLOADPOST_SKIP_SCHEDULING=true to avoid timezone issues
+   * Includes rate limiting to avoid API rate limit errors
    */
   static async sendScheduledPosts(): Promise<void> {
     const skipScheduling = process.env.UPLOADPOST_SKIP_SCHEDULING !== 'false'
@@ -2325,14 +2326,20 @@ export class AutomationService {
     const now = new Date()
     const nowISO = now.toISOString()
 
+    // Rate limiting: Process fewer posts per run to avoid hitting API limits
+    // Process max 3 posts per minute to stay under rate limits
+    const maxPostsPerRun = parseInt(process.env.UPLOADPOST_MAX_POSTS_PER_RUN || '3', 10)
+
     // Find scheduled posts that are due (scheduled_time <= now) and still pending
+    // Order by scheduled_time to process oldest first
     const { data: duePosts, error } = await supabase
       .from('scheduled_posts')
       .select('*')
       .eq('status', 'pending')
       .not('scheduled_time', 'is', null)
       .lte('scheduled_time', nowISO)
-      .limit(10) // Process up to 10 at a time
+      .order('scheduled_time', { ascending: true })
+      .limit(maxPostsPerRun)
 
     if (error) {
       console.error('[Scheduled Posts] Error fetching due posts:', error)
@@ -2343,7 +2350,7 @@ export class AutomationService {
       return
     }
 
-    console.log(`[Scheduled Posts] Found ${duePosts.length} posts due to be sent`)
+    console.log(`[Scheduled Posts] Found ${duePosts.length} posts due to be sent (processing max ${maxPostsPerRun} per run)`)
 
     // Group by video_id to send all platforms together
     const postsByVideo = new Map<string, typeof duePosts>()
@@ -2355,7 +2362,16 @@ export class AutomationService {
       postsByVideo.get(key)!.push(post)
     }
 
+    // Add delay between batches to avoid rate limits
+    const delayBetweenBatches = parseInt(process.env.UPLOADPOST_DELAY_MS || '2000', 10) // 2 seconds default
+
+    let isFirstBatch = true
     for (const [key, videoPosts] of postsByVideo) {
+      // Add delay before processing each batch (except first)
+      if (!isFirstBatch) {
+        await new Promise(resolve => setTimeout(resolve, delayBetweenBatches))
+      }
+      isFirstBatch = false
       try {
         const firstPost = videoPosts[0]
         
@@ -2425,14 +2441,27 @@ export class AutomationService {
 
         // Send to Upload-Post without scheduled_date (posts immediately)
         const { postVideo } = await import('../lib/uploadpost.js')
-        const postResponse = await postVideo({
-          videoUrl: video.video_url,
-          platforms,
-          caption,
-          scheduledTime: undefined, // Don't schedule - post immediately
-          userId: account.platform_account_id,
-          asyncUpload: true,
-        })
+        let postResponse
+        try {
+          postResponse = await postVideo({
+            videoUrl: video.video_url,
+            platforms,
+            caption,
+            scheduledTime: undefined, // Don't schedule - post immediately
+            userId: account.platform_account_id,
+            asyncUpload: true,
+          })
+        } catch (error: any) {
+          // Handle rate limit errors specifically
+          if (error.message && error.message.includes('rate limit')) {
+            console.warn(`[Scheduled Posts] Rate limit hit, will retry on next run. Error: ${error.message}`)
+            // Don't mark as failed - leave as pending so it retries
+            // Add a small delay before continuing to other posts
+            await new Promise(resolve => setTimeout(resolve, 5000)) // Wait 5 seconds
+            continue
+          }
+          throw error // Re-throw other errors
+        }
 
         // Update all related scheduled_posts
         for (const videoPost of videoPosts) {
