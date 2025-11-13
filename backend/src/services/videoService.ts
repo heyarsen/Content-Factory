@@ -565,13 +565,10 @@ export class VideoService {
         throw new Error('No avatar available. Please configure a default avatar in your settings.')
       }
 
-      // Build payload with avatar and vertical resolution for Reels/TikTok (9:16)
-      // Try multiple vertical resolution formats - HeyGen may support different formats
-      // Priority: Try explicit dimensions first, then fallback formats
-      const verticalResolutions = ['1080x1920', '720x1280', '1080p_vertical', 'vertical_1080p']
-      const verticalResolution = verticalResolutions[0] // Start with 1080x1920
-      console.log(`[Reel Video] Building payload with vertical resolution: ${verticalResolution} (9:16 aspect ratio)`)
-      console.log(`[Reel Video] Will try fallback formats if needed: ${verticalResolutions.slice(1).join(', ')}`)
+      // Build payload with avatar and vertical aspect ratio for Reels/TikTok (9:16)
+      // Use aspect_ratio: "9:16" for vertical videos - this is the correct way to generate vertical videos
+      const verticalResolution = '1080p' // Use standard resolution, aspect_ratio will make it vertical
+      console.log(`[Reel Video] Building payload with aspect_ratio 9:16 for vertical video (Instagram Reels/TikTok)`)
       
       const payload = buildHeygenPayload(
         reel.topic,
@@ -580,8 +577,8 @@ export class VideoService {
         DEFAULT_REEL_DURATION,
         avatarId,
         isPhotoAvatar,
-        verticalResolution, // Use vertical resolution instead of default horizontal resolution
-        undefined // Don't use aspect_ratio - resolution format defines it
+        verticalResolution, // Use standard resolution
+        '9:16' // Use aspect_ratio to ensure vertical format (no white frames on sides)
       )
       
       console.log(`[Reel Video] Generating video for reel with avatar:`, {
@@ -590,7 +587,8 @@ export class VideoService {
         avatarId,
         isPhotoAvatar,
         outputResolution: payload.output_resolution,
-        isVertical: payload.output_resolution === verticalResolution,
+        aspectRatio: payload.aspect_ratio,
+        isVertical: payload.aspect_ratio === '9:16',
       })
 
       const response = await requestHeygenVideo(payload)
