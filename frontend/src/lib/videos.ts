@@ -22,6 +22,11 @@ export interface CreateVideoPayload {
   script?: string
   style: VideoRecord['style']
   duration: number
+  aspect_ratio?: string
+  dimension?: {
+    width: number
+    height: number
+  }
 }
 
 export interface ListVideosParams {
@@ -29,8 +34,20 @@ export interface ListVideosParams {
   search?: string
 }
 
+const DEFAULT_VERTICAL_DIMENSION = { width: 1080, height: 1920 }
+const DEFAULT_VERTICAL_ASPECT_RATIO = '9:16'
+
 export async function createVideo(payload: CreateVideoPayload): Promise<VideoRecord> {
-  const { data } = await api.post('/api/videos/generate', payload)
+  const aspectRatio = payload.aspect_ratio || DEFAULT_VERTICAL_ASPECT_RATIO
+  const dimension =
+    payload.dimension ||
+    (aspectRatio === DEFAULT_VERTICAL_ASPECT_RATIO ? { ...DEFAULT_VERTICAL_DIMENSION } : undefined)
+
+  const { data } = await api.post('/api/videos/generate', {
+    ...payload,
+    aspect_ratio: aspectRatio,
+    ...(dimension ? { dimension } : {}),
+  })
   return data.video as VideoRecord
 }
 
