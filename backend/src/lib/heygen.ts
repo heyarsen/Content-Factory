@@ -60,8 +60,8 @@ const parseResolutionToDimension = (resolution?: string): HeyGenDimension | null
 }
 
 const DEFAULT_VERTICAL_DIMENSION: HeyGenDimension = (() => {
-  const fallbackWidth = 720
-  const fallbackHeight = 1280
+  const fallbackWidth = 1080
+  const fallbackHeight = 1920
   const envWidth = parsePositiveInteger(process.env.HEYGEN_VERTICAL_WIDTH) ?? fallbackWidth
   const envHeight = parsePositiveInteger(process.env.HEYGEN_VERTICAL_HEIGHT)
   const computedHeight = envHeight && envHeight > envWidth ? envHeight : Math.max(Math.round(envWidth * (16 / 9)), envWidth + 1, fallbackHeight)
@@ -456,6 +456,7 @@ export async function generateVideo(
         // For vertical videos (Instagram Reels/TikTok), use ONLY aspect_ratio: "9:16"
         // Do NOT set output_resolution for vertical videos to avoid white frames on sides
         payload.video_config.aspect_ratio = '9:16'
+        payload.video_config.fit = 'cover'
         console.log(
           `[HeyGen] Setting aspect_ratio to 9:16 for vertical video (Instagram Reels/TikTok) - NOT setting output_resolution to avoid white frames`
         )

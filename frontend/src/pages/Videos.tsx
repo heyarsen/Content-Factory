@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
@@ -37,7 +37,7 @@ export function Videos() {
   const [loadingVideo, setLoadingVideo] = useState(false)
   const [generatingDescription, setGeneratingDescription] = useState(false)
   const [socialDescription, setSocialDescription] = useState('')
-  const [completedVideos, setCompletedVideos] = useState<Set<string>>(new Set())
+  const notifiedVideosRef = useRef<Set<string>>(new Set())
 
   const loadVideos = useCallback(async () => {
     try {
@@ -146,14 +146,16 @@ export function Videos() {
           }
           
           // Check if video just completed
-          if (updated.status === 'completed' && !completedVideos.has(video.id)) {
-            setCompletedVideos((prev) => new Set(prev).add(video.id))
+          if (updated.status === 'completed' && !notifiedVideosRef.current.has(video.id)) {
+            notifiedVideosRef.current.add(video.id)
             addNotification({
               type: 'success',
               title: 'Video Ready!',
               message: `"${updated.topic}" has finished generating and is ready to view.`,
               link: `/videos`,
             })
+          } else if (updated.status !== 'completed' && notifiedVideosRef.current.has(video.id)) {
+            notifiedVideosRef.current.delete(video.id)
           }
         } catch (error: any) {
           hasError = true
@@ -198,7 +200,7 @@ export function Videos() {
     return () => {
       if (pollTimeout) clearTimeout(pollTimeout)
     }
-  }, [videos, selectedVideo, completedVideos, addNotification])
+  }, [videos, selectedVideo, addNotification])
 
   const handleDelete = async (id: string) => {
     setDeleting(true)
