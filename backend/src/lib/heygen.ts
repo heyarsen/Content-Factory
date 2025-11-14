@@ -71,6 +71,8 @@ const DEFAULT_VERTICAL_DIMENSION: HeyGenDimension = (() => {
   }
 })()
 
+const DEFAULT_VERTICAL_OUTPUT_RESOLUTION = `${DEFAULT_VERTICAL_DIMENSION.width}x${DEFAULT_VERTICAL_DIMENSION.height}`
+
 export interface GenerateVideoRequest {
   topic: string
   script?: string
@@ -457,8 +459,13 @@ export async function generateVideo(
         // Do NOT set output_resolution for vertical videos to avoid white frames on sides
         payload.video_config.aspect_ratio = '9:16'
         payload.video_config.fit = 'cover'
+        const verticalResolution =
+          resolutionDimension && resolutionLooksPortrait
+            ? `${resolutionDimension.width}x${resolutionDimension.height}`
+            : request.output_resolution?.trim() || DEFAULT_VERTICAL_OUTPUT_RESOLUTION
+        payload.video_config.output_resolution = verticalResolution
         console.log(
-          `[HeyGen] Setting aspect_ratio to 9:16 for vertical video (Instagram Reels/TikTok) - NOT setting output_resolution to avoid white frames`
+          `[HeyGen] Setting aspect_ratio to 9:16 for vertical video (Instagram Reels/TikTok) with output_resolution ${payload.video_config.output_resolution}`
         )
       } else if (outputResolution && outputResolution !== DEFAULT_HEYGEN_RESOLUTION) {
         // For horizontal videos, use output_resolution
@@ -500,6 +507,14 @@ export async function generateVideo(
           aspect_ratio: payload.video_config.aspect_ratio,
           dimension: payload.video_config.dimension,
         })
+        // Mirror video_config to each video input to satisfy HeyGen's per-input schema
+        payload.video_inputs = payload.video_inputs.map((input) => ({
+          ...input,
+          video_config: {
+            ...(input.video_config || {}),
+            ...payload.video_config,
+          },
+        }))
     } else {
       console.log(`[HeyGen] No video_config set - using HeyGen defaults`)
     }
