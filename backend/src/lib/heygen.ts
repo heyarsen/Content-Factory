@@ -15,6 +15,62 @@ const DEFAULT_HEYGEN_RESOLUTION =
     ? process.env.HEYGEN_OUTPUT_RESOLUTION.trim()
     : '720p'
 
+type HeyGenDimensionInput = {
+  width?: number
+  height?: number
+}
+
+type HeyGenDimension = {
+  width: number
+  height: number
+}
+
+const parsePositiveInteger = (value: unknown): number | null => {
+  if (value === undefined || value === null) return null
+  const numeric =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string'
+        ? Number(value)
+        : Number(value)
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return null
+  }
+  return Math.round(numeric)
+}
+
+const sanitizeDimensionInput = (dimension?: HeyGenDimensionInput): HeyGenDimension | null => {
+  if (!dimension) return null
+  const width = parsePositiveInteger(dimension.width)
+  const height = parsePositiveInteger(dimension.height)
+  if (!width || !height) {
+    return null
+  }
+  return { width, height }
+}
+
+const parseResolutionToDimension = (resolution?: string): HeyGenDimension | null => {
+  if (!resolution) return null
+  const match = resolution.trim().toLowerCase().match(/(\d+)\s*x\s*(\d+)/)
+  if (!match) return null
+  const width = parsePositiveInteger(parseInt(match[1], 10))
+  const height = parsePositiveInteger(parseInt(match[2], 10))
+  if (!width || !height) return null
+  return { width, height }
+}
+
+const DEFAULT_VERTICAL_DIMENSION: HeyGenDimension = (() => {
+  const fallbackWidth = 720
+  const fallbackHeight = 1280
+  const envWidth = parsePositiveInteger(process.env.HEYGEN_VERTICAL_WIDTH) ?? fallbackWidth
+  const envHeight = parsePositiveInteger(process.env.HEYGEN_VERTICAL_HEIGHT)
+  const computedHeight = envHeight && envHeight > envWidth ? envHeight : Math.max(Math.round(envWidth * (16 / 9)), envWidth + 1, fallbackHeight)
+  return {
+    width: envWidth,
+    height: computedHeight,
+  }
+})()
+
 export interface GenerateVideoRequest {
   topic: string
   script?: string
@@ -25,6 +81,7 @@ export interface GenerateVideoRequest {
   template_id?: string
   output_resolution?: string
   aspect_ratio?: string // e.g., "9:16" for vertical videos (Reels/TikTok)
+  dimension?: HeyGenDimensionInput
 }
 
 export interface HeyGenVideoResponse {
@@ -379,37 +436,56 @@ export async function generateVideo(
       },
     }
 
-    // Build video_config - Use aspect_ratio for vertical videos (9:16 for Instagram Reels/TikTok)
-    // According to docs: https://docs.heygen.com/reference/create-an-avatar-video-v2
-    // For vertical videos, use aspect_ratio: "9:16" in video_config
-    const isVerticalFormat = outputResolution && (
-      outputResolution.includes('x') || 
-      outputResolution.includes('1920') || 
-      outputResolution.includes('1280') ||
-      outputResolution.toLowerCase().includes('vertical')
-    ) || request.aspect_ratio === '9:16'
-    
-    // Initialize video_config if needed
-    if (!payload.video_config) {
-      payload.video_config = {}
-    }
-    
-    if (isVerticalFormat || request.aspect_ratio === '9:16') {
-      // For vertical videos (Instagram Reels/TikTok), use ONLY aspect_ratio: "9:16"
-      // Do NOT set output_resolution for vertical videos to avoid white frames on sides
-      payload.video_config.aspect_ratio = '9:16'
-      console.log(`[HeyGen] Setting aspect_ratio to 9:16 for vertical video (Instagram Reels/TikTok) - NOT setting output_resolution to avoid white frames`)
-    } else if (outputResolution && outputResolution !== DEFAULT_HEYGEN_RESOLUTION) {
-      // For horizontal videos, use output_resolution
-      payload.video_config.output_resolution = outputResolution
-      console.log(`[HeyGen] Setting output_resolution for horizontal video: ${outputResolution}`)
-    }
-    
-    // If aspect_ratio was explicitly provided, use it
-    if (request.aspect_ratio && !isVerticalFormat) {
-      payload.video_config.aspect_ratio = request.aspect_ratio
-      console.log(`[HeyGen] Using explicit aspect_ratio: ${request.aspect_ratio}`)
-    }
+      // Build video_config - Use aspect_ratio for vertical videos (9:16 for Instagram Reels/TikTok)
+      // According to docs: https://docs.heygen.com/reference/create-an-avatar-video-v2
+      // For vertical videos, use aspect_ratio: "9:16" in video_config
+      const requestDimension = sanitizeDimensionInput(request.dimension)
+      const resolutionDimension = parseResolutionToDimension(outputResolution)
+      const resolutionLooksPortrait = !!resolutionDimension && resolutionDimension.height > resolutionDimension.width
+      const isVerticalFormat =
+        resolutionLooksPortrait ||
+        outputResolution.toLowerCase().includes('vertical') ||
+        request.aspect_ratio === '9:16'
+
+      // Initialize video_config if needed
+      if (!payload.video_config) {
+        payload.video_config = {}
+      }
+
+      if (isVerticalFormat || request.aspect_ratio === '9:16') {
+        // For vertical videos (Instagram Reels/TikTok), use ONLY aspect_ratio: "9:16"
+        // Do NOT set output_resolution for vertical videos to avoid white frames on sides
+        payload.video_config.aspect_ratio = '9:16'
+        console.log(
+          `[HeyGen] Setting aspect_ratio to 9:16 for vertical video (Instagram Reels/TikTok) - NOT setting output_resolution to avoid white frames`
+        )
+      } else if (outputResolution && outputResolution !== DEFAULT_HEYGEN_RESOLUTION) {
+        // For horizontal videos, use output_resolution
+        payload.video_config.output_resolution = outputResolution
+        console.log(`[HeyGen] Setting output_resolution for horizontal video: ${outputResolution}`)
+      }
+
+      // If aspect_ratio was explicitly provided, use it
+      if (request.aspect_ratio && !isVerticalFormat) {
+        payload.video_config.aspect_ratio = request.aspect_ratio
+        console.log(`[HeyGen] Using explicit aspect_ratio: ${request.aspect_ratio}`)
+      }
+
+      if (requestDimension) {
+        payload.video_config.dimension = requestDimension
+        console.log(
+          `[HeyGen] Using explicit video dimension override: ${requestDimension.width}x${requestDimension.height}`
+        )
+      } else if (isVerticalFormat) {
+        const chosenDimension =
+          resolutionLooksPortrait && resolutionDimension
+            ? resolutionDimension
+            : DEFAULT_VERTICAL_DIMENSION
+        payload.video_config.dimension = { ...chosenDimension }
+        console.log(
+          `[HeyGen] Setting portrait dimension for vertical video: ${payload.video_config.dimension.width}x${payload.video_config.dimension.height}`
+        )
+      }
     
     // Remove video_config if it's empty to avoid API errors
     if (Object.keys(payload.video_config).length === 0) {
@@ -418,10 +494,11 @@ export async function generateVideo(
     
     // Log video_config details
     if (payload.video_config) {
-      console.log(`[HeyGen] Video config:`, {
-        output_resolution: payload.video_config.output_resolution,
-        aspect_ratio: payload.video_config.aspect_ratio,
-      })
+        console.log(`[HeyGen] Video config:`, {
+          output_resolution: payload.video_config.output_resolution,
+          aspect_ratio: payload.video_config.aspect_ratio,
+          dimension: payload.video_config.dimension,
+        })
     } else {
       console.log(`[HeyGen] No video_config set - using HeyGen defaults`)
     }
