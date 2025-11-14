@@ -508,7 +508,7 @@ export async function generateVideo(
           dimension: payload.video_config.dimension,
         })
         // Mirror video_config to each video input to satisfy HeyGen's per-input schema
-        payload.video_inputs = payload.video_inputs.map((input) => ({
+        payload.video_inputs = payload.video_inputs.map((input: any) => ({
           ...input,
           video_config: {
             ...(input.video_config || {}),
