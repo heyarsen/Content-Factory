@@ -395,14 +395,10 @@ export async function generateVideo(
     }
     
     if (isVerticalFormat || request.aspect_ratio === '9:16') {
-      // For vertical videos (Instagram Reels/TikTok), use aspect_ratio: "9:16"
+      // For vertical videos (Instagram Reels/TikTok), use ONLY aspect_ratio: "9:16"
+      // Do NOT set output_resolution for vertical videos to avoid white frames on sides
       payload.video_config.aspect_ratio = '9:16'
-      // Also set output_resolution if provided, but aspect_ratio takes precedence
-      if (outputResolution && !outputResolution.includes('x')) {
-        // If it's a standard resolution like 1080p, keep it but add aspect_ratio
-        payload.video_config.output_resolution = outputResolution
-      }
-      console.log(`[HeyGen] Setting aspect_ratio to 9:16 for vertical video (Instagram Reels/TikTok)`)
+      console.log(`[HeyGen] Setting aspect_ratio to 9:16 for vertical video (Instagram Reels/TikTok) - NOT setting output_resolution to avoid white frames`)
     } else if (outputResolution && outputResolution !== DEFAULT_HEYGEN_RESOLUTION) {
       // For horizontal videos, use output_resolution
       payload.video_config.output_resolution = outputResolution
