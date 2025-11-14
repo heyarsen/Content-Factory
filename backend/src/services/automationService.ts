@@ -2325,19 +2325,26 @@ export class AutomationService {
 
     const now = new Date()
     const nowISO = now.toISOString()
+    
+    // Add a small buffer (30 seconds) to account for cron timing and ensure posts are sent
+    // even if they're slightly past due (within the same minute)
+    const bufferMs = 30 * 1000 // 30 seconds
+    const nowWithBuffer = new Date(now.getTime() + bufferMs)
+    const nowWithBufferISO = nowWithBuffer.toISOString()
 
     // Rate limiting: Process fewer posts per run to avoid hitting API limits
     // Process max 3 posts per minute to stay under rate limits
     const maxPostsPerRun = parseInt(process.env.UPLOADPOST_MAX_POSTS_PER_RUN || '3', 10)
 
-    // Find scheduled posts that are due (scheduled_time <= now) and still pending
+    // Find scheduled posts that are due (scheduled_time <= now + buffer) and still pending
     // Order by scheduled_time to process oldest first
+    // Use buffer to ensure posts scheduled for the current minute are caught
     const { data: duePosts, error } = await supabase
       .from('scheduled_posts')
       .select('*')
       .eq('status', 'pending')
       .not('scheduled_time', 'is', null)
-      .lte('scheduled_time', nowISO)
+      .lte('scheduled_time', nowWithBufferISO)
       .order('scheduled_time', { ascending: true })
       .limit(maxPostsPerRun)
 

@@ -379,38 +379,55 @@ export async function generateVideo(
       },
     }
 
-    // Build video_config - HeyGen API v2 may not support custom resolutions for vertical videos
+    // Build video_config - Use aspect_ratio for vertical videos (9:16 for Instagram Reels/TikTok)
     // According to docs: https://docs.heygen.com/reference/create-an-avatar-video-v2
-    // Only include video_config if using standard resolution formats (720p, 1080p)
-    // For vertical videos (Reels/TikTok), HeyGen may need templates or default to vertical format
-    // Skip video_config for vertical formats to avoid API errors
+    // For vertical videos, use aspect_ratio: "9:16" in video_config
     const isVerticalFormat = outputResolution && (
       outputResolution.includes('x') || 
       outputResolution.includes('1920') || 
       outputResolution.includes('1280') ||
       outputResolution.toLowerCase().includes('vertical')
-    )
+    ) || request.aspect_ratio === '9:16'
     
-    if (!isVerticalFormat && outputResolution && outputResolution !== DEFAULT_HEYGEN_RESOLUTION) {
-      // Only set video_config for standard horizontal resolutions
-      payload.video_config = {
-        output_resolution: outputResolution
+    // Initialize video_config if needed
+    if (!payload.video_config) {
+      payload.video_config = {}
+    }
+    
+    if (isVerticalFormat || request.aspect_ratio === '9:16') {
+      // For vertical videos (Instagram Reels/TikTok), use aspect_ratio: "9:16"
+      payload.video_config.aspect_ratio = '9:16'
+      // Also set output_resolution if provided, but aspect_ratio takes precedence
+      if (outputResolution && !outputResolution.includes('x')) {
+        // If it's a standard resolution like 1080p, keep it but add aspect_ratio
+        payload.video_config.output_resolution = outputResolution
       }
+      console.log(`[HeyGen] Setting aspect_ratio to 9:16 for vertical video (Instagram Reels/TikTok)`)
+    } else if (outputResolution && outputResolution !== DEFAULT_HEYGEN_RESOLUTION) {
+      // For horizontal videos, use output_resolution
+      payload.video_config.output_resolution = outputResolution
       console.log(`[HeyGen] Setting output_resolution for horizontal video: ${outputResolution}`)
-    } else if (isVerticalFormat) {
-      // For vertical videos, don't set video_config - let HeyGen handle it
-      // OR use a vertical template if available
-      console.log(`[HeyGen] Vertical video format detected (${outputResolution}) - skipping video_config to use HeyGen defaults`)
-      // Note: If HeyGen still generates horizontal videos, we may need to use vertical templates
+    }
+    
+    // If aspect_ratio was explicitly provided, use it
+    if (request.aspect_ratio && !isVerticalFormat) {
+      payload.video_config.aspect_ratio = request.aspect_ratio
+      console.log(`[HeyGen] Using explicit aspect_ratio: ${request.aspect_ratio}`)
+    }
+    
+    // Remove video_config if it's empty to avoid API errors
+    if (Object.keys(payload.video_config).length === 0) {
+      delete payload.video_config
     }
     
     // Log video_config details
     if (payload.video_config) {
       console.log(`[HeyGen] Video config:`, {
         output_resolution: payload.video_config.output_resolution,
+        aspect_ratio: payload.video_config.aspect_ratio,
       })
     } else {
-      console.log(`[HeyGen] No video_config set - using HeyGen defaults (may be vertical for Reels/TikTok)`)
+      console.log(`[HeyGen] No video_config set - using HeyGen defaults`)
     }
 
     // Determine if this is a photo avatar (talking_photo) or regular avatar
@@ -556,26 +573,27 @@ export async function generateVideo(
         if (response) {
           // Continue to success path below
         } else {
-          // All alternatives failed, try removing video_config entirely as last resort
-          const shouldRetryWithoutConfig = !!payload.video_config
-          if (shouldRetryWithoutConfig) {
-            const hadDimension = !!payload.video_config?.dimension
-            const hadAspectRatio = !!payload.video_config?.aspect_ratio
+          // All alternatives failed, try removing only output_resolution but keep aspect_ratio
+          const shouldRetryWithoutOutputResolution = !!payload.video_config?.output_resolution
+          const hadAspectRatio = !!payload.video_config?.aspect_ratio
+          if (shouldRetryWithoutOutputResolution && hadAspectRatio) {
+            // Keep aspect_ratio but remove output_resolution that's causing issues
             console.warn(
-              '[HeyGen] All vertical video formats failed, retrying without video_config:',
+              '[HeyGen] Output resolution failed, retrying with aspect_ratio only:',
               {
                 error: err.response?.data,
                 errorStatus: err.response?.status,
                 errorMessage: errorMessageStr,
-                hadDimension,
-                hadAspectRatio,
-                dimension: payload.video_config?.dimension,
                 aspectRatio: payload.video_config?.aspect_ratio,
                 outputResolution: payload.video_config?.output_resolution,
               }
             )
-            console.warn(`[HeyGen] ⚠️ Vertical video parameters may not be supported. Video will be generated in default format (likely horizontal).`)
-            delete payload.video_config
+            // Remove output_resolution but keep aspect_ratio
+            delete payload.video_config.output_resolution
+            // Ensure aspect_ratio is still set
+            if (!payload.video_config.aspect_ratio) {
+              payload.video_config.aspect_ratio = '9:16'
+            }
             response = await axios.post(
               requestUrl,
               payload,
@@ -587,7 +605,24 @@ export async function generateVideo(
                 timeout: 30000,
               }
             )
-            console.warn(`[HeyGen] ⚠️ Video generated without vertical format - may have white frames on sides for Reels/TikTok`)
+            console.log(`[HeyGen] ✅ Successfully generated video with aspect_ratio only (no output_resolution)`)
+          } else if (shouldRetryWithoutOutputResolution) {
+            // No aspect_ratio, try removing output_resolution only
+            delete payload.video_config.output_resolution
+            if (Object.keys(payload.video_config).length === 0) {
+              delete payload.video_config
+            }
+            response = await axios.post(
+              requestUrl,
+              payload,
+              {
+                headers: {
+                  'X-Api-Key': apiKey,
+                  'Content-Type': 'application/json',
+                },
+                timeout: 30000,
+              }
+            )
           } else {
             throw err
           }
@@ -607,36 +642,79 @@ export async function generateVideo(
         if (shouldRetryWithoutConfig) {
           const hadAspectRatio = !!payload.video_config?.aspect_ratio
           const hadDimension = !!payload.video_config?.dimension
-          console.warn(
-            '[HeyGen] Output resolution/aspect_ratio/dimension not supported, retrying without video_config:',
-            {
-              error: err.response?.data,
-              errorStatus: err.response?.status,
-              hadAspectRatio,
-              hadDimension,
-              aspectRatio: payload.video_config?.aspect_ratio,
-              dimension: payload.video_config?.dimension,
-              outputResolution: payload.video_config?.output_resolution,
+          const hadOutputResolution = !!payload.video_config?.output_resolution
+          
+          // If we have aspect_ratio, try to preserve it and only remove problematic fields
+          if (hadAspectRatio && (hadOutputResolution || hadDimension)) {
+            console.warn(
+              '[HeyGen] Output resolution/dimension not supported, retrying with aspect_ratio only:',
+              {
+                error: err.response?.data,
+                errorStatus: err.response?.status,
+                aspectRatio: payload.video_config?.aspect_ratio,
+                outputResolution: payload.video_config?.output_resolution,
+                dimension: payload.video_config?.dimension,
+              }
+            )
+            // Remove problematic fields but keep aspect_ratio
+            if (payload.video_config.output_resolution) {
+              delete payload.video_config.output_resolution
             }
-          )
-          if (hadAspectRatio) {
-            console.warn(`[HeyGen] ⚠️ Aspect ratio ${payload.video_config.aspect_ratio} may not be supported by HeyGen API. Video will be generated without aspect ratio setting.`)
-          }
-          if (hadDimension) {
-            console.warn(`[HeyGen] ⚠️ Dimension parameter may not be supported by HeyGen API. Video will be generated without dimension setting.`)
-          }
-          delete payload.video_config
-          response = await axios.post(
-            requestUrl,
-            payload,
-            {
-              headers: {
-                'X-Api-Key': apiKey,
-                'Content-Type': 'application/json',
-              },
-              timeout: 30000,
+            if (payload.video_config.dimension) {
+              delete payload.video_config.dimension
             }
-          )
+            if (payload.video_config.fit) {
+              delete payload.video_config.fit
+            }
+            // Ensure aspect_ratio is still set
+            if (!payload.video_config.aspect_ratio) {
+              payload.video_config.aspect_ratio = '9:16'
+            }
+            response = await axios.post(
+              requestUrl,
+              payload,
+              {
+                headers: {
+                  'X-Api-Key': apiKey,
+                  'Content-Type': 'application/json',
+                },
+                timeout: 30000,
+              }
+            )
+            console.log(`[HeyGen] ✅ Successfully generated video with aspect_ratio only`)
+          } else {
+            // No aspect_ratio to preserve, remove entire video_config
+            console.warn(
+              '[HeyGen] Output resolution/aspect_ratio/dimension not supported, retrying without video_config:',
+              {
+                error: err.response?.data,
+                errorStatus: err.response?.status,
+                hadAspectRatio,
+                hadDimension,
+                aspectRatio: payload.video_config?.aspect_ratio,
+                dimension: payload.video_config?.dimension,
+                outputResolution: payload.video_config?.output_resolution,
+              }
+            )
+            if (hadAspectRatio) {
+              console.warn(`[HeyGen] ⚠️ Aspect ratio ${payload.video_config.aspect_ratio} may not be supported by HeyGen API. Video will be generated without aspect ratio setting.`)
+            }
+            if (hadDimension) {
+              console.warn(`[HeyGen] ⚠️ Dimension parameter may not be supported by HeyGen API. Video will be generated without dimension setting.`)
+            }
+            delete payload.video_config
+            response = await axios.post(
+              requestUrl,
+              payload,
+              {
+                headers: {
+                  'X-Api-Key': apiKey,
+                  'Content-Type': 'application/json',
+                },
+                timeout: 30000,
+              }
+            )
+          }
         } else {
           // Check if error is specifically about aspect_ratio or dimension
           if (errorMessageStr.toLowerCase().includes('aspect') || errorMessageStr.toLowerCase().includes('ratio') || errorMessageStr.toLowerCase().includes('dimension')) {
