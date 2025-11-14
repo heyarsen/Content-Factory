@@ -41,7 +41,7 @@ router.post('/generate', authenticate, async (req: AuthRequest, res: Response) =
   })
   
   try {
-    const { topic, script, style, duration, avatar_id, generate_caption } = req.body
+    const { topic, script, style, duration, avatar_id, generate_caption, aspect_ratio } = req.body
     const userId = req.userId!
     
     console.log('Video generation request:', {
@@ -70,6 +70,7 @@ router.post('/generate', authenticate, async (req: AuthRequest, res: Response) =
       duration,
       avatar_id: avatar_id || undefined,
       generate_caption: generate_caption !== false, // Default to true if not specified
+      aspect_ratio: typeof aspect_ratio === 'string' ? aspect_ratio : undefined,
     })
 
     res.json({ video })

@@ -20,6 +20,8 @@ const DEFAULT_HEYGEN_RESOLUTION =
     ? process.env.HEYGEN_OUTPUT_RESOLUTION.trim()
     : '720p'
 
+const DEFAULT_VERTICAL_ASPECT_RATIO = '9:16' as const
+
 export interface ManualVideoInput {
   topic: string
   script?: string
@@ -29,6 +31,7 @@ export interface ManualVideoInput {
   plan_item_id?: string | null
   output_resolution?: string
   generate_caption?: boolean
+  aspect_ratio?: string | null
 }
 
 type ServiceError = Error & { status?: number }
@@ -57,7 +60,7 @@ function buildHeygenPayload(
   avatarId?: string,
   isPhotoAvatar: boolean = false,
   outputResolution: string = DEFAULT_HEYGEN_RESOLUTION,
-  aspectRatio?: string // e.g., "9:16" for vertical videos
+  aspectRatio: string | null = DEFAULT_VERTICAL_ASPECT_RATIO // e.g., "9:16" for vertical videos
 ) {
   const payload: any = {
     topic,
@@ -140,7 +143,8 @@ async function runHeygenGeneration(
   avatarId?: string,
   isPhotoAvatar: boolean = false,
   outputResolution: string = DEFAULT_HEYGEN_RESOLUTION,
-  planItemId?: string | null
+  planItemId?: string | null,
+  aspectRatio: string | null = DEFAULT_VERTICAL_ASPECT_RATIO
 ): Promise<void> {
   try {
     // Idempotency guard: if a HeyGen video was already created for this record, do not create again
@@ -156,18 +160,16 @@ async function runHeygenGeneration(
       throw new Error('No avatar available. Please configure an avatar in your settings.')
     }
     
-    // Build payload with proper avatar type
-    const payload: any = {
-      topic: video.topic,
-      script: video.script || undefined,
-      style: video.style,
-      duration: video.duration,
-      ...(isPhotoAvatar ? { talking_photo_id: avatarId } : { avatar_id: avatarId }),
-    }
-
-    if (outputResolution) {
-      payload.output_resolution = outputResolution
-    }
+    const payload = buildHeygenPayload(
+      video.topic,
+      video.script || undefined,
+      video.style,
+      video.duration,
+      avatarId,
+      isPhotoAvatar,
+      outputResolution,
+      aspectRatio
+    )
     
     console.log('Calling HeyGen API with payload:', {
       videoId: video.id,
@@ -177,7 +179,8 @@ async function runHeygenGeneration(
       scriptLength: payload.script?.length,
       style: payload.style,
       duration: payload.duration,
-      outputResolution,
+      outputResolution: payload.output_resolution,
+      aspectRatio: payload.aspect_ratio,
     })
     
     const response = await requestHeygenVideo(payload)
@@ -349,12 +352,14 @@ export class VideoService {
     
     const video = await this.createVideoRecord(userId, input, avatarRecordId)
     const outputResolution = input.output_resolution || DEFAULT_HEYGEN_RESOLUTION
+    const aspectRatio = input.aspect_ratio || DEFAULT_VERTICAL_ASPECT_RATIO
     void runHeygenGeneration(
       video,
       avatarId,
       isPhotoAvatar,
       outputResolution,
-      input.plan_item_id || null
+      input.plan_item_id || null,
+      aspectRatio
     )
     return video
   }
@@ -578,7 +583,7 @@ export class VideoService {
         avatarId,
         isPhotoAvatar,
         verticalResolution, // Use standard resolution
-        '9:16' // Use aspect_ratio to ensure vertical format (no white frames on sides)
+        DEFAULT_VERTICAL_ASPECT_RATIO // Use aspect_ratio to ensure vertical format (no white frames on sides)
       )
       
       console.log(`[Reel Video] Generating video for reel with avatar:`, {
