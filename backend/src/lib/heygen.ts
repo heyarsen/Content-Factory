@@ -15,7 +15,7 @@ const DEFAULT_HEYGEN_RESOLUTION =
     ? process.env.HEYGEN_OUTPUT_RESOLUTION.trim()
     : '720p'
 
-type HeyGenDimensionInput = {
+export type HeyGenDimensionInput = {
   width?: number
   height?: number
 }

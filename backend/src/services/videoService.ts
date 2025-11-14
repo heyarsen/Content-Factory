@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase.js'
 import { generateVideo as requestHeygenVideo, getVideoStatus } from '../lib/heygen.js'
-import type { HeyGenVideoResponse } from '../lib/heygen.js'
+import type { GenerateVideoRequest, HeyGenDimensionInput, HeyGenVideoResponse } from '../lib/heygen.js'
 import type { Reel, Video } from '../types/database.js'
 
 // Category to HeyGen template mapping
@@ -21,6 +21,11 @@ const DEFAULT_HEYGEN_RESOLUTION =
     : '720p'
 
 const DEFAULT_VERTICAL_ASPECT_RATIO = '9:16' as const
+const DEFAULT_VERTICAL_DIMENSION: Required<HeyGenDimensionInput> = {
+  width: 1080,
+  height: 1920,
+}
+const DEFAULT_VERTICAL_OUTPUT_RESOLUTION = '1080x1920'
 
 export interface ManualVideoInput {
   topic: string
@@ -32,6 +37,7 @@ export interface ManualVideoInput {
   output_resolution?: string
   generate_caption?: boolean
   aspect_ratio?: string | null
+  dimension?: HeyGenDimensionInput
 }
 
 type ServiceError = Error & { status?: number }
@@ -60,9 +66,15 @@ function buildHeygenPayload(
   avatarId?: string,
   isPhotoAvatar: boolean = false,
   outputResolution: string = DEFAULT_HEYGEN_RESOLUTION,
-  aspectRatio: string | null = DEFAULT_VERTICAL_ASPECT_RATIO // e.g., "9:16" for vertical videos
-) {
-  const payload: any = {
+  aspectRatio: string | null = DEFAULT_VERTICAL_ASPECT_RATIO, // e.g., "9:16" for vertical videos
+  dimension?: HeyGenDimensionInput
+): GenerateVideoRequest {
+  const isVertical = aspectRatio === DEFAULT_VERTICAL_ASPECT_RATIO
+  const resolvedOutputResolution = isVertical ? DEFAULT_VERTICAL_OUTPUT_RESOLUTION : outputResolution
+  const resolvedDimension =
+    dimension || (isVertical ? { ...DEFAULT_VERTICAL_DIMENSION } : undefined)
+
+  const payload: GenerateVideoRequest = {
     topic,
     script: script || topic,
     style,
@@ -70,12 +82,16 @@ function buildHeygenPayload(
     ...(isPhotoAvatar ? { talking_photo_id: avatarId } : { avatar_id: avatarId }),
   }
 
-  if (outputResolution) {
-    payload.output_resolution = outputResolution
+  if (resolvedOutputResolution) {
+    payload.output_resolution = resolvedOutputResolution
   }
 
   if (aspectRatio) {
     payload.aspect_ratio = aspectRatio
+  }
+
+  if (resolvedDimension) {
+    payload.dimension = resolvedDimension
   }
 
   // Log payload details including aspect ratio
@@ -83,8 +99,9 @@ function buildHeygenPayload(
     console.log(`[HeyGen Payload] Built payload with aspect_ratio: ${aspectRatio}`, {
       hasAspectRatio: !!aspectRatio,
       aspectRatio,
-      outputResolution,
+      outputResolution: resolvedOutputResolution,
       hasAvatar: !!avatarId,
+      dimension: resolvedDimension,
     })
   }
 
@@ -144,7 +161,8 @@ async function runHeygenGeneration(
   isPhotoAvatar: boolean = false,
   outputResolution: string = DEFAULT_HEYGEN_RESOLUTION,
   planItemId?: string | null,
-  aspectRatio: string | null = DEFAULT_VERTICAL_ASPECT_RATIO
+  aspectRatio: string | null = DEFAULT_VERTICAL_ASPECT_RATIO,
+  dimension?: HeyGenDimensionInput
 ): Promise<void> {
   try {
     // Idempotency guard: if a HeyGen video was already created for this record, do not create again
@@ -168,7 +186,8 @@ async function runHeygenGeneration(
       avatarId,
       isPhotoAvatar,
       outputResolution,
-      aspectRatio
+      aspectRatio,
+      dimension
     )
     
     console.log('Calling HeyGen API with payload:', {
@@ -353,13 +372,17 @@ export class VideoService {
     const video = await this.createVideoRecord(userId, input, avatarRecordId)
     const outputResolution = input.output_resolution || DEFAULT_HEYGEN_RESOLUTION
     const aspectRatio = input.aspect_ratio || DEFAULT_VERTICAL_ASPECT_RATIO
+    const dimension =
+      input.dimension ||
+      (aspectRatio === DEFAULT_VERTICAL_ASPECT_RATIO ? { ...DEFAULT_VERTICAL_DIMENSION } : undefined)
     void runHeygenGeneration(
       video,
       avatarId,
       isPhotoAvatar,
       outputResolution,
       input.plan_item_id || null,
-      aspectRatio
+      aspectRatio,
+      dimension
     )
     return video
   }
