@@ -1,14 +1,46 @@
 import { supabase } from '../lib/supabase.js'
-import { generateVideo as requestHeygenVideo, getVideoStatus } from '../lib/heygen.js'
-import type { GenerateVideoRequest, HeyGenDimensionInput, HeyGenVideoResponse } from '../lib/heygen.js'
+import { generateVideo as requestHeygenVideo, generateVideoFromTemplate, getVideoStatus } from '../lib/heygen.js'
+import type {
+  GenerateTemplateVideoRequest,
+  GenerateVideoRequest,
+  HeyGenDimensionInput,
+  HeyGenVideoResponse,
+} from '../lib/heygen.js'
 import type { Reel, Video } from '../types/database.js'
 
-// Category to HeyGen template mapping
-const CATEGORY_TEMPLATES: Record<string, string> = {
-  Trading: 'Daran walking',
-  Lifestyle: 'Car',
-  'Fin. Freedom': 'Daran sitting',
+type TemplateCategory = 'Trading' | 'Lifestyle' | 'Fin. Freedom'
+
+interface TemplateOption {
+  id: string
+  name: string
+  variableKey: string
+  aliases?: string[]
 }
+
+// Category to HeyGen template mapping
+const CATEGORY_TEMPLATES: Record<TemplateCategory, TemplateOption[]> = {
+  Trading: [
+    { name: 'Daran walking', id: 'a237e3542bf84d87846b37d682d2c01c', variableKey: 'script_text1', aliases: ['daran walk'] },
+    { name: 'Daran in car', id: 'b99820266bee40358230e262ec87c311', variableKey: 'script_text1' },
+    { name: 'Daran sitting', id: 'e34a91cbd65e4fa3b0128a07ba170d98', variableKey: 'script' },
+  ],
+  Lifestyle: [
+    { name: 'Car', id: 'e9422da4ef744aae824f00fbc4a55400', variableKey: 'script' },
+    { name: 'Room', id: 'dcba1982d86c4624b40266ff074e1712', variableKey: 'script', aliases: ['room'] },
+    { name: 'Outside', id: '265a7b0306a34b58bf1be6eeb5bc4aa2', variableKey: 'script' },
+  ],
+  'Fin. Freedom': [
+    { name: 'Tim outside', id: '01eb044dcc5d4c6aa5f2ad7b06d3cdd8', variableKey: 'script' },
+    { name: 'Tim laying', id: '2915dfbaefa046f487acfbef3414d101', variableKey: 'script' },
+    { name: '3', id: '54c7ee59d7cd4b3b8efc5aca10808bb4', variableKey: 'script', aliases: ['template 3'] },
+  ],
+}
+
+const ALL_TEMPLATE_OPTIONS: TemplateOption[] = [
+  ...CATEGORY_TEMPLATES.Trading,
+  ...CATEGORY_TEMPLATES.Lifestyle,
+  ...CATEGORY_TEMPLATES['Fin. Freedom'],
+]
 
 const DEFAULT_REEL_STYLE: Video['style'] = 'professional'
 const DEFAULT_REEL_DURATION = 30
@@ -26,6 +58,65 @@ const DEFAULT_VERTICAL_DIMENSION: Required<HeyGenDimensionInput> = {
   height: 1920,
 }
 const DEFAULT_VERTICAL_OUTPUT_RESOLUTION = '1080x1920'
+const DEFAULT_TEMPLATE_DIMENSION: HeyGenDimensionInput = {
+  width: 720,
+  height: 1280,
+}
+
+function normalizeCategory(category?: string | null): TemplateCategory {
+  const value = (category || '').trim().toLowerCase()
+  if (value === 'life style' || value === 'lifestyle') {
+    return 'Lifestyle'
+  }
+  if (value === 'fin. freedom' || value === 'fin freedom' || value === 'financial freedom') {
+    return 'Fin. Freedom'
+  }
+  return 'Trading'
+}
+
+function templateMatches(option: TemplateOption, identifier: string): boolean {
+  const normalizedIdentifier = identifier.trim().toLowerCase()
+  if (option.id.toLowerCase() === normalizedIdentifier) {
+    return true
+  }
+
+  const normalizedName = option.name.trim().toLowerCase()
+  if (normalizedName === normalizedIdentifier) {
+    return true
+  }
+
+  if (normalizedName.replace(/\s+/g, '') === normalizedIdentifier.replace(/\s+/g, '')) {
+    return true
+  }
+
+  return option.aliases?.some(
+    (alias) => alias.trim().toLowerCase() === normalizedIdentifier
+  ) ?? false
+}
+
+function selectTemplateOption(category: string | null | undefined, requested?: string | null): TemplateOption {
+  const normalizedCategory = normalizeCategory(category)
+  const templates = CATEGORY_TEMPLATES[normalizedCategory] || CATEGORY_TEMPLATES.Trading
+
+  if (requested && requested.trim().length > 0) {
+    const trimmed = requested.trim()
+    const match =
+      templates.find((option) => templateMatches(option, trimmed)) ||
+      ALL_TEMPLATE_OPTIONS.find((option) => templateMatches(option, trimmed))
+
+    if (match) {
+      return match
+    }
+
+    return {
+      id: trimmed,
+      name: trimmed,
+      variableKey: 'script',
+    }
+  }
+
+  return templates[Math.floor(Math.random() * templates.length)]
+}
 
 export interface ManualVideoInput {
   topic: string
@@ -545,7 +636,9 @@ export class VideoService {
   /**
    * Generate video for a reel based on category
    */
-  static async generateVideoForReel(reel: Reel, userId?: string): Promise<{ video_id: string; video_url: string | null }> {
+  static async generateVideoForReel(
+    reel: Reel
+  ): Promise<{ video_id: string; video_url: string | null; template: TemplateOption }> {
     // Idempotency: if reel already has a HeyGen video or URL, reuse it
     if (reel.heygen_video_id || reel.video_url) {
       return {
@@ -558,78 +651,50 @@ export class VideoService {
       throw new Error('Reel must have a script to generate video')
     }
 
-    // Ensure userId is available - use from reel if not provided
-    const effectiveUserId = userId || reel.user_id
-    if (!effectiveUserId) {
-      throw new Error('User ID is required to generate video. Please ensure the reel has a user_id.')
+    try {
+      const templateSelection = selectTemplateOption(reel.category, reel.template)
+      const scriptText = reel.script.trim()
+      if (!scriptText) {
+        throw new Error('Reel script is empty. Please provide a script before generating video.')
     }
 
-    const template = reel.template || CATEGORY_TEMPLATES[reel.category] || CATEGORY_TEMPLATES.Trading
-
-    try {
-      // Get default avatar - userId is guaranteed to be available at this point
-      let avatarId: string | undefined = undefined
-      let isPhotoAvatar = false
-
-      const { AvatarService } = await import('./avatarService.js')
-      const defaultAvatar = await AvatarService.getDefaultAvatar(effectiveUserId)
-      if (defaultAvatar) {
-        avatarId = defaultAvatar.heygen_avatar_id
-        isPhotoAvatar = defaultAvatar.avatar_url?.includes('supabase.co/storage') || false
-        console.log(`[Reel Video] Using default avatar for reel: ${avatarId} (isPhotoAvatar: ${isPhotoAvatar})`)
-      } else {
-        console.warn(`[Reel Video] No default avatar found for user ${effectiveUserId}`)
-        // Try to get any active avatar as fallback
-        const userAvatars = await AvatarService.getUserAvatars(effectiveUserId)
-        const activeAvatar = userAvatars.find(a => a.status === 'active')
-        if (activeAvatar) {
-          avatarId = activeAvatar.heygen_avatar_id
-          isPhotoAvatar = activeAvatar.avatar_url?.includes('supabase.co/storage') || false
-          console.log(`[Reel Video] Using fallback active avatar: ${avatarId} (isPhotoAvatar: ${isPhotoAvatar})`)
-        }
+      const variables: Record<string, string> = {
+        [templateSelection.variableKey]: scriptText,
       }
 
-      if (!avatarId) {
-        throw new Error('No avatar available. Please configure a default avatar in your settings.')
+      const templatePayload: GenerateTemplateVideoRequest = {
+        template_id: templateSelection.id,
+        variables,
+        title: reel.topic?.slice(0, 80) || 'Content Factory Video',
+        caption: true,
+        include_gif: false,
+        enable_sharing: false,
+        dimension: DEFAULT_TEMPLATE_DIMENSION,
       }
 
-      // Build payload with avatar and vertical aspect ratio for Reels/TikTok (9:16)
-      // Use aspect_ratio: "9:16" for vertical videos - this is the correct way to generate vertical videos
-      const verticalResolution = '1080p' // Use standard resolution, aspect_ratio will make it vertical
-      console.log(`[Reel Video] Building payload with aspect_ratio 9:16 for vertical video (Instagram Reels/TikTok)`)
-      
-      const payload = buildHeygenPayload(
-        reel.topic,
-        reel.script,
-        DEFAULT_REEL_STYLE,
-        DEFAULT_REEL_DURATION,
-        avatarId,
-        isPhotoAvatar,
-        verticalResolution, // Use standard resolution
-        DEFAULT_VERTICAL_ASPECT_RATIO // Use aspect_ratio to ensure vertical format (no white frames on sides)
-      )
-      
-      console.log(`[Reel Video] Generating video for reel with avatar:`, {
-        topic: reel.topic,
-        hasScript: !!reel.script,
-        avatarId,
-        isPhotoAvatar,
-        outputResolution: payload.output_resolution,
-        aspectRatio: payload.aspect_ratio,
-        isVertical: payload.aspect_ratio === '9:16',
+      const callbackUrl = process.env.HEYGEN_TEMPLATE_CALLBACK_URL?.trim()
+      if (callbackUrl) {
+        templatePayload.callback_url = callbackUrl
+      }
+
+      console.log('[Reel Template] Generating HeyGen template video', {
+        reelId: reel.id,
+        category: reel.category,
+        selectedTemplate: templateSelection.name,
+        templateId: templateSelection.id,
+        variableKey: templateSelection.variableKey,
+        hasCallback: !!templatePayload.callback_url,
       })
 
-      const response = await requestHeygenVideo(payload)
-
-      // template is currently not sent to HeyGen, but kept for future use
-      void template
+      const response = await generateVideoFromTemplate(templatePayload)
 
       return {
         video_id: response.video_id,
         video_url: response.video_url || null,
+        template: templateSelection,
       }
     } catch (error: any) {
-      console.error('Error generating video for reel:', error)
+      console.error('Error generating template video for reel:', error)
       throw new Error(`Failed to generate video: ${error.message}`)
     }
   }
@@ -637,8 +702,8 @@ export class VideoService {
   /**
    * Get template for category
    */
-  static getTemplateForCategory(category: 'Trading' | 'Lifestyle' | 'Fin. Freedom'): string {
-    return CATEGORY_TEMPLATES[category] || CATEGORY_TEMPLATES.Trading
+  static getTemplateForCategory(category: TemplateCategory): string {
+    return selectTemplateOption(category).name
   }
 
   private static async createVideoRecord(userId: string, input: ManualVideoInput, avatarRecordId?: string): Promise<Video> {

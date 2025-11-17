@@ -168,6 +168,7 @@ export class ReelService {
     videoData: {
       video_url?: string | null
       heygen_video_id?: string | null
+      template?: string | null
     }
   ): Promise<void> {
     const { error } = await supabase

@@ -86,6 +86,17 @@ export interface GenerateVideoRequest {
   dimension?: HeyGenDimensionInput
 }
 
+export interface GenerateTemplateVideoRequest {
+  template_id: string
+  variables: Record<string, string>
+  title?: string
+  caption?: boolean
+  include_gif?: boolean
+  enable_sharing?: boolean
+  callback_url?: string
+  dimension?: HeyGenDimensionInput
+}
+
 export interface HeyGenVideoResponse {
   video_id: string
   status: string
@@ -877,6 +888,94 @@ export async function generateVideo(
       errorMessage = error.message
     }
     
+    throw new Error(errorMessage)
+  }
+}
+
+export async function generateVideoFromTemplate(
+  request: GenerateTemplateVideoRequest
+): Promise<HeyGenVideoResponse> {
+  try {
+    const apiKey = getHeyGenKey()
+
+    if (!request.template_id || !request.template_id.trim()) {
+      throw new Error('template_id is required for template video generation')
+    }
+
+    if (!request.variables || Object.keys(request.variables).length === 0) {
+      throw new Error('At least one template variable is required for template video generation')
+    }
+
+    const payload: Record<string, any> = {
+      template_id: request.template_id,
+      variables: request.variables,
+      title: request.title || 'Untitled Video',
+      caption: request.caption ?? false,
+      include_gif: request.include_gif ?? false,
+      enable_sharing: request.enable_sharing ?? false,
+    }
+
+    if (request.callback_url) {
+      payload.callback_url = request.callback_url
+    }
+
+    const resolvedDimension = sanitizeDimensionInput(request.dimension)
+    if (resolvedDimension) {
+      payload.dimension = {
+        width: resolvedDimension.width.toString(),
+        height: resolvedDimension.height.toString(),
+      }
+    }
+
+    const response = await axios.post(
+      `${HEYGEN_API_URL}/templateVideo.create`,
+      payload,
+      {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'X-Api-Key': apiKey,
+          'Content-Type': 'application/json',
+        },
+        timeout: 30000,
+      }
+    )
+
+    const data = response.data?.data || response.data
+    const videoId = data.video_id || data.id || data.videoId
+
+    if (!videoId) {
+      throw new Error('Failed to get video_id from HeyGen template response. Response: ' + JSON.stringify(response.data))
+    }
+
+    return {
+      video_id: videoId,
+      status: data.status || 'pending',
+      video_url: data.video_url || data.videoUrl || data.url || null,
+    }
+  } catch (error: any) {
+    console.error('HeyGen API error (generateVideoFromTemplate):', error.response?.data || error.message)
+
+    let errorMessage = 'Failed to generate video from template'
+    if (error.response?.status === 401) {
+      errorMessage = 'HeyGen API authentication failed. Please check your HEYGEN_KEY.'
+    } else if (error.response?.status === 404) {
+      errorMessage = 'HeyGen template not found. Please verify the template ID.'
+    } else if (error.response?.status === 429) {
+      errorMessage = 'HeyGen API rate limit exceeded. Please try again later.'
+    } else if (error.response?.status >= 500) {
+      errorMessage = 'HeyGen API server error. Please try again later.'
+    } else if (error.response?.data?.message) {
+      errorMessage = error.response.data.message
+    } else if (error.response?.data?.error?.message) {
+      errorMessage = error.response.data.error.message
+    } else if (error.response?.data?.error) {
+      errorMessage = typeof error.response.data.error === 'string'
+        ? error.response.data.error
+        : JSON.stringify(error.response.data.error)
+    } else if (error.message) {
+      errorMessage = error.message
+    }
+
     throw new Error(errorMessage)
   }
 }
