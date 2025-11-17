@@ -638,7 +638,7 @@ export class VideoService {
    */
   static async generateVideoForReel(
     reel: Reel
-  ): Promise<{ video_id: string; video_url: string | null; template: TemplateOption }> {
+  ): Promise<{ video_id: string; video_url: string | null; template?: TemplateOption }> {
     // Idempotency: if reel already has a HeyGen video or URL, reuse it
     if (reel.heygen_video_id || reel.video_url) {
       return {
