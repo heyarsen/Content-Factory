@@ -4,6 +4,8 @@ import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Select } from '../components/ui/Select'
 import { Badge } from '../components/ui/Badge'
+import { Input } from '../components/ui/Input'
+import { Textarea } from '../components/ui/Textarea'
 import { useToast } from '../hooks/useToast'
 import { Settings, Globe, Bell, Sparkles, Share2, Instagram, Youtube, Facebook, Users } from 'lucide-react'
 import api from '../lib/api'
@@ -15,6 +17,9 @@ interface Preferences {
   notifications_enabled: boolean
   auto_research_default: boolean
   auto_approve_default: boolean
+  heygen_vertical_template_id?: string | null
+  heygen_vertical_template_script_key?: string | null
+  heygen_vertical_template_variables?: Record<string, string> | null
 }
 
 interface SocialAccount {
@@ -96,7 +101,11 @@ export function Preferences() {
     notifications_enabled: true,
     auto_research_default: true,
     auto_approve_default: false,
+    heygen_vertical_template_id: '',
+    heygen_vertical_template_script_key: 'script',
+    heygen_vertical_template_variables: {},
   })
+  const [templateVariablesText, setTemplateVariablesText] = useState('')
 
   useEffect(() => {
     loadPreferences()
@@ -112,17 +121,30 @@ export function Preferences() {
         setPreferences({
           ...response.data.preferences,
           timezone: response.data.preferences.timezone || detectedTimezone,
+          heygen_vertical_template_id: response.data.preferences.heygen_vertical_template_id || '',
+          heygen_vertical_template_script_key:
+            response.data.preferences.heygen_vertical_template_script_key || 'script',
+          heygen_vertical_template_variables:
+            response.data.preferences.heygen_vertical_template_variables || {},
         })
+        const templateVars = response.data.preferences.heygen_vertical_template_variables || {}
+        const formattedTemplateVars =
+          templateVars && Object.keys(templateVars).length > 0
+            ? JSON.stringify(templateVars, null, 2)
+            : ''
+        setTemplateVariablesText(formattedTemplateVars)
       } else {
         // No preferences exist, use detected timezone
         const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
         setPreferences(prev => ({ ...prev, timezone: detectedTimezone }))
+        setTemplateVariablesText('')
       }
     } catch (error) {
       console.error('Failed to load preferences:', error)
       // Use detected timezone as fallback
       const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
       setPreferences(prev => ({ ...prev, timezone: detectedTimezone }))
+      setTemplateVariablesText('')
     } finally {
       setLoading(false)
     }
@@ -140,7 +162,46 @@ export function Preferences() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      await api.put('/api/preferences', preferences)
+      let parsedTemplateVariables: Record<string, string> = {}
+      const trimmedTemplate = templateVariablesText.trim()
+
+      if (trimmedTemplate.length > 0) {
+        try {
+          const parsed = JSON.parse(trimmedTemplate)
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            throw new Error('Template variables must be a JSON object')
+          }
+          parsedTemplateVariables = Object.entries(parsed).reduce((acc, [key, value]) => {
+            if (value === null || value === undefined) {
+              return acc
+            }
+            acc[key] = typeof value === 'string' ? value : String(value)
+            return acc
+          }, {} as Record<string, string>)
+        } catch (error: any) {
+          toast.error(error.message || 'Template variables must be valid JSON')
+          setSaving(false)
+          return
+        }
+      }
+
+      const payload = {
+        ...preferences,
+        heygen_vertical_template_variables: parsedTemplateVariables,
+      }
+
+      await api.put('/api/preferences', payload)
+      setPreferences(prev => ({
+        ...prev,
+        heygen_vertical_template_variables: parsedTemplateVariables,
+      }))
+
+      setTemplateVariablesText(
+        Object.keys(parsedTemplateVariables).length > 0
+          ? JSON.stringify(parsedTemplateVariables, null, 2)
+          : ''
+      )
+
       toast.success('Preferences saved successfully')
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to save preferences')
@@ -280,6 +341,59 @@ export function Preferences() {
                 )
               })}
             </div>
+          </div>
+        </Card>
+
+        {/* HeyGen Template Overrides */}
+        <Card className="p-6">
+          <div className="mb-6 flex items-center gap-3">
+            <Users className="h-5 w-5 text-slate-400" />
+            <h2 className="text-lg font-semibold text-primary">HeyGen Template Overrides</h2>
+          </div>
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Provide a HeyGen template ID to guarantee vertical framing. We will send your script to the
+              template API and keep avatars zoomed exactly as you configure in HeyGen&apos;s editor.
+            </p>
+            <Input
+              label="Template ID"
+              placeholder="Template ID from HeyGen editor"
+              value={preferences.heygen_vertical_template_id || ''}
+              onChange={(e) =>
+                setPreferences({
+                  ...preferences,
+                  heygen_vertical_template_id: e.target.value,
+                })
+              }
+            />
+            <Input
+              label="Script Variable Key"
+              placeholder="script"
+              value={preferences.heygen_vertical_template_script_key || ''}
+              onChange={(e) =>
+                setPreferences({
+                  ...preferences,
+                  heygen_vertical_template_script_key: e.target.value,
+                })
+              }
+            />
+            <p className="text-xs text-slate-500">
+              This must match the variable name inside your HeyGen template (for example, script_text1).
+            </p>
+            <Textarea
+              label="Default Template Variables (JSON)"
+              placeholder='{"cta_text":"Link in bio"}'
+              rows={6}
+              value={templateVariablesText}
+              onChange={(e) => setTemplateVariablesText(e.target.value)}
+            />
+            <p className="text-xs text-slate-500">
+              Provide an optional JSON object with additional template variables. You can reference dynamic
+              values with placeholders like <span className="font-mono text-slate-600">{'{{script}}'}</span>,{' '}
+              <span className="font-mono text-slate-600">{'{{topic}}'}</span>,{' '}
+              <span className="font-mono text-slate-600">{'{{avatar_id}}'}</span> or{' '}
+              <span className="font-mono text-slate-600">{'{{talking_photo_id}}'}</span>.
+            </p>
           </div>
         </Card>
 

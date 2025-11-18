@@ -5,8 +5,7 @@ type PreprocessResult = {
   mimeType: string
 }
 
-const TARGET_HEIGHT = 1024
-const TARGET_WIDTH = Math.round(TARGET_HEIGHT * (9 / 16)) // 576
+const TARGET_SIZE = 1024
 const DEFAULT_MIME = 'image/jpeg'
 
 export async function preprocessAvatarPhoto(
@@ -17,7 +16,7 @@ export async function preprocessAvatarPhoto(
     const pipeline = sharp(inputBuffer, { failOn: 'none' }).rotate()
 
     const processed = await pipeline
-      .resize(TARGET_WIDTH, TARGET_HEIGHT, {
+      .resize(TARGET_SIZE, TARGET_SIZE, {
         fit: 'cover',
         position: 'attention',
       })

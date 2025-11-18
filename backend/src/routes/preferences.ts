@@ -48,6 +48,8 @@ router.put('/', authenticate, async (req: AuthRequest, res: Response) => {
       auto_research_default,
       auto_approve_default,
       heygen_vertical_template_id,
+      heygen_vertical_template_script_key,
+      heygen_vertical_template_variables,
     } = req.body
 
     // Check if preferences exist
@@ -66,7 +68,30 @@ router.put('/', authenticate, async (req: AuthRequest, res: Response) => {
     if (notifications_enabled !== undefined) updates.notifications_enabled = notifications_enabled
     if (auto_research_default !== undefined) updates.auto_research_default = auto_research_default
     if (auto_approve_default !== undefined) updates.auto_approve_default = auto_approve_default
-    if (heygen_vertical_template_id !== undefined) updates.heygen_vertical_template_id = heygen_vertical_template_id
+    if (heygen_vertical_template_id !== undefined) {
+      updates.heygen_vertical_template_id =
+        typeof heygen_vertical_template_id === 'string' && heygen_vertical_template_id.trim().length > 0
+          ? heygen_vertical_template_id.trim()
+          : null
+    }
+    if (heygen_vertical_template_script_key !== undefined) {
+      updates.heygen_vertical_template_script_key =
+        typeof heygen_vertical_template_script_key === 'string' &&
+        heygen_vertical_template_script_key.trim().length > 0
+          ? heygen_vertical_template_script_key.trim()
+          : null
+    }
+    if (heygen_vertical_template_variables !== undefined) {
+      if (
+        heygen_vertical_template_variables === null ||
+        (typeof heygen_vertical_template_variables === 'object' &&
+          !Array.isArray(heygen_vertical_template_variables))
+      ) {
+        updates.heygen_vertical_template_variables = heygen_vertical_template_variables || {}
+      } else {
+        return res.status(400).json({ error: 'Template variables must be a JSON object' })
+      }
+    }
 
     let data
     let error

@@ -62,6 +62,13 @@ const DEFAULT_TEMPLATE_DIMENSION: HeyGenDimensionInput = {
   width: 720,
   height: 1280,
 }
+const DEFAULT_TEMPLATE_SCRIPT_KEY = 'script'
+
+type TemplateOverrides = {
+  templateId: string
+  scriptKey: string
+  defaults: Record<string, string>
+}
 
 function normalizeCategory(category?: string | null): TemplateCategory {
   const value = (category || '').trim().toLowerCase()
@@ -158,8 +165,7 @@ function buildHeygenPayload(
   isPhotoAvatar: boolean = false,
   outputResolution: string = DEFAULT_HEYGEN_RESOLUTION,
   aspectRatio: string | null = DEFAULT_VERTICAL_ASPECT_RATIO, // e.g., "9:16" for vertical videos
-  dimension?: HeyGenDimensionInput,
-  verticalTemplateId?: string | null
+  dimension?: HeyGenDimensionInput
 ): GenerateVideoRequest {
   const isVertical = aspectRatio === DEFAULT_VERTICAL_ASPECT_RATIO
   const resolvedOutputResolution = isVertical ? DEFAULT_VERTICAL_OUTPUT_RESOLUTION : outputResolution
@@ -173,7 +179,6 @@ function buildHeygenPayload(
     duration,
     ...(isPhotoAvatar ? { talking_photo_id: avatarId } : { avatar_id: avatarId }),
     force_vertical: isVertical,
-    template_id: verticalTemplateId || undefined,
   }
 
   if (resolvedOutputResolution) {
@@ -231,6 +236,24 @@ async function applyManualGenerationSuccess(videoId: string, response: HeyGenVid
   // Skipping automatic caption generation to avoid metadata column dependency
 }
 
+async function updatePlanItemStatus(planItemId: string | null | undefined, status: string): Promise<void> {
+  if (!planItemId) {
+    return
+  }
+
+  try {
+    await supabase
+      .from('video_plan_items')
+      .update({
+        status: mapHeygenStatus(status),
+        error_message: null,
+      })
+      .eq('id', planItemId)
+  } catch (error) {
+    console.error('Failed to update plan item status:', error)
+  }
+}
+
 // Caption generation is handled via the /api/videos/:id/generate-description endpoint
 // Removed automatic caption generation to avoid metadata column dependency
 
@@ -257,7 +280,7 @@ async function runHeygenGeneration(
   planItemId?: string | null,
   aspectRatio: string | null = DEFAULT_VERTICAL_ASPECT_RATIO,
   dimension?: HeyGenDimensionInput,
-  verticalTemplateId?: string | null
+  templateSettings?: TemplateOverrides
 ): Promise<void> {
   try {
     // Idempotency guard: if a HeyGen video was already created for this record, do not create again
@@ -268,11 +291,72 @@ async function runHeygenGeneration(
       })
       return
     }
-    
-    if (!avatarId) {
+
+    const usingTemplate =
+      !!templateSettings?.templateId && aspectRatio === DEFAULT_VERTICAL_ASPECT_RATIO
+
+    if (!avatarId && !usingTemplate) {
       throw new Error('No avatar available. Please configure an avatar in your settings.')
     }
-    
+
+    if (usingTemplate) {
+      const scriptValue = (video.script || video.topic || '').trim()
+      if (!scriptValue) {
+        throw new Error('Script is required when using a HeyGen template.')
+      }
+
+      const scriptKey = templateSettings.scriptKey?.trim() || DEFAULT_TEMPLATE_SCRIPT_KEY
+
+      const topicValue = (video.topic || scriptValue).trim()
+      const placeholderMap: Record<string, string> = {
+        '{{script}}': scriptValue,
+        '{{topic}}': topicValue,
+        '{{avatar_id}}': avatarId || '',
+        '{{talking_photo_id}}': isPhotoAvatar && avatarId ? avatarId : '',
+      }
+
+      const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+      const processedDefaults: Record<string, string> = {}
+      for (const [key, rawValue] of Object.entries(templateSettings.defaults || {})) {
+        if (rawValue === null || rawValue === undefined) {
+          continue
+        }
+        const valueString = typeof rawValue === 'string' ? rawValue : String(rawValue)
+        const finalValue = Object.entries(placeholderMap).reduce((acc, [token, replacement]) => {
+          return acc.replace(new RegExp(escapeRegex(token), 'gi'), replacement || '')
+        }, valueString)
+        processedDefaults[key] = finalValue
+      }
+
+      const variables = {
+        ...processedDefaults,
+        [scriptKey]: scriptValue,
+      }
+
+      const templateRequest: GenerateTemplateVideoRequest = {
+        template_id: templateSettings.templateId,
+        variables,
+        title: video.topic?.slice(0, 80) || 'Content Factory Video',
+        caption: false,
+        include_gif: false,
+        enable_sharing: false,
+        dimension: dimension || DEFAULT_TEMPLATE_DIMENSION,
+      }
+
+      console.log('[HeyGen Template] Generating video via template', {
+        videoId: video.id,
+        templateId: templateSettings.templateId,
+        scriptKey,
+        variableKeys: Object.keys(variables),
+      })
+
+      const response = await generateVideoFromTemplate(templateRequest)
+      await applyManualGenerationSuccess(video.id, response)
+      await updatePlanItemStatus(planItemId, response.status)
+      return
+    }
+
     const payload = buildHeygenPayload(
       video.topic,
       video.script || undefined,
@@ -282,8 +366,7 @@ async function runHeygenGeneration(
       isPhotoAvatar,
       outputResolution,
       aspectRatio,
-      dimension,
-      verticalTemplateId
+      dimension
     )
     
     console.log('Calling HeyGen API with payload:', {
@@ -300,15 +383,7 @@ async function runHeygenGeneration(
     
     const response = await requestHeygenVideo(payload)
     await applyManualGenerationSuccess(video.id, response)
-    if (planItemId) {
-      await supabase
-        .from('video_plan_items')
-        .update({
-          status: mapHeygenStatus(response.status),
-          error_message: null,
-        })
-        .eq('id', planItemId)
-    }
+    await updatePlanItemStatus(planItemId, response.status)
   } catch (error: any) {
     console.error('HeyGen generation error:', error)
     
@@ -406,19 +481,45 @@ export class VideoService {
       }
     }
     
-    // Validate avatar before creating video record
-    if (!avatarId) {
-      throw new Error('No avatar configured. Please set up an avatar in your settings before generating videos.')
-    }
-
-    // For SaaS: Fetch user-specific vertical template ID from preferences
+    // For SaaS: Fetch user-specific template overrides from preferences
     const { data: preferences } = await supabase
       .from('user_preferences')
-      .select('heygen_vertical_template_id')
+      .select(
+        'heygen_vertical_template_id, heygen_vertical_template_script_key, heygen_vertical_template_variables'
+      )
       .eq('user_id', userId)
       .single()
 
-    const verticalTemplateId = preferences?.heygen_vertical_template_id || undefined
+    const normalizeTemplateDefaults = (raw: unknown): Record<string, string> => {
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        return {}
+      }
+      return Object.entries(raw as Record<string, any>).reduce((acc, [key, value]) => {
+        if (value === null || value === undefined) {
+          return acc
+        }
+        acc[key] = typeof value === 'string' ? value : String(value)
+        return acc
+      }, {} as Record<string, string>)
+    }
+
+    const templateSettings: TemplateOverrides | undefined =
+      typeof preferences?.heygen_vertical_template_id === 'string' &&
+      preferences.heygen_vertical_template_id.trim().length > 0
+        ? {
+            templateId: preferences.heygen_vertical_template_id.trim(),
+            scriptKey:
+              preferences.heygen_vertical_template_script_key?.trim() || DEFAULT_TEMPLATE_SCRIPT_KEY,
+            defaults: normalizeTemplateDefaults(preferences.heygen_vertical_template_variables),
+          }
+        : undefined
+
+    // Validate avatar before creating video record (unless a template is configured)
+    if (!avatarId && !templateSettings) {
+      throw new Error(
+        'No avatar configured. Please set up an avatar or provide a HeyGen template in Preferences before generating videos.'
+      )
+    }
     
     // Idempotency 1: If tied to a plan item, and it already has a video_id, reuse that video
     if (input.plan_item_id) {
@@ -488,7 +589,7 @@ export class VideoService {
       input.plan_item_id || null,
       aspectRatio,
       dimension,
-      verticalTemplateId
+      templateSettings
     )
     return video
   }
