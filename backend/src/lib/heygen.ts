@@ -84,6 +84,7 @@ export interface GenerateVideoRequest {
   output_resolution?: string
   aspect_ratio?: string // e.g., "9:16" for vertical videos (Reels/TikTok)
   dimension?: HeyGenDimensionInput
+  force_vertical?: boolean
 }
 
 export interface GenerateTemplateVideoRequest {
@@ -419,6 +420,7 @@ export async function generateVideo(
       request.output_resolution && request.output_resolution.trim().length > 0
         ? request.output_resolution.trim()
         : DEFAULT_HEYGEN_RESOLUTION
+    const requirePortrait = !!request.force_vertical || request.aspect_ratio === '9:16'
     
     // Always use v2 API - https://docs.heygen.com/reference/create-an-avatar-video-v2
     // Build payload with video_inputs array format
@@ -428,6 +430,15 @@ export async function generateVideo(
           character: {},
         },
       ],
+    }
+
+    const ensurePortraitConfig = () => {
+      if (!requirePortrait) return
+      if (!payload.video_config) {
+        payload.video_config = {}
+      }
+      payload.video_config.aspect_ratio = '9:16'
+      payload.video_config.fit = payload.video_config.fit || 'cover'
     }
 
     // Voice is required by HeyGen v2 schema under voice.text.voice_id
@@ -505,6 +516,8 @@ export async function generateVideo(
           `[HeyGen] Setting portrait dimension for vertical video: ${payload.video_config.dimension.width}x${payload.video_config.dimension.height}`
         )
       }
+
+      ensurePortraitConfig()
     
     // Remove video_config if it's empty to avoid API errors
     if (Object.keys(payload.video_config).length === 0) {
@@ -691,6 +704,7 @@ export async function generateVideo(
             // Remove output_resolution but keep aspect_ratio
             delete payload.video_config.output_resolution
             // Ensure aspect_ratio is still set
+            ensurePortraitConfig()
             if (!payload.video_config.aspect_ratio) {
               payload.video_config.aspect_ratio = '9:16'
             }
@@ -709,7 +723,8 @@ export async function generateVideo(
           } else if (shouldRetryWithoutOutputResolution) {
             // No aspect_ratio, try removing output_resolution only
             delete payload.video_config.output_resolution
-            if (Object.keys(payload.video_config).length === 0) {
+            ensurePortraitConfig()
+            if (!requirePortrait && Object.keys(payload.video_config).length === 0) {
               delete payload.video_config
             }
             response = await axios.post(
@@ -745,7 +760,7 @@ export async function generateVideo(
           const hadOutputResolution = !!payload.video_config?.output_resolution
           
           // If we have aspect_ratio, try to preserve it and only remove problematic fields
-          if (hadAspectRatio && (hadOutputResolution || hadDimension)) {
+          if (hadAspectRatio) {
             console.warn(
               '[HeyGen] Output resolution/dimension not supported, retrying with aspect_ratio only:',
               {
@@ -767,6 +782,7 @@ export async function generateVideo(
               delete payload.video_config.fit
             }
             // Ensure aspect_ratio is still set
+            ensurePortraitConfig()
             if (!payload.video_config.aspect_ratio) {
               payload.video_config.aspect_ratio = '9:16'
             }
@@ -783,7 +799,7 @@ export async function generateVideo(
             )
             console.log(`[HeyGen] ✅ Successfully generated video with aspect_ratio only`)
           } else {
-            // No aspect_ratio to preserve, remove entire video_config
+            // No aspect_ratio to preserve
             console.warn(
               '[HeyGen] Output resolution/aspect_ratio/dimension not supported, retrying without video_config:',
               {
@@ -796,6 +812,11 @@ export async function generateVideo(
                 outputResolution: payload.video_config?.output_resolution,
               }
             )
+            if (requirePortrait) {
+              throw new Error(
+                'HeyGen could not render a vertical video with this avatar/photo. Please upload a portrait-oriented photo or switch to a template-based video.'
+              )
+            }
             if (hadAspectRatio) {
               console.warn(`[HeyGen] ⚠️ Aspect ratio ${payload.video_config.aspect_ratio} may not be supported by HeyGen API. Video will be generated without aspect ratio setting.`)
             }

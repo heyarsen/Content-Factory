@@ -171,6 +171,7 @@ function buildHeygenPayload(
     style,
     duration,
     ...(isPhotoAvatar ? { talking_photo_id: avatarId } : { avatar_id: avatarId }),
+    force_vertical: isVertical,
   }
 
   if (resolvedOutputResolution) {
