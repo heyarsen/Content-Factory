@@ -50,6 +50,7 @@ router.put('/', authenticate, async (req: AuthRequest, res: Response) => {
       heygen_vertical_template_id,
       heygen_vertical_template_script_key,
       heygen_vertical_template_variables,
+      heygen_vertical_template_overrides,
     } = req.body
 
     // Check if preferences exist
@@ -90,6 +91,17 @@ router.put('/', authenticate, async (req: AuthRequest, res: Response) => {
         updates.heygen_vertical_template_variables = heygen_vertical_template_variables || {}
       } else {
         return res.status(400).json({ error: 'Template variables must be a JSON object' })
+      }
+    }
+    if (heygen_vertical_template_overrides !== undefined) {
+      if (
+        heygen_vertical_template_overrides === null ||
+        (typeof heygen_vertical_template_overrides === 'object' &&
+          !Array.isArray(heygen_vertical_template_overrides))
+      ) {
+        updates.heygen_vertical_template_overrides = heygen_vertical_template_overrides || {}
+      } else {
+        return res.status(400).json({ error: 'Template overrides must be a JSON object' })
       }
     }
 

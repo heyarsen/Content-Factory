@@ -68,6 +68,53 @@ type TemplateOverrides = {
   templateId: string
   scriptKey: string
   defaults: Record<string, string>
+  payloadOverrides: Record<string, any>
+}
+
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+const replaceTemplateTokens = (input: any, replacements: Record<string, string | undefined>): any => {
+  if (typeof input === 'string') {
+    return Object.entries(replacements).reduce((acc, [token, replacement]) => {
+      const safeReplacement = replacement ?? ''
+      return acc.replace(new RegExp(escapeRegex(token), 'gi'), safeReplacement)
+    }, input)
+  }
+
+  if (Array.isArray(input)) {
+    return input.map((item) => replaceTemplateTokens(item, replacements))
+  }
+
+  if (input && typeof input === 'object') {
+    return Object.entries(input).reduce((acc, [key, value]) => {
+      acc[key] = replaceTemplateTokens(value, replacements)
+      return acc
+    }, {} as Record<string, any>)
+  }
+
+  return input
+}
+
+const deepMerge = (target: Record<string, any>, source: Record<string, any>): Record<string, any> => {
+  if (!source || typeof source !== 'object') {
+    return target
+  }
+
+  for (const [key, value] of Object.entries(source)) {
+    if (Array.isArray(value)) {
+      target[key] = value
+    } else if (value && typeof value === 'object') {
+      const base = target[key]
+      if (!base || typeof base !== 'object' || Array.isArray(base)) {
+        target[key] = {}
+      }
+      target[key] = deepMerge(target[key], value)
+    } else {
+      target[key] = value
+    }
+  }
+
+  return target
 }
 
 function normalizeCategory(category?: string | null): TemplateCategory {
@@ -315,18 +362,13 @@ async function runHeygenGeneration(
         '{{talking_photo_id}}': isPhotoAvatar && avatarId ? avatarId : '',
       }
 
-      const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-
       const processedDefaults: Record<string, string> = {}
       for (const [key, rawValue] of Object.entries(templateSettings.defaults || {})) {
         if (rawValue === null || rawValue === undefined) {
           continue
         }
         const valueString = typeof rawValue === 'string' ? rawValue : String(rawValue)
-        const finalValue = Object.entries(placeholderMap).reduce((acc, [token, replacement]) => {
-          return acc.replace(new RegExp(escapeRegex(token), 'gi'), replacement || '')
-        }, valueString)
-        processedDefaults[key] = finalValue
+        processedDefaults[key] = replaceTemplateTokens(valueString, placeholderMap)
       }
 
       const variables = {
@@ -342,6 +384,16 @@ async function runHeygenGeneration(
         include_gif: false,
         enable_sharing: false,
         dimension: dimension || DEFAULT_TEMPLATE_DIMENSION,
+      }
+
+      if (templateSettings.payloadOverrides && Object.keys(templateSettings.payloadOverrides).length > 0) {
+        const processedOverrides = replaceTemplateTokens(
+          templateSettings.payloadOverrides,
+          placeholderMap
+        )
+        if (processedOverrides && typeof processedOverrides === 'object' && !Array.isArray(processedOverrides)) {
+          deepMerge(templateRequest as Record<string, any>, processedOverrides as Record<string, any>)
+        }
       }
 
       console.log('[HeyGen Template] Generating video via template', {
@@ -485,7 +537,7 @@ export class VideoService {
     const { data: preferences } = await supabase
       .from('user_preferences')
       .select(
-        'heygen_vertical_template_id, heygen_vertical_template_script_key, heygen_vertical_template_variables'
+        'heygen_vertical_template_id, heygen_vertical_template_script_key, heygen_vertical_template_variables, heygen_vertical_template_overrides'
       )
       .eq('user_id', userId)
       .single()
@@ -502,6 +554,12 @@ export class VideoService {
         return acc
       }, {} as Record<string, string>)
     }
+    const normalizeTemplateOverrides = (raw: unknown): Record<string, any> => {
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        return {}
+      }
+      return raw as Record<string, any>
+    }
 
     const templateSettings: TemplateOverrides | undefined =
       typeof preferences?.heygen_vertical_template_id === 'string' &&
@@ -511,6 +569,7 @@ export class VideoService {
             scriptKey:
               preferences.heygen_vertical_template_script_key?.trim() || DEFAULT_TEMPLATE_SCRIPT_KEY,
             defaults: normalizeTemplateDefaults(preferences.heygen_vertical_template_variables),
+            payloadOverrides: normalizeTemplateOverrides(preferences.heygen_vertical_template_overrides),
           }
         : undefined
 

@@ -20,6 +20,7 @@ interface Preferences {
   heygen_vertical_template_id?: string | null
   heygen_vertical_template_script_key?: string | null
   heygen_vertical_template_variables?: Record<string, string> | null
+  heygen_vertical_template_overrides?: Record<string, any> | null
 }
 
 interface SocialAccount {
@@ -104,8 +105,10 @@ export function Preferences() {
     heygen_vertical_template_id: '',
     heygen_vertical_template_script_key: 'script',
     heygen_vertical_template_variables: {},
+    heygen_vertical_template_overrides: {},
   })
   const [templateVariablesText, setTemplateVariablesText] = useState('')
+  const [templateOverridesText, setTemplateOverridesText] = useState('')
 
   useEffect(() => {
     loadPreferences()
@@ -126,6 +129,8 @@ export function Preferences() {
             response.data.preferences.heygen_vertical_template_script_key || 'script',
           heygen_vertical_template_variables:
             response.data.preferences.heygen_vertical_template_variables || {},
+          heygen_vertical_template_overrides:
+            response.data.preferences.heygen_vertical_template_overrides || {},
         })
         const templateVars = response.data.preferences.heygen_vertical_template_variables || {}
         const formattedTemplateVars =
@@ -133,11 +138,18 @@ export function Preferences() {
             ? JSON.stringify(templateVars, null, 2)
             : ''
         setTemplateVariablesText(formattedTemplateVars)
+        const templateOverrides = response.data.preferences.heygen_vertical_template_overrides || {}
+        const formattedOverrides =
+          templateOverrides && Object.keys(templateOverrides).length > 0
+            ? JSON.stringify(templateOverrides, null, 2)
+            : ''
+        setTemplateOverridesText(formattedOverrides)
       } else {
         // No preferences exist, use detected timezone
         const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
         setPreferences(prev => ({ ...prev, timezone: detectedTimezone }))
         setTemplateVariablesText('')
+        setTemplateOverridesText('')
       }
     } catch (error) {
       console.error('Failed to load preferences:', error)
@@ -145,6 +157,7 @@ export function Preferences() {
       const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
       setPreferences(prev => ({ ...prev, timezone: detectedTimezone }))
       setTemplateVariablesText('')
+      setTemplateOverridesText('')
     } finally {
       setLoading(false)
     }
@@ -185,20 +198,44 @@ export function Preferences() {
         }
       }
 
+      let parsedTemplateOverrides: Record<string, any> = {}
+      const trimmedOverrides = templateOverridesText.trim()
+
+      if (trimmedOverrides.length > 0) {
+        try {
+          const parsed = JSON.parse(trimmedOverrides)
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            throw new Error('Template overrides must be a JSON object')
+          }
+          parsedTemplateOverrides = parsed
+        } catch (error: any) {
+          toast.error(error.message || 'Template overrides must be valid JSON')
+          setSaving(false)
+          return
+        }
+      }
+
       const payload = {
         ...preferences,
         heygen_vertical_template_variables: parsedTemplateVariables,
+        heygen_vertical_template_overrides: parsedTemplateOverrides,
       }
 
       await api.put('/api/preferences', payload)
       setPreferences(prev => ({
         ...prev,
         heygen_vertical_template_variables: parsedTemplateVariables,
+        heygen_vertical_template_overrides: parsedTemplateOverrides,
       }))
 
       setTemplateVariablesText(
         Object.keys(parsedTemplateVariables).length > 0
           ? JSON.stringify(parsedTemplateVariables, null, 2)
+          : ''
+      )
+      setTemplateOverridesText(
+        Object.keys(parsedTemplateOverrides).length > 0
+          ? JSON.stringify(parsedTemplateOverrides, null, 2)
           : ''
       )
 
@@ -393,6 +430,18 @@ export function Preferences() {
               <span className="font-mono text-slate-600">{'{{topic}}'}</span>,{' '}
               <span className="font-mono text-slate-600">{'{{avatar_id}}'}</span> or{' '}
               <span className="font-mono text-slate-600">{'{{talking_photo_id}}'}</span>.
+            </p>
+            <Textarea
+              label="Template Overrides (JSON)"
+              placeholder='{"nodes_override":[{"id":"avatar_node_id","character":{"type":"avatar","avatar_id":"{{avatar_id}}"}}]}'
+              rows={6}
+              value={templateOverridesText}
+              onChange={(e) => setTemplateOverridesText(e.target.value)}
+            />
+            <p className="text-xs text-slate-500">
+              Advanced: pass raw Template API overrides (e.g., nodes, tracks, backgrounds). Tokens like{' '}
+              <span className="font-mono text-slate-600">{'{{avatar_id}}'}</span> or{' '}
+              <span className="font-mono text-slate-600">{'{{talking_photo_id}}'}</span> will be replaced at runtime.
             </p>
           </div>
         </Card>
