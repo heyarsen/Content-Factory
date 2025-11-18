@@ -1167,7 +1167,6 @@ export async function createAvatarFromPhoto(
   avatarName: string
 ): Promise<{ avatar_id: string; status: string }> {
   try {
-    const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
     const apiKey = getHeyGenKey()
     
     // Step 1: Upload image to HeyGen and get image_key
@@ -1244,10 +1243,34 @@ export async function createAvatarFromPhoto(
     
     console.log(`Successfully created avatar group: ${groupId}`)
     
-    // Step 3: Train the avatar group (optional but recommended)
+    // Step 3: Add uploaded image as a look inside the group (required before training)
+    try {
+      console.log('Step 3: Adding uploaded image as a look in the avatar group...')
+      const addLookResponse = await addLooksToAvatarGroup({
+        group_id: groupId,
+        image_keys: [imageKey],
+        name: avatarName,
+      })
+
+      if (!addLookResponse.photo_avatar_list?.length) {
+        console.warn('⚠️ addLooksToAvatarGroup returned no looks; training may fail without at least one valid look.')
+      } else {
+        console.log(`✅ Added ${addLookResponse.photo_avatar_list.length} look(s) to group ${groupId}`)
+      }
+    } catch (addLookErr: any) {
+      console.error('❌ Failed to add look to avatar group:', addLookErr.response?.data || addLookErr.message)
+      throw new Error(
+        addLookErr.response?.data?.error?.message ||
+          addLookErr.response?.data?.message ||
+          addLookErr.message ||
+          'Failed to add image to avatar group.'
+      )
+    }
+
+    // Step 4: Train the avatar group (optional but recommended)
     let status = 'pending'
     try {
-      console.log('Step 3: Starting avatar group training...')
+      console.log('Step 4: Starting avatar group training...')
       const trainResponse = await axios.post(
         `${HEYGEN_V2_API_URL}/photo_avatar/train`,
         {
