@@ -220,11 +220,11 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
       }
       let mimeType = match[1]
       const base64Data = match[2]
-      let buffer = Buffer.from(base64Data, 'base64')
+      let buffer: Buffer = Buffer.from(base64Data, 'base64')
 
       try {
         const processed = await preprocessAvatarPhoto(buffer, mimeType)
-        buffer = processed.buffer
+        buffer = processed.buffer as Buffer
         mimeType = processed.mimeType
       } catch (preprocessError: any) {
         console.warn('Photo preprocessing failed, continuing with original image:', preprocessError?.message || preprocessError)
