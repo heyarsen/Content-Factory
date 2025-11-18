@@ -338,7 +338,7 @@ async function runHeygenGeneration(
       })
       return
     }
-
+    
     const usingTemplate =
       !!templateSettings?.templateId && aspectRatio === DEFAULT_VERTICAL_ASPECT_RATIO
 
@@ -408,7 +408,7 @@ async function runHeygenGeneration(
       await updatePlanItemStatus(planItemId, response.status)
       return
     }
-
+    
     const payload = buildHeygenPayload(
       video.topic,
       video.script || undefined,
@@ -560,6 +560,21 @@ export class VideoService {
       }
       return raw as Record<string, any>
     }
+    const parseJsonObject = (value?: string | null): Record<string, any> => {
+      if (!value || value.trim().length === 0) {
+        return {}
+      }
+      try {
+        const parsed = JSON.parse(value)
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          return {}
+        }
+        return parsed
+      } catch (error) {
+        console.warn('[HeyGen Template] Failed to parse JSON env value:', error)
+        return {}
+      }
+    }
 
     const templateSettings: TemplateOverrides | undefined =
       typeof preferences?.heygen_vertical_template_id === 'string' &&
@@ -571,7 +586,22 @@ export class VideoService {
             defaults: normalizeTemplateDefaults(preferences.heygen_vertical_template_variables),
             payloadOverrides: normalizeTemplateOverrides(preferences.heygen_vertical_template_overrides),
           }
-        : undefined
+        : (() => {
+            const envTemplateId = process.env.HEYGEN_VERTICAL_TEMPLATE_ID?.trim()
+            if (!envTemplateId) {
+              return undefined
+            }
+            return {
+              templateId: envTemplateId,
+              scriptKey:
+                process.env.HEYGEN_VERTICAL_TEMPLATE_SCRIPT_KEY?.trim() ||
+                DEFAULT_TEMPLATE_SCRIPT_KEY,
+              defaults: normalizeTemplateDefaults(
+                parseJsonObject(process.env.HEYGEN_VERTICAL_TEMPLATE_VARIABLES)
+              ),
+              payloadOverrides: parseJsonObject(process.env.HEYGEN_VERTICAL_TEMPLATE_OVERRIDES),
+            }
+          })()
 
     // Validate avatar before creating video record (unless a template is configured)
     if (!avatarId && !templateSettings) {
