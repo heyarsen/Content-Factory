@@ -63,6 +63,10 @@ const DEFAULT_TEMPLATE_DIMENSION: HeyGenDimensionInput = {
   height: 1280,
 }
 const DEFAULT_TEMPLATE_SCRIPT_KEY = 'script'
+const DEFAULT_TEMPLATE_AVATAR_VARIABLE_KEY =
+  process.env.HEYGEN_TEMPLATE_AVATAR_VARIABLE_KEY?.trim() || 'avatar_id'
+const DEFAULT_TEMPLATE_PHOTO_AVATAR_VARIABLE_KEY =
+  process.env.HEYGEN_TEMPLATE_PHOTO_AVATAR_VARIABLE_KEY?.trim() || 'talking_photo_id'
 
 type TemplateOverrides = {
   templateId: string
@@ -70,6 +74,8 @@ type TemplateOverrides = {
   defaults: Record<string, string>
   payloadOverrides: Record<string, any>
   avatarNodeIds: string[]
+  avatarVariableKey?: string
+  photoAvatarVariableKey?: string
 }
 
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -358,6 +364,14 @@ async function runHeygenGeneration(
         [scriptKey]: scriptValue,
       }
 
+      if (avatarId) {
+        if (isPhotoAvatar && templateSettings.photoAvatarVariableKey) {
+          variables[templateSettings.photoAvatarVariableKey] = avatarId
+        } else if (!isPhotoAvatar && templateSettings.avatarVariableKey) {
+          variables[templateSettings.avatarVariableKey] = avatarId
+        }
+      }
+
       const templateRequest: GenerateTemplateVideoRequest = {
         template_id: templateSettings.templateId,
         variables,
@@ -605,6 +619,8 @@ export class VideoService {
             defaults: normalizeTemplateDefaults(preferences.heygen_vertical_template_variables),
             payloadOverrides: normalizeTemplateOverrides(preferences.heygen_vertical_template_overrides),
             avatarNodeIds: parseNodeIdList(process.env.HEYGEN_TEMPLATE_AVATAR_NODE_IDS),
+            avatarVariableKey: DEFAULT_TEMPLATE_AVATAR_VARIABLE_KEY,
+            photoAvatarVariableKey: DEFAULT_TEMPLATE_PHOTO_AVATAR_VARIABLE_KEY,
           }
         : (() => {
             const envTemplateId = process.env.HEYGEN_VERTICAL_TEMPLATE_ID?.trim()
@@ -621,6 +637,8 @@ export class VideoService {
               ),
               payloadOverrides: parseJsonObject(process.env.HEYGEN_VERTICAL_TEMPLATE_OVERRIDES),
               avatarNodeIds: parseNodeIdList(process.env.HEYGEN_TEMPLATE_AVATAR_NODE_IDS),
+              avatarVariableKey: DEFAULT_TEMPLATE_AVATAR_VARIABLE_KEY,
+              photoAvatarVariableKey: DEFAULT_TEMPLATE_PHOTO_AVATAR_VARIABLE_KEY,
             }
           })()
 
