@@ -75,6 +75,7 @@ export default function Avatars() {
   const [detailsModal, setDetailsModal] = useState<{ avatar: Avatar; data: PhotoAvatarDetails | null } | null>(null)
   const [detailsLoadingId, setDetailsLoadingId] = useState<string | null>(null)
   const [upscalingId, setUpscalingId] = useState<string | null>(null)
+  const detailData = detailsModal?.data ?? null
   
   // AI Generation form fields
   const [aiName, setAiName] = useState('')
@@ -192,34 +193,6 @@ export default function Avatars() {
   useEffect(() => {
     loadAvatars()
   }, [loadAvatars])
-
-  useEffect(() => {
-    if (trainingStatusIntervalRef.current) {
-      clearInterval(trainingStatusIntervalRef.current)
-      trainingStatusIntervalRef.current = null
-    }
-
-    const avatarsNeedingUpdate = avatars.filter(avatar =>
-      ['pending', 'training', 'generating'].includes(avatar.status)
-    )
-
-    if (avatarsNeedingUpdate.length === 0) {
-      return
-    }
-
-    trainingStatusIntervalRef.current = setInterval(() => {
-      avatarsNeedingUpdate.forEach(avatar => {
-        handleRefreshTrainingStatus(avatar, { silent: true })
-      })
-    }, 30000)
-
-    return () => {
-      if (trainingStatusIntervalRef.current) {
-        clearInterval(trainingStatusIntervalRef.current)
-        trainingStatusIntervalRef.current = null
-      }
-    }
-  }, [avatars, handleRefreshTrainingStatus])
 
   // Cleanup status check interval on unmount
   useEffect(() => {
@@ -352,6 +325,34 @@ export default function Avatars() {
     },
     []
   )
+
+  useEffect(() => {
+    if (trainingStatusIntervalRef.current) {
+      clearInterval(trainingStatusIntervalRef.current)
+      trainingStatusIntervalRef.current = null
+    }
+
+    const avatarsNeedingUpdate = avatars.filter(avatar =>
+      ['pending', 'training', 'generating'].includes(avatar.status)
+    )
+
+    if (avatarsNeedingUpdate.length === 0) {
+      return
+    }
+
+    trainingStatusIntervalRef.current = setInterval(() => {
+      avatarsNeedingUpdate.forEach(avatar => {
+        handleRefreshTrainingStatus(avatar, { silent: true })
+      })
+    }, 30000)
+
+    return () => {
+      if (trainingStatusIntervalRef.current) {
+        clearInterval(trainingStatusIntervalRef.current)
+        trainingStatusIntervalRef.current = null
+      }
+    }
+  }, [avatars, handleRefreshTrainingStatus])
 
   const handleViewDetails = async (avatar: Avatar) => {
     setDetailsModal({ avatar, data: null })
@@ -1574,12 +1575,12 @@ export default function Avatars() {
           title={`Avatar Details${detailsModal?.avatar ? ` - ${detailsModal.avatar.avatar_name}` : ''}`}
           size="md"
         >
-          {!detailsModal ? null : detailsModal.data ? (
+          {!detailsModal ? null : detailData ? (
             <div className="space-y-5">
               <div className="flex flex-col sm:flex-row gap-4">
-                {detailsModal.data.image_url || detailsModal.data.preview_url ? (
+                {detailData.image_url || detailData.preview_url ? (
                   <img
-                    src={detailsModal.data.image_url || detailsModal.data.preview_url || ''}
+                    src={detailData.image_url || detailData.preview_url || ''}
                     alt="Avatar preview"
                     className="w-full sm:w-40 h-40 object-cover rounded-lg border border-slate-200"
                   />
@@ -1592,9 +1593,9 @@ export default function Avatars() {
                   <div className="flex justify-between gap-2">
                     <dt className="text-slate-500">Photo Avatar ID</dt>
                     <dd className="flex items-center gap-1 text-slate-900">
-                      <span className="font-mono text-xs">{detailsModal.data.id}</span>
+                      <span className="font-mono text-xs">{detailData.id}</span>
                       <button
-                        onClick={() => handleCopyToClipboard(detailsModal.data.id)}
+                        onClick={() => handleCopyToClipboard(detailData.id)}
                         className="text-slate-500 hover:text-slate-900"
                         title="Copy ID"
                       >
@@ -1605,10 +1606,10 @@ export default function Avatars() {
                   <div className="flex justify-between gap-2">
                     <dt className="text-slate-500">Group ID</dt>
                     <dd className="flex items-center gap-1 text-slate-900">
-                      <span className="font-mono text-xs">{detailsModal.data.group_id || '—'}</span>
-                      {detailsModal.data.group_id && (
+                      <span className="font-mono text-xs">{detailData.group_id || '—'}</span>
+                      {detailData.group_id && (
                         <button
-                          onClick={() => handleCopyToClipboard(detailsModal.data.group_id)}
+                          onClick={() => handleCopyToClipboard(detailData.group_id)}
                           className="text-slate-500 hover:text-slate-900"
                           title="Copy Group ID"
                         >
@@ -1619,26 +1620,26 @@ export default function Avatars() {
                   </div>
                   <div className="flex justify-between gap-2">
                     <dt className="text-slate-500">Status</dt>
-                    <dd>{detailsModal.data.status || '—'}</dd>
+                    <dd>{detailData.status || '—'}</dd>
                   </div>
                   <div className="flex justify-between gap-2">
                     <dt className="text-slate-500">Created</dt>
-                    <dd>{formatTimestamp(detailsModal.data.created_at)}</dd>
+                    <dd>{formatTimestamp(detailData.created_at)}</dd>
                   </div>
                   <div className="flex justify-between gap-2">
                     <dt className="text-slate-500">Updated</dt>
-                    <dd>{formatTimestamp(detailsModal.data.updated_at)}</dd>
+                    <dd>{formatTimestamp(detailData.updated_at)}</dd>
                   </div>
                 </dl>
               </div>
 
               <dl className="space-y-2 text-sm">
-                {detailsModal.data.image_url && (
+                {detailData.image_url && (
                   <div className="flex justify-between gap-2">
                     <dt className="text-slate-500">Image URL</dt>
                     <dd className="text-right">
                       <a
-                        href={detailsModal.data.image_url}
+                        href={detailData.image_url}
                         target="_blank"
                         rel="noreferrer"
                         className="text-brand-600 hover:text-brand-700 text-xs break-all"
@@ -1648,12 +1649,12 @@ export default function Avatars() {
                     </dd>
                   </div>
                 )}
-                {detailsModal.data.preview_url && (
+                {detailData.preview_url && (
                   <div className="flex justify-between gap-2">
                     <dt className="text-slate-500">Preview URL</dt>
                     <dd className="text-right">
                       <a
-                        href={detailsModal.data.preview_url}
+                        href={detailData.preview_url}
                         target="_blank"
                         rel="noreferrer"
                         className="text-brand-600 hover:text-brand-700 text-xs break-all"
