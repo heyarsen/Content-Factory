@@ -116,7 +116,19 @@ export default function Avatars() {
   const [aiName, setAiName] = useState('')
   const [aiAge, setAiAge] = useState<'Young Adult' | 'Adult' | 'Middle Aged' | 'Senior'>('Adult')
   const [aiGender, setAiGender] = useState<'Man' | 'Woman'>('Man')
-  const [aiEthnicity, setAiEthnicity] = useState('')
+  const AI_ETHNICITY_OPTIONS = [
+    'Unspecified',
+    'White',
+    'Black',
+    'Asian American',
+    'East Asian',
+    'South East Asian',
+    'South Asian',
+    'Middle Eastern',
+    'Pacific',
+    'Hispanic',
+  ] as const
+  const [aiEthnicity, setAiEthnicity] = useState<(typeof AI_ETHNICITY_OPTIONS)[number]>('Unspecified')
   const [aiOrientation, setAiOrientation] = useState<'horizontal' | 'vertical' | 'square'>('square')
   const [aiPose, setAiPose] = useState<'half_body' | 'full_body' | 'close_up'>('close_up')
   const [aiStyle, setAiStyle] = useState<'Realistic' | 'Cartoon' | 'Anime'>('Realistic')
@@ -629,7 +641,7 @@ export default function Avatars() {
   }
 
   const handleGenerateAI = async () => {
-    if (!aiName.trim() || !aiEthnicity.trim() || !aiAppearance.trim()) {
+  if (!aiName.trim() || !aiAppearance.trim()) {
       toast.error('Please fill in all required fields')
       return
     }
@@ -1425,11 +1437,11 @@ export default function Avatars() {
                     disabled={generatingAI}
                   />
 
-                  <Input
+                  <Select
                     label="Ethnicity *"
                     value={aiEthnicity}
-                    onChange={(e) => setAiEthnicity(e.target.value)}
-                    placeholder="e.g., Asian, Caucasian, Hispanic"
+                    onChange={(e) => setAiEthnicity(e.target.value as (typeof AI_ETHNICITY_OPTIONS)[number])}
+                    options={AI_ETHNICITY_OPTIONS.map(value => ({ value, label: value }))}
                     disabled={generatingAI}
                   />
 
@@ -1477,6 +1489,7 @@ export default function Avatars() {
                   placeholder="Describe the appearance in detail: hair color, clothing, expression, etc. e.g., 'Brown hair, professional business suit, friendly smile'"
                   rows={4}
                   disabled={generatingAI}
+                  helperText="Tip: include outfit, camera framing, vibe (e.g., 'vertical close-up, confident smile, soft office lighting')."
                 />
 
                 <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
