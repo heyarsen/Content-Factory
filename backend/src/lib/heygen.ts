@@ -1164,7 +1164,8 @@ export async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
 
 export async function createAvatarFromPhoto(
   photoUrl: string,
-  avatarName: string
+  avatarName: string,
+  additionalPhotoUrls: string[] = []
 ): Promise<{ avatar_id: string; status: string }> {
   try {
     const apiKey = getHeyGenKey()
@@ -1173,17 +1174,36 @@ export async function createAvatarFromPhoto(
     // According to HeyGen support: https://docs.heygen.com/reference/upload-asset
     // This is required - we must upload the image first to get an image_key
     console.log('Step 1: Uploading image to HeyGen Upload Asset endpoint...')
-    let imageKey: string
+    const imageKeys: string[] = []
     
     try {
-      imageKey = await uploadImageToHeyGen(photoUrl)
-      console.log('✅ Successfully uploaded image to HeyGen, got image_key:', imageKey)
+      const primaryImageKey = await uploadImageToHeyGen(photoUrl)
+      imageKeys.push(primaryImageKey)
+      console.log('✅ Successfully uploaded image to HeyGen, got image_key:', primaryImageKey)
     } catch (uploadError: any) {
       console.error('❌ Image upload failed:', uploadError.message)
       throw new Error(
         `Failed to upload image to HeyGen: ${uploadError.message}. ` +
         `Please check your HEYGEN_KEY and ensure the image is accessible.`
       )
+    }
+    
+    if (Array.isArray(additionalPhotoUrls) && additionalPhotoUrls.length > 0) {
+      for (const [index, extraUrl] of additionalPhotoUrls.entries()) {
+        if (!extraUrl || typeof extraUrl !== 'string') continue
+        try {
+          const extraImageKey = await uploadImageToHeyGen(extraUrl)
+          imageKeys.push(extraImageKey)
+          console.log(
+            `✅ Successfully uploaded additional image #${index + 1} to HeyGen, got image_key: ${extraImageKey}`
+          )
+        } catch (extraUploadErr: any) {
+          console.warn(
+            `⚠️ Failed to upload additional image #${index + 1} to HeyGen:`,
+            extraUploadErr.message
+          )
+        }
+      }
     }
     
     // Step 2: Create Photo Avatar Group using the image_key
@@ -1197,7 +1217,7 @@ export async function createAvatarFromPhoto(
         `${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/create`,
         {
           name: avatarName,
-          image_key: imageKey,
+          image_key: imageKeys[0],
         },
         {
           headers: {
@@ -1243,19 +1263,21 @@ export async function createAvatarFromPhoto(
     
     console.log(`Successfully created avatar group: ${groupId}`)
     
-    // Step 3: Add uploaded image as a look inside the group (required before training)
+    // Step 3: Add uploaded image(s) as look(s) inside the group (required before training)
     try {
-      console.log('Step 3: Adding uploaded image as a look in the avatar group...')
+      console.log('Step 3: Adding uploaded image(s) as look(s) in the avatar group...')
       const addLookResponse = await addLooksToAvatarGroup({
         group_id: groupId,
-        image_keys: [imageKey],
+        image_keys: imageKeys,
         name: avatarName,
       })
 
       if (!addLookResponse.photo_avatar_list?.length) {
         console.warn('⚠️ addLooksToAvatarGroup returned no looks; training may fail without at least one valid look.')
       } else {
-        console.log(`✅ Added ${addLookResponse.photo_avatar_list.length} look(s) to group ${groupId}`)
+        console.log(
+          `✅ Added ${addLookResponse.photo_avatar_list.length} look(s) to group ${groupId} (requested ${imageKeys.length})`
+        )
       }
     } catch (addLookErr: any) {
       console.error('❌ Failed to add look to avatar group:', addLookErr.response?.data || addLookErr.message)

@@ -245,11 +245,12 @@ export class AvatarService {
   static async createAvatarFromPhoto(
     userId: string,
     photoUrl: string,
-    avatarName: string
+    avatarName: string,
+    additionalPhotoUrls: string[] = []
   ): Promise<Avatar> {
     try {
       const { createAvatarFromPhoto } = await import('../lib/heygen.js')
-      const result = await createAvatarFromPhoto(photoUrl, avatarName)
+      const result = await createAvatarFromPhoto(photoUrl, avatarName, additionalPhotoUrls)
 
       // Save to database
       // Save photoUrl as avatar_url to identify user-created avatars

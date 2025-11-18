@@ -164,108 +164,136 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
 router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
-    const { photo_data, avatar_name } = req.body // photo_data is base64 data URL
+    const { photo_data, photo_url, avatar_name, additional_photos } = req.body
 
     console.log('Upload photo request received:', {
       hasPhotoData: !!photo_data,
-      photoDataLength: photo_data?.length,
+      hasPhotoUrl: !!photo_url,
       avatarName: avatar_name,
       userId,
+      additionalPhotosCount: Array.isArray(additional_photos) ? additional_photos.length : 0,
     })
 
-    if (!photo_data || !avatar_name) {
-      return res.status(400).json({ error: 'photo_data and avatar_name are required' })
+    if (!avatar_name || typeof avatar_name !== 'string') {
+      return res.status(400).json({ error: 'avatar_name is required' })
     }
 
-    // Convert base64 data URL to buffer
-    let base64Data: string
-    let mimeType: string
-    
-    if (photo_data.startsWith('data:')) {
-      const match = photo_data.match(/^data:([^;]+);base64,(.+)$/)
-      if (!match) {
-        throw new Error('Invalid base64 data URL format')
-      }
-      mimeType = match[1]
-      base64Data = match[2]
-    } else {
-      // Assume it's already base64 without data URL prefix
-      base64Data = photo_data
-      mimeType = 'image/jpeg'
+    const primaryInput: string | null =
+      typeof photo_data === 'string' && photo_data.length > 0
+        ? photo_data
+        : typeof photo_url === 'string' && photo_url.length > 0
+          ? photo_url
+          : null
+
+    if (!primaryInput) {
+      return res.status(400).json({ error: 'photo_data (base64) or photo_url is required' })
     }
-    
-    const buffer = Buffer.from(base64Data, 'base64')
-    
-    // Determine file extension from mime type
-    let extension = 'jpg'
-    if (mimeType.includes('png')) extension = 'png'
-    else if (mimeType.includes('webp')) extension = 'webp'
-    else if (mimeType.includes('gif')) extension = 'gif'
-    
-    const fileName = `avatars/${userId}/${Date.now()}-${avatar_name.replace(/[^a-z0-9]/gi, '_')}.${extension}`
-    
-    console.log('Processing image upload:', {
-      fileName,
-      mimeType,
-      bufferSize: buffer.length,
-      extension,
-    })
-    
-    // Upload to Supabase Storage
+
     const { supabase } = await import('../lib/supabase.js')
-    
-    // Check if bucket exists first
-    const { data: buckets, error: bucketError } = await supabase.storage.listBuckets()
-    
-    if (bucketError) {
-      console.error('Error checking buckets:', bucketError)
-      // Continue anyway - might not have permission to list buckets, but can still try to upload
+
+    const ensureBucketReady = async () => {
+      const { data: buckets, error: bucketError } = await supabase.storage.listBuckets()
+      if (bucketError) {
+        console.error('Error checking buckets:', bucketError)
+        return
+      }
+      const bucketExists = buckets?.some((b) => b.name === 'avatars')
+      if (buckets && !bucketExists) {
+        console.error('Avatars bucket does not exist. Please create it in Supabase Dashboard > Storage.')
+        throw new Error(
+          'Storage bucket "avatars" does not exist. Please create it in Supabase Dashboard > Storage with public access. You can run the SQL migration file: database/migrations/006_avatars_storage_bucket.sql'
+        )
+      }
     }
-    
-    const bucketExists = buckets?.some(b => b.name === 'avatars')
-    
-    if (buckets && !bucketExists) {
-      console.error('Avatars bucket does not exist. Please create it in Supabase Dashboard > Storage.')
-      throw new Error('Storage bucket "avatars" does not exist. Please create it in Supabase Dashboard > Storage with public access. You can run the SQL migration file: database/migrations/006_avatars_storage_bucket.sql')
-    }
-    
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(fileName, buffer, {
+
+    await ensureBucketReady()
+
+    const uploadBase64Photo = async (dataUrl: string, label: string): Promise<string> => {
+      const base64Regex = /^data:([^;]+);base64,(.+)$/
+      const match = dataUrl.match(base64Regex)
+      if (!match) {
+        throw new Error('photo_data must be a base64-encoded data URL (e.g., data:image/jpeg;base64,...)')
+      }
+      const mimeType = match[1]
+      const base64Data = match[2]
+      const buffer = Buffer.from(base64Data, 'base64')
+
+      let extension = 'jpg'
+      if (mimeType.includes('png')) extension = 'png'
+      else if (mimeType.includes('webp')) extension = 'webp'
+      else if (mimeType.includes('gif')) extension = 'gif'
+
+      const safeLabel = label.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'avatar'
+      const fileName = `avatars/${userId}/${Date.now()}-${safeLabel}-${Math.random().toString(36).slice(2, 8)}.${extension}`
+
+      console.log('Processing image upload:', {
+        fileName,
+        mimeType,
+        bufferSize: buffer.length,
+        extension,
+      })
+
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, buffer, {
         contentType: mimeType || `image/${extension}`,
         upsert: false,
         cacheControl: '3600',
       })
 
-    if (uploadError) {
-      console.error('Supabase storage upload error:', uploadError)
-      if (uploadError.message?.includes('Bucket') || uploadError.message?.includes('not found')) {
-        throw new Error(`Storage bucket "avatars" not found. Please create it in Supabase Dashboard > Storage with public access. Error: ${uploadError.message}`)
+      if (uploadError) {
+        console.error('Supabase storage upload error:', uploadError)
+        if (uploadError.message?.includes('Bucket') || uploadError.message?.includes('not found')) {
+          throw new Error(
+            `Storage bucket "avatars" not found. Please create it in Supabase Dashboard > Storage with public access. Error: ${uploadError.message}`
+          )
+        }
+        throw new Error(`Failed to upload image to storage: ${uploadError.message}`)
       }
-      throw new Error(`Failed to upload image to storage: ${uploadError.message}`)
+
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName)
+      const publicUrl = urlData?.publicUrl
+      if (!publicUrl) {
+        throw new Error('Failed to get public URL for uploaded image')
+      }
+
+      console.log('Image uploaded successfully, public URL:', publicUrl)
+      return publicUrl
     }
 
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(fileName)
-
-    const publicUrl = urlData?.publicUrl
-    if (!publicUrl) {
-      throw new Error('Failed to get public URL for uploaded image')
+    const processPhotoInput = async (input: string, label: string): Promise<string> => {
+      if (typeof input !== 'string' || input.trim().length === 0) {
+        throw new Error('Invalid photo input')
+      }
+      if (/^https?:\/\//i.test(input.trim())) {
+        return input.trim()
+      }
+      // Assume it's a base64 data URL
+      return uploadBase64Photo(input, label)
     }
-    
-    console.log('Image uploaded successfully, public URL:', publicUrl)
 
-    // Create avatar using HeyGen API
-    // Following the correct HeyGen API flow:
-    // 1. Upload image to https://upload.heygen.com/v1/asset to get image_key
-    // 2. Create Photo Avatar Group using image_key
-    // 3. Optionally train the avatar group
+    const primaryPhotoUrl = await processPhotoInput(primaryInput, avatar_name)
+
+    const extraPhotoUrls: string[] = []
+    if (Array.isArray(additional_photos)) {
+      for (const [index, extra] of additional_photos.entries()) {
+        if (typeof extra !== 'string' || extra.trim().length === 0) continue
+        try {
+          const extraUrl = await processPhotoInput(extra, `${avatar_name}_extra_${index + 1}`)
+          extraPhotoUrls.push(extraUrl)
+        } catch (extraErr: any) {
+          console.warn(
+            `Failed to process additional photo #${index + 1}:`,
+            extraErr?.message || extraErr
+          )
+        }
+      }
+    }
+
     let avatar
     try {
-      console.log('Creating avatar with HeyGen using photo URL:', publicUrl)
-      avatar = await AvatarService.createAvatarFromPhoto(userId, publicUrl, avatar_name)
+      console.log('Creating avatar with HeyGen using photo URL:', primaryPhotoUrl, {
+        additionalPhotos: extraPhotoUrls.length,
+      })
+      avatar = await AvatarService.createAvatarFromPhoto(userId, primaryPhotoUrl, avatar_name, extraPhotoUrls)
       console.log('Avatar created successfully with HeyGen:', avatar.id)
     } catch (heygenError: any) {
       console.error('HeyGen avatar creation failed:', {
@@ -277,14 +305,14 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
         code: heygenError?.code,
       })
       
-      // Re-throw the error - we now use the correct API endpoint so errors should be meaningful
       throw heygenError
     }
 
     return res.status(201).json({
       message: 'Avatar creation started. It may take a few minutes to train.',
       avatar,
-      photo_url: publicUrl,
+      photo_url: primaryPhotoUrl,
+      additional_photo_urls: extraPhotoUrls,
     })
   } catch (error: any) {
     // Log full error details for debugging
