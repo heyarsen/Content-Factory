@@ -534,13 +534,23 @@ export class VideoService {
     }
     
     // For SaaS: Fetch user-specific template overrides from preferences
-    const { data: preferences } = await supabase
+    let preferences: Record<string, any> | null = null
+    const { data: prefData, error: prefError } = await supabase
       .from('user_preferences')
       .select(
         'heygen_vertical_template_id, heygen_vertical_template_script_key, heygen_vertical_template_variables, heygen_vertical_template_overrides'
       )
       .eq('user_id', userId)
       .single()
+    if (prefError) {
+      if (prefError.code !== 'PGRST205') {
+        console.warn('[Preferences] Failed to load user preferences:', prefError.message || prefError)
+      } else {
+        console.warn('[Preferences] user_preferences table not found; falling back to env template config')
+      }
+    } else {
+      preferences = prefData
+    }
 
     const normalizeTemplateDefaults = (raw: unknown): Record<string, string> => {
       if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {

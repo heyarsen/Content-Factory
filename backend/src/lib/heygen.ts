@@ -95,13 +95,14 @@ export interface GenerateVideoRequest {
 
 export interface GenerateTemplateVideoRequest {
   template_id: string
-  variables: Record<string, string>
+  variables: Record<string, string | Record<string, any>>
   title?: string
   caption?: boolean
   include_gif?: boolean
   enable_sharing?: boolean
   callback_url?: string
   dimension?: HeyGenDimensionInput
+  overrides?: Record<string, any>
 }
 
 export interface HeyGenVideoResponse {
@@ -932,9 +933,32 @@ export async function generateVideoFromTemplate(
       throw new Error('At least one template variable is required for template video generation')
     }
 
+    const formatTemplateVariables = (variables: Record<string, any>): Record<string, any> => {
+      const formatted: Record<string, any> = {}
+      for (const [key, rawValue] of Object.entries(variables || {})) {
+        if (
+          rawValue &&
+          typeof rawValue === 'object' &&
+          !Array.isArray(rawValue) &&
+          'type' in rawValue &&
+          'properties' in rawValue
+        ) {
+          formatted[key] = rawValue
+          continue
+        }
+        formatted[key] = {
+          name: key,
+          type: 'text',
+          properties: {
+            content: typeof rawValue === 'string' ? rawValue : String(rawValue ?? ''),
+          },
+        }
+      }
+      return formatted
+    }
+
     const payload: Record<string, any> = {
-      template_id: request.template_id,
-      variables: request.variables,
+      variables: formatTemplateVariables(request.variables),
       title: request.title || 'Untitled Video',
       caption: request.caption ?? false,
       include_gif: request.include_gif ?? false,
@@ -953,7 +977,15 @@ export async function generateVideoFromTemplate(
       }
     }
 
-    const response = await axios.post(`${HEYGEN_V2_API_URL}/template/generate`, payload, {
+    if (request.overrides && Object.keys(request.overrides).length > 0) {
+      payload.overrides = request.overrides
+    }
+
+    const endpoint = `${HEYGEN_V2_API_URL}/template/${encodeURIComponent(
+      request.template_id.trim()
+    )}/generate`
+
+    const response = await axios.post(endpoint, payload, {
       headers: {
         'X-Api-Key': apiKey,
         'Content-Type': 'application/json',
@@ -965,7 +997,9 @@ export async function generateVideoFromTemplate(
     const videoId = data.video_id || data.id || data.videoId
 
     if (!videoId) {
-      throw new Error('Failed to get video_id from HeyGen template response. Response: ' + JSON.stringify(response.data))
+      throw new Error(
+        'Failed to get video_id from HeyGen template response. Response: ' + JSON.stringify(response.data)
+      )
     }
 
     return {
@@ -981,6 +1015,9 @@ export async function generateVideoFromTemplate(
       errorMessage = 'HeyGen API authentication failed. Please check your HEYGEN_KEY.'
     } else if (error.response?.status === 404) {
       errorMessage = 'HeyGen template not found. Please verify the template ID.'
+    } else if (error.response?.status === 405) {
+      errorMessage =
+        'HeyGen template endpoint rejected the HTTP method. Ensure you are using POST /v2/template/{template_id}/generate and that your account has template access.'
     } else if (error.response?.status === 429) {
       errorMessage = 'HeyGen API rate limit exceeded. Please try again later.'
     } else if (error.response?.status >= 500) {
@@ -990,9 +1027,10 @@ export async function generateVideoFromTemplate(
     } else if (error.response?.data?.error?.message) {
       errorMessage = error.response.data.error.message
     } else if (error.response?.data?.error) {
-      errorMessage = typeof error.response.data.error === 'string'
-        ? error.response.data.error
-        : JSON.stringify(error.response.data.error)
+      errorMessage =
+        typeof error.response.data.error === 'string'
+          ? error.response.data.error
+          : JSON.stringify(error.response.data.error)
     } else if (error.message) {
       errorMessage = error.message
     }
