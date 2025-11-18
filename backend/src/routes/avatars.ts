@@ -144,8 +144,11 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { id } = req.params
+    const removeRemote =
+      req.query.remove_remote === 'true' ||
+      req.body?.remove_remote === true
 
-    await AvatarService.deleteAvatar(id, userId)
+    await AvatarService.deleteAvatar(id, userId, { removeRemote })
 
     return res.status(204).send()
   } catch (error: any) {
@@ -547,13 +550,68 @@ router.post('/complete-ai-generation', async (req: AuthRequest, res: Response) =
 // Check training status
 router.get('/training-status/:groupId', async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.userId!
     const { groupId } = req.params
     const status = await checkTrainingStatus(groupId)
+    const normalizedStatus = status.status === 'ready' ? 'active' : status.status
+
+    try {
+      const { supabase } = await import('../lib/supabase.js')
+      await supabase
+        .from('avatars')
+        .update({
+          status: normalizedStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', userId)
+        .eq('heygen_avatar_id', groupId)
+    } catch (dbError) {
+      console.warn('Failed to persist training status locally:', dbError)
+    }
 
     return res.json(status)
   } catch (error: any) {
     console.error('Check training status error:', error)
     return res.status(500).json({ error: error.message || 'Failed to check training status' })
+  }
+})
+
+// Photo avatar details
+router.get('/:avatarId/details', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { avatarId } = req.params
+    const details = await AvatarService.fetchPhotoAvatarDetails(avatarId, userId)
+
+    return res.json(details)
+  } catch (error: any) {
+    console.error('Get avatar details error:', error)
+    if (error.message === 'Avatar not found') {
+      return res.status(404).json({ error: error.message })
+    }
+    return res.status(500).json({ error: error.message || 'Failed to fetch avatar details' })
+  }
+})
+
+// Upscale photo avatar
+router.post('/:avatarId/upscale', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { avatarId } = req.params
+    const result = await AvatarService.upscaleAvatar(avatarId, userId)
+
+    return res.json({
+      message: 'Upscale requested successfully',
+      result,
+    })
+  } catch (error: any) {
+    console.error('Upscale avatar error:', error)
+    if (error.message === 'Avatar not found') {
+      return res.status(404).json({ error: error.message })
+    }
+    return res.status(error.response?.status || 500).json({
+      error: error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to upscale avatar',
+    })
   }
 })
 

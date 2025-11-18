@@ -1485,6 +1485,92 @@ export interface TrainingStatus {
   updated_at?: number | null
 }
 
+export interface PhotoAvatarDetails {
+  id: string
+  name?: string
+  status?: string
+  group_id?: string
+  image_url?: string
+  preview_url?: string
+  thumbnail_url?: string
+  created_at?: number
+  updated_at?: number | null
+  [key: string]: any
+}
+
+interface ResolvedPhotoAvatarTarget {
+  photoAvatarId: string
+  groupId?: string
+  details?: PhotoAvatarDetails
+}
+
+const fetchPhotoAvatarDetails = async (photoAvatarId: string): Promise<PhotoAvatarDetails> => {
+  const apiKey = getHeyGenKey()
+  const response = await axios.get(`${HEYGEN_V2_API_URL}/photo_avatar/details/${photoAvatarId}`, {
+    headers: {
+      'X-Api-Key': apiKey,
+      'Content-Type': 'application/json',
+    },
+  })
+
+  const data = response.data?.data || response.data
+  if (!data) {
+    throw new Error('Failed to fetch photo avatar details')
+  }
+
+  return {
+    id: data.id || photoAvatarId,
+    ...data,
+  }
+}
+
+const resolvePhotoAvatarTarget = async (
+  identifier: string,
+  options: { includeDetails?: boolean } = {}
+): Promise<ResolvedPhotoAvatarTarget> => {
+  // First, try to treat the identifier as a direct photo_avatar_id
+  try {
+    const details = await fetchPhotoAvatarDetails(identifier)
+    return {
+      photoAvatarId: identifier,
+      groupId: details.group_id,
+      details,
+    }
+  } catch (err: any) {
+    if (err?.response?.status && err.response.status !== 404) {
+      throw err
+    }
+  }
+
+  // Otherwise, treat it as a group_id and fetch the first look
+  const apiKey = getHeyGenKey()
+  const groupResponse = await axios.get(`${HEYGEN_V2_API_URL}/avatar_group/${identifier}/avatars`, {
+    headers: {
+      'X-Api-Key': apiKey,
+      'Content-Type': 'application/json',
+    },
+  })
+
+  const avatarList =
+    groupResponse.data?.data?.avatar_list ||
+    groupResponse.data?.avatar_list ||
+    groupResponse.data?.data ||
+    []
+
+  if (!Array.isArray(avatarList) || avatarList.length === 0) {
+    throw new Error(`No avatars found in group ${identifier}`)
+  }
+
+  const photoAvatarId = avatarList[0].id
+  const details = options.includeDetails ? await fetchPhotoAvatarDetails(photoAvatarId) : undefined
+
+  return {
+    photoAvatarId,
+    groupId: identifier,
+    details,
+  }
+}
+
 export async function checkTrainingStatus(
   groupId: string
 ): Promise<TrainingStatus> {
@@ -1511,6 +1597,81 @@ export async function checkTrainingStatus(
     }
   } catch (error: any) {
     console.error('HeyGen API error (checkTrainingStatus):', error.response?.data || error.message)
+    throw error
+  }
+}
+
+export async function getPhotoAvatarDetails(
+  identifier: string
+): Promise<PhotoAvatarDetails> {
+  try {
+    const resolved = await resolvePhotoAvatarTarget(identifier, { includeDetails: true })
+    if (resolved.details) {
+      return resolved.details
+    }
+    return fetchPhotoAvatarDetails(resolved.photoAvatarId)
+  } catch (error: any) {
+    console.error('HeyGen API error (getPhotoAvatarDetails):', error.response?.data || error.message)
+    throw error
+  }
+}
+
+export async function upscalePhotoAvatar(
+  identifier: string
+): Promise<{ job_id?: string; status?: string; message?: string }> {
+  try {
+    const { photoAvatarId } = await resolvePhotoAvatarTarget(identifier)
+    const apiKey = getHeyGenKey()
+
+    const response = await axios.post(
+      `${HEYGEN_V2_API_URL}/photo_avatar/upscale`,
+      {
+        photo_avatar_id: photoAvatarId,
+      },
+      {
+        headers: {
+          'X-Api-Key': apiKey,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
+
+    return response.data?.data || response.data || {}
+  } catch (error: any) {
+    console.error('HeyGen API error (upscalePhotoAvatar):', error.response?.data || error.message)
+    throw error
+  }
+}
+
+export async function deletePhotoAvatar(identifier: string): Promise<void> {
+  try {
+    const { photoAvatarId } = await resolvePhotoAvatarTarget(identifier)
+    const apiKey = getHeyGenKey()
+
+    await axios.delete(`${HEYGEN_V2_API_URL}/photo_avatar/${photoAvatarId}`, {
+      headers: {
+        'X-Api-Key': apiKey,
+        'Content-Type': 'application/json',
+      },
+    })
+  } catch (error: any) {
+    console.error('HeyGen API error (deletePhotoAvatar):', error.response?.data || error.message)
+    throw error
+  }
+}
+
+export async function deletePhotoAvatarGroup(groupId: string): Promise<void> {
+  try {
+    const apiKey = getHeyGenKey()
+
+    await axios.delete(`${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/${groupId}`, {
+      headers: {
+        'X-Api-Key': apiKey,
+        'Content-Type': 'application/json',
+      },
+    })
+  } catch (error: any) {
+    console.error('HeyGen API error (deletePhotoAvatarGroup):', error.response?.data || error.message)
     throw error
   }
 }
@@ -1583,7 +1744,10 @@ export async function getVideoStatus(
       }
     } catch (v2Error: any) {
       // Fallback to v1 API
-      console.log('v2 API failed, trying v1:', v2Error.response?.status)
+      console.log(
+        'v2 API failed, trying v1:',
+        v2Error.response?.status ?? v2Error?.message ?? 'unknown error'
+      )
       const response = await axios.get(
         `${HEYGEN_API_URL}/video_status.get`,
         {

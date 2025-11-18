@@ -1,5 +1,13 @@
 import { supabase } from '../lib/supabase.js'
-import { listAvatars as listHeyGenAvatars, getAvatar as getHeyGenAvatar } from '../lib/heygen.js'
+import {
+  listAvatars as listHeyGenAvatars,
+  getAvatar as getHeyGenAvatar,
+  getPhotoAvatarDetails,
+  deletePhotoAvatar,
+  deletePhotoAvatarGroup,
+  upscalePhotoAvatar,
+  type PhotoAvatarDetails,
+} from '../lib/heygen.js'
 import type { HeyGenAvatar } from '../lib/heygen.js'
 
 export interface Avatar {
@@ -219,7 +227,11 @@ export class AvatarService {
   /**
    * Delete avatar (soft delete by setting status to inactive)
    */
-  static async deleteAvatar(avatarId: string, userId: string): Promise<void> {
+  static async deleteAvatar(
+    avatarId: string,
+    userId: string,
+    options: { removeRemote?: boolean } = {}
+  ): Promise<void> {
     const avatar = await this.getAvatarById(avatarId, userId)
     if (!avatar) {
       throw new Error('Avatar not found')
@@ -230,6 +242,10 @@ export class AvatarService {
       throw new Error('Cannot delete default avatar. Please set another avatar as default first.')
     }
 
+    if (options.removeRemote && this.isUserCreatedAvatar(avatar)) {
+      await this.removeRemotePhotoAvatarResources(avatar)
+    }
+
     const { error } = await supabase
       .from('avatars')
       .update({ status: 'inactive' })
@@ -237,6 +253,52 @@ export class AvatarService {
       .eq('user_id', userId)
 
     if (error) throw error
+  }
+
+  private static isUserCreatedAvatar(avatar: Avatar | null): boolean {
+    if (!avatar) return false
+    if (avatar.avatar_url && avatar.avatar_url.includes('supabase.co/storage')) {
+      return true
+    }
+    if (['training', 'pending', 'generating'].includes(avatar.status)) {
+      return true
+    }
+    if (!avatar.avatar_url && avatar.status !== 'active') {
+      return true
+    }
+    return false
+  }
+
+  private static async removeRemotePhotoAvatarResources(avatar: Avatar): Promise<void> {
+    try {
+      await deletePhotoAvatar(avatar.heygen_avatar_id)
+    } catch (error: any) {
+      console.warn('Failed to delete photo avatar look in HeyGen:', error.response?.data || error.message)
+    }
+
+    try {
+      await deletePhotoAvatarGroup(avatar.heygen_avatar_id)
+    } catch (error: any) {
+      console.warn('Failed to delete photo avatar group in HeyGen:', error.response?.data || error.message)
+    }
+  }
+
+  static async fetchPhotoAvatarDetails(avatarId: string, userId: string): Promise<PhotoAvatarDetails> {
+    const avatar = await this.getAvatarById(avatarId, userId)
+    if (!avatar) {
+      throw new Error('Avatar not found')
+    }
+
+    return getPhotoAvatarDetails(avatar.heygen_avatar_id)
+  }
+
+  static async upscaleAvatar(avatarId: string, userId: string) {
+    const avatar = await this.getAvatarById(avatarId, userId)
+    if (!avatar) {
+      throw new Error('Avatar not found')
+    }
+
+    return upscalePhotoAvatar(avatar.heygen_avatar_id)
   }
 
   /**

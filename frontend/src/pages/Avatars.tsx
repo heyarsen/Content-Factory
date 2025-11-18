@@ -6,7 +6,21 @@ import { Input } from '../components/ui/Input'
 import { Modal } from '../components/ui/Modal'
 import { useToast } from '../hooks/useToast'
 import api from '../lib/api'
-import { RefreshCw, Star, Trash2, User, Upload, Plus, Sparkles, Image, X } from 'lucide-react'
+import {
+  RefreshCw,
+  Star,
+  Trash2,
+  User,
+  Upload,
+  Plus,
+  Sparkles,
+  Image,
+  X,
+  Info,
+  ArrowUpCircle,
+  Loader2,
+  Copy,
+} from 'lucide-react'
 import { Select } from '../components/ui/Select'
 import { Textarea } from '../components/ui/Textarea'
 
@@ -23,6 +37,18 @@ interface Avatar {
   created_at: string
 }
 
+interface PhotoAvatarDetails {
+  id: string
+  group_id?: string
+  status?: string
+  image_url?: string
+  preview_url?: string
+  thumbnail_url?: string
+  created_at?: number
+  updated_at?: number | null
+  [key: string]: any
+}
+
 export default function Avatars() {
   const [avatars, setAvatars] = useState<Avatar[]>([])
   const [defaultAvatarId, setDefaultAvatarId] = useState<string | null>(null)
@@ -30,8 +56,9 @@ export default function Avatars() {
   const [syncing, setSyncing] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [avatarName, setAvatarName] = useState('')
-  const [photoFile, setPhotoFile] = useState<File | null>(null)
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const MAX_PHOTOS = 5
+  const [photoFiles, setPhotoFiles] = useState<File[]>([])
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
   const [creating, setCreating] = useState(false)
   const [onlyCreated, setOnlyCreated] = useState(true) // Default to showing only user-created avatars
   const [showGenerateAIModal, setShowGenerateAIModal] = useState(false)
@@ -44,6 +71,10 @@ export default function Avatars() {
   const [generatingLook, setGeneratingLook] = useState(false)
   const [lookImageFiles, setLookImageFiles] = useState<File[]>([])
   const [lookImagePreviews, setLookImagePreviews] = useState<string[]>([])
+  const [statusLoadingMap, setStatusLoadingMap] = useState<Record<string, boolean>>({})
+  const [detailsModal, setDetailsModal] = useState<{ avatar: Avatar; data: PhotoAvatarDetails | null } | null>(null)
+  const [detailsLoadingId, setDetailsLoadingId] = useState<string | null>(null)
+  const [upscalingId, setUpscalingId] = useState<string | null>(null)
   
   // AI Generation form fields
   const [aiName, setAiName] = useState('')
@@ -61,8 +92,10 @@ export default function Avatars() {
   const [lookPose, setLookPose] = useState<'half_body' | 'full_body' | 'close_up'>('close_up')
   const [lookStyle, setLookStyle] = useState<'Realistic' | 'Cartoon' | 'Anime'>('Realistic')
   
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const createPhotoInputRef = useRef<HTMLInputElement>(null)
+  const addLooksInputRef = useRef<HTMLInputElement>(null)
   const statusCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const trainingStatusIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const { toast } = useToast()
   const toastRef = useRef(toast)
   
@@ -97,6 +130,49 @@ export default function Avatars() {
     return false
   }
 
+  const renderStatusBadge = (avatar: Avatar) => {
+    const statusMap: Record<
+      string,
+      {
+        label: string
+        classes: string
+      }
+    > = {
+      active: { label: 'Ready', classes: 'bg-emerald-100 text-emerald-700' },
+      training: { label: 'Training', classes: 'bg-amber-100 text-amber-700' },
+      pending: { label: 'Pending', classes: 'bg-slate-100 text-slate-600' },
+      generating: { label: 'Generating', classes: 'bg-blue-100 text-blue-700' },
+      failed: { label: 'Failed', classes: 'bg-red-100 text-red-600' },
+    }
+
+    const config = statusMap[avatar.status] || {
+      label: avatar.status || 'Unknown',
+      classes: 'bg-slate-100 text-slate-600',
+    }
+
+    return (
+      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${config.classes}`}>
+        {config.label}
+        {statusLoadingMap[avatar.id] && <Loader2 className="h-3 w-3 animate-spin" />}
+      </span>
+    )
+  }
+
+  const formatTimestamp = (value?: number | string | null) => {
+    if (!value) return '—'
+    let date: Date
+    if (typeof value === 'number') {
+      date = new Date(value < 1e12 ? value * 1000 : value)
+    } else {
+      const numeric = Number(value)
+      date = new Date(Number.isFinite(numeric) && numeric > 0 ? (numeric < 1e12 ? numeric * 1000 : numeric) : Date.parse(value))
+    }
+    if (Number.isNaN(date.getTime())) {
+      return '—'
+    }
+    return date.toLocaleString()
+  }
+
   const loadAvatars = useCallback(async () => {
     try {
       setLoading(true)
@@ -117,11 +193,42 @@ export default function Avatars() {
     loadAvatars()
   }, [loadAvatars])
 
+  useEffect(() => {
+    if (trainingStatusIntervalRef.current) {
+      clearInterval(trainingStatusIntervalRef.current)
+      trainingStatusIntervalRef.current = null
+    }
+
+    const avatarsNeedingUpdate = avatars.filter(avatar =>
+      ['pending', 'training', 'generating'].includes(avatar.status)
+    )
+
+    if (avatarsNeedingUpdate.length === 0) {
+      return
+    }
+
+    trainingStatusIntervalRef.current = setInterval(() => {
+      avatarsNeedingUpdate.forEach(avatar => {
+        handleRefreshTrainingStatus(avatar, { silent: true })
+      })
+    }, 30000)
+
+    return () => {
+      if (trainingStatusIntervalRef.current) {
+        clearInterval(trainingStatusIntervalRef.current)
+        trainingStatusIntervalRef.current = null
+      }
+    }
+  }, [avatars, handleRefreshTrainingStatus])
+
   // Cleanup status check interval on unmount
   useEffect(() => {
     return () => {
       if (statusCheckIntervalRef.current) {
         clearInterval(statusCheckIntervalRef.current)
+      }
+      if (trainingStatusIntervalRef.current) {
+        clearInterval(trainingStatusIntervalRef.current)
       }
     }
   }, [])
@@ -176,15 +283,24 @@ export default function Avatars() {
     }
   }
 
-  const handleDelete = async (avatarId: string, avatarName: string) => {
-    if (!confirm(`Are you sure you want to remove "${avatarName}" from your avatar list?`)) {
+  const handleDelete = async (avatar: Avatar) => {
+    if (!confirm(`Are you sure you want to remove "${avatar.avatar_name}" from your avatar list?`)) {
       return
     }
 
+    let removeRemote = false
+    if (isUserCreatedAvatar(avatar)) {
+      removeRemote = confirm(
+        'Do you also want to delete this avatar from HeyGen (recommended to keep your account clean)?'
+      )
+    }
+
     try {
-      await api.delete(`/api/avatars/${avatarId}`)
-      setAvatars(avatars.filter(a => a.id !== avatarId))
-      if (defaultAvatarId === avatarId) {
+      await api.delete(`/api/avatars/${avatar.id}`, {
+        params: removeRemote ? { remove_remote: 'true' } : undefined,
+      })
+      setAvatars(avatars.filter(a => a.id !== avatar.id))
+      if (defaultAvatarId === avatar.id) {
         setDefaultAvatarId(null)
       }
       toast.success('Avatar removed')
@@ -194,59 +310,189 @@ export default function Avatars() {
     }
   }
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      if (!file.type.startsWith('image/')) {
-        toast.error('Please select an image file')
-        return
+  const handleRefreshTrainingStatus = useCallback(
+    async (avatar: Avatar, options: { silent?: boolean } = {}) => {
+      if (!avatar) return
+      setStatusLoadingMap(prev => ({ ...prev, [avatar.id]: true }))
+      try {
+        const response = await api.get(`/api/avatars/training-status/${avatar.heygen_avatar_id}`)
+        const status = response.data?.status
+        const normalizedStatus = status === 'ready' ? 'active' : status || avatar.status
+
+        setAvatars(prev =>
+          prev.map(item =>
+            item.id === avatar.id
+              ? {
+                  ...item,
+                  status: normalizedStatus,
+                }
+              : item
+          )
+        )
+
+        if (!options.silent) {
+          if (status === 'ready') {
+            toastRef.current.success('Avatar training completed!')
+          } else {
+            toastRef.current.info(`Status updated: ${status}`)
+          }
+        }
+      } catch (error: any) {
+        console.error('Failed to refresh training status:', error)
+        if (!options.silent) {
+          toastRef.current.error(error.response?.data?.error || 'Failed to refresh training status')
+        }
+      } finally {
+        setStatusLoadingMap(prev => {
+          const next = { ...prev }
+          delete next[avatar.id]
+          return next
+        })
       }
-      if (file.size > 10 * 1024 * 1024) { // 10MB limit
-        toast.error('Image size must be less than 10MB')
-        return
-      }
-      setPhotoFile(file)
+    },
+    []
+  )
+
+  const handleViewDetails = async (avatar: Avatar) => {
+    setDetailsModal({ avatar, data: null })
+    setDetailsLoadingId(avatar.id)
+    try {
+      const response = await api.get(`/api/avatars/${avatar.id}/details`)
+      setDetailsModal({ avatar, data: response.data })
+    } catch (error: any) {
+      console.error('Failed to fetch avatar details:', error)
+      setDetailsModal(null)
+      toastRef.current.error(error.response?.data?.error || 'Failed to load avatar details')
+    } finally {
+      setDetailsLoadingId(null)
+    }
+  }
+
+  const handleUpscaleAvatar = async (avatar: Avatar) => {
+    setUpscalingId(avatar.id)
+    try {
+      const response = await api.post(`/api/avatars/${avatar.id}/upscale`)
+      toastRef.current.success(response.data?.message || 'Upscale requested successfully')
+    } catch (error: any) {
+      console.error('Failed to upscale avatar:', error)
+      toastRef.current.error(error.response?.data?.error || 'Failed to upscale avatar')
+    } finally {
+      setUpscalingId(null)
+    }
+  }
+
+  const handleCloseDetailsModal = () => {
+    setDetailsModal(null)
+  }
+
+  const handleCopyToClipboard = async (value?: string | null) => {
+    if (!value) return
+    try {
+      await navigator.clipboard.writeText(value)
+      toastRef.current.success('Copied to clipboard')
+    } catch (error) {
+      console.error('Clipboard copy failed:', error)
+      toastRef.current.error('Failed to copy')
+    }
+  }
+
+  const fileToDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.onloadend = () => {
-        setPhotoPreview(reader.result as string)
+        if (typeof reader.result === 'string') {
+          resolve(reader.result)
+        } else {
+          reject(new Error('Failed to read file'))
+        }
       }
+      reader.onerror = () => reject(new Error('Failed to read file'))
       reader.readAsDataURL(file)
+    })
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (!files.length) {
+        return
+      }
+
+    const validFiles = files.filter(file => {
+      if (!file.type.startsWith('image/')) {
+        toast.error(`${file.name} is not an image file`)
+        return false
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(`${file.name} is larger than 10MB`)
+        return false
+      }
+      return true
+    })
+
+    if (!validFiles.length) {
+        return
+      }
+
+    const availableSlots = Math.max(0, MAX_PHOTOS - photoFiles.length)
+    if (availableSlots === 0) {
+      toast.error(`You can upload up to ${MAX_PHOTOS} photos`)
+      return
     }
+
+    const filesToAdd = validFiles.slice(0, availableSlots)
+    if (filesToAdd.length < validFiles.length) {
+      toast.info(`Only the first ${filesToAdd.length} photo(s) were added (max ${MAX_PHOTOS})`)
+    }
+
+    try {
+      const previews = await Promise.all(filesToAdd.map(fileToDataUrl))
+      setPhotoFiles(prev => [...prev, ...filesToAdd])
+      setPhotoPreviews(prev => [...prev, ...previews])
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to process selected photos')
+    }
+  }
+
+  const handleRemovePhoto = (index: number) => {
+    setPhotoFiles(prev => prev.filter((_, i) => i !== index))
+    setPhotoPreviews(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const handleSetPrimaryPhoto = (index: number) => {
+    if (index === 0) return
+    setPhotoFiles(prev => {
+      const next = [...prev]
+      const [selected] = next.splice(index, 1)
+      return [selected, ...next]
+    })
+    setPhotoPreviews(prev => {
+      const next = [...prev]
+      const [selected] = next.splice(index, 1)
+      return [selected, ...next]
+    })
   }
 
   const handleCreateAvatar = async (e?: React.MouseEvent) => {
     e?.preventDefault()
     e?.stopPropagation()
     
-    console.log('handleCreateAvatar called', { avatarName, photoFile: !!photoFile })
+    console.log('handleCreateAvatar called', { avatarName, photoCount: photoFiles.length })
     
     if (!avatarName.trim()) {
       toast.error('Please enter an avatar name')
       return
     }
-    if (!photoFile) {
-      toast.error('Please select a photo')
+    if (photoFiles.length === 0) {
+      toast.error('Please select at least one photo')
       return
     }
 
     setCreating(true)
     
     try {
-      // Convert file to base64 data URL
-      const base64Data = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onloadend = () => {
-          if (reader.result && typeof reader.result === 'string') {
-            resolve(reader.result)
-          } else {
-            reject(new Error('Failed to read file'))
-          }
-        }
-        reader.onerror = () => reject(new Error('Failed to read file'))
-        reader.readAsDataURL(photoFile)
-      })
+      const base64Photos = await Promise.all(photoFiles.map(fileToDataUrl))
+      const [primaryPhoto, ...additionalPhotos] = base64Photos
       
-      console.log('File read, sending to API...')
+      console.log('Primary photo prepared, sending to API...', { additionalCount: additionalPhotos.length })
       
       // Send to API - upload photo and create avatar
       console.log('Uploading photo and creating avatar...')
@@ -257,12 +503,17 @@ export default function Avatars() {
       
       let response
       try {
-        response = await api.post('/api/avatars/upload-photo', {
-          photo_data: base64Data,
+        response = await api.post(
+          '/api/avatars/upload-photo',
+          {
+            photo_data: primaryPhoto,
           avatar_name: avatarName,
-        }, {
+            additional_photos: additionalPhotos.length ? additionalPhotos : undefined,
+          },
+          {
           signal: controller.signal,
-        })
+          }
+        )
         
         clearTimeout(timeoutId)
       } catch (error: any) {
@@ -286,10 +537,10 @@ export default function Avatars() {
         
         setShowCreateModal(false)
         setAvatarName('')
-        setPhotoFile(null)
-        setPhotoPreview(null)
-        if (fileInputRef.current) {
-          fileInputRef.current.value = ''
+        setPhotoFiles([])
+        setPhotoPreviews([])
+        if (createPhotoInputRef.current) {
+          createPhotoInputRef.current.value = ''
         }
         
         // Reload avatars
@@ -333,10 +584,10 @@ export default function Avatars() {
     if (!creating) {
       setShowCreateModal(false)
       setAvatarName('')
-      setPhotoFile(null)
-      setPhotoPreview(null)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
+      setPhotoFiles([])
+      setPhotoPreviews([])
+      if (createPhotoInputRef.current) {
+        createPhotoInputRef.current.value = ''
       }
     }
   }
@@ -589,7 +840,7 @@ export default function Avatars() {
       return true
     })
 
-    setLookImageFiles([...lookImageFiles, ...validFiles])
+    setLookImageFiles(prev => [...prev, ...validFiles])
     
     // Create previews
     validFiles.forEach(file => {
@@ -735,16 +986,21 @@ export default function Avatars() {
                     </div>
                   )}
                 </div>
-                <div className="p-4">
-                  <h3 className="font-semibold text-slate-900 mb-1">
-                    {avatar.avatar_name}
-                  </h3>
-                  {avatar.gender && (
-                    <p className="text-sm text-slate-500 mb-3 capitalize">
-                      {avatar.gender}
-                    </p>
-                  )}
-                  <div className="flex gap-2 mt-4">
+                <div className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold text-slate-900">
+                        {avatar.avatar_name}
+                      </h3>
+                      {avatar.gender && (
+                        <p className="text-sm text-slate-500 capitalize">
+                          {avatar.gender}
+                        </p>
+                      )}
+                    </div>
+                    {renderStatusBadge(avatar)}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
                     {!avatar.is_default && (
                       <Button
                         variant="secondary"
@@ -756,27 +1012,56 @@ export default function Avatars() {
                         Set Default
                       </Button>
                     )}
-                    {isUserCreatedAvatar(avatar) && (
-                      <>
+                    <div className="flex items-center gap-1 ml-auto">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleViewDetails(avatar)}
+                        className="text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                        title="View details"
+                        disabled={detailsLoadingId === avatar.id}
+                      >
+                        <Info className={`h-4 w-4 ${detailsLoadingId === avatar.id ? 'animate-spin' : ''}`} />
+                      </Button>
+                      {['pending', 'training', 'generating'].includes(avatar.status) && (
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleManageLooks(avatar)}
-                          className="text-brand-600 hover:text-brand-700 hover:bg-brand-50"
-                          title="Manage Looks"
+                          onClick={() => handleRefreshTrainingStatus(avatar)}
+                          className="text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                          title="Refresh status"
+                          disabled={!!statusLoadingMap[avatar.id]}
                         >
-                          <Image className="h-4 w-4" />
+                          <RefreshCw
+                            className={`h-4 w-4 ${
+                              statusLoadingMap[avatar.id] ? 'animate-spin text-brand-600' : ''
+                            }`}
+                          />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(avatar.id, avatar.avatar_name)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </>
-                    )}
+                      )}
+                      {isUserCreatedAvatar(avatar) && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleManageLooks(avatar)}
+                            className="text-brand-600 hover:text-brand-700 hover:bg-brand-50"
+                            title="Manage Looks"
+                          >
+                            <Image className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(avatar)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            title="Delete avatar"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               </Card>
@@ -809,54 +1094,77 @@ export default function Avatars() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Photo *
+                Photos * (upload 1–5 best shots)
               </label>
-              {photoPreview ? (
+              <p className="text-xs text-slate-500 mb-3">
+                Front-facing, good lighting, no heavy filters. Add multiple angles to improve training success.
+              </p>
+              {photoPreviews.length > 0 ? (
                 <div className="space-y-3">
-                  <div className="relative w-full h-64 rounded-lg overflow-hidden border-2 border-slate-200">
-                    <img
-                      src={photoPreview}
-                      alt="Preview"
-                      className="w-full h-full object-cover"
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {photoPreviews.map((preview, index) => (
+                      <div key={`${preview}-${index}`} className="relative rounded-lg border-2 border-slate-200 overflow-hidden">
+                        <img
+                          src={preview}
+                          alt={`Preview ${index + 1}`}
+                          className="w-full h-48 object-cover"
+                        />
+                        <div className="absolute top-2 left-2">
+                          <span className={`rounded-full px-2 py-1 text-xs font-semibold ${index === 0 ? 'bg-brand-500 text-white' : 'bg-white/90 text-slate-700'}`}>
+                            {index === 0 ? 'Primary' : 'Secondary'}
+                          </span>
+                        </div>
+                        <div className="absolute top-2 right-2 flex gap-1">
+                          {index !== 0 && (
+                            <button
+                              onClick={() => handleSetPrimaryPhoto(index)}
+                              className="rounded-full bg-white/90 text-slate-700 hover:bg-brand-50 px-2 py-1 text-xs font-medium"
+                            >
+                              Make Primary
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleRemovePhoto(index)}
+                            className="rounded-full bg-red-500 text-white hover:bg-red-600 p-1"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => {
-                      setPhotoFile(null)
-                      setPhotoPreview(null)
-                      if (fileInputRef.current) {
-                        fileInputRef.current.value = ''
-                      }
-                    }}
+                    onClick={() => createPhotoInputRef.current?.click()}
                     disabled={creating}
                   >
-                    Change Photo
+                    Add More Photos
                   </Button>
                 </div>
               ) : (
                 <div
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => createPhotoInputRef.current?.click()}
                   className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center cursor-pointer hover:border-brand-500 transition-colors"
                 >
                   <Upload className="h-12 w-12 mx-auto text-slate-400 mb-3" />
                   <p className="text-sm text-slate-600 mb-1">
-                    Click to upload a photo
+                    Click to upload your best photo
                   </p>
                   <p className="text-xs text-slate-500">
-                    PNG, JPG up to 10MB. Front-facing photo recommended.
+                    PNG/JPG up to 10MB each. You can add more after the first upload.
                   </p>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                    disabled={creating}
-                  />
                 </div>
               )}
+              <input
+                ref={createPhotoInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleFileSelect}
+                className="hidden"
+                disabled={creating}
+              />
             </div>
 
             <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
@@ -879,15 +1187,15 @@ export default function Avatars() {
                   console.log('Create Avatar button clicked', { 
                     creating, 
                     hasName: !!avatarName.trim(), 
-                    hasFile: !!photoFile,
+                    hasFile: photoFiles.length > 0,
                     avatarName,
-                    photoFileName: photoFile?.name
+                    photoCount: photoFiles.length
                   })
                   handleCreateAvatar(e).catch((err) => {
                     console.error('Error in handleCreateAvatar:', err)
                   })
                 }}
-                disabled={creating || !avatarName.trim() || !photoFile}
+                disabled={creating || !avatarName.trim() || photoFiles.length === 0}
                 loading={creating}
                 type="button"
               >
@@ -1115,7 +1423,7 @@ export default function Avatars() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => addLooksInputRef.current?.click()}
                     disabled={addingLooks}
                   >
                     Add More Photos
@@ -1123,7 +1431,7 @@ export default function Avatars() {
                 </div>
               ) : (
                 <div
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => addLooksInputRef.current?.click()}
                   className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center cursor-pointer hover:border-brand-500 transition-colors"
                 >
                   <Upload className="h-12 w-12 mx-auto text-slate-400 mb-3" />
@@ -1136,7 +1444,7 @@ export default function Avatars() {
                 </div>
               )}
               <input
-                ref={fileInputRef}
+                ref={addLooksInputRef}
                 type="file"
                 accept="image/*"
                 multiple
@@ -1257,6 +1565,139 @@ export default function Avatars() {
               </Button>
             </div>
           </div>
+        </Modal>
+
+        {/* Avatar Details Modal */}
+        <Modal
+          isOpen={!!detailsModal}
+          onClose={handleCloseDetailsModal}
+          title={`Avatar Details${detailsModal?.avatar ? ` - ${detailsModal.avatar.avatar_name}` : ''}`}
+          size="md"
+        >
+          {!detailsModal ? null : detailsModal.data ? (
+            <div className="space-y-5">
+              <div className="flex flex-col sm:flex-row gap-4">
+                {detailsModal.data.image_url || detailsModal.data.preview_url ? (
+                  <img
+                    src={detailsModal.data.image_url || detailsModal.data.preview_url || ''}
+                    alt="Avatar preview"
+                    className="w-full sm:w-40 h-40 object-cover rounded-lg border border-slate-200"
+                  />
+                ) : (
+                  <div className="w-full sm:w-40 h-40 rounded-lg bg-slate-100 flex items-center justify-center">
+                    <User className="h-12 w-12 text-slate-400" />
+                  </div>
+                )}
+                <dl className="flex-1 space-y-2 text-sm">
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-slate-500">Photo Avatar ID</dt>
+                    <dd className="flex items-center gap-1 text-slate-900">
+                      <span className="font-mono text-xs">{detailsModal.data.id}</span>
+                      <button
+                        onClick={() => handleCopyToClipboard(detailsModal.data.id)}
+                        className="text-slate-500 hover:text-slate-900"
+                        title="Copy ID"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-slate-500">Group ID</dt>
+                    <dd className="flex items-center gap-1 text-slate-900">
+                      <span className="font-mono text-xs">{detailsModal.data.group_id || '—'}</span>
+                      {detailsModal.data.group_id && (
+                        <button
+                          onClick={() => handleCopyToClipboard(detailsModal.data.group_id)}
+                          className="text-slate-500 hover:text-slate-900"
+                          title="Copy Group ID"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
+                      )}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-slate-500">Status</dt>
+                    <dd>{detailsModal.data.status || '—'}</dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-slate-500">Created</dt>
+                    <dd>{formatTimestamp(detailsModal.data.created_at)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-slate-500">Updated</dt>
+                    <dd>{formatTimestamp(detailsModal.data.updated_at)}</dd>
+                  </div>
+                </dl>
+              </div>
+
+              <dl className="space-y-2 text-sm">
+                {detailsModal.data.image_url && (
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-slate-500">Image URL</dt>
+                    <dd className="text-right">
+                      <a
+                        href={detailsModal.data.image_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-brand-600 hover:text-brand-700 text-xs break-all"
+                      >
+                        Open in new tab
+                      </a>
+                    </dd>
+                  </div>
+                )}
+                {detailsModal.data.preview_url && (
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-slate-500">Preview URL</dt>
+                    <dd className="text-right">
+                      <a
+                        href={detailsModal.data.preview_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-brand-600 hover:text-brand-700 text-xs break-all"
+                      >
+                        Open in new tab
+                      </a>
+                    </dd>
+                  </div>
+                )}
+              </dl>
+
+              <div className="flex flex-wrap items-center gap-3 justify-end pt-4 border-t border-slate-200">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => handleRefreshTrainingStatus(detailsModal.avatar)}
+                  disabled={!!statusLoadingMap[detailsModal.avatar.id]}
+                  className="flex items-center gap-2"
+                >
+                  <RefreshCw
+                    className={`h-4 w-4 ${
+                      statusLoadingMap[detailsModal.avatar.id] ? 'animate-spin text-brand-600' : ''
+                    }`}
+                  />
+                  Refresh Status
+                </Button>
+                <Button
+                  onClick={() => handleUpscaleAvatar(detailsModal.avatar)}
+                  disabled={upscalingId === detailsModal.avatar.id}
+                  className="flex items-center gap-2"
+                >
+                  <ArrowUpCircle
+                    className={`h-4 w-4 ${upscalingId === detailsModal.avatar.id ? 'animate-spin' : ''}`}
+                  />
+                  {upscalingId === detailsModal.avatar.id ? 'Upscaling...' : 'Request Upscale'}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="py-10 text-center space-y-3">
+              <Loader2 className="h-8 w-8 mx-auto text-brand-500 animate-spin" />
+              <p className="text-sm text-slate-600">Loading avatar details...</p>
+            </div>
+          )}
         </Modal>
       </div>
     </Layout>
