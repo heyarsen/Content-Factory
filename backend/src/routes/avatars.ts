@@ -11,6 +11,7 @@ import {
   type AddLooksRequest,
   type GenerateLookRequest,
 } from '../lib/heygen.js'
+import { preprocessAvatarPhoto } from '../lib/imageProcessing.js'
 
 const router = Router()
 
@@ -217,23 +218,32 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
       if (!match) {
         throw new Error('photo_data must be a base64-encoded data URL (e.g., data:image/jpeg;base64,...)')
       }
-      const mimeType = match[1]
+      let mimeType = match[1]
       const base64Data = match[2]
-      const buffer = Buffer.from(base64Data, 'base64')
+      let buffer = Buffer.from(base64Data, 'base64')
 
-      let extension = 'jpg'
-      if (mimeType.includes('png')) extension = 'png'
-      else if (mimeType.includes('webp')) extension = 'webp'
-      else if (mimeType.includes('gif')) extension = 'gif'
+      try {
+        const processed = await preprocessAvatarPhoto(buffer, mimeType)
+        buffer = processed.buffer
+        mimeType = processed.mimeType
+      } catch (preprocessError: any) {
+        console.warn('Photo preprocessing failed, continuing with original image:', preprocessError?.message || preprocessError)
+      }
 
+      const normalizedMime = (mimeType || '').toLowerCase()
+    let extension = 'jpg'
+      if (normalizedMime.includes('png')) extension = 'png'
+      else if (normalizedMime.includes('webp')) extension = 'webp'
+    
       const safeLabel = label.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'avatar'
       const fileName = `avatars/${userId}/${Date.now()}-${safeLabel}-${Math.random().toString(36).slice(2, 8)}.${extension}`
-
-      console.log('Processing image upload:', {
-        fileName,
-        mimeType,
-        bufferSize: buffer.length,
-        extension,
+    
+    console.log('Processing image upload:', {
+      fileName,
+      mimeType,
+      bufferSize: buffer.length,
+      extension,
+        enhanced: true,
       })
 
       const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, buffer, {
@@ -242,23 +252,23 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
         cacheControl: '3600',
       })
 
-      if (uploadError) {
-        console.error('Supabase storage upload error:', uploadError)
-        if (uploadError.message?.includes('Bucket') || uploadError.message?.includes('not found')) {
+    if (uploadError) {
+      console.error('Supabase storage upload error:', uploadError)
+      if (uploadError.message?.includes('Bucket') || uploadError.message?.includes('not found')) {
           throw new Error(
             `Storage bucket "avatars" not found. Please create it in Supabase Dashboard > Storage with public access. Error: ${uploadError.message}`
           )
-        }
-        throw new Error(`Failed to upload image to storage: ${uploadError.message}`)
       }
+      throw new Error(`Failed to upload image to storage: ${uploadError.message}`)
+    }
 
       const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName)
-      const publicUrl = urlData?.publicUrl
-      if (!publicUrl) {
-        throw new Error('Failed to get public URL for uploaded image')
-      }
-
-      console.log('Image uploaded successfully, public URL:', publicUrl)
+    const publicUrl = urlData?.publicUrl
+    if (!publicUrl) {
+      throw new Error('Failed to get public URL for uploaded image')
+    }
+    
+    console.log('Image uploaded successfully, public URL:', publicUrl)
       return publicUrl
     }
 
@@ -342,6 +352,11 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
       errorMessage = error.response.data.message
     } else if (error.message) {
       errorMessage = error.message
+    }
+
+    if (/no valid image/i.test(errorMessage)) {
+      errorMessage =
+        'HeyGen could not use this photo (usually because the face is blurry, too dark, or out of frame). Try a brighter front-facing selfie on a plain background.'
     }
     
     // Add more context if available

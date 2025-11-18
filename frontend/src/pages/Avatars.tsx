@@ -20,6 +20,8 @@ import {
   ArrowUpCircle,
   Loader2,
   Copy,
+  CheckCircle2,
+  Circle,
 } from 'lucide-react'
 import { Select } from '../components/ui/Select'
 import { Textarea } from '../components/ui/Textarea'
@@ -49,6 +51,9 @@ interface PhotoAvatarDetails {
   [key: string]: any
 }
 
+type AiGenerationStage = 'idle' | 'creating' | 'photosReady' | 'completing' | 'completed'
+type AiStageVisualState = 'done' | 'current' | 'pending'
+
 export default function Avatars() {
   const [avatars, setAvatars] = useState<Avatar[]>([])
   const [defaultAvatarId, setDefaultAvatarId] = useState<string | null>(null)
@@ -64,6 +69,8 @@ export default function Avatars() {
   const [showGenerateAIModal, setShowGenerateAIModal] = useState(false)
   const [generatingAI, setGeneratingAI] = useState(false)
   const [checkingStatus, setCheckingStatus] = useState(false)
+  const [aiGenerationStage, setAiGenerationStage] = useState<AiGenerationStage>('idle')
+  const [aiGenerationError, setAiGenerationError] = useState<string | null>(null)
   const [showLooksModal, setShowLooksModal] = useState<Avatar | null>(null)
   const [showAddLooksModal, setShowAddLooksModal] = useState(false)
   const [showGenerateLookModal, setShowGenerateLookModal] = useState(false)
@@ -76,6 +83,34 @@ export default function Avatars() {
   const [detailsLoadingId, setDetailsLoadingId] = useState<string | null>(null)
   const [upscalingId, setUpscalingId] = useState<string | null>(null)
   const detailData = detailsModal?.data ?? null
+
+  const photoChecklist = [
+    'Face centered, looking straight at the camera',
+    'Even lighting, no harsh shadows or heavy filters',
+    'Plain background and minimal accessories',
+    'At least 1024px resolution (a good phone selfie works)',
+  ]
+
+  const aiStageFlow: Array<{ key: 'creating' | 'photosReady' | 'completing'; title: string; description: string }> = [
+    { key: 'creating', title: 'Generating reference photos', description: 'HeyGen creates a photo set from your description' },
+    { key: 'photosReady', title: 'Building the talking photo', description: 'We convert the best look into a HeyGen avatar' },
+    { key: 'completing', title: 'Saving to your workspace', description: 'Avatar is synced and ready for video generation' },
+  ]
+  const aiStageOrder: Array<'creating' | 'photosReady' | 'completing'> = ['creating', 'photosReady', 'completing']
+  const aiStageWeights: Record<AiGenerationStage, number> = {
+    idle: -1,
+    creating: 0,
+    photosReady: 1,
+    completing: 2,
+    completed: 3,
+  }
+  const getAiStageState = (stageKey: (typeof aiStageOrder)[number]): AiStageVisualState => {
+    const currentWeight = aiStageWeights[aiGenerationStage]
+    const targetIndex = aiStageOrder.indexOf(stageKey)
+    if (currentWeight > targetIndex) return 'done'
+    if (currentWeight === targetIndex) return 'current'
+    return 'pending'
+  }
   
   // AI Generation form fields
   const [aiName, setAiName] = useState('')
@@ -337,8 +372,8 @@ export default function Avatars() {
     )
 
     if (avatarsNeedingUpdate.length === 0) {
-      return
-    }
+        return
+      }
 
     trainingStatusIntervalRef.current = setInterval(() => {
       avatarsNeedingUpdate.forEach(avatar => {
@@ -405,7 +440,7 @@ export default function Avatars() {
           resolve(reader.result)
         } else {
           reject(new Error('Failed to read file'))
-        }
+      }
       }
       reader.onerror = () => reject(new Error('Failed to read file'))
       reader.readAsDataURL(file)
@@ -600,7 +635,10 @@ export default function Avatars() {
     }
 
     setGeneratingAI(true)
+    setAiGenerationStage('creating')
+    setAiGenerationError(null)
     try {
+      const requestedAiName = aiName
       console.log('Sending AI avatar generation request to:', '/api/avatars/generate-ai')
       console.log('Request payload:', {
         name: aiName,
@@ -629,7 +667,7 @@ export default function Avatars() {
       toast.success('AI avatar generation started! This may take a few minutes.')
       
       // Start polling for status
-      startStatusCheck(genId)
+      startStatusCheck(genId, requestedAiName)
     } catch (error: any) {
       console.error('Failed to generate AI avatar - Full error:', {
         message: error.message,
@@ -657,11 +695,15 @@ export default function Avatars() {
       
       toast.error(errorMessage)
       setGeneratingAI(false)
+      setAiGenerationStage('idle')
+      setAiGenerationError(errorMessage)
     }
   }
 
-  const startStatusCheck = (genId: string) => {
+  const startStatusCheck = (genId: string, avatarNameOverride?: string) => {
     setCheckingStatus(true)
+    setAiGenerationStage('creating')
+    setAiGenerationError(null)
     
     // Check status every 5 seconds
     statusCheckIntervalRef.current = setInterval(async () => {
@@ -670,6 +712,7 @@ export default function Avatars() {
         const status = response.data
         
         if (status.status === 'success') {
+          setAiGenerationStage('photosReady')
           // Generation complete - create avatar group
           if (statusCheckIntervalRef.current) {
             clearInterval(statusCheckIntervalRef.current)
@@ -678,18 +721,21 @@ export default function Avatars() {
           
           if (status.image_key_list && status.image_key_list.length > 0) {
             try {
+              setAiGenerationStage('completing')
               await api.post('/api/avatars/complete-ai-generation', {
                 generation_id: genId,
                 image_keys: status.image_key_list,
-                avatar_name: aiName,
+                avatar_name: avatarNameOverride || aiName,
               })
               
+              setAiGenerationStage('completed')
               toast.success('AI avatar created successfully!')
               setShowGenerateAIModal(false)
               resetAIGenerationForm()
               await loadAvatars()
             } catch (err: any) {
               console.error('Failed to complete AI avatar:', err)
+              setAiGenerationStage('idle')
               toast.error(err.response?.data?.error || 'Failed to create avatar from generated images')
             }
           } else {
@@ -703,7 +749,10 @@ export default function Avatars() {
             clearInterval(statusCheckIntervalRef.current)
             statusCheckIntervalRef.current = null
           }
-          toast.error(status.msg || 'Avatar generation failed')
+          const failureMessage = status.msg || 'Avatar generation failed'
+          toast.error(failureMessage)
+          setAiGenerationError(failureMessage)
+          setAiGenerationStage('idle')
           setCheckingStatus(false)
           setGeneratingAI(false)
         }
@@ -724,6 +773,8 @@ export default function Avatars() {
     setAiPose('close_up')
     setAiStyle('Realistic')
     setAiAppearance('')
+    setAiGenerationStage('idle')
+    setAiGenerationError(null)
   }
 
   const handleCloseGenerateAIModal = () => {
@@ -733,6 +784,17 @@ export default function Avatars() {
         statusCheckIntervalRef.current = null
       }
       setShowGenerateAIModal(false)
+      resetAIGenerationForm()
+    } else {
+      setShowGenerateAIModal(false)
+      if (statusCheckIntervalRef.current) {
+        clearInterval(statusCheckIntervalRef.current)
+        statusCheckIntervalRef.current = null
+      }
+      setCheckingStatus(false)
+      setGeneratingAI(false)
+      setAiGenerationStage('idle')
+      setAiGenerationError(null)
       resetAIGenerationForm()
     }
   }
@@ -928,6 +990,54 @@ export default function Avatars() {
           </div>
         </div>
 
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card className="p-5 space-y-4">
+            <div className="flex items-center gap-2 text-slate-900">
+              <Upload className="h-5 w-5 text-brand-600" />
+              <h3 className="text-base font-semibold">Best photo checklist</h3>
+            </div>
+            <ul className="space-y-2 text-sm text-slate-600">
+              {photoChecklist.map((tip, index) => (
+                <li key={tip} className="flex items-start gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-brand-500 mt-0.5" />
+                  <span>{tip}</span>
+                  {index === 0 && <span className="sr-only">Tip</span>}
+                </li>
+              ))}
+            </ul>
+            <div className="rounded-lg border border-slate-200 bg-white/60 p-3 text-xs text-slate-500">
+              We automatically crop, brighten, and sharpen every upload before it goes to HeyGen. One good phone selfie is enough—you can add extra angles if you have them.
+            </div>
+          </Card>
+
+          <Card className="p-5 space-y-4 bg-gradient-to-br from-brand-50 to-white">
+            <div className="flex items-center gap-2 text-slate-900">
+              <Sparkles className="h-5 w-5 text-brand-600" />
+              <h3 className="text-base font-semibold">No perfect photo? Generate one</h3>
+            </div>
+            <p className="text-sm text-slate-600">
+              Describe the persona you need (age, outfit, vibe) and we&apos;ll create a matching AI avatar automatically. No uploads required.
+            </p>
+            <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+              <span className="rounded-full bg-white/70 px-3 py-1">Ready in ~2 min</span>
+              <span className="rounded-full bg-white/70 px-3 py-1">Full-body or close-up</span>
+              <span className="rounded-full bg-white/70 px-3 py-1">Always portrait-ready</span>
+            </div>
+            <Button
+              variant="secondary"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setShowGenerateAIModal(true)
+              }}
+              className="flex items-center gap-2"
+            >
+              <Sparkles className="h-4 w-4" />
+              Generate AI Avatar
+            </Button>
+          </Card>
+        </div>
+
         {avatars.length === 0 ? (
           <Card className="p-12 text-center">
             <User className="h-16 w-16 mx-auto text-slate-400 mb-4" />
@@ -991,13 +1101,13 @@ export default function Avatars() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <h3 className="font-semibold text-slate-900">
-                        {avatar.avatar_name}
-                      </h3>
-                      {avatar.gender && (
+                    {avatar.avatar_name}
+                  </h3>
+                  {avatar.gender && (
                         <p className="text-sm text-slate-500 capitalize">
-                          {avatar.gender}
-                        </p>
-                      )}
+                      {avatar.gender}
+                    </p>
+                  )}
                     </div>
                     {renderStatusBadge(avatar)}
                   </div>
@@ -1038,30 +1148,30 @@ export default function Avatars() {
                               statusLoadingMap[avatar.id] ? 'animate-spin text-brand-600' : ''
                             }`}
                           />
+                      </Button>
+                    )}
+                    {isUserCreatedAvatar(avatar) && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleManageLooks(avatar)}
+                          className="text-brand-600 hover:text-brand-700 hover:bg-brand-50"
+                          title="Manage Looks"
+                        >
+                          <Image className="h-4 w-4" />
                         </Button>
-                      )}
-                      {isUserCreatedAvatar(avatar) && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleManageLooks(avatar)}
-                            className="text-brand-600 hover:text-brand-700 hover:bg-brand-50"
-                            title="Manage Looks"
-                          >
-                            <Image className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
+                        <Button
+                          variant="ghost"
+                          size="sm"
                             onClick={() => handleDelete(avatar)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
                             title="Delete avatar"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
                     </div>
                   </div>
                 </div>
@@ -1157,15 +1267,31 @@ export default function Avatars() {
                   </p>
                 </div>
               )}
-              <input
+                  <input
                 ref={createPhotoInputRef}
-                type="file"
-                accept="image/*"
+                    type="file"
+                    accept="image/*"
                 multiple
-                onChange={handleFileSelect}
-                className="hidden"
-                disabled={creating}
-              />
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    disabled={creating}
+                  />
+              <p className="mt-2 text-xs text-slate-500">
+                We automatically crop, normalize, and sharpen your upload before sending it to HeyGen.
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                <span>Don&apos;t have a usable photo?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateModal(false)
+                    setShowGenerateAIModal(true)
+                  }}
+                  className="font-semibold text-brand-600 hover:text-brand-700"
+                >
+                  Generate an AI avatar instead
+                </button>
+                </div>
             </div>
 
             <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
@@ -1215,14 +1341,48 @@ export default function Avatars() {
         >
           <div className="space-y-6">
             {checkingStatus ? (
-              <div className="text-center py-8">
-                <RefreshCw className="h-12 w-12 mx-auto text-brand-500 animate-spin mb-4" />
-                <p className="text-lg font-semibold text-slate-900 mb-2">
+              <div className="space-y-6">
+                <div className="text-center py-4">
+                  <RefreshCw className="h-10 w-10 mx-auto text-brand-500 animate-spin mb-3" />
+                  <p className="text-lg font-semibold text-slate-900 mb-1">
                   Generating your avatar...
                 </p>
                 <p className="text-sm text-slate-600">
-                  This may take a few minutes. Please don't close this window.
-                </p>
+                    This runs in the background—you can close this window and we&apos;ll keep working.
+                  </p>
+                  {aiGenerationError && (
+                    <p className="mt-3 text-sm text-red-600">
+                      {aiGenerationError}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-3">
+                  {aiStageFlow.map(({ key, title, description }) => {
+                    const state = getAiStageState(key)
+                    const colorClasses =
+                      state === 'done'
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                        : state === 'current'
+                          ? 'border-brand-200 bg-brand-50 text-brand-900'
+                          : 'border-slate-200 bg-white text-slate-600'
+                    return (
+                      <div
+                        key={key}
+                        className={`flex items-start gap-3 rounded-lg border p-3 text-sm ${colorClasses}`}
+                      >
+                        <div className="mt-0.5">
+                          {state === 'done' && <CheckCircle2 className="h-4 w-4" />}
+                          {state === 'current' && <Loader2 className="h-4 w-4 animate-spin" />}
+                          {state === 'pending' && <Circle className="h-4 w-4 text-slate-300" />}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-900">{title}</p>
+                          <p className="mt-1 text-xs text-slate-600">{description}</p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             ) : (
               <>
