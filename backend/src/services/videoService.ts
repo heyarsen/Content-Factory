@@ -69,6 +69,7 @@ type TemplateOverrides = {
   scriptKey: string
   defaults: Record<string, string>
   payloadOverrides: Record<string, any>
+  avatarNodeIds: string[]
 }
 
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -95,27 +96,8 @@ const replaceTemplateTokens = (input: any, replacements: Record<string, string |
   return input
 }
 
-const deepMerge = (target: Record<string, any>, source: Record<string, any>): Record<string, any> => {
-  if (!source || typeof source !== 'object') {
-    return target
-  }
-
-  for (const [key, value] of Object.entries(source)) {
-    if (Array.isArray(value)) {
-      target[key] = value
-    } else if (value && typeof value === 'object') {
-      const base = target[key]
-      if (!base || typeof base !== 'object' || Array.isArray(base)) {
-        target[key] = {}
-      }
-      target[key] = deepMerge(target[key], value)
-    } else {
-      target[key] = value
-    }
-  }
-
-  return target
-}
+const cloneJson = <T>(value: T): T =>
+  value === undefined ? value : JSON.parse(JSON.stringify(value))
 
 function normalizeCategory(category?: string | null): TemplateCategory {
   const value = (category || '').trim().toLowerCase()
@@ -386,14 +368,33 @@ async function runHeygenGeneration(
         dimension: dimension || DEFAULT_TEMPLATE_DIMENSION,
       }
 
-      if (templateSettings.payloadOverrides && Object.keys(templateSettings.payloadOverrides).length > 0) {
-        const processedOverrides = replaceTemplateTokens(
-          templateSettings.payloadOverrides,
-          placeholderMap
-        )
-        if (processedOverrides && typeof processedOverrides === 'object' && !Array.isArray(processedOverrides)) {
-          deepMerge(templateRequest as Record<string, any>, processedOverrides as Record<string, any>)
+      let overridesPayload: Record<string, any> | undefined =
+        templateSettings.payloadOverrides && Object.keys(templateSettings.payloadOverrides).length > 0
+          ? replaceTemplateTokens(cloneJson(templateSettings.payloadOverrides), placeholderMap)
+          : undefined
+
+      if (templateSettings.avatarNodeIds?.length && avatarId) {
+        const nodesOverride: any[] = Array.isArray(overridesPayload?.nodes_override)
+          ? [...overridesPayload!.nodes_override]
+          : []
+
+        const characterOverride = isPhotoAvatar
+          ? { type: 'talking_photo', talking_photo_id: avatarId }
+          : { type: 'avatar', avatar_id: avatarId }
+
+        for (const nodeId of templateSettings.avatarNodeIds) {
+          nodesOverride.push({
+            id: nodeId,
+            character: characterOverride,
+          })
         }
+
+        overridesPayload = overridesPayload || {}
+        overridesPayload.nodes_override = nodesOverride
+      }
+
+      if (overridesPayload && Object.keys(overridesPayload).length > 0) {
+        templateRequest.overrides = overridesPayload
       }
 
       console.log('[HeyGen Template] Generating video via template', {
@@ -401,6 +402,7 @@ async function runHeygenGeneration(
         templateId: templateSettings.templateId,
         scriptKey,
         variableKeys: Object.keys(variables),
+        hasOverrides: !!templateRequest.overrides,
       })
 
       const response = await generateVideoFromTemplate(templateRequest)
@@ -585,6 +587,13 @@ export class VideoService {
         return {}
       }
     }
+    const parseNodeIdList = (value?: string | null): string[] => {
+      if (!value) return []
+      return value
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0)
+    }
 
     const templateSettings: TemplateOverrides | undefined =
       typeof preferences?.heygen_vertical_template_id === 'string' &&
@@ -595,6 +604,7 @@ export class VideoService {
               preferences.heygen_vertical_template_script_key?.trim() || DEFAULT_TEMPLATE_SCRIPT_KEY,
             defaults: normalizeTemplateDefaults(preferences.heygen_vertical_template_variables),
             payloadOverrides: normalizeTemplateOverrides(preferences.heygen_vertical_template_overrides),
+            avatarNodeIds: parseNodeIdList(process.env.HEYGEN_TEMPLATE_AVATAR_NODE_IDS),
           }
         : (() => {
             const envTemplateId = process.env.HEYGEN_VERTICAL_TEMPLATE_ID?.trim()
@@ -610,6 +620,7 @@ export class VideoService {
                 parseJsonObject(process.env.HEYGEN_VERTICAL_TEMPLATE_VARIABLES)
               ),
               payloadOverrides: parseJsonObject(process.env.HEYGEN_VERTICAL_TEMPLATE_OVERRIDES),
+              avatarNodeIds: parseNodeIdList(process.env.HEYGEN_TEMPLATE_AVATAR_NODE_IDS),
             }
           })()
 
