@@ -780,7 +780,7 @@ export default function Avatars() {
     setAiName('')
     setAiAge('Adult')
     setAiGender('Man')
-    setAiEthnicity('')
+    setAiEthnicity('Unspecified')
     setAiOrientation('square')
     setAiPose('close_up')
     setAiStyle('Realistic')
@@ -1489,8 +1489,10 @@ export default function Avatars() {
                   placeholder="Describe the appearance in detail: hair color, clothing, expression, etc. e.g., 'Brown hair, professional business suit, friendly smile'"
                   rows={4}
                   disabled={generatingAI}
-                  helperText="Tip: include outfit, camera framing, vibe (e.g., 'vertical close-up, confident smile, soft office lighting')."
                 />
+                <p className="text-xs text-slate-500">
+                  Tip: include outfit, camera framing, vibe (e.g., &ldquo;vertical close-up, confident smile, soft office lighting&rdquo;).
+                </p>
 
                 <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
                   <Button
