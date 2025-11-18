@@ -26,6 +26,11 @@ type HeyGenDimension = {
   height: number
 }
 
+const formatDimensionForHeygen = (dimension: HeyGenDimension): { width: string; height: string } => ({
+  width: dimension.width.toString(),
+  height: dimension.height.toString(),
+})
+
 const parsePositiveInteger = (value: unknown): number | null => {
   if (value === undefined || value === null) return null
   const numeric =
@@ -502,7 +507,7 @@ export async function generateVideo(
       }
 
       if (requestDimension) {
-        payload.video_config.dimension = requestDimension
+        payload.video_config.dimension = formatDimensionForHeygen(requestDimension)
         console.log(
           `[HeyGen] Using explicit video dimension override: ${requestDimension.width}x${requestDimension.height}`
         )
@@ -511,7 +516,7 @@ export async function generateVideo(
           resolutionLooksPortrait && resolutionDimension
             ? resolutionDimension
             : DEFAULT_VERTICAL_DIMENSION
-        payload.video_config.dimension = { ...chosenDimension }
+        payload.video_config.dimension = formatDimensionForHeygen(chosenDimension)
         console.log(
           `[HeyGen] Setting portrait dimension for vertical video: ${payload.video_config.dimension.width}x${payload.video_config.dimension.height}`
         )
