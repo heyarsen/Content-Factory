@@ -1,6 +1,7 @@
 import axios from 'axios'
 
 const HEYGEN_API_URL = 'https://api.heygen.com/v1'
+const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
 
 function getHeyGenKey(): string {
   const key = process.env.HEYGEN_KEY
@@ -414,7 +415,6 @@ export async function generateVideo(
   request: GenerateVideoRequest
 ): Promise<HeyGenVideoResponse> {
   try {
-    const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
     const apiKey = getHeyGenKey()
     const outputResolution =
       request.output_resolution && request.output_resolution.trim().length > 0
@@ -948,18 +948,13 @@ export async function generateVideoFromTemplate(
       }
     }
 
-    const response = await axios.post(
-      `${HEYGEN_API_URL}/templateVideo.create`,
-      payload,
-      {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'X-Api-Key': apiKey,
-          'Content-Type': 'application/json',
-        },
-        timeout: 30000,
-      }
-    )
+    const response = await axios.post(`${HEYGEN_V2_API_URL}/template/generate`, payload, {
+      headers: {
+        'X-Api-Key': apiKey,
+        'Content-Type': 'application/json',
+      },
+      timeout: 30000,
+    })
 
     const data = response.data?.data || response.data
     const videoId = data.video_id || data.id || data.videoId
