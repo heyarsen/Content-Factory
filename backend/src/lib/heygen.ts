@@ -91,18 +91,11 @@ export interface GenerateVideoRequest {
   aspect_ratio?: string // e.g., "9:16" for vertical videos (Reels/TikTok)
   dimension?: HeyGenDimensionInput
   force_vertical?: boolean
-  caption?: boolean
-  test?: boolean
 }
 
-export interface HeyGenTemplateVariable {
-  name: string
-  value: string
-  is_photo?: boolean
-}
 export interface GenerateTemplateVideoRequest {
   template_id: string
-  variables: HeyGenTemplateVariable[]
+  variables: Record<string, string>
   title?: string
   caption?: boolean
   include_gif?: boolean
@@ -450,7 +443,6 @@ export async function generateVideo(
         payload.video_config = {}
       }
       payload.video_config.aspect_ratio = '9:16'
-      payload.video_config.fit = payload.video_config.fit || 'cover'
     }
 
     // Voice is required by HeyGen v2 schema under voice.text.voice_id
@@ -483,6 +475,10 @@ export async function generateVideo(
         outputResolution.toLowerCase().includes('vertical') ||
         request.aspect_ratio === '9:16'
 
+      if (isVerticalFormat) {
+        payload.video_inputs[0].fit = 'crop'
+      }
+
       // Initialize video_config if needed
       if (!payload.video_config) {
         payload.video_config = {}
@@ -492,7 +488,6 @@ export async function generateVideo(
         // For vertical videos (Instagram Reels/TikTok), use ONLY aspect_ratio: "9:16"
         // Do NOT set output_resolution for vertical videos to avoid white frames on sides
         payload.video_config.aspect_ratio = '9:16'
-        payload.video_config.fit = 'cover'
         const verticalResolution =
           resolutionDimension && resolutionLooksPortrait
             ? `${resolutionDimension.width}x${resolutionDimension.height}`
@@ -585,24 +580,6 @@ export async function generateVideo(
       } catch (groupErr: any) {
         // If fetching from group fails, assume it's already an individual avatar ID
         console.log(`Assuming ${talkingPhotoId} is an individual avatar ID (group fetch failed: ${groupErr.response?.status || groupErr.message})`)
-      }
-
-      const VERTICAL_TEMPLATE_ID = process.env.HEYGEN_VERTICAL_TEMPLATE_ID
-      const requirePortrait = !!request.force_vertical || request.aspect_ratio === '9:16'
-
-      if (requirePortrait && VERTICAL_TEMPLATE_ID) {
-        console.log(`[HeyGen] Using vertical template ID ${VERTICAL_TEMPLATE_ID} for talking photo ${talkingPhotoId}.`)
-        const variables: HeyGenTemplateVariable[] = [
-          { name: 'avatar', value: talkingPhotoId, is_photo: true },
-          { name: 'script', value: request.script || request.topic },
-        ]
-
-        return generateVideoFromTemplate({
-          template_id: VERTICAL_TEMPLATE_ID,
-          variables,
-          caption: request.caption ?? true,
-          dimension: request.dimension,
-        })
       }
       
       payload.video_inputs[0].character = {

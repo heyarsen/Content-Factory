@@ -47,6 +47,7 @@ router.put('/', authenticate, async (req: AuthRequest, res: Response) => {
       notifications_enabled,
       auto_research_default,
       auto_approve_default,
+      heygen_vertical_template_id,
     } = req.body
 
     // Check if preferences exist
@@ -65,6 +66,7 @@ router.put('/', authenticate, async (req: AuthRequest, res: Response) => {
     if (notifications_enabled !== undefined) updates.notifications_enabled = notifications_enabled
     if (auto_research_default !== undefined) updates.auto_research_default = auto_research_default
     if (auto_approve_default !== undefined) updates.auto_approve_default = auto_approve_default
+    if (heygen_vertical_template_id !== undefined) updates.heygen_vertical_template_id = heygen_vertical_template_id
 
     let data
     let error

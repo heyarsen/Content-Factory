@@ -158,7 +158,8 @@ function buildHeygenPayload(
   isPhotoAvatar: boolean = false,
   outputResolution: string = DEFAULT_HEYGEN_RESOLUTION,
   aspectRatio: string | null = DEFAULT_VERTICAL_ASPECT_RATIO, // e.g., "9:16" for vertical videos
-  dimension?: HeyGenDimensionInput
+  dimension?: HeyGenDimensionInput,
+  verticalTemplateId?: string | null
 ): GenerateVideoRequest {
   const isVertical = aspectRatio === DEFAULT_VERTICAL_ASPECT_RATIO
   const resolvedOutputResolution = isVertical ? DEFAULT_VERTICAL_OUTPUT_RESOLUTION : outputResolution
@@ -172,6 +173,7 @@ function buildHeygenPayload(
     duration,
     ...(isPhotoAvatar ? { talking_photo_id: avatarId } : { avatar_id: avatarId }),
     force_vertical: isVertical,
+    template_id: verticalTemplateId || undefined,
   }
 
   if (resolvedOutputResolution) {
@@ -254,7 +256,8 @@ async function runHeygenGeneration(
   outputResolution: string = DEFAULT_HEYGEN_RESOLUTION,
   planItemId?: string | null,
   aspectRatio: string | null = DEFAULT_VERTICAL_ASPECT_RATIO,
-  dimension?: HeyGenDimensionInput
+  dimension?: HeyGenDimensionInput,
+  verticalTemplateId?: string | null
 ): Promise<void> {
   try {
     // Idempotency guard: if a HeyGen video was already created for this record, do not create again
@@ -279,7 +282,8 @@ async function runHeygenGeneration(
       isPhotoAvatar,
       outputResolution,
       aspectRatio,
-      dimension
+      dimension,
+      verticalTemplateId
     )
     
     console.log('Calling HeyGen API with payload:', {
@@ -406,6 +410,15 @@ export class VideoService {
     if (!avatarId) {
       throw new Error('No avatar configured. Please set up an avatar in your settings before generating videos.')
     }
+
+    // For SaaS: Fetch user-specific vertical template ID from preferences
+    const { data: preferences } = await supabase
+      .from('user_preferences')
+      .select('heygen_vertical_template_id')
+      .eq('user_id', userId)
+      .single()
+
+    const verticalTemplateId = preferences?.heygen_vertical_template_id || undefined
     
     // Idempotency 1: If tied to a plan item, and it already has a video_id, reuse that video
     if (input.plan_item_id) {
@@ -474,7 +487,8 @@ export class VideoService {
       outputResolution,
       input.plan_item_id || null,
       aspectRatio,
-      dimension
+      dimension,
+      verticalTemplateId
     )
     return video
   }
