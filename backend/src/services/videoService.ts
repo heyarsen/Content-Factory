@@ -63,6 +63,7 @@ const DEFAULT_TEMPLATE_DIMENSION: HeyGenDimensionInput = {
   height: 1280,
 }
 const DEFAULT_TEMPLATE_SCRIPT_KEY = 'script'
+const GLOBAL_FALLBACK_TEMPLATE_ID = 'baf2ab03a4354aebac815fd42c10895b'
 const DEFAULT_TEMPLATE_AVATAR_VARIABLE_KEY =
   process.env.HEYGEN_TEMPLATE_AVATAR_VARIABLE_KEY?.trim() || 'avatar_id'
 const DEFAULT_TEMPLATE_PHOTO_AVATAR_VARIABLE_KEY =
@@ -609,38 +610,38 @@ export class VideoService {
         .filter((entry) => entry.length > 0)
     }
 
-    const templateSettings: TemplateOverrides | undefined =
-      typeof preferences?.heygen_vertical_template_id === 'string' &&
-      preferences.heygen_vertical_template_id.trim().length > 0
-        ? {
-            templateId: preferences.heygen_vertical_template_id.trim(),
-            scriptKey:
-              preferences.heygen_vertical_template_script_key?.trim() || DEFAULT_TEMPLATE_SCRIPT_KEY,
-            defaults: normalizeTemplateDefaults(preferences.heygen_vertical_template_variables),
-            payloadOverrides: normalizeTemplateOverrides(preferences.heygen_vertical_template_overrides),
-            avatarNodeIds: parseNodeIdList(process.env.HEYGEN_TEMPLATE_AVATAR_NODE_IDS),
-            avatarVariableKey: DEFAULT_TEMPLATE_AVATAR_VARIABLE_KEY,
-            photoAvatarVariableKey: DEFAULT_TEMPLATE_PHOTO_AVATAR_VARIABLE_KEY,
-          }
-        : (() => {
-            const envTemplateId = process.env.HEYGEN_VERTICAL_TEMPLATE_ID?.trim()
-            if (!envTemplateId) {
-              return undefined
-            }
-            return {
-              templateId: envTemplateId,
-              scriptKey:
-                process.env.HEYGEN_VERTICAL_TEMPLATE_SCRIPT_KEY?.trim() ||
-                DEFAULT_TEMPLATE_SCRIPT_KEY,
-              defaults: normalizeTemplateDefaults(
-                parseJsonObject(process.env.HEYGEN_VERTICAL_TEMPLATE_VARIABLES)
-              ),
-              payloadOverrides: parseJsonObject(process.env.HEYGEN_VERTICAL_TEMPLATE_OVERRIDES),
-              avatarNodeIds: parseNodeIdList(process.env.HEYGEN_TEMPLATE_AVATAR_NODE_IDS),
-              avatarVariableKey: DEFAULT_TEMPLATE_AVATAR_VARIABLE_KEY,
-              photoAvatarVariableKey: DEFAULT_TEMPLATE_PHOTO_AVATAR_VARIABLE_KEY,
-            }
-          })()
+    const resolveTemplateId = (): string | undefined => {
+      if (preferences?.heygen_vertical_template_id?.trim()) {
+        return preferences.heygen_vertical_template_id.trim()
+      }
+      if (process.env.HEYGEN_VERTICAL_TEMPLATE_ID?.trim()) {
+        return process.env.HEYGEN_VERTICAL_TEMPLATE_ID.trim()!
+      }
+      return GLOBAL_FALLBACK_TEMPLATE_ID
+    }
+
+    const templateId = resolveTemplateId()
+
+    const templateSettings: TemplateOverrides | undefined = templateId
+      ? {
+          templateId,
+          scriptKey:
+            preferences?.heygen_vertical_template_script_key?.trim() ||
+            process.env.HEYGEN_VERTICAL_TEMPLATE_SCRIPT_KEY?.trim() ||
+            DEFAULT_TEMPLATE_SCRIPT_KEY,
+          defaults:
+            Object.keys(preferences?.heygen_vertical_template_variables || {}).length > 0
+              ? normalizeTemplateDefaults(preferences?.heygen_vertical_template_variables)
+              : normalizeTemplateDefaults(parseJsonObject(process.env.HEYGEN_VERTICAL_TEMPLATE_VARIABLES)),
+          payloadOverrides:
+            Object.keys(preferences?.heygen_vertical_template_overrides || {}).length > 0
+              ? normalizeTemplateOverrides(preferences?.heygen_vertical_template_overrides)
+              : parseJsonObject(process.env.HEYGEN_VERTICAL_TEMPLATE_OVERRIDES),
+          avatarNodeIds: parseNodeIdList(process.env.HEYGEN_TEMPLATE_AVATAR_NODE_IDS),
+          avatarVariableKey: DEFAULT_TEMPLATE_AVATAR_VARIABLE_KEY,
+          photoAvatarVariableKey: DEFAULT_TEMPLATE_PHOTO_AVATAR_VARIABLE_KEY,
+        }
+      : undefined
 
     // Validate avatar before creating video record (unless a template is configured)
     if (!avatarId && !templateSettings) {
