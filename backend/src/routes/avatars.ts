@@ -11,8 +11,6 @@ import {
   type AddLooksRequest,
   type GenerateLookRequest,
 } from '../lib/heygen.js'
-import { preprocessAvatarPhoto } from '../lib/imageProcessing.js'
-
 const router = Router()
 
 // All routes require authentication
@@ -222,14 +220,6 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
       const base64Data = match[2]
       let buffer: Buffer = Buffer.from(base64Data, 'base64')
 
-      try {
-        const processed = await preprocessAvatarPhoto(buffer, mimeType)
-        buffer = processed.buffer as Buffer
-        mimeType = processed.mimeType
-      } catch (preprocessError: any) {
-        console.warn('Photo preprocessing failed, continuing with original image:', preprocessError?.message || preprocessError)
-      }
-
       const normalizedMime = (mimeType || '').toLowerCase()
     let extension = 'jpg'
       if (normalizedMime.includes('png')) extension = 'png'
@@ -238,12 +228,11 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
       const safeLabel = label.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'avatar'
       const fileName = `avatars/${userId}/${Date.now()}-${safeLabel}-${Math.random().toString(36).slice(2, 8)}.${extension}`
     
-    console.log('Processing image upload:', {
-      fileName,
-      mimeType,
-      bufferSize: buffer.length,
-      extension,
-        enhanced: true,
+      console.log('Processing image upload:', {
+        fileName,
+        mimeType,
+        bufferSize: buffer.length,
+        extension,
       })
 
       const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, buffer, {
