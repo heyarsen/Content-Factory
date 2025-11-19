@@ -369,22 +369,23 @@ async function runHeygenGeneration(
       }
 
       if (avatarId) {
+        const characterPayload = (variableName: string) => ({
+          name: variableName,
+          type: 'character',
+          properties: {
+            character_id: avatarId,
+            character_type: isPhotoAvatar ? 'talking_photo' : 'avatar',
+          },
+        })
+
         if (isPhotoAvatar && templateSettings.photoAvatarVariableKey) {
-          variables[templateSettings.photoAvatarVariableKey] = {
-            name: templateSettings.photoAvatarVariableKey,
-            type: 'talking_photo',
-            properties: {
-              character_id: avatarId,
-            },
-          }
+          variables[templateSettings.photoAvatarVariableKey] = characterPayload(
+            templateSettings.photoAvatarVariableKey
+          )
         } else if (!isPhotoAvatar && templateSettings.avatarVariableKey) {
-          variables[templateSettings.avatarVariableKey] = {
-            name: templateSettings.avatarVariableKey,
-            type: 'avatar',
-            properties: {
-              character_id: avatarId,
-            },
-          }
+          variables[templateSettings.avatarVariableKey] = characterPayload(
+            templateSettings.avatarVariableKey
+          )
         }
       }
 
