@@ -6,9 +6,34 @@ import {
   deletePhotoAvatar,
   deletePhotoAvatarGroup,
   upscalePhotoAvatar,
-  type PhotoAvatarDetails,
+  generateAvatarLook,
 } from '../lib/heygen.js'
-import type { HeyGenAvatar } from '../lib/heygen.js'
+import type { HeyGenAvatar, PhotoAvatarDetails, GenerateLookRequest } from '../lib/heygen.js'
+
+const AUTO_LOOKS_ENABLED =
+  process.env.HEYGEN_AUTO_LOOKS_ENABLED?.toLowerCase() === 'false' ? false : true
+
+const AUTO_LOOK_ORIENTATION: GenerateLookRequest['orientation'] =
+  (process.env.HEYGEN_AUTO_LOOK_ORIENTATION as GenerateLookRequest['orientation']) || 'vertical'
+
+const AUTO_LOOK_POSE: GenerateLookRequest['pose'] =
+  (process.env.HEYGEN_AUTO_LOOK_POSE as GenerateLookRequest['pose']) || 'half_body'
+
+const AUTO_LOOK_STYLE: GenerateLookRequest['style'] =
+  (process.env.HEYGEN_AUTO_LOOK_STYLE as GenerateLookRequest['style']) || 'Realistic'
+
+const AUTO_LOOK_PROMPT_TEMPLATE =
+  process.env.HEYGEN_AUTO_LOOK_PROMPT?.trim() ||
+  'Ultra-realistic vertical half-body portrait of {{name}}, looking at the camera, soft studio lighting, clean background, 9:16 framing.'
+
+const buildAutoLookPrompt = (avatarName?: string): string => {
+  const safeName = avatarName?.trim() || 'the speaker'
+  const replaced = AUTO_LOOK_PROMPT_TEMPLATE.replace(/{{\s*name\s*}}/gi, safeName)
+  if (replaced !== AUTO_LOOK_PROMPT_TEMPLATE) {
+    return replaced
+  }
+  return `${AUTO_LOOK_PROMPT_TEMPLATE} ${safeName}`.trim()
+}
 
 export interface Avatar {
   id: string
@@ -337,6 +362,41 @@ export class AvatarService {
     } catch (error: any) {
       console.error('Create avatar from photo error:', error)
       throw new Error(`Failed to create avatar from photo: ${error.message}`)
+    }
+  }
+
+  static async autoGenerateVerticalLook(groupId: string, avatarName?: string): Promise<string | null> {
+    if (!AUTO_LOOKS_ENABLED) {
+      return null
+    }
+
+    if (!groupId) {
+      return null
+    }
+
+    const prompt = buildAutoLookPrompt(avatarName)
+
+    try {
+      const response = await generateAvatarLook({
+        group_id: groupId,
+        prompt,
+        orientation: AUTO_LOOK_ORIENTATION,
+        pose: AUTO_LOOK_POSE,
+        style: AUTO_LOOK_STYLE,
+      })
+
+      console.log('[Auto Look] Generation requested', {
+        groupId,
+        generationId: response.generation_id,
+        orientation: AUTO_LOOK_ORIENTATION,
+        pose: AUTO_LOOK_POSE,
+        style: AUTO_LOOK_STYLE,
+      })
+
+      return response.generation_id || null
+    } catch (error: any) {
+      console.warn('[Auto Look] Failed to request look generation:', error.response?.data || error.message)
+      return null
     }
   }
 

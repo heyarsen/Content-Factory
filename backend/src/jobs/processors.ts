@@ -144,7 +144,7 @@ async function processVideoGeneration(job: BackgroundJob): Promise<void> {
   await ReelService.updateReelVideo(reel_id, {
     video_url: videoData.video_url ?? null,
     heygen_video_id: videoData.video_id,
-    template: videoData.template?.id ?? null,
+    template: null,
   })
 }
 
