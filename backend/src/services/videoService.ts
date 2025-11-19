@@ -374,7 +374,7 @@ async function runHeygenGeneration(
           type: 'character',
           properties: {
             character_id: avatarId,
-            character_type: isPhotoAvatar ? 'talking_photo' : 'avatar',
+            type: isPhotoAvatar ? 'talking_photo' : 'avatar',
           },
         })
 
