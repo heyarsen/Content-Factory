@@ -351,25 +351,40 @@ async function runHeygenGeneration(
         '{{talking_photo_id}}': isPhotoAvatar && avatarId ? avatarId : '',
       }
 
-      const processedDefaults: Record<string, string> = {}
+      const processedDefaults: Record<string, any> = {}
       for (const [key, rawValue] of Object.entries(templateSettings.defaults || {})) {
         if (rawValue === null || rawValue === undefined) {
           continue
         }
-        const valueString = typeof rawValue === 'string' ? rawValue : String(rawValue)
-        processedDefaults[key] = replaceTemplateTokens(valueString, placeholderMap)
+        const processedValue =
+          typeof rawValue === 'string'
+            ? replaceTemplateTokens(rawValue, placeholderMap)
+            : replaceTemplateTokens(cloneJson(rawValue), placeholderMap)
+        processedDefaults[key] = processedValue
       }
 
-      const variables = {
+      const variables: Record<string, any> = {
         ...processedDefaults,
         [scriptKey]: scriptValue,
       }
 
       if (avatarId) {
         if (isPhotoAvatar && templateSettings.photoAvatarVariableKey) {
-          variables[templateSettings.photoAvatarVariableKey] = avatarId
+          variables[templateSettings.photoAvatarVariableKey] = {
+            name: templateSettings.photoAvatarVariableKey,
+            type: 'talking_photo',
+            properties: {
+              character_id: avatarId,
+            },
+          }
         } else if (!isPhotoAvatar && templateSettings.avatarVariableKey) {
-          variables[templateSettings.avatarVariableKey] = avatarId
+          variables[templateSettings.avatarVariableKey] = {
+            name: templateSettings.avatarVariableKey,
+            type: 'avatar',
+            properties: {
+              character_id: avatarId,
+            },
+          }
         }
       }
 
@@ -569,17 +584,17 @@ export class VideoService {
       preferences = prefData
     }
 
-    const normalizeTemplateDefaults = (raw: unknown): Record<string, string> => {
+    const normalizeTemplateDefaults = (raw: unknown): Record<string, any> => {
       if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
         return {}
       }
       return Object.entries(raw as Record<string, any>).reduce((acc, [key, value]) => {
-        if (value === null || value === undefined) {
+        if (value === undefined) {
           return acc
         }
-        acc[key] = typeof value === 'string' ? value : String(value)
+        acc[key] = value
         return acc
-      }, {} as Record<string, string>)
+      }, {} as Record<string, any>)
     }
     const normalizeTemplateOverrides = (raw: unknown): Record<string, any> => {
       if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
