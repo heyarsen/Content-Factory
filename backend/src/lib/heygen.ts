@@ -1748,7 +1748,24 @@ export async function generateAvatarLook(
     }
   } catch (error: any) {
     console.error('HeyGen API error (generateAvatarLook):', JSON.stringify(error.response?.data || error.message, null, 2))
-    throw error
+
+    let errorMessage = 'Failed to generate avatar look'
+    if (error.response?.data?.error) {
+      errorMessage = typeof error.response.data.error === 'string'
+        ? error.response.data.error
+        : (error.response.data.error.message || JSON.stringify(error.response.data.error))
+    } else if (error.response?.data?.message) {
+      errorMessage = error.response.data.message
+    } else if (error.message) {
+      errorMessage = error.message
+    }
+
+    // Attach response status if available to help with debugging
+    const enhancedError: any = new Error(errorMessage)
+    if (error.response) {
+      enhancedError.response = error.response
+    }
+    throw enhancedError
   }
 }
 

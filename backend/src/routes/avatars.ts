@@ -23,14 +23,14 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const showAll = req.query.all === 'true'
-    
+
     // Default to showing only user-created avatars unless ?all=true is specified
-    const avatars = showAll 
+    const avatars = showAll
       ? await AvatarService.getUserAvatars(userId)
       : await AvatarService.getUserCreatedAvatars(userId)
-    
+
     // Get default avatar (only from user-created avatars)
-    const defaultAvatar = showAll 
+    const defaultAvatar = showAll
       ? await AvatarService.getDefaultAvatar(userId)
       : (await AvatarService.getUserCreatedAvatars(userId)).find(a => a.is_default) || null
 
@@ -63,7 +63,7 @@ router.post('/sync', async (req: AuthRequest, res: Response) => {
       response: error.response?.data,
       status: error.response?.status,
     })
-    
+
     // Provide more helpful error messages
     let errorMessage = error.message || 'Failed to sync avatars'
     if (error.message?.includes('HEYGEN_KEY') || error.message?.includes('Missing')) {
@@ -73,7 +73,7 @@ router.post('/sync', async (req: AuthRequest, res: Response) => {
     } else if (error.response?.status === 404) {
       errorMessage = 'HeyGen avatar endpoint not found. The API endpoint may have changed. Please check HeyGen API documentation.'
     }
-    
+
     return res.status(500).json({ error: errorMessage })
   }
 })
@@ -221,13 +221,13 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
       let buffer: Buffer = Buffer.from(base64Data, 'base64')
 
       const normalizedMime = (mimeType || '').toLowerCase()
-    let extension = 'jpg'
+      let extension = 'jpg'
       if (normalizedMime.includes('png')) extension = 'png'
       else if (normalizedMime.includes('webp')) extension = 'webp'
-    
+
       const safeLabel = label.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'avatar'
       const fileName = `avatars/${userId}/${Date.now()}-${safeLabel}-${Math.random().toString(36).slice(2, 8)}.${extension}`
-    
+
       console.log('Processing image upload:', {
         fileName,
         mimeType,
@@ -241,23 +241,23 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
         cacheControl: '3600',
       })
 
-    if (uploadError) {
-      console.error('Supabase storage upload error:', uploadError)
-      if (uploadError.message?.includes('Bucket') || uploadError.message?.includes('not found')) {
+      if (uploadError) {
+        console.error('Supabase storage upload error:', uploadError)
+        if (uploadError.message?.includes('Bucket') || uploadError.message?.includes('not found')) {
           throw new Error(
             `Storage bucket "avatars" not found. Please create it in Supabase Dashboard > Storage with public access. Error: ${uploadError.message}`
           )
+        }
+        throw new Error(`Failed to upload image to storage: ${uploadError.message}`)
       }
-      throw new Error(`Failed to upload image to storage: ${uploadError.message}`)
-    }
 
       const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName)
-    const publicUrl = urlData?.publicUrl
-    if (!publicUrl) {
-      throw new Error('Failed to get public URL for uploaded image')
-    }
-    
-    console.log('Image uploaded successfully, public URL:', publicUrl)
+      const publicUrl = urlData?.publicUrl
+      if (!publicUrl) {
+        throw new Error('Failed to get public URL for uploaded image')
+      }
+
+      console.log('Image uploaded successfully, public URL:', publicUrl)
       return publicUrl
     }
 
@@ -306,7 +306,7 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
         name: heygenError?.name,
         code: heygenError?.code,
       })
-      
+
       throw heygenError
     }
 
@@ -328,14 +328,14 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
       code: error.code,
       fullError: error,
     })
-    
+
     // Extract detailed error message
     let errorMessage = 'Failed to upload photo and create avatar'
-    
+
     // Try to get the most specific error message
     if (error.response?.data?.error) {
-      errorMessage = typeof error.response.data.error === 'string' 
-        ? error.response.data.error 
+      errorMessage = typeof error.response.data.error === 'string'
+        ? error.response.data.error
         : JSON.stringify(error.response.data.error)
     } else if (error.response?.data?.message) {
       errorMessage = error.response.data.message
@@ -347,7 +347,7 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
       errorMessage =
         'HeyGen could not use this photo (usually because the face is blurry, too dark, or out of frame). Try a brighter front-facing selfie on a plain background.'
     }
-    
+
     // Add more context if available
     if (error.response?.status) {
       if (error.response.status === 404) {
@@ -364,10 +364,10 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
         errorMessage = `Invalid request: ${errorMessage}`
       }
     }
-    
+
     // Include more details in development
     const statusCode = error.response?.status || 500
-    return res.status(statusCode).json({ 
+    return res.status(statusCode).json({
       error: errorMessage,
       details: process.env.NODE_ENV === 'development' ? {
         originalMessage: error.message,
@@ -401,12 +401,12 @@ router.post('/create-from-photo', async (req: AuthRequest, res: Response) => {
       response: error.response?.data,
       status: error.response?.status,
     })
-    
-    const errorMessage = 
-      error.message || 
+
+    const errorMessage =
+      error.message ||
       error.response?.data?.message ||
       'Failed to create avatar from photo'
-    
+
     return res.status(500).json({ error: errorMessage })
   }
 })
@@ -419,7 +419,7 @@ router.post('/generate-ai', async (req: AuthRequest, res: Response) => {
     userId: req.userId,
     bodyKeys: Object.keys(req.body || {}),
   })
-  
+
   try {
     const userId = req.userId!
     const request: GenerateAIAvatarRequest = req.body
@@ -481,9 +481,9 @@ router.post('/generate-ai', async (req: AuthRequest, res: Response) => {
       status: error.response?.status,
       statusText: error.response?.statusText,
     })
-    
+
     let errorMessage = 'Failed to generate AI avatar'
-    
+
     if (error.response?.status === 404) {
       errorMessage = 'HeyGen AI avatar generation endpoint not found (404). The API endpoint may have changed or the feature may not be available in your HeyGen plan.'
     } else if (error.response?.status === 401) {
@@ -491,16 +491,16 @@ router.post('/generate-ai', async (req: AuthRequest, res: Response) => {
     } else if (error.response?.status === 403) {
       errorMessage = 'Access denied. AI avatar generation may not be available in your HeyGen plan.'
     } else if (error.response?.data?.error) {
-      errorMessage = typeof error.response.data.error === 'string' 
-        ? error.response.data.error 
+      errorMessage = typeof error.response.data.error === 'string'
+        ? error.response.data.error
         : JSON.stringify(error.response.data.error)
     } else if (error.response?.data?.message) {
       errorMessage = error.response.data.message
     } else if (error.message) {
       errorMessage = error.message
     }
-    
-    return res.status(error.response?.status || 500).json({ 
+
+    return res.status(error.response?.status || 500).json({
       error: errorMessage,
       details: process.env.NODE_ENV === 'development' ? {
         originalMessage: error.message,
@@ -662,7 +662,7 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
     })
   } catch (error: any) {
     console.error('Generate look error:', error)
-    return res.status(500).json({ error: error.message || 'Failed to generate look' })
+    return res.status(error.response?.status || 500).json({ error: error.message || 'Failed to generate look' })
   }
 })
 
@@ -677,7 +677,7 @@ router.post('/upload-look-image', authenticate, async (req: AuthRequest, res: Re
 
     // Import uploadImageToHeyGen function
     const { uploadImageToHeyGen } = await import('../lib/heygen.js')
-    
+
     // Upload to HeyGen and get image_key
     const imageKey = await uploadImageToHeyGen(photo_data)
 
@@ -686,8 +686,8 @@ router.post('/upload-look-image', authenticate, async (req: AuthRequest, res: Re
     })
   } catch (error: any) {
     console.error('Upload look image error:', error)
-    return res.status(500).json({ 
-      error: error.message || 'Failed to upload look image' 
+    return res.status(500).json({
+      error: error.message || 'Failed to upload look image'
     })
   }
 })
