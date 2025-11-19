@@ -79,6 +79,8 @@ type TemplateOverrides = {
   photoAvatarVariableKey?: string
 }
 
+const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
+
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 const replaceTemplateTokens = (input: any, replacements: Record<string, string | undefined>): any => {
@@ -105,6 +107,51 @@ const replaceTemplateTokens = (input: any, replacements: Record<string, string |
 
 const cloneJson = <T>(value: T): T =>
   value === undefined ? value : JSON.parse(JSON.stringify(value))
+
+async function resolveCharacterIdentifier(
+  avatarId?: string,
+  isPhotoAvatar?: boolean
+): Promise<string | undefined> {
+  if (!avatarId) {
+    return undefined
+  }
+
+  if (!isPhotoAvatar) {
+    return avatarId
+  }
+
+  try {
+    const axios = (await import('axios')).default
+    const apiKey = process.env.HEYGEN_KEY
+    if (!apiKey) {
+      throw new Error('Missing HEYGEN_KEY environment variable')
+    }
+
+    const response = await axios.get(
+      `${HEYGEN_V2_API_URL}/avatar_group/${avatarId}/avatars`,
+      {
+        headers: {
+          'X-Api-Key': apiKey,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
+
+    const avatarList =
+      response.data?.data?.avatar_list ||
+      response.data?.avatar_list ||
+      response.data?.data ||
+      []
+
+    if (Array.isArray(avatarList) && avatarList.length > 0) {
+      return avatarList[0].id
+    }
+  } catch (error: any) {
+    console.warn('Failed to resolve talking_photo_id; using group id instead:', error?.response?.data || error?.message)
+  }
+
+  return avatarId
+}
 
 function normalizeCategory(category?: string | null): TemplateCategory {
   const value = (category || '').trim().toLowerCase()
@@ -335,6 +382,8 @@ async function runHeygenGeneration(
       throw new Error('No avatar available. Please configure an avatar in your settings.')
     }
 
+    const resolvedAvatarId = await resolveCharacterIdentifier(avatarId, isPhotoAvatar)
+
     if (usingTemplate) {
       const scriptValue = (video.script || video.topic || '').trim()
       if (!scriptValue) {
@@ -347,8 +396,8 @@ async function runHeygenGeneration(
       const placeholderMap: Record<string, string> = {
         '{{script}}': scriptValue,
         '{{topic}}': topicValue,
-        '{{avatar_id}}': avatarId || '',
-        '{{talking_photo_id}}': isPhotoAvatar && avatarId ? avatarId : '',
+        '{{avatar_id}}': resolvedAvatarId || '',
+        '{{talking_photo_id}}': isPhotoAvatar && resolvedAvatarId ? resolvedAvatarId : '',
       }
 
       const processedDefaults: Record<string, any> = {}
@@ -368,12 +417,12 @@ async function runHeygenGeneration(
         [scriptKey]: scriptValue,
       }
 
-      if (avatarId) {
+      if (resolvedAvatarId) {
         const characterPayload = (variableName: string) => ({
           name: variableName,
           type: 'character',
           properties: {
-            character_id: avatarId,
+            character_id: resolvedAvatarId,
             type: isPhotoAvatar ? 'talking_photo' : 'avatar',
           },
         })
@@ -447,7 +496,7 @@ async function runHeygenGeneration(
       video.script || undefined,
       video.style,
       video.duration,
-      avatarId,
+      resolvedAvatarId,
       isPhotoAvatar,
       outputResolution,
       aspectRatio,

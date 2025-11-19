@@ -1289,7 +1289,7 @@ export default function Avatars() {
                     disabled={creating}
                   />
               <p className="mt-2 text-xs text-slate-500">
-                We automatically crop, normalize, and sharpen your upload before sending it to HeyGen.
+                We upload your photo to HeyGen exactly as provided—no automatic cropping or enhancement is applied.
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                 <span>Don&apos;t have a usable photo?</span>
