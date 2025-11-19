@@ -241,27 +241,27 @@ export async function listAvatars(): Promise<HeyGenAvatarsResponse> {
   try {
     const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
     const apiKey = getHeyGenKey()
-    
+
     // Try v2 API first (photo avatars) - based on official docs
     // https://docs.heygen.com/docs/create-videos-with-photo-avatars
     const endpoints = [
       // v2 API - List avatar groups, then get avatars from each group
-      { 
+      {
         type: 'v2-groups',
-        method: 'GET' as const, 
+        method: 'GET' as const,
         url: `${HEYGEN_V2_API_URL}/avatar_group.list`,
         useXApiKey: true,
       },
       // Fallback to v1 API endpoints
-      { 
+      {
         type: 'v1-list',
-        method: 'POST' as const, 
+        method: 'POST' as const,
         url: `${HEYGEN_API_URL}/avatar.list`,
         useXApiKey: false,
       },
-      { 
+      {
         type: 'v1-get',
-        method: 'GET' as const, 
+        method: 'GET' as const,
         url: `${HEYGEN_API_URL}/avatars`,
         useXApiKey: false,
       },
@@ -271,9 +271,9 @@ export async function listAvatars(): Promise<HeyGenAvatarsResponse> {
     for (const endpoint of endpoints) {
       try {
         const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
+          'Content-Type': 'application/json',
         }
-        
+
         // Use X-Api-Key header for v2 API, Bearer for v1
         if (endpoint.useXApiKey) {
           headers['X-Api-Key'] = apiKey
@@ -298,7 +298,7 @@ export async function listAvatars(): Promise<HeyGenAvatarsResponse> {
         if (endpoint.type === 'v2-groups' && response.data?.data?.avatar_group_list) {
           const groups = response.data.data.avatar_group_list
           console.log(`Found ${groups.length} avatar groups`)
-          
+
           // Fetch avatars from each group
           const allAvatars: any[] = []
           for (const group of groups) {
@@ -307,7 +307,7 @@ export async function listAvatars(): Promise<HeyGenAvatarsResponse> {
                 `${HEYGEN_V2_API_URL}/avatar_group/${group.id}/avatars`,
                 { headers: { 'X-Api-Key': apiKey, 'Content-Type': 'application/json' } }
               )
-              
+
               if (avatarsResponse.data?.data?.avatar_list) {
                 const groupAvatars = avatarsResponse.data.data.avatar_list.map((avatar: any) => ({
                   avatar_id: avatar.id,
@@ -326,7 +326,7 @@ export async function listAvatars(): Promise<HeyGenAvatarsResponse> {
               console.log(`Failed to fetch avatars from group ${group.id}:`, groupErr.response?.status)
             }
           }
-          
+
           if (allAvatars.length > 0) {
             console.log(`Successfully fetched ${allAvatars.length} avatars from v2 API`)
             return { avatars: allAvatars }
@@ -335,7 +335,7 @@ export async function listAvatars(): Promise<HeyGenAvatarsResponse> {
 
         // Handle v1 API response structures
         let avatars: any[] = []
-        
+
         if (response.data?.data?.avatars && Array.isArray(response.data.data.avatars)) {
           avatars = response.data.data.avatars
         } else if (response.data?.data && Array.isArray(response.data.data)) {
@@ -360,7 +360,7 @@ export async function listAvatars(): Promise<HeyGenAvatarsResponse> {
           }))
           return { avatars: normalizedAvatars }
         }
-        
+
         // Log unexpected structure for debugging
         console.log(`Unexpected response structure from ${endpoint.url}:`, JSON.stringify(response.data, null, 2).substring(0, 500))
       } catch (err: any) {
@@ -378,9 +378,9 @@ export async function listAvatars(): Promise<HeyGenAvatarsResponse> {
     })
 
     throw new Error(
-      lastError?.response?.data?.message || 
+      lastError?.response?.data?.message ||
       lastError?.response?.data?.error?.message ||
-      lastError?.message || 
+      lastError?.message ||
       'Failed to list avatars. Please check your HeyGen API key and endpoint. The API may require a different endpoint format.'
     )
   } catch (error: any) {
@@ -427,7 +427,7 @@ export async function generateVideo(
         ? request.output_resolution.trim()
         : DEFAULT_HEYGEN_RESOLUTION
     const requirePortrait = !!request.force_vertical || request.aspect_ratio === '9:16'
-    
+
     // Always use v2 API - https://docs.heygen.com/reference/create-an-avatar-video-v2
     // Build payload with video_inputs array format
     const payload: any = {
@@ -466,85 +466,85 @@ export async function generateVideo(
       },
     }
 
-      // Build video_config - Use aspect_ratio for vertical videos (9:16 for Instagram Reels/TikTok)
-      // According to docs: https://docs.heygen.com/reference/create-an-avatar-video-v2
-      // For vertical videos, use aspect_ratio: "9:16" in video_config
-      const requestDimension = sanitizeDimensionInput(request.dimension)
-      const resolutionDimension = parseResolutionToDimension(outputResolution)
-      const resolutionLooksPortrait = !!resolutionDimension && resolutionDimension.height > resolutionDimension.width
-      const isVerticalFormat =
-        resolutionLooksPortrait ||
-        outputResolution.toLowerCase().includes('vertical') ||
-        request.aspect_ratio === '9:16'
+    // Build video_config - Use aspect_ratio for vertical videos (9:16 for Instagram Reels/TikTok)
+    // According to docs: https://docs.heygen.com/reference/create-an-avatar-video-v2
+    // For vertical videos, use aspect_ratio: "9:16" in video_config
+    const requestDimension = sanitizeDimensionInput(request.dimension)
+    const resolutionDimension = parseResolutionToDimension(outputResolution)
+    const resolutionLooksPortrait = !!resolutionDimension && resolutionDimension.height > resolutionDimension.width
+    const isVerticalFormat =
+      resolutionLooksPortrait ||
+      outputResolution.toLowerCase().includes('vertical') ||
+      request.aspect_ratio === '9:16'
 
-      // Initialize video_config if needed
-      if (!payload.video_config) {
-        payload.video_config = {}
-      }
+    // Initialize video_config if needed
+    if (!payload.video_config) {
+      payload.video_config = {}
+    }
 
-      if (isVerticalFormat || request.aspect_ratio === '9:16') {
-        // For vertical videos (Instagram Reels/TikTok), use ONLY aspect_ratio: "9:16"
-        // Do NOT set output_resolution for vertical videos to avoid white frames on sides
-        payload.video_config.aspect_ratio = '9:16'
-        payload.video_config.fit = 'cover'
-        const verticalResolution =
-          resolutionDimension && resolutionLooksPortrait
-            ? `${resolutionDimension.width}x${resolutionDimension.height}`
-            : request.output_resolution?.trim() || DEFAULT_VERTICAL_OUTPUT_RESOLUTION
-        payload.video_config.output_resolution = verticalResolution
-        console.log(
-          `[HeyGen] Setting aspect_ratio to 9:16 for vertical video (Instagram Reels/TikTok) with output_resolution ${payload.video_config.output_resolution}`
-        )
-      } else if (outputResolution && outputResolution !== DEFAULT_HEYGEN_RESOLUTION) {
-        // For horizontal videos, use output_resolution
-        payload.video_config.output_resolution = outputResolution
-        console.log(`[HeyGen] Setting output_resolution for horizontal video: ${outputResolution}`)
-      }
+    if (isVerticalFormat || request.aspect_ratio === '9:16') {
+      // For vertical videos (Instagram Reels/TikTok), use ONLY aspect_ratio: "9:16"
+      // Do NOT set output_resolution for vertical videos to avoid white frames on sides
+      payload.video_config.aspect_ratio = '9:16'
+      payload.video_config.fit = 'cover'
+      const verticalResolution =
+        resolutionDimension && resolutionLooksPortrait
+          ? `${resolutionDimension.width}x${resolutionDimension.height}`
+          : request.output_resolution?.trim() || DEFAULT_VERTICAL_OUTPUT_RESOLUTION
+      payload.video_config.output_resolution = verticalResolution
+      console.log(
+        `[HeyGen] Setting aspect_ratio to 9:16 for vertical video (Instagram Reels/TikTok) with output_resolution ${payload.video_config.output_resolution}`
+      )
+    } else if (outputResolution && outputResolution !== DEFAULT_HEYGEN_RESOLUTION) {
+      // For horizontal videos, use output_resolution
+      payload.video_config.output_resolution = outputResolution
+      console.log(`[HeyGen] Setting output_resolution for horizontal video: ${outputResolution}`)
+    }
 
-      // If aspect_ratio was explicitly provided, use it
-      if (request.aspect_ratio && !isVerticalFormat) {
-        payload.video_config.aspect_ratio = request.aspect_ratio
-        console.log(`[HeyGen] Using explicit aspect_ratio: ${request.aspect_ratio}`)
-      }
+    // If aspect_ratio was explicitly provided, use it
+    if (request.aspect_ratio && !isVerticalFormat) {
+      payload.video_config.aspect_ratio = request.aspect_ratio
+      console.log(`[HeyGen] Using explicit aspect_ratio: ${request.aspect_ratio}`)
+    }
 
-      if (requestDimension) {
-        payload.video_config.dimension = formatDimensionForHeygen(requestDimension)
-        console.log(
-          `[HeyGen] Using explicit video dimension override: ${requestDimension.width}x${requestDimension.height}`
-        )
-      } else if (isVerticalFormat) {
-        const chosenDimension =
-          resolutionLooksPortrait && resolutionDimension
-            ? resolutionDimension
-            : DEFAULT_VERTICAL_DIMENSION
-        payload.video_config.dimension = formatDimensionForHeygen(chosenDimension)
-        console.log(
-          `[HeyGen] Setting portrait dimension for vertical video: ${payload.video_config.dimension.width}x${payload.video_config.dimension.height}`
-        )
-      }
+    if (requestDimension) {
+      payload.video_config.dimension = formatDimensionForHeygen(requestDimension)
+      console.log(
+        `[HeyGen] Using explicit video dimension override: ${requestDimension.width}x${requestDimension.height}`
+      )
+    } else if (isVerticalFormat) {
+      const chosenDimension =
+        resolutionLooksPortrait && resolutionDimension
+          ? resolutionDimension
+          : DEFAULT_VERTICAL_DIMENSION
+      payload.video_config.dimension = formatDimensionForHeygen(chosenDimension)
+      console.log(
+        `[HeyGen] Setting portrait dimension for vertical video: ${payload.video_config.dimension.width}x${payload.video_config.dimension.height}`
+      )
+    }
 
-      ensurePortraitConfig()
-    
+    ensurePortraitConfig()
+
     // Remove video_config if it's empty to avoid API errors
     if (Object.keys(payload.video_config).length === 0) {
       delete payload.video_config
     }
-    
+
     // Log video_config details
     if (payload.video_config) {
-        console.log(`[HeyGen] Video config:`, {
-          output_resolution: payload.video_config.output_resolution,
-          aspect_ratio: payload.video_config.aspect_ratio,
-          dimension: payload.video_config.dimension,
-        })
-        // Mirror video_config to each video input to satisfy HeyGen's per-input schema
-        payload.video_inputs = payload.video_inputs.map((input: any) => ({
-          ...input,
-          video_config: {
-            ...(input.video_config || {}),
-            ...payload.video_config,
-          },
-        }))
+      console.log(`[HeyGen] Video config:`, {
+        output_resolution: payload.video_config.output_resolution,
+        aspect_ratio: payload.video_config.aspect_ratio,
+        dimension: payload.video_config.dimension,
+      })
+      // Mirror video_config to each video input to satisfy HeyGen's per-input schema
+      payload.video_inputs = payload.video_inputs.map((input: any) => ({
+        ...input,
+        video_config: {
+          ...(input.video_config || {}),
+          ...payload.video_config,
+        },
+      }))
     } else {
       console.log(`[HeyGen] No video_config set - using HeyGen defaults`)
     }
@@ -557,7 +557,7 @@ export async function generateVideo(
       // Photo avatar - use TalkingPhotoSettings
       // Check if this is a group_id (photo avatar groups) or individual avatar ID
       let talkingPhotoId = request.talking_photo_id
-      
+
       // If it's a group_id format (usually longer), try to fetch individual avatars from the group
       // HeyGen API requires individual avatar IDs, not group IDs for talking_photo_id
       try {
@@ -570,7 +570,7 @@ export async function generateVideo(
             },
           }
         )
-        
+
         if (avatarGroupResponse.data?.data?.avatar_list && avatarGroupResponse.data.data.avatar_list.length > 0) {
           // Use the first available avatar from the group
           talkingPhotoId = avatarGroupResponse.data.data.avatar_list[0].id
@@ -580,7 +580,7 @@ export async function generateVideo(
         // If fetching from group fails, assume it's already an individual avatar ID
         console.log(`Assuming ${talkingPhotoId} is an individual avatar ID (group fetch failed: ${groupErr.response?.status || groupErr.message})`)
       }
-      
+
       payload.video_inputs[0].character = {
         type: 'talking_photo',
         talking_photo_id: talkingPhotoId,
@@ -594,7 +594,7 @@ export async function generateVideo(
     } else {
       throw new Error('Either avatar_id or talking_photo_id must be provided')
     }
-    
+
     const requestUrl = `${HEYGEN_V2_API_URL}/video/generate`
     console.log('HeyGen v2 API request:', {
       url: requestUrl,
@@ -604,7 +604,7 @@ export async function generateVideo(
       talkingPhotoId: request.talking_photo_id,
       payload: JSON.stringify(payload, null, 2),
     })
-    
+
     let response
     try {
       response = await axios.post(
@@ -622,7 +622,7 @@ export async function generateVideo(
       const errorStatus = err?.response?.status
       const errorMessage = err?.response?.data?.message || err?.response?.data?.error
       const errorMessageStr = typeof errorMessage === 'string' ? errorMessage : String(errorMessage || '')
-      
+
       // Log the actual error for debugging
       console.error(`[HeyGen] API Error Details:`, {
         status: errorStatus,
@@ -630,31 +630,31 @@ export async function generateVideo(
         responseData: err.response?.data,
         videoConfig: payload.video_config,
       })
-      
+
       // Check if it's a resolution/config format error or server error
       const isConfigError = (errorStatus === 400 || errorStatus >= 500) && errorMessageStr &&
         (errorMessageStr.toLowerCase().includes('output_resolution') ||
-         errorMessageStr.toLowerCase().includes('dimension') ||
-         errorMessageStr.toLowerCase().includes('fit') ||
-         errorMessageStr.toLowerCase().includes('resolution') ||
-         errorMessageStr.toLowerCase().includes('invalid') ||
-         errorMessageStr.toLowerCase().includes('not supported') ||
-         errorMessageStr.toLowerCase().includes('server error'))
-      
+          errorMessageStr.toLowerCase().includes('dimension') ||
+          errorMessageStr.toLowerCase().includes('fit') ||
+          errorMessageStr.toLowerCase().includes('resolution') ||
+          errorMessageStr.toLowerCase().includes('invalid') ||
+          errorMessageStr.toLowerCase().includes('not supported') ||
+          errorMessageStr.toLowerCase().includes('server error'))
+
       // If using vertical resolution and it fails, try alternative approaches
       const verticalResolutions = ['1080x1920', '720x1280', '1080p_vertical', 'vertical_1080p', '1080p']
-      const isVerticalResolution = payload.video_config?.output_resolution && 
+      const isVerticalResolution = payload.video_config?.output_resolution &&
         verticalResolutions.includes(payload.video_config.output_resolution)
-      
+
       // If vertical resolution causes errors, try alternative formats
       if ((isConfigError || errorStatus >= 500) && isVerticalResolution) {
         const currentRes = payload.video_config?.output_resolution
         console.warn(`[HeyGen] Vertical resolution '${currentRes}' failed, trying alternative formats...`)
-        
+
         // Try alternative resolution formats (simpler approach - no dimension parameter)
         const alternativeResolutions = ['720x1280', '1080x1920', '1080p', '720p']
         const filteredResolutions = alternativeResolutions.filter(r => r !== currentRes)
-        
+
         for (const altResolution of filteredResolutions) {
           try {
             console.log(`[HeyGen] Trying alternative resolution: ${altResolution}`)
@@ -666,7 +666,7 @@ export async function generateVideo(
             if (payload.video_config.fit) {
               delete payload.video_config.fit
             }
-            
+
             response = await axios.post(
               requestUrl,
               payload,
@@ -687,7 +687,7 @@ export async function generateVideo(
             }
           }
         }
-        
+
         // If we got a successful response from alternative resolution, skip the rest of error handling
         if (response) {
           // Continue to success path below
@@ -764,7 +764,7 @@ export async function generateVideo(
           const hadAspectRatio = !!payload.video_config?.aspect_ratio
           const hadDimension = !!payload.video_config?.dimension
           const hadOutputResolution = !!payload.video_config?.output_resolution
-          
+
           // If we have aspect_ratio, try to preserve it and only remove problematic fields
           if (hadAspectRatio) {
             console.warn(
@@ -865,11 +865,11 @@ export async function generateVideo(
     // HeyGen v2 API returns: { code: 100, data: { video_id: "...", ... }, message: "Success" }
     const data = response.data?.data || response.data
     const videoId = data.video_id || data.id || data.videoId
-    
+
     if (!videoId) {
       throw new Error('Failed to get video_id from HeyGen response. Response: ' + JSON.stringify(response.data))
     }
-    
+
     return {
       video_id: videoId,
       status: data.status || 'pending',
@@ -882,7 +882,7 @@ export async function generateVideo(
       status: error.response?.status,
       statusText: error.response?.statusText,
     })
-    
+
     // Extract detailed error message
     let errorMessage = 'Failed to generate video'
     // Map HeyGen error code 400116 (Voice not found) with actionable guidance
@@ -890,7 +890,7 @@ export async function generateVideo(
       error.response?.data?.code ||
       error.response?.data?.error_code ||
       error.response?.data?.error?.code
-    
+
     if (errorCode === 400116 || /voice not found/i.test(error.response?.data?.message || '')) {
       errorMessage =
         'Voice not found. Please use a valid HEYGEN_VOICE_ID from List All Voices (V2).'
@@ -908,13 +908,13 @@ export async function generateVideo(
     } else if (error.response?.data?.error?.message) {
       errorMessage = error.response.data.error.message
     } else if (error.response?.data?.error) {
-      errorMessage = typeof error.response.data.error === 'string' 
-        ? error.response.data.error 
+      errorMessage = typeof error.response.data.error === 'string'
+        ? error.response.data.error
         : JSON.stringify(error.response.data.error)
     } else if (error.message) {
       errorMessage = error.message
     }
-    
+
     throw new Error(errorMessage)
   }
 }
@@ -1052,11 +1052,11 @@ export async function generateVideoFromTemplate(
 export async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
   const apiKey = getHeyGenKey()
   const HEYGEN_UPLOAD_URL = 'https://upload.heygen.com/v1/asset'
-  
+
   // First, download the image from the URL to get the buffer
   let imageBuffer: Buffer
   let contentType: string = 'image/jpeg'
-  
+
   try {
     if (photoUrl.startsWith('data:')) {
       // Handle base64 data URL
@@ -1068,7 +1068,7 @@ export async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
       }
     } else {
       // Download from URL
-      const imageResponse = await axios.get(photoUrl, { 
+      const imageResponse = await axios.get(photoUrl, {
         responseType: 'arraybuffer',
         maxContentLength: 10 * 1024 * 1024, // 10MB limit
       })
@@ -1078,16 +1078,16 @@ export async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
   } catch (err: any) {
     throw new Error(`Failed to download image: ${err.message}`)
   }
-  
+
   // Convert WebP to JPEG if needed (HeyGen doesn't support WebP)
   // Supported formats: JPEG, PNG
   const needsConversion = contentType === 'image/webp' || contentType.includes('webp')
-  
+
   if (needsConversion) {
     try {
       // Try to use sharp for image conversion
       const sharp = await import('sharp').catch(() => null)
-      
+
       if (sharp && sharp.default) {
         console.log('Converting WebP image to JPEG for HeyGen compatibility...')
         imageBuffer = await sharp.default(imageBuffer)
@@ -1111,7 +1111,7 @@ export async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
       )
     }
   }
-  
+
   // Ensure we're using a supported content type
   // HeyGen supports: image/jpeg, image/png
   if (!contentType.includes('jpeg') && !contentType.includes('jpg') && !contentType.includes('png')) {
@@ -1134,11 +1134,11 @@ export async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
       )
     }
   }
-  
+
   try {
     console.log(`Uploading image to HeyGen Upload Asset endpoint: ${HEYGEN_UPLOAD_URL}`)
     console.log(`Content-Type: ${contentType}, Size: ${imageBuffer.length} bytes`)
-    
+
     // Upload raw binary data to HeyGen Upload Asset endpoint
     // According to HeyGen docs: https://docs.heygen.com/reference/upload-asset
     // The endpoint expects raw binary image data in the body (not multipart/form-data)
@@ -1155,20 +1155,20 @@ export async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
         timeout: 30000, // 30 seconds timeout for upload
       }
     )
-    
+
     console.log('Upload response:', {
       status: uploadResponse.status,
       dataKeys: Object.keys(uploadResponse.data || {}),
       data: uploadResponse.data,
     })
-    
+
     // Extract image_key from response
     // Based on HeyGen docs, response should contain 'id' and 'image_key'
-    const imageKey = uploadResponse.data?.data?.image_key || 
-                    uploadResponse.data?.image_key ||
-                    uploadResponse.data?.data?.id || // Fallback to id if image_key not present
-                    uploadResponse.data?.id
-    
+    const imageKey = uploadResponse.data?.data?.image_key ||
+      uploadResponse.data?.image_key ||
+      uploadResponse.data?.data?.id || // Fallback to id if image_key not present
+      uploadResponse.data?.id
+
     if (imageKey) {
       console.log(`✅ Successfully uploaded image to HeyGen, got image_key: ${imageKey}`)
       return imageKey
@@ -1184,18 +1184,18 @@ export async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
       error: err.response?.data?.error || err.message,
       responseData: err.response?.data,
     })
-    
+
     let errorMessage = 'Failed to upload image to HeyGen'
     if (err.response?.data?.error) {
-      errorMessage = typeof err.response.data.error === 'string' 
-        ? err.response.data.error 
+      errorMessage = typeof err.response.data.error === 'string'
+        ? err.response.data.error
         : JSON.stringify(err.response.data.error)
     } else if (err.response?.data?.message) {
       errorMessage = err.response.data.message
     } else if (err.message) {
       errorMessage = err.message
     }
-    
+
     throw new Error(errorMessage)
   }
 }
@@ -1207,13 +1207,13 @@ export async function createAvatarFromPhoto(
 ): Promise<{ avatar_id: string; status: string }> {
   try {
     const apiKey = getHeyGenKey()
-    
+
     // Step 1: Upload image to HeyGen and get image_key
     // According to HeyGen support: https://docs.heygen.com/reference/upload-asset
     // This is required - we must upload the image first to get an image_key
     console.log('Step 1: Uploading image to HeyGen Upload Asset endpoint...')
     const imageKeys: string[] = []
-    
+
     try {
       const primaryImageKey = await uploadImageToHeyGen(photoUrl)
       imageKeys.push(primaryImageKey)
@@ -1225,7 +1225,7 @@ export async function createAvatarFromPhoto(
         `Please check your HEYGEN_KEY and ensure the image is accessible.`
       )
     }
-    
+
     if (Array.isArray(additionalPhotoUrls) && additionalPhotoUrls.length > 0) {
       for (const [index, extraUrl] of additionalPhotoUrls.entries()) {
         if (!extraUrl || typeof extraUrl !== 'string') continue
@@ -1243,13 +1243,13 @@ export async function createAvatarFromPhoto(
         }
       }
     }
-    
+
     // Step 2: Create Photo Avatar Group using the image_key
     // Based on https://docs.heygen.com/docs/create-and-train-photo-avatar-groups
     console.log('Step 2: Creating Photo Avatar Group with image_key...')
     let createGroupResponse: any
     const createTimeout = 30000 // 30 seconds timeout
-    
+
     try {
       createGroupResponse = await axios.post(
         `${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/create`,
@@ -1273,34 +1273,34 @@ export async function createAvatarFromPhoto(
         error: err.response?.data?.error || err.message,
         responseData: err.response?.data,
       })
-      
+
       let errorMessage = 'Failed to create avatar group'
       if (err.response?.data?.error) {
-        errorMessage = typeof err.response.data.error === 'string' 
-          ? err.response.data.error 
+        errorMessage = typeof err.response.data.error === 'string'
+          ? err.response.data.error
           : JSON.stringify(err.response.data.error)
       } else if (err.response?.data?.message) {
         errorMessage = err.response.data.message
       } else if (err.message) {
         errorMessage = err.message
       }
-      
+
       throw new Error(`Failed to create Photo Avatar Group: ${errorMessage}`)
     }
-    
+
     console.log('Avatar group creation response:', createGroupResponse.data)
-    
-    const groupId = createGroupResponse.data?.data?.id || 
-                   createGroupResponse.data?.data?.group_id ||
-                   createGroupResponse.data?.id ||
-                   createGroupResponse.data?.group_id
-    
+
+    const groupId = createGroupResponse.data?.data?.id ||
+      createGroupResponse.data?.data?.group_id ||
+      createGroupResponse.data?.id ||
+      createGroupResponse.data?.group_id
+
     if (!groupId) {
       throw new Error('Failed to get group_id from avatar group creation response')
     }
-    
+
     console.log(`Successfully created avatar group: ${groupId}`)
-    
+
     // Step 3: Add uploaded image(s) as look(s) inside the group (required before training)
     try {
       console.log('Step 3: Adding uploaded image(s) as look(s) in the avatar group...')
@@ -1321,9 +1321,9 @@ export async function createAvatarFromPhoto(
       console.error('❌ Failed to add look to avatar group:', addLookErr.response?.data || addLookErr.message)
       throw new Error(
         addLookErr.response?.data?.error?.message ||
-          addLookErr.response?.data?.message ||
-          addLookErr.message ||
-          'Failed to add image to avatar group.'
+        addLookErr.response?.data?.message ||
+        addLookErr.message ||
+        'Failed to add image to avatar group.'
       )
     }
 
@@ -1343,7 +1343,7 @@ export async function createAvatarFromPhoto(
           },
         }
       )
-      
+
       console.log('Training started:', trainResponse.data)
       status = 'training'
     } catch (trainErr: any) {
@@ -1362,18 +1362,18 @@ export async function createAvatarFromPhoto(
       statusText: error.response?.statusText,
       data: error.response?.data,
     })
-    
+
     let errorMessage = 'Failed to create avatar from photo'
     if (error.response?.data?.error) {
-      errorMessage = typeof error.response.data.error === 'string' 
-        ? error.response.data.error 
+      errorMessage = typeof error.response.data.error === 'string'
+        ? error.response.data.error
         : JSON.stringify(error.response.data.error)
     } else if (error.response?.data?.message) {
       errorMessage = error.response.data.message
     } else if (error.message) {
       errorMessage = error.message
     }
-    
+
     throw new Error(errorMessage)
   }
 }
@@ -1722,7 +1722,7 @@ export interface GenerateLookRequest {
   prompt: string
   orientation: 'horizontal' | 'vertical' | 'square'
   pose: 'half_body' | 'full_body' | 'close_up'
-  style: 'Realistic' | 'Cartoon' | 'Anime'
+  style: 'Realistic' | 'Pixar' | 'Cinematic' | 'Vintage' | 'Noir' | 'Cyberpunk' | 'Unspecified' | 'Cartoon' | 'Anime'
 }
 
 export async function generateAvatarLook(
@@ -1747,7 +1747,7 @@ export async function generateAvatarLook(
       generation_id: response.data?.data?.generation_id || response.data?.generation_id,
     }
   } catch (error: any) {
-    console.error('HeyGen API error (generateAvatarLook):', error.response?.data || error.message)
+    console.error('HeyGen API error (generateAvatarLook):', JSON.stringify(error.response?.data || error.message, null, 2))
     throw error
   }
 }
@@ -1758,7 +1758,7 @@ export async function getVideoStatus(
   try {
     const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
     const apiKey = getHeyGenKey()
-    
+
     // Try v2 API first
     try {
       const response = await axios.get(
@@ -1772,7 +1772,7 @@ export async function getVideoStatus(
       )
 
       const data = response.data?.data || response.data
-      
+
       return {
         video_id: videoId,
         status: data.status || 'pending',
@@ -1824,7 +1824,7 @@ export async function getSharableVideoUrl(
 ): Promise<{ share_url: string }> {
   try {
     const apiKey = getHeyGenKey()
-    
+
     const response = await axios.post(
       `${HEYGEN_API_URL}/video/share`,
       {
@@ -1839,7 +1839,7 @@ export async function getSharableVideoUrl(
     )
 
     const data = response.data?.data || response.data
-    
+
     return {
       share_url: data.share_url || data.shareUrl || data.url,
     }
