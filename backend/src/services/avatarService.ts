@@ -1,17 +1,23 @@
 import { supabase } from '../lib/supabase.js'
-import {
-  listAvatars as listHeyGenAvatars,
-  getAvatar as getHeyGenAvatar,
-  getPhotoAvatarDetails,
-  deletePhotoAvatar,
-  deletePhotoAvatarGroup,
-  upscalePhotoAvatar,
-  generateAvatarLook,
-  addLooksToAvatarGroup,
-  uploadImageToHeyGen,
-  checkTrainingStatus,
-} from '../lib/heygen.js'
-import type { HeyGenAvatar, PhotoAvatarDetails, GenerateLookRequest } from '../lib/heygen.js'
+  import {
+    listAvatars as listHeyGenAvatars,
+    getAvatar as getHeyGenAvatar,
+    getPhotoAvatarDetails,
+    deletePhotoAvatar,
+    deletePhotoAvatarGroup,
+    upscalePhotoAvatar,
+    generateAvatarLook,
+    addLooksToAvatarGroup,
+    uploadImageToHeyGen,
+    checkTrainingStatus,
+    checkGenerationStatus,
+  } from '../lib/heygen.js'
+  import type {
+    HeyGenAvatar,
+    PhotoAvatarDetails,
+    GenerateLookRequest,
+    GenerationStatus,
+  } from '../lib/heygen.js'
 
 const AUTO_LOOKS_ENABLED =
   process.env.HEYGEN_AUTO_LOOKS_ENABLED?.toLowerCase() === 'false' ? false : true
@@ -28,6 +34,14 @@ const AUTO_LOOK_STYLE: GenerateLookRequest['style'] =
 const AUTO_LOOK_PROMPT_TEMPLATE =
   process.env.HEYGEN_AUTO_LOOK_PROMPT?.trim() ||
   'Ultra-realistic vertical portrait of {{name}} in 9:16 aspect ratio, half-body shot, looking directly at camera, professional studio lighting, clean neutral background, high quality, cinematic framing.'
+
+const AUTO_LOOK_GENERATION_TIMEOUT_MS =
+  Number(process.env.HEYGEN_AUTO_LOOK_GENERATION_TIMEOUT_MS) || 5 * 60 * 1000
+
+const AUTO_LOOK_GENERATION_POLL_INTERVAL_MS =
+  Number(process.env.HEYGEN_AUTO_LOOK_GENERATION_POLL_INTERVAL_MS) || 5000
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const buildAutoLookPrompt = (avatarName?: string): string => {
   const safeName = avatarName?.trim() || 'the speaker'
@@ -418,7 +432,6 @@ export class AvatarService {
 
     // Step 2: Generate AI look (training is ready)
     const prompt = buildAutoLookPrompt(avatarName)
-    
     try {
       console.log('[Auto Look] Training is ready. Generating AI look (9:16 format)...', {
         groupId,
@@ -442,6 +455,52 @@ export class AvatarService {
         pose: AUTO_LOOK_POSE,
         style: AUTO_LOOK_STYLE,
       })
+
+      if (response.generation_id) {
+        try {
+          const generationResult = await this.waitForAutoLookGeneration(response.generation_id)
+          const imageKeys = generationResult.image_key_list?.filter((key) => !!key) || []
+
+          if (imageKeys.length > 0) {
+            const addResult = await addLooksToAvatarGroup({
+              group_id: groupId,
+              image_keys: imageKeys,
+              name: avatarName,
+            })
+
+            const lookId =
+              addResult.photo_avatar_list?.find((look) => look?.id)?.id ||
+              generationResult.id
+
+            if (lookId) {
+              console.log('[Auto Look] ✅ AI look generated and added to group', {
+                groupId,
+                lookId,
+                generationId: response.generation_id,
+              })
+
+              return {
+                type: 'photo_look',
+                id: lookId,
+              }
+            }
+          } else {
+            console.warn('[Auto Look] Look generation completed but no image keys were returned', {
+              groupId,
+              generationId: response.generation_id,
+            })
+          }
+        } catch (generationError: any) {
+          console.warn(
+            '[Auto Look] AI look generation did not finish before timeout (will remain pending in HeyGen)',
+            {
+              groupId,
+              generationId: response.generation_id,
+              error: generationError?.message,
+            }
+          )
+        }
+      }
 
       return {
         type: 'ai_generation',
@@ -630,5 +689,46 @@ export class AvatarService {
       console.error('Complete AI avatar generation error:', error)
       throw new Error(`Failed to complete AI avatar generation: ${error.message}`)
     }
+  }
+
+  private static async waitForAutoLookGeneration(generationId: string): Promise<GenerationStatus> {
+    console.log('[Auto Look] Waiting for AI look generation to complete...', { generationId })
+    const startTime = Date.now()
+
+    while (Date.now() - startTime < AUTO_LOOK_GENERATION_TIMEOUT_MS) {
+      try {
+        const status = await checkGenerationStatus(generationId)
+
+        if (status.status === 'success') {
+          console.log('[Auto Look] AI look generation completed', {
+            generationId,
+            durationMs: Date.now() - startTime,
+            imageKeys: status.image_key_list?.length || 0,
+          })
+          return status
+        }
+
+        if (status.status === 'failed') {
+          throw new Error(status.msg || 'HeyGen reported look generation failure')
+        }
+
+        console.log('[Auto Look] Look generation still in progress...', {
+          generationId,
+          status: status.status,
+          message: status.msg,
+        })
+      } catch (error: any) {
+        console.warn('[Auto Look] Failed to fetch look generation status (will retry)', {
+          generationId,
+          error: error.message,
+        })
+      }
+
+      await delay(AUTO_LOOK_GENERATION_POLL_INTERVAL_MS)
+    }
+
+    throw new Error(
+      `Timed out after ${Math.round(AUTO_LOOK_GENERATION_TIMEOUT_MS / 1000)}s while waiting for AI look generation ${generationId}`
+    )
   }
 }
