@@ -7,8 +7,6 @@ import {
   deletePhotoAvatarGroup,
   upscalePhotoAvatar,
   generateAvatarLook,
-  addLooksToAvatarGroup,
-  uploadImageToHeyGen,
 } from '../lib/heygen.js'
 import type { HeyGenAvatar, PhotoAvatarDetails, GenerateLookRequest } from '../lib/heygen.js'
 
@@ -26,7 +24,7 @@ const AUTO_LOOK_STYLE: GenerateLookRequest['style'] =
 
 const AUTO_LOOK_PROMPT_TEMPLATE =
   process.env.HEYGEN_AUTO_LOOK_PROMPT?.trim() ||
-  'Ultra-realistic vertical half-body portrait of {{name}}, looking at the camera, soft studio lighting, clean background, 9:16 framing.'
+  'Ultra-realistic vertical portrait of {{name}} in 9:16 aspect ratio, half-body shot, looking directly at camera, professional studio lighting, clean neutral background, high quality, cinematic framing.'
 
 const buildAutoLookPrompt = (avatarName?: string): string => {
   const safeName = avatarName?.trim() || 'the speaker'
@@ -369,45 +367,51 @@ export class AvatarService {
 
   static async autoGenerateVerticalLook(
     groupId: string,
-    photoUrl: string,
     avatarName?: string
   ): Promise<string | null> {
     if (!AUTO_LOOKS_ENABLED) {
       return null
     }
 
-    if (!groupId || !photoUrl) {
+    if (!groupId) {
       return null
     }
 
+    const prompt = buildAutoLookPrompt(avatarName)
+
     try {
-      // Upload the photo to HeyGen to get an image_key
-      console.log('[Auto Look] Uploading photo to HeyGen for look creation...', {
-        groupId,
-        photoUrl: photoUrl.substring(0, 100) + '...',
-      })
-
-      const imageKey = await uploadImageToHeyGen(photoUrl)
-
-      console.log('[Auto Look] Photo uploaded, got image_key:', imageKey)
-
-      // Add the uploaded image as a look to the avatar group
-      const response = await addLooksToAvatarGroup({
+      // Generate AI look with vertical orientation (9:16 format)
+      const response = await generateAvatarLook({
         group_id: groupId,
-        image_keys: [imageKey],
-        name: avatarName || 'Auto-generated look',
+        prompt,
+        orientation: 'vertical', // Force 9:16 format
+        pose: AUTO_LOOK_POSE,
+        style: AUTO_LOOK_STYLE,
       })
 
-      console.log('[Auto Look] Look added successfully', {
+      console.log('[Auto Look] AI look generation requested', {
         groupId,
-        looksAdded: response.photo_avatar_list?.length || 0,
-        lookIds: response.photo_avatar_list?.map((l) => l.id) || [],
+        generationId: response.generation_id,
+        orientation: 'vertical',
+        pose: AUTO_LOOK_POSE,
+        style: AUTO_LOOK_STYLE,
+        prompt: prompt.substring(0, 100) + '...',
       })
 
-      // Return the first look ID if available
-      return response.photo_avatar_list?.[0]?.id || null
+      return response.generation_id || null
     } catch (error: any) {
-      console.warn('[Auto Look] Failed to add look:', error.response?.data || error.message)
+      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message
+      
+      // If model not ready, log but don't fail - user can retry later
+      if (errorMessage?.toLowerCase().includes('model not found') || 
+          errorMessage?.toLowerCase().includes('invalid_parameter')) {
+        console.warn('[Auto Look] Model not ready yet for AI generation. The avatar may need training first.', {
+          groupId,
+          error: errorMessage,
+        })
+      } else {
+        console.warn('[Auto Look] Failed to generate AI look:', error.response?.data || error.message)
+      }
       return null
     }
   }
