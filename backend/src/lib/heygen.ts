@@ -79,6 +79,186 @@ const DEFAULT_VERTICAL_DIMENSION: HeyGenDimension = (() => {
 
 const DEFAULT_VERTICAL_OUTPUT_RESOLUTION = `${DEFAULT_VERTICAL_DIMENSION.width}x${DEFAULT_VERTICAL_DIMENSION.height}`
 
+const LOOK_PROCESSING_TIMEOUT_MS =
+  parsePositiveInteger(process.env.HEYGEN_LOOK_PROCESSING_TIMEOUT_MS) ?? 240000
+
+const LOOK_PROCESSING_POLL_INTERVAL_MS =
+  parsePositiveInteger(process.env.HEYGEN_LOOK_PROCESSING_POLL_INTERVAL_MS) ?? 5000
+
+const LOOK_UPLOAD_PENDING_SUBSTRINGS = [
+  'photo avatar look upload not completed',
+  'look upload not completed',
+  'look upload incomplete',
+]
+
+const RETRYABLE_TRAINING_ERROR_SUBSTRINGS = [
+  'no valid image',
+  ...LOOK_UPLOAD_PENDING_SUBSTRINGS,
+]
+
+type PhotoAvatarLook = {
+  id: string
+  name?: string
+  status?: string
+  group_id?: string
+  image_url?: string
+  business_type?: string
+  upscale_availability?: {
+    available?: boolean
+    reason?: string | null
+  }
+  [key: string]: any
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const normalize = (value?: string | null) => (value || '').toLowerCase().trim()
+
+const isLookUploadPending = (look?: PhotoAvatarLook | null): boolean => {
+  if (!look) return true
+  const reason = normalize(look.upscale_availability?.reason)
+  if (!reason) return false
+  return LOOK_UPLOAD_PENDING_SUBSTRINGS.some((token) => reason.includes(token))
+}
+
+const isLookReadyForTraining = (look?: PhotoAvatarLook | null): boolean => {
+  if (!look || !look.id) return false
+  if (normalize(look.status) === 'failed') {
+    return false
+  }
+  if (isLookUploadPending(look)) {
+    return false
+  }
+  return true
+}
+
+async function fetchAvatarGroupLooks(groupId: string): Promise<PhotoAvatarLook[]> {
+  const apiKey = getHeyGenKey()
+  const response = await axios.get(
+    `${HEYGEN_V2_API_URL}/avatar_group/${groupId}/avatars`,
+    {
+      headers: {
+        'X-Api-Key': apiKey,
+        'Content-Type': 'application/json',
+      },
+    }
+  )
+
+  const avatarList =
+    response.data?.data?.avatar_list ||
+    response.data?.avatar_list ||
+    response.data?.data ||
+    []
+
+  if (!Array.isArray(avatarList)) {
+    return []
+  }
+
+  return avatarList.filter((look: any) => look && typeof look === 'object')
+}
+
+interface WaitForLooksReadyOptions {
+  minReadyLooks?: number
+  maxWaitTime?: number
+  pollInterval?: number
+}
+
+async function waitForLooksReady(
+  groupId: string,
+  lookIds: string[],
+  options: WaitForLooksReadyOptions = {}
+): Promise<{ readyLooks: PhotoAvatarLook[]; snapshot: PhotoAvatarLook[] }> {
+  const uniqueLookIds = Array.from(
+    new Set(
+      lookIds
+        .map((id) => id.trim())
+        .filter((id) => id.length > 0)
+    )
+  )
+
+  if (uniqueLookIds.length === 0) {
+    throw new Error('No look IDs available to monitor for upload completion.')
+  }
+
+  const minReadyLooks = Math.min(
+    uniqueLookIds.length,
+    Math.max(options.minReadyLooks ?? 1, 1)
+  )
+  const maxWaitTime = options.maxWaitTime ?? LOOK_PROCESSING_TIMEOUT_MS
+  const pollInterval = options.pollInterval ?? LOOK_PROCESSING_POLL_INTERVAL_MS
+  const startTime = Date.now()
+
+  console.log(
+    `[Looks Monitor] Waiting for ${minReadyLooks}/${uniqueLookIds.length} look(s) to finish uploading for group ${groupId}...`
+  )
+
+  let lastError: any = null
+
+  while (Date.now() - startTime < maxWaitTime) {
+    try {
+      const snapshot = await fetchAvatarGroupLooks(groupId)
+      const lookMap = new Map<string, PhotoAvatarLook>()
+      snapshot.forEach((look) => {
+        if (look?.id) {
+          lookMap.set(look.id, look)
+        }
+      })
+
+      const statusReport = uniqueLookIds.map((id) => ({
+        id,
+        look: lookMap.get(id),
+      }))
+
+      const readyLooks = statusReport
+        .map((entry) => entry.look)
+        .filter((look): look is PhotoAvatarLook => isLookReadyForTraining(look))
+
+      const pendingLooks = statusReport.filter(
+        (entry) => !isLookReadyForTraining(entry.look)
+      )
+
+      console.log(
+        `[Looks Monitor] group ${groupId}: ${readyLooks.length}/${uniqueLookIds.length} ready (need ${minReadyLooks}).`
+      )
+
+      if (pendingLooks.length > 0) {
+        console.log(
+          '[Looks Monitor] Pending looks:',
+          pendingLooks.map((entry) => ({
+            id: entry.id,
+            status: entry.look?.status || 'missing',
+            reason:
+              entry.look?.upscale_availability?.reason ||
+              (entry.look ? null : 'not_returned_yet'),
+          }))
+        )
+      }
+
+      if (readyLooks.length >= minReadyLooks) {
+        console.log('[Looks Monitor] ✅ Looks upload completed.')
+        return { readyLooks, snapshot }
+      }
+    } catch (err: any) {
+      lastError = err
+      console.warn(
+        '[Looks Monitor] Failed to fetch avatar group looks (will retry):',
+        err.response?.data || err.message
+      )
+    }
+
+    await sleep(pollInterval)
+  }
+
+  const waitedSeconds = Math.round((Date.now() - startTime) / 1000)
+  const timeoutMessage =
+    `Looks did not finish uploading within ${waitedSeconds} seconds for group ${groupId}. ` +
+    'Please wait a bit longer and try again.'
+
+  throw new Error(
+    timeoutMessage + (lastError ? ` Last error: ${lastError.message}` : '')
+  )
+}
+
 export interface GenerateVideoRequest {
   topic: string
   script?: string
@@ -1351,170 +1531,92 @@ export async function createAvatarFromPhoto(
       throw new Error('Failed to get group_id from avatar group creation response')
     }
 
-    console.log(`Successfully created avatar group: ${groupId}`)
+      console.log(`Successfully created avatar group: ${groupId}`)
 
-    // Step 3: Add uploaded image(s) as look(s) inside the group
-    // According to HeyGen workflow: After creating the group, we need to add looks
-    // The group creation with image_key may not automatically create a trainable look,
-    // so we explicitly add all images (including the primary) as looks
-    try {
-      console.log(`Step 3: Adding ${imageKeys.length} image(s) as look(s) in the avatar group...`)
-      console.log('Image keys to add:', imageKeys)
-      
-      const addLookResponse = await addLooksToAvatarGroup({
-        group_id: groupId,
-        image_keys: imageKeys, // Add ALL images, including the primary one
-        name: avatarName,
-      })
+      // Step 3: Add uploaded image(s) as look(s) inside the group
+      // According to HeyGen workflow: After creating the group, we need to add looks
+      // The group creation with image_key may not automatically create a trainable look,
+      // so we explicitly add all images (including the primary) as looks
+      let lookIds: string[] = []
+      try {
+        console.log(`Step 3: Adding ${imageKeys.length} image(s) as look(s) in the avatar group...`)
+        console.log('Image keys to add:', imageKeys)
+        
+        const addLookResponse = await addLooksToAvatarGroup({
+          group_id: groupId,
+          image_keys: imageKeys, // Add ALL images, including the primary one
+          name: avatarName,
+        })
 
-      if (!addLookResponse.photo_avatar_list?.length) {
-        console.warn('⚠️ addLooksToAvatarGroup returned no looks; training may fail without at least one valid look.')
-        throw new Error('No looks were added to the avatar group. Cannot proceed with training.')
-      } else {
+        if (!addLookResponse.photo_avatar_list?.length) {
+          console.warn('⚠️ addLooksToAvatarGroup returned no looks; training may fail without at least one valid look.')
+          throw new Error('No looks were added to the avatar group. Cannot proceed with training.')
+        }
+
+        lookIds = addLookResponse.photo_avatar_list
+          .map((look: any) => look?.id)
+          .filter((id: any): id is string => typeof id === 'string' && id.trim().length > 0)
+
         console.log(
           `✅ Added ${addLookResponse.photo_avatar_list.length} look(s) to group ${groupId} (requested ${imageKeys.length})`
         )
-        console.log('Look IDs:', addLookResponse.photo_avatar_list.map((l) => l.id))
+        console.log('Look IDs:', lookIds)
         console.log('Look details:', addLookResponse.photo_avatar_list.map((l: any) => ({
           id: l.id,
           name: l.name,
           status: l.status,
           image_url: l.image_url?.substring(0, 100),
         })))
-      }
-    } catch (addLookErr: any) {
-      console.error('❌ Failed to add look to avatar group:', addLookErr.response?.data || addLookErr.message)
-      throw new Error(
-        addLookErr.response?.data?.error?.message ||
-        addLookErr.response?.data?.message ||
-        addLookErr.message ||
-        'Failed to add image to avatar group.'
-      )
-    }
-
-    // Verify looks are actually in the group and wait for them to be processed
-    // HeyGen needs time to process looks before training can start
-    // We must wait until upscale_availability.reason is NOT "Photo avatar look upload not completed"
-    console.log('Verifying looks exist in group and waiting for upload processing to complete...')
-    const maxWaitTime = 60000 // 60 seconds max wait (increased for upload processing)
-    const pollInterval = 3000 // Check every 3 seconds
-    const startTime = Date.now()
-    let looksReady = false
-    let verifiedLookCount = 0
-
-    while (!looksReady && (Date.now() - startTime) < maxWaitTime) {
-      try {
-        const verifyResponse = await axios.get(
-          `${HEYGEN_V2_API_URL}/avatar_group/${groupId}/avatars`,
-          {
-            headers: {
-              'X-Api-Key': apiKey,
-              'Content-Type': 'application/json',
-            },
-          }
+      } catch (addLookErr: any) {
+        console.error('❌ Failed to add look to avatar group:', addLookErr.response?.data || addLookErr.message)
+        throw new Error(
+          addLookErr.response?.data?.error?.message ||
+          addLookErr.response?.data?.message ||
+          addLookErr.message ||
+          'Failed to add image to avatar group.'
         )
-
-        console.log('Full group verification response:', JSON.stringify(verifyResponse.data, null, 2))
-
-        const avatarList =
-          verifyResponse.data?.data?.avatar_list ||
-          verifyResponse.data?.avatar_list ||
-          verifyResponse.data?.data ||
-          []
-
-        // Filter out the group ID itself (sometimes returned as a look)
-        const actualLooks = avatarList.filter((a: any) => {
-          // Exclude the group ID
-          if (a.id === groupId) return false
-          // Also exclude if it's the group object (has group_id matching groupId and same id)
-          if (a.group_id === groupId && a.id === groupId) return false
-          return true
-        })
-
-        verifiedLookCount = actualLooks.length
-
-        console.log(`Verified: Group has ${actualLooks.length} actual look(s) (total items: ${avatarList.length})`, {
-          groupId,
-          lookIds: actualLooks.map((a: any) => a.id),
-          allIds: avatarList.map((a: any) => a.id),
-          lookDetails: actualLooks.map((a: any) => ({
-            id: a.id,
-            name: a.name,
-            status: a.status,
-            image_url: a.image_url?.substring(0, 100),
-            group_id: a.group_id,
-          })),
-        })
-
-        // We need at least 1 look
-        if (actualLooks.length >= 1) {
-          // Check if looks are ready for training
-          // A look is ready when:
-          // 1. Status is not 'failed'
-          // 2. Upload is completed (upscale_availability.reason is NOT "Photo avatar look upload not completed")
-          const readyLooks = actualLooks.filter((a: any) => {
-            // Exclude failed looks
-            if (a.status === 'failed') {
-              return false
-            }
-            
-            // Check if upload is completed
-            // The key indicator: if upscale_availability.reason says "Photo avatar look upload not completed",
-            // the look is NOT ready for training yet
-            if (a.upscale_availability?.reason === 'Photo avatar look upload not completed') {
-              return false
-            }
-            
-            // If we get here, the look is ready (status is pending/active/etc and upload is completed)
-            return true
-          })
-
-          if (readyLooks.length >= 1) {
-            console.log(`✅ Found ${readyLooks.length} ready look(s) out of ${actualLooks.length} total. Upload completed. Waiting additional 5 seconds for final processing...`)
-            console.log('Ready look details:', readyLooks.map((l: any) => ({
-              id: l.id,
-              status: l.status,
-              upload_completed: l.upscale_availability?.reason !== 'Photo avatar look upload not completed',
-            })))
-            await new Promise((resolve) => setTimeout(resolve, 5000))
-            looksReady = true
-            break
-          } else {
-            const pendingCount = actualLooks.filter((a: any) => 
-              a.upscale_availability?.reason === 'Photo avatar look upload not completed'
-            ).length
-            console.log(`Looks are still being processed (${actualLooks.length} found, ${pendingCount} still uploading). Waiting ${pollInterval / 1000} seconds...`)
-            console.log('Look statuses:', actualLooks.map((a: any) => ({
-              id: a.id,
-              status: a.status,
-              upload_reason: a.upscale_availability?.reason,
-            })))
-            await new Promise((resolve) => setTimeout(resolve, pollInterval))
-          }
-        } else {
-          console.log(`No actual looks found yet (expected at least 1). Waiting ${pollInterval / 1000} seconds...`)
-          await new Promise((resolve) => setTimeout(resolve, pollInterval))
-        }
-      } catch (verifyErr: any) {
-        console.warn('⚠️ Error verifying looks (will retry):', verifyErr.response?.data || verifyErr.message)
-        await new Promise((resolve) => setTimeout(resolve, pollInterval))
       }
-    }
 
-    if (!looksReady) {
-      console.warn(`⚠️ WARNING: Looks may not be fully processed (found ${verifiedLookCount} look(s)). Training may fail, but will attempt anyway.`)
-    } else {
-      console.log(`✅ Looks verified and ready for training (${verifiedLookCount} look(s) found)`)
-    }
+      if (!lookIds.length) {
+        throw new Error('Failed to determine look IDs after adding images. Cannot start training.')
+      }
 
-    // Step 4: Train the avatar group (MANDATORY - cannot be skipped)
-    // According to HeyGen support: Training is mandatory and must complete before generating looks
-    console.log('Step 4: Starting avatar group training (mandatory step)...')
-    console.log('Training request:', { group_id: groupId })
-    
-    let trainingStarted = false
-    const maxRetries = 3
-    let lastError: any = null
+      console.log('Verifying looks exist in group and waiting for upload processing to complete...')
+      let looksReadyResult: { readyLooks: PhotoAvatarLook[]; snapshot: PhotoAvatarLook[] }
+      try {
+        looksReadyResult = await waitForLooksReady(groupId, lookIds, {
+          minReadyLooks: 1,
+        })
+      } catch (looksErr: any) {
+        console.error('❌ Looks did not finish processing before training could start:', looksErr.message)
+        throw new Error(
+          looksErr.message ||
+          'Looks did not finish uploading in time. Please try again with a different photo.'
+        )
+      }
+
+      console.log('✅ Looks verified and ready for training', {
+        groupId,
+        readyLooks: looksReadyResult.readyLooks.map((look) => ({
+          id: look.id,
+          status: look.status,
+          reason: look.upscale_availability?.reason,
+        })),
+        totalLooks: lookIds.length,
+      })
+
+      // Step 4: Train the avatar group (MANDATORY - cannot be skipped)
+      // According to HeyGen support: Training is mandatory and must complete before generating looks
+      console.log('Step 4: Starting avatar group training (mandatory step)...')
+      console.log('Training request:', { group_id: groupId, look_ids: lookIds })
+      
+      let trainingStarted = false
+      const maxRetries = 3
+      let lastError: any = null
+      const trainingPayload: Record<string, any> = { group_id: groupId }
+      if (lookIds.length) {
+        trainingPayload.photo_avatar_ids = lookIds
+      }
 
     // Retry training start with exponential backoff (HeyGen may need more time to process looks)
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -1525,18 +1627,16 @@ export async function createAvatarFromPhoto(
           await new Promise((resolve) => setTimeout(resolve, waitTime))
         }
 
-        const trainResponse = await axios.post(
-          `${HEYGEN_V2_API_URL}/photo_avatar/train`,
-          {
-            group_id: groupId,
-          },
-          {
-            headers: {
-              'X-Api-Key': apiKey,
-              'Content-Type': 'application/json',
-            },
-          }
-        )
+          const trainResponse = await axios.post(
+            `${HEYGEN_V2_API_URL}/photo_avatar/train`,
+            trainingPayload,
+            {
+              headers: {
+                'X-Api-Key': apiKey,
+                'Content-Type': 'application/json',
+              },
+            }
+          )
 
         console.log('✅ Training started successfully:', trainResponse.data)
         trainingStarted = true
@@ -1548,8 +1648,14 @@ export async function createAvatarFromPhoto(
                              trainErr.message
         const errorCode = trainErr.response?.data?.error?.code || 
                           trainErr.response?.data?.code
-        
-        console.warn(`⚠️ Training start attempt ${attempt}/${maxRetries} failed:`, {
+          const normalizedTrainError = (trainErrorMsg || '').toLowerCase()
+          const retryableTrainingError =
+            normalizedTrainError.length > 0 &&
+            RETRYABLE_TRAINING_ERROR_SUBSTRINGS.some((token) =>
+              normalizedTrainError.includes(token)
+            )
+
+          console.warn(`⚠️ Training start attempt ${attempt}/${maxRetries} failed:`, {
           status: trainErr.response?.status,
           statusText: trainErr.response?.statusText,
           error: trainErrorMsg,
@@ -1557,11 +1663,21 @@ export async function createAvatarFromPhoto(
           groupId,
         })
 
-        // If it's not a "no valid image" error, don't retry (likely a permanent issue)
-        if (trainErrorMsg && !trainErrorMsg.toLowerCase().includes('no valid image')) {
-          console.error('❌ Training failed with non-retryable error:', trainErrorMsg)
-          break
-        }
+          if (retryableTrainingError && attempt < maxRetries) {
+            console.log('[Training] Looks may not be ready yet. Waiting before retrying...')
+            try {
+              await waitForLooksReady(groupId, lookIds, {
+                minReadyLooks: 1,
+                maxWaitTime: Math.min(LOOK_PROCESSING_TIMEOUT_MS, 60000),
+              })
+            } catch (waitErr: any) {
+              console.warn('[Training] Additional wait for looks before retry failed:', waitErr.message)
+            }
+            continue
+          } else if (!retryableTrainingError) {
+            console.error('❌ Training failed with non-retryable error:', trainErrorMsg)
+            break
+          }
 
         // If this is the last attempt, we'll throw the error below
         if (attempt === maxRetries) {
