@@ -7,6 +7,8 @@ import {
   deletePhotoAvatarGroup,
   upscalePhotoAvatar,
   generateAvatarLook,
+  addLooksToAvatarGroup,
+  uploadImageToHeyGen,
 } from '../lib/heygen.js'
 import type { HeyGenAvatar, PhotoAvatarDetails, GenerateLookRequest } from '../lib/heygen.js'
 
@@ -365,37 +367,47 @@ export class AvatarService {
     }
   }
 
-  static async autoGenerateVerticalLook(groupId: string, avatarName?: string): Promise<string | null> {
+  static async autoGenerateVerticalLook(
+    groupId: string,
+    photoUrl: string,
+    avatarName?: string
+  ): Promise<string | null> {
     if (!AUTO_LOOKS_ENABLED) {
       return null
     }
 
-    if (!groupId) {
+    if (!groupId || !photoUrl) {
       return null
     }
 
-    const prompt = buildAutoLookPrompt(avatarName)
-
     try {
-      const response = await generateAvatarLook({
-        group_id: groupId,
-        prompt,
-        orientation: AUTO_LOOK_ORIENTATION,
-        pose: AUTO_LOOK_POSE,
-        style: AUTO_LOOK_STYLE,
-      })
-
-      console.log('[Auto Look] Generation requested', {
+      // Upload the photo to HeyGen to get an image_key
+      console.log('[Auto Look] Uploading photo to HeyGen for look creation...', {
         groupId,
-        generationId: response.generation_id,
-        orientation: AUTO_LOOK_ORIENTATION,
-        pose: AUTO_LOOK_POSE,
-        style: AUTO_LOOK_STYLE,
+        photoUrl: photoUrl.substring(0, 100) + '...',
       })
 
-      return response.generation_id || null
+      const imageKey = await uploadImageToHeyGen(photoUrl)
+
+      console.log('[Auto Look] Photo uploaded, got image_key:', imageKey)
+
+      // Add the uploaded image as a look to the avatar group
+      const response = await addLooksToAvatarGroup({
+        group_id: groupId,
+        image_keys: [imageKey],
+        name: avatarName || 'Auto-generated look',
+      })
+
+      console.log('[Auto Look] Look added successfully', {
+        groupId,
+        looksAdded: response.photo_avatar_list?.length || 0,
+        lookIds: response.photo_avatar_list?.map((l) => l.id) || [],
+      })
+
+      // Return the first look ID if available
+      return response.photo_avatar_list?.[0]?.id || null
     } catch (error: any) {
-      console.warn('[Auto Look] Failed to request look generation:', error.response?.data || error.message)
+      console.warn('[Auto Look] Failed to add look:', error.response?.data || error.message)
       return null
     }
   }

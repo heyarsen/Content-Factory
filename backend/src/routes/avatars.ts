@@ -297,7 +297,11 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
       })
       avatar = await AvatarService.createAvatarFromPhoto(userId, primaryPhotoUrl, avatar_name, extraPhotoUrls)
       console.log('Avatar created successfully with HeyGen:', avatar.id)
-      autoLookGenerationId = await AvatarService.autoGenerateVerticalLook(avatar.heygen_avatar_id, avatar_name)
+      autoLookGenerationId = await AvatarService.autoGenerateVerticalLook(
+        avatar.heygen_avatar_id,
+        primaryPhotoUrl,
+        avatar_name
+      )
     } catch (heygenError: any) {
       console.error('HeyGen avatar creation failed:', {
         message: heygenError?.message,
@@ -316,7 +320,7 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
       avatar,
       photo_url: primaryPhotoUrl,
       additional_photo_urls: extraPhotoUrls,
-      auto_look_generation_id: autoLookGenerationId,
+      auto_look_id: autoLookGenerationId,
     })
   } catch (error: any) {
     // Log full error details for debugging
