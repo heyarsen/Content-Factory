@@ -372,7 +372,7 @@ export class AvatarService {
     groupId: string,
     photoUrl: string,
     avatarName?: string
-  ): Promise<{ type: 'ai_generation' | 'photo_look'; id: string; aiGenerationScheduled?: boolean } | null> {
+  ): Promise<{ type: 'ai_generation' | 'photo_look'; id: string } | null> {
     if (!AUTO_LOOKS_ENABLED) {
       return null
     }

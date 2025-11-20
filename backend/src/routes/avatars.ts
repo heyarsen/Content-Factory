@@ -316,7 +316,7 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
     }
 
     return res.status(201).json({
-      message: 'Avatar creation started. It may take a few minutes to train.',
+      message: 'Avatar created successfully. Training has completed and the avatar is ready to use.',
       avatar,
       photo_url: primaryPhotoUrl,
       additional_photo_urls: extraPhotoUrls,
@@ -324,13 +324,10 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
         ? {
             type: autoLookResult.type,
             id: autoLookResult.id,
-            ai_generation_scheduled: autoLookResult.aiGenerationScheduled || false,
             note:
               autoLookResult.type === 'ai_generation'
                 ? 'AI-generated 9:16 look is being created based on your photo. This may take a few minutes.'
-                : autoLookResult.aiGenerationScheduled
-                ? 'Photo added as immediate look. AI-generated 9:16 look will be created automatically once training completes.'
-                : 'Photo added as look (AI generation not available - training may have failed).',
+                : 'Photo added as look.',
           }
         : null,
     })
