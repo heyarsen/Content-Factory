@@ -290,14 +290,18 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
     }
 
     let avatar
-    let autoLookGenerationId: string | null = null
+    let autoLookResult: { type: 'ai_generation' | 'photo_look'; id: string } | null = null
     try {
       console.log('Creating avatar with HeyGen using photo URL:', primaryPhotoUrl, {
         additionalPhotos: extraPhotoUrls.length,
       })
       avatar = await AvatarService.createAvatarFromPhoto(userId, primaryPhotoUrl, avatar_name, extraPhotoUrls)
       console.log('Avatar created successfully with HeyGen:', avatar.id)
-      autoLookGenerationId = await AvatarService.autoGenerateVerticalLook(avatar.heygen_avatar_id, avatar_name)
+      autoLookResult = await AvatarService.autoGenerateVerticalLook(
+        avatar.heygen_avatar_id,
+        primaryPhotoUrl,
+        avatar_name
+      )
     } catch (heygenError: any) {
       console.error('HeyGen avatar creation failed:', {
         message: heygenError?.message,
@@ -316,7 +320,16 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
       avatar,
       photo_url: primaryPhotoUrl,
       additional_photo_urls: extraPhotoUrls,
-      auto_look_generation_id: autoLookGenerationId,
+      auto_look: autoLookResult
+        ? {
+            type: autoLookResult.type,
+            id: autoLookResult.id,
+            note:
+              autoLookResult.type === 'ai_generation'
+                ? 'AI-generated 9:16 look is being created. This may take a few minutes.'
+                : 'Photo added as look (AI generation not available yet - model may need training first).',
+          }
+        : null,
     })
   } catch (error: any) {
     // Log full error details for debugging

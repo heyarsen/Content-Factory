@@ -7,6 +7,8 @@ import {
   deletePhotoAvatarGroup,
   upscalePhotoAvatar,
   generateAvatarLook,
+  addLooksToAvatarGroup,
+  uploadImageToHeyGen,
 } from '../lib/heygen.js'
 import type { HeyGenAvatar, PhotoAvatarDetails, GenerateLookRequest } from '../lib/heygen.js'
 
@@ -367,8 +369,9 @@ export class AvatarService {
 
   static async autoGenerateVerticalLook(
     groupId: string,
+    photoUrl: string,
     avatarName?: string
-  ): Promise<string | null> {
+  ): Promise<{ type: 'ai_generation' | 'photo_look'; id: string } | null> {
     if (!AUTO_LOOKS_ENABLED) {
       return null
     }
@@ -379,8 +382,8 @@ export class AvatarService {
 
     const prompt = buildAutoLookPrompt(avatarName)
 
+    // Step 1: Try AI look generation first (preferred - creates actual 9:16 look)
     try {
-      // Generate AI look with vertical orientation (9:16 format)
       const response = await generateAvatarLook({
         group_id: groupId,
         prompt,
@@ -389,31 +392,66 @@ export class AvatarService {
         style: AUTO_LOOK_STYLE,
       })
 
-      console.log('[Auto Look] AI look generation requested', {
+      console.log('[Auto Look] ✅ AI look generation started', {
         groupId,
         generationId: response.generation_id,
         orientation: 'vertical',
         pose: AUTO_LOOK_POSE,
         style: AUTO_LOOK_STYLE,
-        prompt: prompt.substring(0, 100) + '...',
       })
 
-      return response.generation_id || null
+      return {
+        type: 'ai_generation',
+        id: response.generation_id,
+      }
     } catch (error: any) {
       const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message
-      
-      // If model not ready, log but don't fail - user can retry later
-      if (errorMessage?.toLowerCase().includes('model not found') || 
-          errorMessage?.toLowerCase().includes('invalid_parameter')) {
-        console.warn('[Auto Look] Model not ready yet for AI generation. The avatar may need training first.', {
+      const isModelNotFound = errorMessage?.toLowerCase().includes('model not found') || 
+                              errorMessage?.toLowerCase().includes('invalid_parameter')
+
+      if (isModelNotFound) {
+        console.log('[Auto Look] AI generation not available (model not ready). Falling back to photo upload...', {
           groupId,
           error: errorMessage,
         })
+
+        // Step 2: Fallback - Add the photo as a look (works immediately, no training needed)
+        if (photoUrl) {
+          try {
+            console.log('[Auto Look] Uploading photo as fallback look...', {
+              groupId,
+              photoUrl: photoUrl.substring(0, 100) + '...',
+            })
+
+            const imageKey = await uploadImageToHeyGen(photoUrl)
+            const response = await addLooksToAvatarGroup({
+              group_id: groupId,
+              image_keys: [imageKey],
+              name: avatarName ? `${avatarName} - Vertical Look` : 'Vertical Look',
+            })
+
+            if (response.photo_avatar_list?.length > 0) {
+              console.log('[Auto Look] ✅ Photo added as look (fallback)', {
+                groupId,
+                lookId: response.photo_avatar_list[0].id,
+                totalLooks: response.photo_avatar_list.length,
+              })
+
+              return {
+                type: 'photo_look',
+                id: response.photo_avatar_list[0].id,
+              }
+            }
+          } catch (fallbackError: any) {
+            console.warn('[Auto Look] Fallback photo upload also failed:', fallbackError.response?.data || fallbackError.message)
+          }
+        }
       } else {
         console.warn('[Auto Look] Failed to generate AI look:', error.response?.data || error.message)
       }
-      return null
     }
+
+    return null
   }
 
   /**
