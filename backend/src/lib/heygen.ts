@@ -1079,32 +1079,42 @@ export async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
     throw new Error(`Failed to download image: ${err.message}`)
   }
 
+  // Validate and process image to meet HeyGen requirements
+  // Requirements: JPG/PNG, under 50MB, less than 2K resolution (max 2048px on longest side)
+  let sharp: any = null
+  try {
+    sharp = await import('sharp').catch(() => null)
+  } catch (err) {
+    // sharp not available, will handle below
+  }
+
+  // Check file size (50MB limit)
+  const fileSizeMB = imageBuffer.length / (1024 * 1024)
+  if (fileSizeMB > 50) {
+    throw new Error(
+      `Image file size (${fileSizeMB.toFixed(2)}MB) exceeds HeyGen's 50MB limit. Please compress or resize the image.`
+    )
+  }
+
   // Convert WebP to JPEG if needed (HeyGen doesn't support WebP)
   // Supported formats: JPEG, PNG
   const needsConversion = contentType === 'image/webp' || contentType.includes('webp')
 
   if (needsConversion) {
+    if (!sharp || !sharp.default) {
+      throw new Error(
+        'WebP format is not supported by HeyGen. Please install "sharp" package to enable automatic conversion: npm install sharp. ' +
+        'Alternatively, upload a JPEG or PNG image instead.'
+      )
+    }
     try {
-      // Try to use sharp for image conversion
-      const sharp = await import('sharp').catch(() => null)
-
-      if (sharp && sharp.default) {
-        console.log('Converting WebP image to JPEG for HeyGen compatibility...')
-        imageBuffer = await sharp.default(imageBuffer)
-          .jpeg({ quality: 90 })
-          .toBuffer()
-        contentType = 'image/jpeg'
-        console.log('✅ Successfully converted WebP to JPEG')
-      } else {
-        throw new Error(
-          'WebP format is not supported by HeyGen. Please install "sharp" package to enable automatic conversion: npm install sharp. ' +
-          'Alternatively, upload a JPEG or PNG image instead.'
-        )
-      }
+      console.log('Converting WebP image to JPEG for HeyGen compatibility...')
+      imageBuffer = await sharp.default(imageBuffer)
+        .jpeg({ quality: 90 })
+        .toBuffer()
+      contentType = 'image/jpeg'
+      console.log('✅ Successfully converted WebP to JPEG')
     } catch (convError: any) {
-      if (convError.message.includes('sharp')) {
-        throw convError // Re-throw the helpful error about installing sharp
-      }
       throw new Error(
         `Failed to convert WebP image to JPEG: ${convError.message}. ` +
         'HeyGen only supports JPEG and PNG formats. Please convert your image to JPEG or PNG before uploading.'
@@ -1112,27 +1122,69 @@ export async function uploadImageToHeyGen(photoUrl: string): Promise<string> {
     }
   }
 
-  // Ensure we're using a supported content type
-  // HeyGen supports: image/jpeg, image/png
-  if (!contentType.includes('jpeg') && !contentType.includes('jpg') && !contentType.includes('png')) {
-    // Try to detect from buffer or convert to JPEG
+  // Validate and resize image if needed (HeyGen requires less than 2K resolution = max 2048px)
+  if (sharp && sharp.default) {
     try {
-      const sharp = await import('sharp').catch(() => null)
-      if (sharp && sharp.default) {
-        console.log(`Converting ${contentType} to JPEG for HeyGen compatibility...`)
-        imageBuffer = await sharp.default(imageBuffer)
+      const image = sharp.default(imageBuffer)
+      const metadata = await image.metadata()
+      const width = metadata.width || 0
+      const height = metadata.height || 0
+      const maxDimension = Math.max(width, height)
+      const MAX_RESOLUTION = 2048 // 2K resolution limit
+
+      console.log(`Image dimensions: ${width}x${height} (max dimension: ${maxDimension}px)`)
+
+      if (maxDimension > MAX_RESOLUTION) {
+        console.log(`Image exceeds 2K resolution limit (${maxDimension}px > ${MAX_RESOLUTION}px). Resizing...`)
+        
+        // Calculate new dimensions maintaining aspect ratio
+        let newWidth = width
+        let newHeight = height
+        if (width > height) {
+          newWidth = MAX_RESOLUTION
+          newHeight = Math.round((height / width) * MAX_RESOLUTION)
+        } else {
+          newHeight = MAX_RESOLUTION
+          newWidth = Math.round((width / height) * MAX_RESOLUTION)
+        }
+
+        console.log(`Resizing to: ${newWidth}x${newHeight}`)
+        
+        // Resize and convert to JPEG for consistency
+        imageBuffer = await image
+          .resize(newWidth, newHeight, {
+            fit: 'inside',
+            withoutEnlargement: true,
+          })
           .jpeg({ quality: 90 })
           .toBuffer()
+        
         contentType = 'image/jpeg'
+        console.log(`✅ Successfully resized image to ${newWidth}x${newHeight}`)
       } else {
-        throw new Error(`Unsupported image format: ${contentType}. HeyGen only supports JPEG and PNG.`)
+        // Ensure it's JPEG or PNG format
+        if (!contentType.includes('jpeg') && !contentType.includes('jpg') && !contentType.includes('png')) {
+          console.log(`Converting ${contentType} to JPEG...`)
+          imageBuffer = await image
+            .jpeg({ quality: 90 })
+            .toBuffer()
+          contentType = 'image/jpeg'
+        }
       }
-    } catch (convError: any) {
-      throw new Error(
-        `Unsupported image format: ${contentType}. HeyGen only supports JPEG and PNG formats. ` +
-        `Error: ${convError.message}`
-      )
+    } catch (processError: any) {
+      console.warn('⚠️ Failed to process image with sharp (continuing anyway):', processError.message)
+      // Continue with original image if processing fails
     }
+  } else {
+    console.warn('⚠️ Sharp not available - cannot validate/resize image. Image may not meet HeyGen requirements if it exceeds 2K resolution.')
+  }
+
+  // Final format validation (fallback if sharp wasn't available earlier)
+  if (!contentType.includes('jpeg') && !contentType.includes('jpg') && !contentType.includes('png')) {
+    throw new Error(
+      `Unsupported image format: ${contentType}. HeyGen only supports JPEG and PNG formats. ` +
+      `Please convert your image to JPEG or PNG, or install the "sharp" package for automatic conversion.`
+    )
   }
 
   try {
@@ -1514,8 +1566,15 @@ export async function createAvatarFromPhoto(
       throw new Error(
         `Failed to start training for avatar group ${groupId} after ${maxRetries} attempts: ${trainErrorMsg}. ` +
         `Error code: ${errorCode || 'N/A'}. ` +
-        `Please ensure the uploaded images are valid (JPG/PNG, under 50MB, less than 2K resolution) and try again. ` +
-        `If the issue persists, the images may not meet HeyGen's quality requirements for training.`
+        `\n\nImage Requirements:\n` +
+        `- Format: JPG or PNG only\n` +
+        `- Size: Under 50MB\n` +
+        `- Resolution: Less than 2K (max 2048px on longest side)\n` +
+        `- Content: Clear face visible, well-lit, no obstructions (sunglasses, masks, etc.)\n` +
+        `- Quality: High quality, not blurry or heavily filtered\n\n` +
+        `The image has been automatically resized if it exceeded 2K resolution. ` +
+        `If the issue persists, the image may not meet HeyGen's face detection or quality requirements. ` +
+        `Please try a different image with a clear, unobstructed face.`
       )
     }
 
