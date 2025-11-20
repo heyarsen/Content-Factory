@@ -1394,9 +1394,10 @@ export async function createAvatarFromPhoto(
 
     // Verify looks are actually in the group and wait for them to be processed
     // HeyGen needs time to process looks before training can start
-    console.log('Verifying looks exist in group and waiting for processing...')
-    const maxWaitTime = 30000 // 30 seconds max wait
-    const pollInterval = 2000 // Check every 2 seconds
+    // We must wait until upscale_availability.reason is NOT "Photo avatar look upload not completed"
+    console.log('Verifying looks exist in group and waiting for upload processing to complete...')
+    const maxWaitTime = 60000 // 60 seconds max wait (increased for upload processing)
+    const pollInterval = 3000 // Check every 3 seconds
     const startTime = Date.now()
     let looksReady = false
     let verifiedLookCount = 0
@@ -1447,23 +1448,47 @@ export async function createAvatarFromPhoto(
 
         // We need at least 1 look
         if (actualLooks.length >= 1) {
-          // Check if looks have status/are ready (if status field exists)
+          // Check if looks are ready for training
+          // A look is ready when:
+          // 1. Status is not 'failed'
+          // 2. Upload is completed (upscale_availability.reason is NOT "Photo avatar look upload not completed")
           const readyLooks = actualLooks.filter((a: any) => {
-            // If status exists, check it's not 'failed' or 'processing'
-            if (a.status) {
-              return a.status !== 'failed' && a.status !== 'processing'
+            // Exclude failed looks
+            if (a.status === 'failed') {
+              return false
             }
-            // If no status field, assume ready
+            
+            // Check if upload is completed
+            // The key indicator: if upscale_availability.reason says "Photo avatar look upload not completed",
+            // the look is NOT ready for training yet
+            if (a.upscale_availability?.reason === 'Photo avatar look upload not completed') {
+              return false
+            }
+            
+            // If we get here, the look is ready (status is pending/active/etc and upload is completed)
             return true
           })
 
           if (readyLooks.length >= 1) {
-            console.log(`✅ Found ${readyLooks.length} ready look(s). Waiting additional 5 seconds for final processing...`)
+            console.log(`✅ Found ${readyLooks.length} ready look(s) out of ${actualLooks.length} total. Upload completed. Waiting additional 5 seconds for final processing...`)
+            console.log('Ready look details:', readyLooks.map((l: any) => ({
+              id: l.id,
+              status: l.status,
+              upload_completed: l.upscale_availability?.reason !== 'Photo avatar look upload not completed',
+            })))
             await new Promise((resolve) => setTimeout(resolve, 5000))
             looksReady = true
             break
           } else {
-            console.log(`Looks are still processing (${actualLooks.length} found, ${readyLooks.length} ready). Waiting ${pollInterval / 1000} seconds...`)
+            const pendingCount = actualLooks.filter((a: any) => 
+              a.upscale_availability?.reason === 'Photo avatar look upload not completed'
+            ).length
+            console.log(`Looks are still being processed (${actualLooks.length} found, ${pendingCount} still uploading). Waiting ${pollInterval / 1000} seconds...`)
+            console.log('Look statuses:', actualLooks.map((a: any) => ({
+              id: a.id,
+              status: a.status,
+              upload_reason: a.upscale_availability?.reason,
+            })))
             await new Promise((resolve) => setTimeout(resolve, pollInterval))
           }
         } else {
