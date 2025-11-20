@@ -9,6 +9,7 @@ import {
   generateAvatarLook,
   addLooksToAvatarGroup,
   uploadImageToHeyGen,
+  checkTrainingStatus,
 } from '../lib/heygen.js'
 import type { HeyGenAvatar, PhotoAvatarDetails, GenerateLookRequest } from '../lib/heygen.js'
 
@@ -371,7 +372,7 @@ export class AvatarService {
     groupId: string,
     photoUrl: string,
     avatarName?: string
-  ): Promise<{ type: 'ai_generation' | 'photo_look'; id: string } | null> {
+  ): Promise<{ type: 'ai_generation' | 'photo_look'; id: string; aiGenerationScheduled?: boolean } | null> {
     if (!AUTO_LOOKS_ENABLED) {
       return null
     }
@@ -380,10 +381,52 @@ export class AvatarService {
       return null
     }
 
-    const prompt = buildAutoLookPrompt(avatarName)
-
-    // Step 1: Try AI look generation first (preferred - creates actual 9:16 look)
+    // According to HeyGen support: Only generate looks AFTER training is complete (status: "ready")
+    // Step 1: Check training status first
+    console.log('[Auto Look] Checking training status before generating look...', { groupId })
+    
+    let trainingStatus
     try {
+      trainingStatus = await checkTrainingStatus(groupId)
+      console.log('[Auto Look] Training status:', {
+        groupId,
+        status: trainingStatus.status,
+        error_msg: trainingStatus.error_msg,
+      })
+    } catch (statusError: any) {
+      console.warn('[Auto Look] Failed to check training status:', statusError.response?.data || statusError.message)
+      // If we can't check status, we'll still try to generate (might work if training is already complete)
+      trainingStatus = { status: 'unknown' as any }
+    }
+
+    // Only proceed if training is ready
+    if (trainingStatus.status !== 'ready') {
+      if (trainingStatus.status === 'failed') {
+        console.warn('[Auto Look] Training failed. Cannot generate AI look. Error:', trainingStatus.error_msg)
+        return null
+      } else if (trainingStatus.status === 'training' || trainingStatus.status === 'pending') {
+        console.log('[Auto Look] Training not yet complete. Status:', trainingStatus.status, {
+          groupId,
+          note: 'AI look generation will be available once training completes (status: "ready")',
+        })
+        return null
+      } else {
+        // Unknown status - log warning but try anyway
+        console.warn('[Auto Look] Unknown training status:', trainingStatus.status, 'Attempting generation anyway...')
+      }
+    }
+
+    // Step 2: Generate AI look (training is ready)
+    const prompt = buildAutoLookPrompt(avatarName)
+    
+    try {
+      console.log('[Auto Look] Training is ready. Generating AI look (9:16 format)...', {
+        groupId,
+        orientation: 'vertical',
+        pose: AUTO_LOOK_POSE,
+        style: AUTO_LOOK_STYLE,
+      })
+
       const response = await generateAvatarLook({
         group_id: groupId,
         prompt,
@@ -392,7 +435,7 @@ export class AvatarService {
         style: AUTO_LOOK_STYLE,
       })
 
-      console.log('[Auto Look] ✅ AI look generation started', {
+      console.log('[Auto Look] ✅ AI look generation started (9:16 format)', {
         groupId,
         generationId: response.generation_id,
         orientation: 'vertical',
@@ -406,52 +449,22 @@ export class AvatarService {
       }
     } catch (error: any) {
       const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message
-      const isModelNotFound = errorMessage?.toLowerCase().includes('model not found') || 
-                              errorMessage?.toLowerCase().includes('invalid_parameter')
+      console.error('[Auto Look] Failed to generate AI look:', {
+        groupId,
+        error: errorMessage,
+        responseData: error.response?.data,
+      })
 
-      if (isModelNotFound) {
-        console.log('[Auto Look] AI generation not available (model not ready). Falling back to photo upload...', {
+      // If training was ready but generation still failed, this is a real error
+      if (trainingStatus.status === 'ready') {
+        console.error('[Auto Look] Generation failed even though training is ready. This may indicate an API issue.', {
           groupId,
           error: errorMessage,
         })
-
-        // Step 2: Fallback - Add the photo as a look (works immediately, no training needed)
-        if (photoUrl) {
-          try {
-            console.log('[Auto Look] Uploading photo as fallback look...', {
-              groupId,
-              photoUrl: photoUrl.substring(0, 100) + '...',
-            })
-
-            const imageKey = await uploadImageToHeyGen(photoUrl)
-            const response = await addLooksToAvatarGroup({
-              group_id: groupId,
-              image_keys: [imageKey],
-              name: avatarName ? `${avatarName} - Vertical Look` : 'Vertical Look',
-            })
-
-            if (response.photo_avatar_list?.length > 0) {
-              console.log('[Auto Look] ✅ Photo added as look (fallback)', {
-                groupId,
-                lookId: response.photo_avatar_list[0].id,
-                totalLooks: response.photo_avatar_list.length,
-              })
-
-              return {
-                type: 'photo_look',
-                id: response.photo_avatar_list[0].id,
-              }
-            }
-          } catch (fallbackError: any) {
-            console.warn('[Auto Look] Fallback photo upload also failed:', fallbackError.response?.data || fallbackError.message)
-          }
-        }
-      } else {
-        console.warn('[Auto Look] Failed to generate AI look:', error.response?.data || error.message)
       }
-    }
 
-    return null
+      return null
+    }
   }
 
   /**

@@ -1312,10 +1312,49 @@ export async function createAvatarFromPhoto(
 
       if (!addLookResponse.photo_avatar_list?.length) {
         console.warn('⚠️ addLooksToAvatarGroup returned no looks; training may fail without at least one valid look.')
+        throw new Error('No looks were added to the avatar group. Cannot proceed with training.')
       } else {
         console.log(
           `✅ Added ${addLookResponse.photo_avatar_list.length} look(s) to group ${groupId} (requested ${imageKeys.length})`
         )
+        console.log('Look IDs:', addLookResponse.photo_avatar_list.map((l) => l.id))
+      }
+
+      // Verify looks are actually in the group before training
+      try {
+        console.log('Verifying looks exist in group before training...')
+        const verifyResponse = await axios.get(
+          `${HEYGEN_V2_API_URL}/avatar_group/${groupId}/avatars`,
+          {
+            headers: {
+              'X-Api-Key': apiKey,
+              'Content-Type': 'application/json',
+            },
+          }
+        )
+
+        const avatarList =
+          verifyResponse.data?.data?.avatar_list ||
+          verifyResponse.data?.avatar_list ||
+          verifyResponse.data?.data ||
+          []
+
+        console.log(`✅ Verified: Group has ${avatarList.length} look(s)`, {
+          groupId,
+          lookIds: avatarList.map((a: any) => a.id),
+        })
+
+        if (avatarList.length === 0) {
+          console.warn('⚠️ WARNING: Group has no looks even after adding them. Training will likely fail.')
+        }
+
+        // Give HeyGen a moment to fully process the looks
+        console.log('Waiting 2 seconds for HeyGen to finalize look processing...')
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+      } catch (verifyErr: any) {
+        console.warn('⚠️ Could not verify looks in group (continuing anyway):', verifyErr.response?.data || verifyErr.message)
+        // Still wait a bit before training
+        await new Promise((resolve) => setTimeout(resolve, 2000))
       }
     } catch (addLookErr: any) {
       console.error('❌ Failed to add look to avatar group:', addLookErr.response?.data || addLookErr.message)
@@ -1327,10 +1366,13 @@ export async function createAvatarFromPhoto(
       )
     }
 
-    // Step 4: Train the avatar group (optional but recommended)
-    let status = 'pending'
+    // Step 4: Train the avatar group (MANDATORY - cannot be skipped)
+    // According to HeyGen support: Training is mandatory and must complete before generating looks
+    console.log('Step 4: Starting avatar group training (mandatory step)...')
+    console.log('Training request:', { group_id: groupId })
+    
+    let trainingStarted = false
     try {
-      console.log('Step 4: Starting avatar group training...')
       const trainResponse = await axios.post(
         `${HEYGEN_V2_API_URL}/photo_avatar/train`,
         {
@@ -1344,16 +1386,62 @@ export async function createAvatarFromPhoto(
         }
       )
 
-      console.log('Training started:', trainResponse.data)
-      status = 'training'
+      console.log('✅ Training started successfully:', trainResponse.data)
+      trainingStarted = true
     } catch (trainErr: any) {
-      console.log('Training failed (this is optional):', trainErr.response?.status, trainErr.response?.data)
-      // Training is optional, so we continue even if it fails
+      const trainErrorMsg = trainErr.response?.data?.error?.message || 
+                           trainErr.response?.data?.message || 
+                           trainErr.message
+      const errorCode = trainErr.response?.data?.error?.code || 
+                       trainErr.response?.data?.code
+      
+      console.error('❌ Training failed to start:', {
+        status: trainErr.response?.status,
+        statusText: trainErr.response?.statusText,
+        error: trainErrorMsg,
+        code: errorCode,
+        groupId,
+        responseData: trainErr.response?.data,
+      })
+
+      // Training is mandatory - throw error if it fails to start
+      throw new Error(
+        `Failed to start training for avatar group ${groupId}: ${trainErrorMsg || 'Unknown error'}. ` +
+        `Error code: ${errorCode || 'N/A'}. ` +
+        `Please ensure the uploaded images are valid (JPG/PNG, under 50MB, less than 2K resolution) and try again.`
+      )
+    }
+
+    // Step 5: Monitor training status until complete (MANDATORY)
+    // According to HeyGen support: Must monitor training status and wait for "ready" status
+    console.log('Step 5: Monitoring training status until completion...')
+    let finalStatus = 'training'
+    
+    try {
+      const trainingResult = await waitForTrainingComplete(groupId, {
+        maxWaitTime: 10 * 60 * 1000, // 10 minutes max wait
+        pollInterval: 10 * 1000, // Check every 10 seconds
+        onStatusUpdate: (status) => {
+          console.log(`[Training Progress] Status: ${status.status}${status.error_msg ? `, Error: ${status.error_msg}` : ''}`)
+        },
+      })
+
+      finalStatus = trainingResult.status
+      console.log(`✅ Training completed with status: ${finalStatus}`)
+    } catch (waitError: any) {
+      console.error('❌ Error waiting for training to complete:', waitError.message)
+      // If training failed, we still return the group ID but with failed status
+      // The user can check status later or retry
+      finalStatus = 'failed'
+      throw new Error(
+        `Training did not complete successfully for avatar group ${groupId}: ${waitError.message}. ` +
+        `The avatar group was created but training failed. Please check the training status manually.`
+      )
     }
 
     return {
       avatar_id: groupId,
-      status,
+      status: finalStatus === 'ready' ? 'active' : finalStatus,
     }
   } catch (error: any) {
     console.error('HeyGen API error (createAvatarFromPhoto):', {
@@ -1636,6 +1724,81 @@ export async function checkTrainingStatus(
   } catch (error: any) {
     console.error('HeyGen API error (checkTrainingStatus):', error.response?.data || error.message)
     throw error
+  }
+}
+
+/**
+ * Wait for training to complete (polling with status checks)
+ * According to HeyGen support: Training is mandatory and must complete before generating looks
+ * 
+ * @param groupId - The avatar group ID
+ * @param options - Configuration options
+ * @returns Promise that resolves when training is ready or rejects if training fails
+ */
+export async function waitForTrainingComplete(
+  groupId: string,
+  options: {
+    maxWaitTime?: number // Maximum time to wait in milliseconds (default: 10 minutes)
+    pollInterval?: number // Time between status checks in milliseconds (default: 10 seconds)
+    onStatusUpdate?: (status: TrainingStatus) => void // Callback for status updates
+  } = {}
+): Promise<TrainingStatus> {
+  const maxWaitTime = options.maxWaitTime || 10 * 60 * 1000 // 10 minutes default
+  const pollInterval = options.pollInterval || 10 * 1000 // 10 seconds default
+  const startTime = Date.now()
+
+  console.log(`[Training Monitor] Starting to monitor training for group ${groupId}...`)
+
+  while (true) {
+    const elapsed = Date.now() - startTime
+    if (elapsed > maxWaitTime) {
+      throw new Error(
+        `Training did not complete within ${maxWaitTime / 1000 / 60} minutes. ` +
+        `Please check training status manually for group ${groupId}.`
+      )
+    }
+
+    try {
+      const status = await checkTrainingStatus(groupId)
+      
+      if (options.onStatusUpdate) {
+        options.onStatusUpdate(status)
+      }
+
+      console.log(`[Training Monitor] Status check: ${status.status} (elapsed: ${Math.round(elapsed / 1000)}s)`)
+
+      if (status.status === 'ready') {
+        console.log(`✅ [Training Monitor] Training completed successfully for group ${groupId}`)
+        return status
+      }
+
+      if (status.status === 'failed') {
+        const errorMsg = status.error_msg || 'Training failed with unknown error'
+        throw new Error(
+          `Training failed for group ${groupId}: ${errorMsg}. ` +
+          `Please check the uploaded images and try again.`
+        )
+      }
+
+      // Status is 'pending' or 'training', continue polling
+      if (status.status === 'pending' || status.status === 'training') {
+        await new Promise((resolve) => setTimeout(resolve, pollInterval))
+        continue
+      }
+
+      // Unknown status, log warning but continue
+      console.warn(`[Training Monitor] Unknown training status: ${status.status}, continuing to poll...`)
+      await new Promise((resolve) => setTimeout(resolve, pollInterval))
+    } catch (error: any) {
+      // If it's a status check error (not a training failure), retry
+      if (error.message && !error.message.includes('Training failed')) {
+        console.warn(`[Training Monitor] Error checking status, will retry:`, error.message)
+        await new Promise((resolve) => setTimeout(resolve, pollInterval))
+        continue
+      }
+      // Otherwise, re-throw (this is a training failure)
+      throw error
+    }
   }
 }
 
