@@ -156,7 +156,7 @@ export function QuickCreate() {
   const loadAvatars = async () => {
     try {
       const response = await api.get('/api/avatars', { params: { all: 'true' } })
-      const allAvatars = response.data.avatars || []
+      const allAvatars: AvatarRecord[] = (response.data.avatars || []) as AvatarRecord[]
       const userAvatars = allAvatars.filter((avatar) => isUserCreatedAvatar(avatar))
       setAvatars(userAvatars)
       const defaultAvatar = userAvatars.find((a: any) => a.is_default)
