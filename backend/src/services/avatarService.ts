@@ -127,7 +127,7 @@ export class AvatarService {
 
           assignAvatarSource(newAvatarPayload, 'synced')
 
-          const { data, error } = await executeWithAvatarSourceFallback(
+        const { data, error } = await executeWithAvatarSourceFallback<Avatar>(
             newAvatarPayload,
             () =>
               supabase
@@ -270,7 +270,7 @@ export class AvatarService {
 
       assignAvatarSource(newAvatarPayload, 'synced')
 
-      const { data, error } = await executeWithAvatarSourceFallback(
+      const { data, error } = await executeWithAvatarSourceFallback<Avatar>(
         newAvatarPayload,
         () =>
           supabase
@@ -403,7 +403,7 @@ export class AvatarService {
 
         assignAvatarSource(newPhotoAvatarPayload, 'user_photo')
 
-        const { data, error } = await executeWithAvatarSourceFallback(
+        const { data, error } = await executeWithAvatarSourceFallback<Avatar>(
           newPhotoAvatarPayload,
           () =>
             supabase
@@ -690,7 +690,7 @@ export class AvatarService {
 
           assignAvatarSource(updatePayload, resolvedSource)
 
-          const { data, error } = await executeWithAvatarSourceFallback(
+          const { data, error } = await executeWithAvatarSourceFallback<Avatar>(
             updatePayload,
             () =>
               supabase
@@ -719,7 +719,7 @@ export class AvatarService {
 
           assignAvatarSource(newAvatarPayload, 'ai_generated')
 
-          const { data, error } = await executeWithAvatarSourceFallback(
+          const { data, error } = await executeWithAvatarSourceFallback<Avatar>(
             newAvatarPayload,
             () =>
               supabase

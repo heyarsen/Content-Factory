@@ -1,3 +1,5 @@
+import type { PostgrestSingleResponse } from '@supabase/supabase-js'
+
 const MISSING_SOURCE_COLUMN_CODE = 'PGRST204'
 const SOURCE_COLUMN_PATTERN = /'source'\s+column/i
 
@@ -11,19 +13,18 @@ const isMissingSourceColumnError = (error: any): boolean => {
 
 export type AvatarSource = 'synced' | 'user_photo' | 'ai_generated'
 
-export function assignAvatarSource<T extends Record<string, any>>(payload: T, source: AvatarSource): T {
+export function assignAvatarSource(payload: Record<string, any>, source: AvatarSource): void {
   if (avatarSourceColumnEnabled) {
     payload.source = source
   } else {
     delete payload.source
   }
-  return payload
 }
 
 export async function executeWithAvatarSourceFallback<T>(
   payload: Record<string, any>,
-  executor: () => Promise<{ data: T; error: any }>
-): Promise<{ data: T; error: any }> {
+  executor: () => Promise<PostgrestSingleResponse<T>>
+): Promise<PostgrestSingleResponse<T>> {
   const result = await executor()
 
   if (

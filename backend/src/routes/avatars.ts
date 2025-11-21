@@ -1,6 +1,7 @@
 import { Router, Response } from 'express'
 import { authenticate, AuthRequest } from '../middleware/auth.js'
 import { AvatarService } from '../services/avatarService.js'
+import type { Avatar } from '../services/avatarService.js'
 import {
   generateAIAvatar,
   checkGenerationStatus,
@@ -479,7 +480,7 @@ router.post('/generate-ai', async (req: AuthRequest, res: Response) => {
 
     assignAvatarSource(avatarPayload, 'ai_generated')
 
-    const { data, error } = await executeWithAvatarSourceFallback(
+    const { data, error } = await executeWithAvatarSourceFallback<Avatar>(
       avatarPayload,
       () =>
         supabase
