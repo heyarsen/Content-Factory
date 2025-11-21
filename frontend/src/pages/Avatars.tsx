@@ -37,6 +37,7 @@ interface Avatar {
   status: string
   is_default: boolean
   created_at: string
+  source?: 'synced' | 'user_photo' | 'ai_generated' | null
 }
 
 interface PhotoAvatarDetails {
@@ -154,24 +155,25 @@ export default function Avatars() {
 
   // Helper function to check if avatar is user-created
   const isUserCreatedAvatar = (avatar: Avatar): boolean => {
-    // User-created avatars have Supabase storage URLs or specific statuses
+    if (avatar.source === 'user_photo' || avatar.source === 'ai_generated') {
+      return true
+    }
+    if (avatar.source === 'synced') {
+      return false
+    }
+    // Fallback heuristics for older records without source metadata
     if (avatar.avatar_url && avatar.avatar_url.includes('supabase.co/storage')) {
       return true
     }
-    // AI generation in progress
     if (avatar.status === 'generating') {
       return true
     }
-    // Training or pending status without HeyGen CDN URL
-    if ((avatar.status === 'training' || avatar.status === 'pending') && 
-        (!avatar.avatar_url || !avatar.avatar_url.includes('heygen'))) {
+    if (
+      (avatar.status === 'training' || avatar.status === 'pending') &&
+      (!avatar.avatar_url || !avatar.avatar_url.includes('heygen'))
+    ) {
       return true
     }
-    // Exclude avatars with HeyGen CDN URLs (synced from HeyGen)
-    if (avatar.avatar_url && avatar.avatar_url.includes('heygen')) {
-      return false
-    }
-    // Include avatars with no URL if they're in training/pending (recently created)
     if (!avatar.avatar_url && (avatar.status === 'training' || avatar.status === 'pending')) {
       return true
     }
@@ -734,11 +736,12 @@ export default function Avatars() {
           if (status.image_key_list && status.image_key_list.length > 0) {
             try {
               setAiGenerationStage('completing')
-              await api.post('/api/avatars/complete-ai-generation', {
-                generation_id: genId,
-                image_keys: status.image_key_list,
-                avatar_name: avatarNameOverride || aiName,
-              })
+                await api.post('/api/avatars/complete-ai-generation', {
+                  generation_id: genId,
+                  image_keys: status.image_key_list,
+                  image_urls: status.image_url_list,
+                  avatar_name: avatarNameOverride || aiName,
+                })
               
               setAiGenerationStage('completed')
               toast.success('AI avatar created successfully!')
