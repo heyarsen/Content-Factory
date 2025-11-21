@@ -34,8 +34,8 @@ export interface ListVideosParams {
   search?: string
 }
 
-const DEFAULT_VERTICAL_DIMENSION = { width: 1080, height: 1920 }
-const DEFAULT_VERTICAL_ASPECT_RATIO = '9:16'
+export const DEFAULT_VERTICAL_DIMENSION = { width: 1080, height: 1920 }
+export const DEFAULT_VERTICAL_ASPECT_RATIO = '9:16'
 
 export async function createVideo(payload: CreateVideoPayload): Promise<VideoRecord> {
   const aspectRatio = payload.aspect_ratio || DEFAULT_VERTICAL_ASPECT_RATIO

@@ -10,6 +10,7 @@ import { Badge } from '../components/ui/Badge'
 import { Video, Sparkles, FileText, CheckCircle2, ArrowRight, ArrowLeft, Loader, Download, Share2, Instagram, Youtube, Users, Facebook } from 'lucide-react'
 import { Modal } from '../components/ui/Modal'
 import api from '../lib/api'
+import { DEFAULT_VERTICAL_ASPECT_RATIO, DEFAULT_VERTICAL_DIMENSION } from '../lib/videos'
 import { useNotifications } from '../contexts/NotificationContext'
 
 
@@ -331,6 +332,7 @@ export function QuickCreate() {
         category: 'general', // Default category
         avatar_id: selectedAvatarId || undefined,
       })
+      const verticalDimension = { ...DEFAULT_VERTICAL_DIMENSION }
       
       const response = await api.post('/api/videos/generate', {
         topic,
@@ -340,6 +342,8 @@ export function QuickCreate() {
         category: 'general', // Default category
         avatar_id: selectedAvatarId || undefined,
         generate_caption: generateCaption,
+        aspect_ratio: DEFAULT_VERTICAL_ASPECT_RATIO,
+        dimension: verticalDimension,
       })
 
       console.log('Video generation response:', response.data)
