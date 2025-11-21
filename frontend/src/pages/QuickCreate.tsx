@@ -80,12 +80,30 @@ export function QuickCreate() {
     loadAvatars()
   }, [])
 
+  const fetchAvatars = async (
+    params: Record<string, string> = {},
+    allowFallback: boolean = true
+  ) => {
+    const response = await api.get('/api/avatars', { params })
+    const avatars = response.data.avatars || []
+
+    if (
+      allowFallback &&
+      response.data.only_created &&
+      avatars.length === 0 &&
+      !params.all
+    ) {
+      return fetchAvatars({ all: 'true' }, false)
+    }
+
+    return response
+  }
+
   const loadAvatars = async () => {
     try {
-      // Only fetch user-created avatars (default behavior, no params needed)
-      const response = await api.get('/api/avatars')
+      const params = onlyCreated ? {} : { all: 'true' }
+      const response = await fetchAvatars(params)
       setAvatars(response.data.avatars || [])
-      // Set default avatar if available
       const defaultAvatar = response.data.avatars?.find((a: any) => a.is_default)
       if (defaultAvatar) {
         setSelectedAvatarId(defaultAvatar.heygen_avatar_id)
