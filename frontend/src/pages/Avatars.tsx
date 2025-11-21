@@ -138,7 +138,6 @@ export default function Avatars() {
   
   // Generate look form fields
   const [lookPrompt, setLookPrompt] = useState('')
-  const [lookOrientation, setLookOrientation] = useState<'horizontal' | 'vertical' | 'square'>('vertical')
   const [lookPose, setLookPose] = useState<'half_body' | 'full_body' | 'close_up'>('close_up')
   const [lookStyle, setLookStyle] = useState<'Realistic' | 'Cartoon' | 'Anime'>('Realistic')
   
@@ -883,7 +882,7 @@ export default function Avatars() {
       await api.post('/api/avatars/generate-look', {
         group_id: showLooksModal.heygen_avatar_id,
         prompt: lookPrompt,
-        orientation: lookOrientation,
+        orientation: 'vertical',
         pose: lookPose,
         style: lookStyle,
       })
@@ -892,7 +891,6 @@ export default function Avatars() {
       setShowGenerateLookModal(false)
       setShowLooksModal(null)
       setLookPrompt('')
-      setLookOrientation('vertical')
       setLookPose('close_up')
       setLookStyle('Realistic')
     } catch (error: any) {
@@ -1669,7 +1667,6 @@ export default function Avatars() {
           onClose={() => {
             setShowGenerateLookModal(false)
             setLookPrompt('')
-            setLookOrientation('vertical')
             setLookPose('close_up')
             setLookStyle('Realistic')
           }}
@@ -1691,18 +1688,6 @@ export default function Avatars() {
             />
 
             <div className="grid gap-4 md:grid-cols-3">
-              <Select
-                label="Orientation *"
-                value={lookOrientation}
-                onChange={(e) => setLookOrientation(e.target.value as any)}
-                options={[
-                  { value: 'vertical', label: 'Vertical (9:16)' },
-                  { value: 'horizontal', label: 'Horizontal' },
-                  { value: 'square', label: 'Square' },
-                ]}
-                disabled={generatingLook}
-              />
-
               <Select
                 label="Pose *"
                 value={lookPose}
@@ -1734,7 +1719,6 @@ export default function Avatars() {
                 onClick={() => {
                   setShowGenerateLookModal(false)
                   setLookPrompt('')
-                  setLookOrientation('vertical')
                   setLookPose('close_up')
                   setLookStyle('Realistic')
                 }}
