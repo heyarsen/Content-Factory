@@ -301,6 +301,22 @@ export function QuickCreate() {
       return
     }
 
+    const selectedAvatar = avatars.find((avatar) => avatar.heygen_avatar_id === selectedAvatarId)
+    if (!selectedAvatar) {
+      setVideoError('Please select an avatar')
+      return
+    }
+
+    if (!isAvatarReady(selectedAvatar)) {
+      setVideoError('Selected avatar is still training and cannot be used yet.')
+      addNotification({
+        type: 'warning',
+        title: 'Avatar still training',
+        message: 'Please wait until the avatar finishes training before generating a video.',
+      })
+      return
+    }
+
     setGeneratingVideo(true)
     setVideoError('')
 
