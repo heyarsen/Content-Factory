@@ -24,6 +24,10 @@ export function assignAvatarSource(payload: Record<string, any>, source: AvatarS
   }
 }
 
+export function isAvatarSourceColumnEnabled(): boolean {
+  return avatarSourceColumnEnabled
+}
+
 export async function executeWithAvatarSourceFallback<T>(
   payload: Record<string, any>,
   executor: () => PostgrestBuilder<
