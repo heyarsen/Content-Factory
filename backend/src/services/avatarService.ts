@@ -1,25 +1,28 @@
 import { supabase } from '../lib/supabase.js'
-  import {
-    listAvatars as listHeyGenAvatars,
-    getAvatar as getHeyGenAvatar,
-    getPhotoAvatarDetails,
-    deletePhotoAvatar,
-    deletePhotoAvatarGroup,
-    upscalePhotoAvatar,
-    generateAvatarLook,
-    addLooksToAvatarGroup,
-    uploadImageToHeyGen,
-    checkTrainingStatus,
-    checkGenerationStatus,
-  } from '../lib/heygen.js'
-  import type {
-    HeyGenAvatar,
-    PhotoAvatarDetails,
-    GenerateLookRequest,
-    GenerationStatus,
-  } from '../lib/heygen.js'
-
-type AvatarSource = 'synced' | 'user_photo' | 'ai_generated'
+import {
+  listAvatars as listHeyGenAvatars,
+  getAvatar as getHeyGenAvatar,
+  getPhotoAvatarDetails,
+  deletePhotoAvatar,
+  deletePhotoAvatarGroup,
+  upscalePhotoAvatar,
+  generateAvatarLook,
+  addLooksToAvatarGroup,
+  uploadImageToHeyGen,
+  checkTrainingStatus,
+  checkGenerationStatus,
+} from '../lib/heygen.js'
+import type {
+  HeyGenAvatar,
+  PhotoAvatarDetails,
+  GenerateLookRequest,
+  GenerationStatus,
+} from '../lib/heygen.js'
+import {
+  AvatarSource,
+  assignAvatarSource,
+  executeWithAvatarSourceFallback,
+} from '../lib/avatarSourceColumn.js'
 
 const AUTO_LOOKS_ENABLED =
   process.env.HEYGEN_AUTO_LOOKS_ENABLED?.toLowerCase() === 'false' ? false : true
@@ -110,22 +113,29 @@ export class AvatarService {
             }
           } else {
             // Insert new avatar
-            const { data, error } = await supabase
-              .from('avatars')
-              .insert({
-                user_id: userId,
-                heygen_avatar_id: heygenAvatar.avatar_id,
-                avatar_name: heygenAvatar.avatar_name,
-                avatar_url: heygenAvatar.avatar_url || null,
-                preview_url: heygenAvatar.preview_url || null,
-                thumbnail_url: heygenAvatar.thumbnail_url || null,
-                gender: heygenAvatar.gender || null,
-                status: heygenAvatar.status || 'active',
-                is_default: false,
-                source: 'synced',
-              })
-              .select()
-              .single()
+          const newAvatarPayload = {
+            user_id: userId,
+            heygen_avatar_id: heygenAvatar.avatar_id,
+            avatar_name: heygenAvatar.avatar_name,
+            avatar_url: heygenAvatar.avatar_url || null,
+            preview_url: heygenAvatar.preview_url || null,
+            thumbnail_url: heygenAvatar.thumbnail_url || null,
+            gender: heygenAvatar.gender || null,
+            status: heygenAvatar.status || 'active',
+            is_default: false,
+          }
+
+          assignAvatarSource(newAvatarPayload, 'synced')
+
+          const { data, error } = await executeWithAvatarSourceFallback(
+            newAvatarPayload,
+            () =>
+              supabase
+                .from('avatars')
+                .insert(newAvatarPayload)
+                .select()
+                .single()
+          )
 
           if (!error && data) {
             syncedAvatars.push(data)
@@ -246,22 +256,29 @@ export class AvatarService {
       }
 
       // Insert new avatar
-      const { data, error } = await supabase
-        .from('avatars')
-        .insert({
-          user_id: userId,
-          heygen_avatar_id: heygenAvatar.avatar_id,
-          avatar_name: heygenAvatar.avatar_name,
-          avatar_url: heygenAvatar.avatar_url || null,
-          preview_url: heygenAvatar.preview_url || null,
-          thumbnail_url: heygenAvatar.thumbnail_url || null,
-          gender: heygenAvatar.gender || null,
-          status: heygenAvatar.status || 'active',
-          is_default: false,
-            source: 'synced',
-        })
-        .select()
-        .single()
+      const newAvatarPayload = {
+        user_id: userId,
+        heygen_avatar_id: heygenAvatar.avatar_id,
+        avatar_name: heygenAvatar.avatar_name,
+        avatar_url: heygenAvatar.avatar_url || null,
+        preview_url: heygenAvatar.preview_url || null,
+        thumbnail_url: heygenAvatar.thumbnail_url || null,
+        gender: heygenAvatar.gender || null,
+        status: heygenAvatar.status || 'active',
+        is_default: false,
+      }
+
+      assignAvatarSource(newAvatarPayload, 'synced')
+
+      const { data, error } = await executeWithAvatarSourceFallback(
+        newAvatarPayload,
+        () =>
+          supabase
+            .from('avatars')
+            .insert(newAvatarPayload)
+            .select()
+            .single()
+      )
 
       if (error) throw error
       return data
@@ -372,22 +389,29 @@ export class AvatarService {
 
         // Save to database
         // Save photoUrl as avatar_url to identify user-created avatars
-        const { data, error } = await supabase
-          .from('avatars')
-          .insert({
-            user_id: userId,
-            heygen_avatar_id: result.avatar_id,
-            avatar_name: avatarName,
-            avatar_url: photoUrl, // Save the photo URL to identify user-created avatars
-            preview_url: photoUrl,
-            thumbnail_url: photoUrl,
-            gender: null,
-            status: result.status === 'training' ? 'training' : 'active',
-            is_default: false,
-            source: 'user_photo',
-          })
-          .select()
-          .single()
+        const newPhotoAvatarPayload = {
+          user_id: userId,
+          heygen_avatar_id: result.avatar_id,
+          avatar_name: avatarName,
+          avatar_url: photoUrl, // Save the photo URL to identify user-created avatars
+          preview_url: photoUrl,
+          thumbnail_url: photoUrl,
+          gender: null,
+          status: result.status === 'training' ? 'training' : 'active',
+          is_default: false,
+        }
+
+        assignAvatarSource(newPhotoAvatarPayload, 'user_photo')
+
+        const { data, error } = await executeWithAvatarSourceFallback(
+          newPhotoAvatarPayload,
+          () =>
+            supabase
+              .from('avatars')
+              .insert(newPhotoAvatarPayload)
+              .select()
+              .single()
+        )
 
       if (error) throw error
       return data
@@ -655,41 +679,55 @@ export class AvatarService {
               : 'ai_generated'
 
           // Update existing record
-          const { data, error } = await supabase
-            .from('avatars')
-            .update({
-              heygen_avatar_id: groupId,
-              avatar_url: resolvedImageUrl,
-              preview_url: resolvedImageUrl,
-              thumbnail_url: resolvedImageUrl,
-              status: 'active',
-              updated_at: new Date().toISOString(),
-              source: resolvedSource,
-            })
-            .eq('id', existingAvatar.id)
-            .select()
-            .single()
+          const updatePayload = {
+            heygen_avatar_id: groupId,
+            avatar_url: resolvedImageUrl,
+            preview_url: resolvedImageUrl,
+            thumbnail_url: resolvedImageUrl,
+            status: 'active',
+            updated_at: new Date().toISOString(),
+          }
+
+          assignAvatarSource(updatePayload, resolvedSource)
+
+          const { data, error } = await executeWithAvatarSourceFallback(
+            updatePayload,
+            () =>
+              supabase
+                .from('avatars')
+                .update(updatePayload)
+                .eq('id', existingAvatar.id)
+                .select()
+                .single()
+          )
 
           if (error) throw error
           return data
         } else {
           // Create new record
-          const { data, error } = await supabase
-            .from('avatars')
-            .insert({
-              user_id: userId,
-              heygen_avatar_id: groupId,
-              avatar_name: avatarName,
-              avatar_url: primaryImageUrl,
-              preview_url: primaryImageUrl,
-              thumbnail_url: primaryImageUrl,
-              gender: null,
-              status: 'active',
-              is_default: false,
-              source: 'ai_generated',
-            })
-            .select()
-            .single()
+          const newAvatarPayload = {
+            user_id: userId,
+            heygen_avatar_id: groupId,
+            avatar_name: avatarName,
+            avatar_url: primaryImageUrl,
+            preview_url: primaryImageUrl,
+            thumbnail_url: primaryImageUrl,
+            gender: null,
+            status: 'active',
+            is_default: false,
+          }
+
+          assignAvatarSource(newAvatarPayload, 'ai_generated')
+
+          const { data, error } = await executeWithAvatarSourceFallback(
+            newAvatarPayload,
+            () =>
+              supabase
+                .from('avatars')
+                .insert(newAvatarPayload)
+                .select()
+                .single()
+          )
 
           if (error) throw error
           return data

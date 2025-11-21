@@ -11,6 +11,10 @@ import {
   type AddLooksRequest,
   type GenerateLookRequest,
 } from '../lib/heygen.js'
+import {
+  assignAvatarSource,
+  executeWithAvatarSourceFallback,
+} from '../lib/avatarSourceColumn.js'
 const router = Router()
 
 // All routes require authentication
@@ -461,22 +465,29 @@ router.post('/generate-ai', async (req: AuthRequest, res: Response) => {
 
     // Save generation_id to database for tracking
     const { supabase } = await import('../lib/supabase.js')
-    const { data, error } = await supabase
-      .from('avatars')
-      .insert({
-        user_id: userId,
-        heygen_avatar_id: result.generation_id,
-        avatar_name: request.name,
-        avatar_url: null,
-        preview_url: null,
-        thumbnail_url: null,
-        gender: request.gender,
-        status: 'generating',
-        is_default: false,
-          source: 'ai_generated',
-      })
-      .select()
-      .single()
+    const avatarPayload = {
+      user_id: userId,
+      heygen_avatar_id: result.generation_id,
+      avatar_name: request.name,
+      avatar_url: null,
+      preview_url: null,
+      thumbnail_url: null,
+      gender: request.gender,
+      status: 'generating',
+      is_default: false,
+    }
+
+    assignAvatarSource(avatarPayload, 'ai_generated')
+
+    const { data, error } = await executeWithAvatarSourceFallback(
+      avatarPayload,
+      () =>
+        supabase
+          .from('avatars')
+          .insert(avatarPayload)
+          .select()
+          .single()
+    )
 
     if (error) {
       console.error('Failed to save avatar generation to database:', error)
