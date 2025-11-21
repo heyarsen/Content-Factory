@@ -32,7 +32,7 @@ export async function executeWithAvatarSourceFallback<T>(
     false
   >
 ): Promise<PostgrestSingleResponse<T>> {
-  const executeOnce = (): Promise<PostgrestSingleResponse<T>> =>
+  const executeOnce = (): PromiseLike<PostgrestSingleResponse<T>> =>
     executor().then((response) => response as PostgrestSingleResponse<T>)
 
   const result = await executeOnce()
