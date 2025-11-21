@@ -343,7 +343,10 @@ export function Videos() {
                 </div>
 
                 {video.status === 'completed' && video.video_url && (
-                  <div className="relative overflow-hidden rounded-2xl border border-white/50 bg-slate-100/70">
+                  <div
+                    className="relative overflow-hidden rounded-2xl border border-white/50 bg-slate-100/70"
+                    style={{ aspectRatio: '9 / 16' }}
+                  >
                     <video src={video.video_url} className="h-full w-full rounded-2xl object-cover" controls />
                   </div>
                 )}
@@ -471,10 +474,13 @@ export function Videos() {
               {selectedVideo.status === 'completed' && selectedVideo.video_url && (
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-primary">Video Preview</h3>
-                  <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-900">
+                  <div
+                    className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-900"
+                    style={{ aspectRatio: '9 / 16' }}
+                  >
                     <video 
                       src={selectedVideo.video_url} 
-                      className="w-full rounded-xl" 
+                      className="w-full rounded-xl h-full object-cover"
                       controls 
                     />
                   </div>
