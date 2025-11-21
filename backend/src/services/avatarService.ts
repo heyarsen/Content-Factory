@@ -340,6 +340,9 @@ export class AvatarService {
     if (!avatar.avatar_url && avatar.status !== 'active') {
       return true
     }
+    if (avatar.status === 'active' && !avatar.avatar_url) {
+      return true
+    }
     return false
   }
 

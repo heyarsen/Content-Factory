@@ -137,6 +137,9 @@ export function QuickCreate() {
     if (!avatar.avatar_url && (avatar.status === 'training' || avatar.status === 'pending')) {
       return true
     }
+    if (avatar.status === 'active' && !avatar.avatar_url) {
+      return true
+    }
     return false
   }
 
