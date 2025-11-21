@@ -26,7 +26,11 @@ export function assignAvatarSource(payload: Record<string, any>, source: AvatarS
 
 export async function executeWithAvatarSourceFallback<T>(
   payload: Record<string, any>,
-  executor: () => PostgrestBuilder<PostgrestSingleResponse<T>>
+  executor: () => PostgrestBuilder<
+    Record<string, any>,
+    PostgrestSingleResponse<T>,
+    false
+  >
 ): Promise<PostgrestSingleResponse<T>> {
   const result = await executor()
 
