@@ -115,7 +115,8 @@ export default function Avatars() {
   
   // AI Generation form fields
   const [aiName, setAiName] = useState('')
-  const [aiAge, setAiAge] = useState<'Young Adult' | 'Adult' | 'Middle Aged' | 'Senior'>('Adult')
+  type AIAgeOption = 'Young Adult' | 'Early Middle Age' | 'Late Middle Age' | 'Senior' | 'Unspecified'
+  const [aiAge, setAiAge] = useState<AIAgeOption>('Unspecified')
   const [aiGender, setAiGender] = useState<'Man' | 'Woman'>('Man')
   const AI_ETHNICITY_OPTIONS = [
     'Unspecified',
@@ -781,7 +782,7 @@ export default function Avatars() {
 
   const resetAIGenerationForm = () => {
     setAiName('')
-    setAiAge('Adult')
+    setAiAge('Unspecified')
     setAiGender('Man')
     setAiEthnicity('Unspecified')
     setAiOrientation('square')
@@ -1422,9 +1423,10 @@ export default function Avatars() {
                     onChange={(e) => setAiAge(e.target.value as any)}
                     options={[
                       { value: 'Young Adult', label: 'Young Adult' },
-                      { value: 'Adult', label: 'Adult' },
-                      { value: 'Middle Aged', label: 'Middle Aged' },
+                      { value: 'Early Middle Age', label: 'Early Middle Age' },
+                      { value: 'Late Middle Age', label: 'Late Middle Age' },
                       { value: 'Senior', label: 'Senior' },
+                      { value: 'Unspecified', label: 'Unspecified' },
                     ]}
                     disabled={generatingAI}
                   />
