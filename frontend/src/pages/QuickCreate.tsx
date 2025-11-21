@@ -58,7 +58,19 @@ export function QuickCreate() {
   // Step 3: Generate Video
   const [style, setStyle] = useState<'casual' | 'professional' | 'energetic' | 'educational'>('professional')
   const [duration, setDuration] = useState(30)
-  const [avatars, setAvatars] = useState<Array<{ id: string; heygen_avatar_id: string; avatar_name: string; thumbnail_url: string | null; preview_url: string | null; is_default: boolean }>>([])
+  const [avatars, setAvatars] = useState<
+    Array<{
+      id: string
+      heygen_avatar_id: string
+      avatar_name: string
+      thumbnail_url: string | null
+      preview_url: string | null
+      avatar_url?: string | null
+      status?: string
+      source?: 'synced' | 'user_photo' | 'ai_generated' | null
+      is_default: boolean
+    }>
+  >([])
   const [selectedAvatarId, setSelectedAvatarId] = useState<string>('')
   const [avatarModalOpen, setAvatarModalOpen] = useState(false)
   const [generatingVideo, setGeneratingVideo] = useState(false)
@@ -99,15 +111,46 @@ export function QuickCreate() {
     return response
   }
 
+  const isUserCreatedAvatar = (avatar: {
+    avatar_url?: string | null
+    status?: string
+    source?: 'synced' | 'user_photo' | 'ai_generated' | null
+  }): boolean => {
+    if (avatar.source === 'user_photo' || avatar.source === 'ai_generated') {
+      return true
+    }
+    if (avatar.source === 'synced') {
+      return false
+    }
+    if (avatar.avatar_url && avatar.avatar_url.includes('supabase.co/storage')) {
+      return true
+    }
+    if (avatar.status === 'generating') {
+      return true
+    }
+    if (
+      (avatar.status === 'training' || avatar.status === 'pending') &&
+      (!avatar.avatar_url || !avatar.avatar_url.includes('heygen'))
+    ) {
+      return true
+    }
+    if (!avatar.avatar_url && (avatar.status === 'training' || avatar.status === 'pending')) {
+      return true
+    }
+    return false
+  }
+
   const loadAvatars = async () => {
     try {
-      const response = await fetchAvatars()
-      setAvatars(response.data.avatars || [])
-      const defaultAvatar = response.data.avatars?.find((a: any) => a.is_default)
+      const response = await api.get('/api/avatars', { params: { all: 'true' } })
+      const allAvatars = response.data.avatars || []
+      const userAvatars = allAvatars.filter(isUserCreatedAvatar)
+      setAvatars(userAvatars)
+      const defaultAvatar = userAvatars.find((a: any) => a.is_default)
       if (defaultAvatar) {
         setSelectedAvatarId(defaultAvatar.heygen_avatar_id)
-      } else if (response.data.avatars?.length > 0) {
-        setSelectedAvatarId(response.data.avatars[0].heygen_avatar_id)
+      } else if (userAvatars.length > 0) {
+        setSelectedAvatarId(userAvatars[0].heygen_avatar_id)
       }
     } catch (error: any) {
       console.error('Failed to load avatars:', error)
