@@ -861,13 +861,16 @@ export function QuickCreate() {
                 <Video className="h-5 w-5 text-brand-500" />
                 <h2 className="text-xl font-semibold text-primary">Your Video</h2>
               </div>
-              <div className="aspect-video rounded-xl bg-slate-900 overflow-hidden mb-4">
-                <video
-                  src={videoUrl}
-                  controls
-                  className="w-full h-full"
-                />
-              </div>
+            <div
+              className="rounded-xl bg-slate-900 overflow-hidden mb-4"
+              style={{ aspectRatio: '9 / 16' }}
+            >
+              <video
+                src={videoUrl}
+                controls
+                className="w-full h-full object-contain"
+              />
+            </div>
               <Button
                 variant="secondary"
                 onClick={handleDownload}

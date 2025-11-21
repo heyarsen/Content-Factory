@@ -138,7 +138,7 @@ export default function Avatars() {
   
   // Generate look form fields
   const [lookPrompt, setLookPrompt] = useState('')
-  const [lookOrientation, setLookOrientation] = useState<'horizontal' | 'vertical' | 'square'>('square')
+  const [lookOrientation, setLookOrientation] = useState<'horizontal' | 'vertical' | 'square'>('vertical')
   const [lookPose, setLookPose] = useState<'half_body' | 'full_body' | 'close_up'>('close_up')
   const [lookStyle, setLookStyle] = useState<'Realistic' | 'Cartoon' | 'Anime'>('Realistic')
   
@@ -892,7 +892,7 @@ export default function Avatars() {
       setShowGenerateLookModal(false)
       setShowLooksModal(null)
       setLookPrompt('')
-      setLookOrientation('square')
+      setLookOrientation('vertical')
       setLookPose('close_up')
       setLookStyle('Realistic')
     } catch (error: any) {
@@ -1584,11 +1584,16 @@ export default function Avatars() {
                   <div className="grid grid-cols-2 gap-3">
                     {lookImagePreviews.map((preview, index) => (
                       <div key={index} className="relative">
-                        <img
-                          src={preview}
-                          alt={`Preview ${index + 1}`}
-                          className="w-full h-32 object-cover rounded-lg border-2 border-slate-200"
-                        />
+                        <div
+                          className="rounded-lg border-2 border-slate-200 overflow-hidden"
+                          style={{ aspectRatio: '9 / 16' }}
+                        >
+                          <img
+                            src={preview}
+                            alt={`Preview ${index + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
                         <button
                           onClick={() => {
                             setLookImageFiles(lookImageFiles.filter((_, i) => i !== index))
@@ -1664,7 +1669,7 @@ export default function Avatars() {
           onClose={() => {
             setShowGenerateLookModal(false)
             setLookPrompt('')
-            setLookOrientation('square')
+            setLookOrientation('vertical')
             setLookPose('close_up')
             setLookStyle('Realistic')
           }}
@@ -1691,8 +1696,8 @@ export default function Avatars() {
                 value={lookOrientation}
                 onChange={(e) => setLookOrientation(e.target.value as any)}
                 options={[
+                  { value: 'vertical', label: 'Vertical (9:16)' },
                   { value: 'horizontal', label: 'Horizontal' },
-                  { value: 'vertical', label: 'Vertical' },
                   { value: 'square', label: 'Square' },
                 ]}
                 disabled={generatingLook}
@@ -1729,7 +1734,7 @@ export default function Avatars() {
                 onClick={() => {
                   setShowGenerateLookModal(false)
                   setLookPrompt('')
-                  setLookOrientation('square')
+                  setLookOrientation('vertical')
                   setLookPose('close_up')
                   setLookStyle('Realistic')
                 }}
