@@ -164,7 +164,41 @@ interface TemplateGenerationInput {
   title?: string
 }
 
+const TEMPLATE_ENV_ID = process.env.HEYGEN_VERTICAL_TEMPLATE_ID?.trim()
+const TEMPLATE_ENV_SCRIPT_KEY = (process.env.HEYGEN_VERTICAL_TEMPLATE_SCRIPT_KEY || 'script').trim() || 'script'
+const TEMPLATE_ENV_VARIABLES = process.env.HEYGEN_VERTICAL_TEMPLATE_VARIABLES
+const TEMPLATE_ENV_OVERRIDES = process.env.HEYGEN_VERTICAL_TEMPLATE_OVERRIDES
+
 const PLACEHOLDER_REGEX = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g
+
+function parseTemplateEnvJson(value?: string): Record<string, any> {
+  if (!value) {
+    return {}
+  }
+
+  try {
+    const parsed = JSON.parse(value)
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed
+    }
+  } catch (error) {
+    console.warn(`Failed to parse template JSON:`, error)
+  }
+  return {}
+}
+
+function getEnvTemplatePreferences(): TemplatePreferences | null {
+  if (!TEMPLATE_ENV_ID) {
+    return null
+  }
+
+  return {
+    templateId: TEMPLATE_ENV_ID,
+    scriptKey: TEMPLATE_ENV_SCRIPT_KEY,
+    variables: parseTemplateEnvJson(TEMPLATE_ENV_VARIABLES),
+    overrides: parseTemplateEnvJson(TEMPLATE_ENV_OVERRIDES),
+  }
+}
 
 async function getTemplatePreferences(userId: string): Promise<TemplatePreferences | null> {
   try {
@@ -176,25 +210,20 @@ async function getTemplatePreferences(userId: string): Promise<TemplatePreferenc
       .eq('user_id', userId)
       .single()
 
-    if (error || !data || !data.heygen_vertical_template_id) {
-      return null
-    }
-
-    const templateId = (data.heygen_vertical_template_id || '').trim()
-    if (!templateId) {
-      return null
-    }
-
-    return {
-      templateId,
-      scriptKey: (data.heygen_vertical_template_script_key || 'script').trim() || 'script',
-      variables: (data.heygen_vertical_template_variables || {}) as Record<string, any>,
-      overrides: (data.heygen_vertical_template_overrides || {}) as Record<string, any>,
+    const templateId = (data?.heygen_vertical_template_id || '').trim()
+    if (!error && data && templateId.length > 0) {
+      return {
+        templateId,
+        scriptKey: (data.heygen_vertical_template_script_key || 'script').trim() || 'script',
+        variables: (data.heygen_vertical_template_variables || {}) as Record<string, any>,
+        overrides: (data.heygen_vertical_template_overrides || {}) as Record<string, any>,
+      }
     }
   } catch (error) {
     console.error('Failed to load HeyGen template preferences:', error)
-    return null
   }
+
+  return getEnvTemplatePreferences()
 }
 
 function replacePlaceholders(value: any, context: TemplateContextRecord): any {
