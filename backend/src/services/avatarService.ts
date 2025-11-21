@@ -648,10 +648,10 @@ export class AvatarService {
           throw new Error('Failed to get group_id from avatar group creation response')
         }
 
-        const sanitizedImageUrls = Array.isArray(imageUrls)
-          ? imageUrls.filter((url): url is string => typeof url === 'string' && url.trim().length > 0)
-          : []
-        const primaryImageUrl = sanitizedImageUrls[0] || null
+      const sanitizedImageUrls = Array.isArray(imageUrls)
+        ? imageUrls.filter((url): url is string => typeof url === 'string' && url.trim().length > 0)
+        : []
+      const primaryImageUrl = sanitizedImageUrls[0] || null
 
       // Add additional images as looks if there are more
       if (imageKeys.length > 1) {
@@ -667,79 +667,90 @@ export class AvatarService {
       }
 
       // Update the avatar record in database
-        const { data: existingAvatar } = await supabase
-          .from('avatars')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('heygen_avatar_id', generationId)
-          .single()
 
-        if (existingAvatar) {
-          const fallbackImageUrl =
-            existingAvatar.avatar_url ||
-            existingAvatar.preview_url ||
-            existingAvatar.thumbnail_url ||
-            null
-          const resolvedImageUrl = primaryImageUrl || fallbackImageUrl
-          const resolvedSource: AvatarSource =
-            existingAvatar.source && existingAvatar.source !== 'synced'
-              ? existingAvatar.source
-              : 'ai_generated'
 
-          // Update existing record
-          const updatePayload = {
-            heygen_avatar_id: groupId,
-            avatar_url: resolvedImageUrl,
-            preview_url: resolvedImageUrl,
-            thumbnail_url: resolvedImageUrl,
-            status: 'active',
-            updated_at: new Date().toISOString(),
-          }
+      const existingAvatarQuery = await supabase
+        .from('avatars')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('heygen_avatar_id', generationId)
+        .single()
 
-          assignAvatarSource(updatePayload, resolvedSource)
+      const existingAvatar = existingAvatarQuery.data as Avatar | null
 
-          const { data, error } = await executeWithAvatarSourceFallback<Avatar>(
-            updatePayload,
-            () =>
-              supabase
-                .from('avatars')
-                .update(updatePayload)
-                .eq('id', existingAvatar.id)
-                .select()
-                .single()
-          )
+      let savedAvatar: Avatar
+      if (existingAvatar) {
+        const fallbackImageUrl =
+          existingAvatar.avatar_url ||
+          existingAvatar.preview_url ||
+          existingAvatar.thumbnail_url ||
+          null
+        const resolvedImageUrl = primaryImageUrl || fallbackImageUrl
+        const resolvedSource: AvatarSource =
+          existingAvatar.source && existingAvatar.source !== 'synced'
+            ? existingAvatar.source
+            : 'ai_generated'
 
-          if (error) throw error
-          return data
-        } else {
-          // Create new record
-          const newAvatarPayload = {
-            user_id: userId,
-            heygen_avatar_id: groupId,
-            avatar_name: avatarName,
-            avatar_url: primaryImageUrl,
-            preview_url: primaryImageUrl,
-            thumbnail_url: primaryImageUrl,
-            gender: null,
-            status: 'active',
-            is_default: false,
-          }
-
-          assignAvatarSource(newAvatarPayload, 'ai_generated')
-
-          const { data, error } = await executeWithAvatarSourceFallback<Avatar>(
-            newAvatarPayload,
-            () =>
-              supabase
-                .from('avatars')
-                .insert(newAvatarPayload)
-                .select()
-                .single()
-          )
-
-          if (error) throw error
-          return data
+        const updatePayload = {
+          heygen_avatar_id: groupId,
+          avatar_url: resolvedImageUrl,
+          preview_url: resolvedImageUrl,
+          thumbnail_url: resolvedImageUrl,
+          status: 'active',
+          updated_at: new Date().toISOString(),
         }
+
+        assignAvatarSource(updatePayload, resolvedSource)
+
+        const { data, error } = await executeWithAvatarSourceFallback<Avatar>(
+          updatePayload,
+          () =>
+            supabase
+              .from('avatars')
+              .update(updatePayload)
+              .eq('id', existingAvatar.id)
+              .select()
+              .single()
+        )
+
+        if (error) throw error
+        savedAvatar = data
+      } else {
+        const newAvatarPayload = {
+          user_id: userId,
+          heygen_avatar_id: groupId,
+          avatar_name: avatarName,
+          avatar_url: primaryImageUrl,
+          preview_url: primaryImageUrl,
+          thumbnail_url: primaryImageUrl,
+          gender: null,
+          status: 'active',
+          is_default: false,
+        }
+
+        assignAvatarSource(newAvatarPayload, 'ai_generated')
+
+        const { data, error } = await executeWithAvatarSourceFallback<Avatar>(
+          newAvatarPayload,
+          () =>
+            supabase
+              .from('avatars')
+              .insert(newAvatarPayload)
+              .select()
+              .single()
+        )
+
+        if (error) throw error
+        savedAvatar = data
+      }
+
+      try {
+        await this.autoGenerateVerticalLook(groupId, undefined, avatarName)
+      } catch (lookError: any) {
+        console.warn('[Auto Look] Failed to generate 9:16 look for AI avatar:', lookError?.message || lookError)
+      }
+
+      return savedAvatar
     } catch (error: any) {
       console.error('Complete AI avatar generation error:', error)
       throw new Error(`Failed to complete AI avatar generation: ${error.message}`)
