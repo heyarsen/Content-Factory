@@ -58,19 +58,18 @@ export function QuickCreate() {
   // Step 3: Generate Video
   const [style, setStyle] = useState<'casual' | 'professional' | 'energetic' | 'educational'>('professional')
   const [duration, setDuration] = useState(30)
-  const [avatars, setAvatars] = useState<
-    Array<{
-      id: string
-      heygen_avatar_id: string
-      avatar_name: string
-      thumbnail_url: string | null
-      preview_url: string | null
-      avatar_url?: string | null
-      status?: string
-      source?: 'synced' | 'user_photo' | 'ai_generated' | null
-      is_default: boolean
-    }>
-  >([])
+  type AvatarRecord = {
+    id: string
+    heygen_avatar_id: string
+    avatar_name: string
+    thumbnail_url: string | null
+    preview_url: string | null
+    avatar_url?: string | null
+    status?: string
+    source?: 'synced' | 'user_photo' | 'ai_generated' | null
+    is_default: boolean
+  }
+  const [avatars, setAvatars] = useState<AvatarRecord[]>([])
   const [selectedAvatarId, setSelectedAvatarId] = useState<string>('')
   const [avatarModalOpen, setAvatarModalOpen] = useState(false)
   const [generatingVideo, setGeneratingVideo] = useState(false)
@@ -111,11 +110,7 @@ export function QuickCreate() {
     return response
   }
 
-  const isUserCreatedAvatar = (avatar: {
-    avatar_url?: string | null
-    status?: string
-    source?: 'synced' | 'user_photo' | 'ai_generated' | null
-  }): boolean => {
+  const isUserCreatedAvatar = (avatar: AvatarRecord): boolean => {
     if (avatar.source === 'user_photo' || avatar.source === 'ai_generated') {
       return true
     }
@@ -143,11 +138,26 @@ export function QuickCreate() {
     return false
   }
 
+  const isAvatarReady = (avatar: AvatarRecord): boolean => avatar.status === 'active'
+
+  const handleSelectAvatar = (avatar: AvatarRecord) => {
+    if (!isAvatarReady(avatar)) {
+      addNotification({
+        type: 'warning',
+        title: 'Avatar Training',
+        message: 'This avatar is still training and cannot be used for video generation yet.',
+      })
+      return
+    }
+    setSelectedAvatarId(avatar.heygen_avatar_id)
+    setAvatarModalOpen(false)
+  }
+
   const loadAvatars = async () => {
     try {
       const response = await api.get('/api/avatars', { params: { all: 'true' } })
       const allAvatars = response.data.avatars || []
-      const userAvatars = allAvatars.filter(isUserCreatedAvatar)
+      const userAvatars = allAvatars.filter((avatar) => isUserCreatedAvatar(avatar))
       setAvatars(userAvatars)
       const defaultAvatar = userAvatars.find((a: any) => a.is_default)
       if (defaultAvatar) {
@@ -966,10 +976,7 @@ export function QuickCreate() {
                   <button
                     key={avatar.id}
                     type="button"
-                    onClick={() => {
-                      setSelectedAvatarId(avatar.heygen_avatar_id)
-                      setAvatarModalOpen(false)
-                    }}
+                      onClick={() => handleSelectAvatar(avatar)}
                     className={`relative rounded-xl border-2 p-3 transition-all hover:scale-105 ${
                       selectedAvatarId === avatar.heygen_avatar_id
                         ? 'border-brand-500 bg-brand-50 shadow-lg ring-2 ring-brand-200'
@@ -990,9 +997,22 @@ export function QuickCreate() {
                     <p className="text-xs font-medium text-slate-700 truncate text-center">
                       {avatar.avatar_name}
                     </p>
-                    {selectedAvatarId === avatar.heygen_avatar_id && (
+                    {selectedAvatarId === avatar.heygen_avatar_id && isAvatarReady(avatar) && (
                       <div className="absolute top-2 right-2 bg-brand-500 text-white rounded-full p-1.5 shadow-lg ring-2 ring-white">
                         <CheckCircle2 className="h-4 w-4" />
+                      </div>
+                    )}
+                    {!isAvatarReady(avatar) && (
+                      <div className="absolute inset-0 flex flex-col justify-between">
+                        <span className="text-center text-xs font-semibold uppercase tracking-widest text-rose-600 bg-rose-50/90 px-2 py-1">
+                          Training
+                        </span>
+                        <div className="flex-1"></div>
+                        <div className="text-center">
+                          <span className="text-[11px] font-semibold uppercase text-slate-400">
+                            Not ready yet
+                          </span>
+                        </div>
                       </div>
                     )}
                   </button>
