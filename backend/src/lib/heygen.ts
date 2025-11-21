@@ -1779,7 +1779,7 @@ export async function createAvatarFromPhoto(
  */
 export interface GenerateAIAvatarRequest {
   name: string
-  age: 'Young Adult' | 'Adult' | 'Middle Aged' | 'Senior'
+  age: 'Young Adult' | 'Early Middle Age' | 'Late Middle Age' | 'Senior' | 'Unspecified'
   gender: 'Man' | 'Woman'
   ethnicity: string
   orientation: 'horizontal' | 'vertical' | 'square'
