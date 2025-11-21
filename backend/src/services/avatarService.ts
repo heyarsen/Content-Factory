@@ -22,6 +22,7 @@ import {
   AvatarSource,
   assignAvatarSource,
   executeWithAvatarSourceFallback,
+  isAvatarSourceColumnEnabled,
 } from '../lib/avatarSourceColumn.js'
 
 const AUTO_LOOKS_ENABLED =
@@ -583,9 +584,13 @@ export class AvatarService {
         .order('is_default', { ascending: false })
         .order('avatar_name', { ascending: true })
 
-      if (error) throw error
+    if (error) throw error
 
-      return (data || []).filter((avatar) => this.isUserCreatedAvatar(avatar))
+    const avatars = data || []
+    if (!isAvatarSourceColumnEnabled()) {
+      return avatars
+    }
+    return avatars.filter((avatar) => this.isUserCreatedAvatar(avatar))
     }
 
   /**
