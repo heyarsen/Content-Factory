@@ -36,11 +36,8 @@ const isPhotoAvatarRecord = (avatar?: AvatarRecord | null): boolean => {
   if (!avatar) {
     return false
   }
-  if (avatar.source === 'user_photo') {
+  if (avatar.source === 'user_photo' || avatar.source === 'ai_generated') {
     return true
-  }
-  if (avatar.source === 'ai_generated') {
-    return false
   }
   return !!avatar.avatar_url && avatar.avatar_url.includes('supabase.co/storage')
 }
