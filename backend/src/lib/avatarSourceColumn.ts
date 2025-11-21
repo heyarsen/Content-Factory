@@ -1,4 +1,7 @@
-import type { PostgrestSingleResponse } from '@supabase/supabase-js'
+import type {
+  PostgrestBuilder,
+  PostgrestSingleResponse,
+} from '@supabase/supabase-js'
 
 const MISSING_SOURCE_COLUMN_CODE = 'PGRST204'
 const SOURCE_COLUMN_PATTERN = /'source'\s+column/i
@@ -23,7 +26,7 @@ export function assignAvatarSource(payload: Record<string, any>, source: AvatarS
 
 export async function executeWithAvatarSourceFallback<T>(
   payload: Record<string, any>,
-  executor: () => Promise<PostgrestSingleResponse<T>>
+  executor: () => PostgrestBuilder<PostgrestSingleResponse<T>>
 ): Promise<PostgrestSingleResponse<T>> {
   const result = await executor()
 
@@ -34,7 +37,7 @@ export async function executeWithAvatarSourceFallback<T>(
   ) {
     avatarSourceColumnEnabled = false
     delete payload.source
-    return executor()
+    return await executor()
   }
 
   return result
