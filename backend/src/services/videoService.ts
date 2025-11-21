@@ -1,7 +1,8 @@
 import { supabase } from '../lib/supabase.js'
-import { generateVideo as requestHeygenVideo, getVideoStatus } from '../lib/heygen.js'
+import { generateVideo as requestHeygenVideo, generateVideoFromTemplate, getVideoStatus } from '../lib/heygen.js'
 import type {
   GenerateVideoRequest,
+  GenerateTemplateVideoRequest,
   HeyGenDimensionInput,
   HeyGenVideoResponse,
 } from '../lib/heygen.js'
@@ -133,6 +134,148 @@ async function resolveAvatarContext(
   }
 
   throw new Error('Avatar not found. Please ensure the selected avatar belongs to your account.')
+}
+
+interface TemplatePreferences {
+  templateId: string
+  scriptKey: string
+  variables: Record<string, any>
+  overrides: Record<string, any>
+}
+
+interface TemplateContext {
+  script: string
+  topic: string
+  avatar_id?: string
+  talking_photo_id?: string
+}
+
+interface TemplateGenerationInput {
+  userId: string
+  topic: string
+  script?: string | null
+  avatarId: string
+  isPhotoAvatar: boolean
+  dimension?: HeyGenDimensionInput
+  title?: string
+}
+
+const PLACEHOLDER_REGEX = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g
+
+async function getTemplatePreferences(userId: string): Promise<TemplatePreferences | null> {
+  try {
+    const { data, error } = await supabase
+      .from('user_preferences')
+      .select(
+        'heygen_vertical_template_id, heygen_vertical_template_script_key, heygen_vertical_template_variables, heygen_vertical_template_overrides'
+      )
+      .eq('user_id', userId)
+      .single()
+
+    if (error || !data || !data.heygen_vertical_template_id) {
+      return null
+    }
+
+    const templateId = (data.heygen_vertical_template_id || '').trim()
+    if (!templateId) {
+      return null
+    }
+
+    return {
+      templateId,
+      scriptKey: (data.heygen_vertical_template_script_key || 'script').trim() || 'script',
+      variables: (data.heygen_vertical_template_variables || {}) as Record<string, any>,
+      overrides: (data.heygen_vertical_template_overrides || {}) as Record<string, any>,
+    }
+  } catch (error) {
+    console.error('Failed to load HeyGen template preferences:', error)
+    return null
+  }
+}
+
+function replacePlaceholders(value: any, context: TemplateContext): any {
+  if (typeof value === 'string') {
+    return value.replace(PLACEHOLDER_REGEX, (_, token) => {
+      const replacement = (context as Record<string, string | undefined>)[token]
+      return replacement !== undefined ? String(replacement) : ''
+    })
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => replacePlaceholders(item, context))
+  }
+
+  if (value && typeof value === 'object') {
+    const result: Record<string, any> = {}
+    for (const [key, nestedValue] of Object.entries(value)) {
+      result[key] = replacePlaceholders(nestedValue, context)
+    }
+    return result
+  }
+
+  return value
+}
+
+function buildTemplateVariables(
+  rawVariables: Record<string, any>,
+  scriptKey: string,
+  scriptValue: string,
+  context: TemplateContext
+): Record<string, any> {
+  const sanitizedVariables = { ...rawVariables }
+  const key = scriptKey?.trim() || 'script'
+  sanitizedVariables[key] = scriptValue
+  return replacePlaceholders(sanitizedVariables, context)
+}
+
+function buildTemplateOverrides(
+  rawOverrides: Record<string, any>,
+  context: TemplateContext
+): Record<string, any> {
+  if (!rawOverrides || Object.keys(rawOverrides).length === 0) {
+    return {}
+  }
+  return replacePlaceholders(rawOverrides, context)
+}
+
+async function maybeGenerateVideoUsingTemplate(
+  input: TemplateGenerationInput
+): Promise<HeyGenVideoResponse | null> {
+  const preferences = await getTemplatePreferences(input.userId)
+  if (!preferences) {
+    return null
+  }
+
+  const scriptValue = (input.script?.trim() || input.topic || 'Video Content').trim() || 'Video Content'
+  const topicValue = (input.topic || scriptValue || 'Video Content').trim() || 'Video Content'
+  const context: TemplateContext = {
+    script: scriptValue,
+    topic: topicValue,
+    avatar_id: input.avatarId?.trim() || undefined,
+  }
+
+  if (input.isPhotoAvatar) {
+    context.talking_photo_id = input.avatarId?.trim() || undefined
+  }
+
+  const variables = buildTemplateVariables(preferences.variables, preferences.scriptKey, scriptValue, context)
+  const overrides = buildTemplateOverrides(preferences.overrides, context)
+
+  const request: GenerateTemplateVideoRequest = {
+    template_id: preferences.templateId,
+    variables,
+    title: input.title?.trim() || topicValue,
+    caption: false,
+    dimension: input.dimension,
+  }
+
+  if (Object.keys(overrides).length > 0) {
+    request.overrides = overrides
+  }
+
+  console.log(`[Template Generation] Using HeyGen template ${preferences.templateId} for user ${input.userId}`)
+
+  return generateVideoFromTemplate(request)
 }
 
 export interface ManualVideoInput {
@@ -306,6 +449,22 @@ async function runHeygenGeneration(
     }
 
     const resolvedAvatarId = await resolveCharacterIdentifier(avatarId, isPhotoAvatar)
+
+    const templateResponse = await maybeGenerateVideoUsingTemplate({
+      userId: video.user_id,
+      topic: video.topic,
+      script: video.script || undefined,
+      avatarId: resolvedAvatarId,
+      isPhotoAvatar,
+      dimension,
+      title: video.topic,
+    })
+
+    if (templateResponse) {
+      await applyManualGenerationSuccess(video.id, templateResponse)
+      await updatePlanItemStatus(planItemId, templateResponse.status)
+      return
+    }
 
     const payload = buildHeygenPayload(
       video.topic,
@@ -633,12 +792,31 @@ export class VideoService {
       }
 
       const { avatarId, isPhotoAvatar } = await resolveAvatarContext(reel.user_id, null)
+      const resolvedAvatarId = await resolveCharacterIdentifier(avatarId, isPhotoAvatar)
+      const templateDimension = { ...DEFAULT_VERTICAL_DIMENSION }
+      const templateResponse = await maybeGenerateVideoUsingTemplate({
+        userId: reel.user_id,
+        topic: reel.topic,
+        script: scriptText,
+        avatarId: resolvedAvatarId,
+        isPhotoAvatar,
+        dimension: templateDimension,
+        title: reel.topic,
+      })
+
+      if (templateResponse) {
+        return {
+          video_id: templateResponse.video_id,
+          video_url: templateResponse.video_url || null,
+        }
+      }
+
       const payload = buildHeygenPayload(
         reel.topic,
         scriptText,
         DEFAULT_REEL_STYLE,
         DEFAULT_REEL_DURATION,
-        avatarId,
+        resolvedAvatarId,
         isPhotoAvatar,
         DEFAULT_HEYGEN_RESOLUTION,
         DEFAULT_VERTICAL_ASPECT_RATIO
