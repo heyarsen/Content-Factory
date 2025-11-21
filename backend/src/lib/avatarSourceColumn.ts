@@ -1,7 +1,7 @@
 import type {
   PostgrestBuilder,
   PostgrestSingleResponse,
-} from '@supabase/supabase-js'
+} from '@supabase/postgrest-js'
 
 const MISSING_SOURCE_COLUMN_CODE = 'PGRST204'
 const SOURCE_COLUMN_PATTERN = /'source'\s+column/i
