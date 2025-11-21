@@ -29,10 +29,18 @@ type AvatarRecord = {
   id: string
   heygen_avatar_id: string
   avatar_url: string | null
+  source?: 'synced' | 'user_photo' | 'ai_generated' | null
 }
 
-const isUserUploadedAvatar = (url?: string | null): boolean =>
-  !!url && url.includes('supabase.co/storage')
+const isPhotoAvatarRecord = (avatar?: AvatarRecord | null): boolean => {
+  if (!avatar) {
+    return false
+  }
+  if (avatar.source === 'user_photo' || avatar.source === 'ai_generated') {
+    return true
+  }
+  return !!avatar.avatar_url && avatar.avatar_url.includes('supabase.co/storage')
+}
 
 async function resolveCharacterIdentifier(
   avatarId?: string,
@@ -88,14 +96,14 @@ interface AvatarContext {
 async function resolveAvatarContext(
   userId: string,
   requestedAvatarId?: string | null
-): Promise<AvatarContext> {
-  const { AvatarService } = await import('./avatarService.js')
+  ): Promise<AvatarContext> {
+    const { AvatarService } = await import('./avatarService.js')
 
-  const mapAvatarRecord = (avatar: AvatarRecord): AvatarContext => ({
-    avatarId: avatar.heygen_avatar_id,
-    avatarRecordId: avatar.id,
-    isPhotoAvatar: isUserUploadedAvatar(avatar.avatar_url),
-  })
+    const mapAvatarRecord = (avatar: AvatarRecord): AvatarContext => ({
+      avatarId: avatar.heygen_avatar_id,
+      avatarRecordId: avatar.id,
+      isPhotoAvatar: isPhotoAvatarRecord(avatar),
+    })
 
   if (!requestedAvatarId) {
     const defaultAvatar = await AvatarService.getDefaultAvatar(userId)

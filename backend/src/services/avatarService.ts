@@ -19,6 +19,8 @@ import { supabase } from '../lib/supabase.js'
     GenerationStatus,
   } from '../lib/heygen.js'
 
+type AvatarSource = 'synced' | 'user_photo' | 'ai_generated'
+
 const AUTO_LOOKS_ENABLED =
   process.env.HEYGEN_AUTO_LOOKS_ENABLED?.toLowerCase() === 'false' ? false : true
 
@@ -65,6 +67,7 @@ export interface Avatar {
   is_default: boolean
   created_at: string
   updated_at: string
+  source: AvatarSource | null
 }
 
 export class AvatarService {
@@ -102,26 +105,27 @@ export class AvatarService {
             .select()
             .single()
 
-          if (!error && data) {
-            syncedAvatars.push(data)
-          }
-        } else {
-          // Insert new avatar
-          const { data, error } = await supabase
-            .from('avatars')
-            .insert({
-              user_id: userId,
-              heygen_avatar_id: heygenAvatar.avatar_id,
-              avatar_name: heygenAvatar.avatar_name,
-              avatar_url: heygenAvatar.avatar_url || null,
-              preview_url: heygenAvatar.preview_url || null,
-              thumbnail_url: heygenAvatar.thumbnail_url || null,
-              gender: heygenAvatar.gender || null,
-              status: heygenAvatar.status || 'active',
-              is_default: false,
-            })
-            .select()
-            .single()
+            if (!error && data) {
+              syncedAvatars.push(data)
+            }
+          } else {
+            // Insert new avatar
+            const { data, error } = await supabase
+              .from('avatars')
+              .insert({
+                user_id: userId,
+                heygen_avatar_id: heygenAvatar.avatar_id,
+                avatar_name: heygenAvatar.avatar_name,
+                avatar_url: heygenAvatar.avatar_url || null,
+                preview_url: heygenAvatar.preview_url || null,
+                thumbnail_url: heygenAvatar.thumbnail_url || null,
+                gender: heygenAvatar.gender || null,
+                status: heygenAvatar.status || 'active',
+                is_default: false,
+                source: 'synced',
+              })
+              .select()
+              .single()
 
           if (!error && data) {
             syncedAvatars.push(data)
@@ -254,6 +258,7 @@ export class AvatarService {
           gender: heygenAvatar.gender || null,
           status: heygenAvatar.status || 'active',
           is_default: false,
+            source: 'synced',
         })
         .select()
         .single()
@@ -299,6 +304,15 @@ export class AvatarService {
 
   private static isUserCreatedAvatar(avatar: Avatar | null): boolean {
     if (!avatar) return false
+
+    if (avatar.source === 'user_photo' || avatar.source === 'ai_generated') {
+      return true
+    }
+
+    if (avatar.source === 'synced') {
+      return false
+    }
+
     if (avatar.avatar_url && avatar.avatar_url.includes('supabase.co/storage')) {
       return true
     }
@@ -356,23 +370,24 @@ export class AvatarService {
       const { createAvatarFromPhoto } = await import('../lib/heygen.js')
       const result = await createAvatarFromPhoto(photoUrl, avatarName, additionalPhotoUrls)
 
-      // Save to database
-      // Save photoUrl as avatar_url to identify user-created avatars
-      const { data, error } = await supabase
-        .from('avatars')
-        .insert({
-          user_id: userId,
-          heygen_avatar_id: result.avatar_id,
-          avatar_name: avatarName,
-          avatar_url: photoUrl, // Save the photo URL to identify user-created avatars
-          preview_url: photoUrl,
-          thumbnail_url: photoUrl,
-          gender: null,
-          status: result.status === 'training' ? 'training' : 'active',
-          is_default: false,
-        })
-        .select()
-        .single()
+        // Save to database
+        // Save photoUrl as avatar_url to identify user-created avatars
+        const { data, error } = await supabase
+          .from('avatars')
+          .insert({
+            user_id: userId,
+            heygen_avatar_id: result.avatar_id,
+            avatar_name: avatarName,
+            avatar_url: photoUrl, // Save the photo URL to identify user-created avatars
+            preview_url: photoUrl,
+            thumbnail_url: photoUrl,
+            gender: null,
+            status: result.status === 'training' ? 'training' : 'active',
+            is_default: false,
+            source: 'user_photo',
+          })
+          .select()
+          .single()
 
       if (error) throw error
       return data
@@ -535,48 +550,19 @@ export class AvatarService {
    * - status 'training' or 'pending' (recently created, not synced)
    * We exclude avatars that were synced from HeyGen (which typically have avatar_url from HeyGen CDN)
    */
-  static async getUserCreatedAvatars(userId: string): Promise<Avatar[]> {
-    const { data, error } = await supabase
-      .from('avatars')
-      .select('*')
-      .eq('user_id', userId)
-      .in('status', ['active', 'training', 'pending', 'generating'])
-      .order('is_default', { ascending: false })
-      .order('avatar_name', { ascending: true })
+    static async getUserCreatedAvatars(userId: string): Promise<Avatar[]> {
+      const { data, error } = await supabase
+        .from('avatars')
+        .select('*')
+        .eq('user_id', userId)
+        .in('status', ['active', 'training', 'pending', 'generating'])
+        .order('is_default', { ascending: false })
+        .order('avatar_name', { ascending: true })
 
-    if (error) throw error
-    
-    // Filter to only include user-created avatars:
-    // 1. Avatars with Supabase storage URLs (photo uploads)
-    // 2. Avatars with status 'generating' (AI generation in progress)
-    // 3. Avatars with status 'training' or 'pending' that don't have HeyGen CDN URLs
-    const userCreated = (data || []).filter(avatar => {
-      // If it has a Supabase storage URL, it's user-created
-      if (avatar.avatar_url && avatar.avatar_url.includes('supabase.co/storage')) {
-        return true
-      }
-      // If status is generating, it's user-created (AI generation)
-      if (avatar.status === 'generating') {
-        return true
-      }
-      // If status is training or pending and doesn't have a HeyGen CDN URL, it's likely user-created
-      if ((avatar.status === 'training' || avatar.status === 'pending') && 
-          (!avatar.avatar_url || !avatar.avatar_url.includes('heygen'))) {
-        return true
-      }
-      // Exclude avatars with HeyGen CDN URLs (these are synced from HeyGen)
-      if (avatar.avatar_url && avatar.avatar_url.includes('heygen')) {
-        return false
-      }
-      // Include avatars with no URL if they're in training/pending (recently created)
-      if (!avatar.avatar_url && (avatar.status === 'training' || avatar.status === 'pending')) {
-        return true
-      }
-      return false
-    })
+      if (error) throw error
 
-    return userCreated
-  }
+      return (data || []).filter((avatar) => this.isUserCreatedAvatar(avatar))
+    }
 
   /**
    * Complete AI avatar generation by creating avatar group from generated images
@@ -585,7 +571,8 @@ export class AvatarService {
     userId: string,
     generationId: string,
     imageKeys: string[],
-    avatarName: string
+    avatarName: string,
+    imageUrls?: string[]
   ): Promise<Avatar> {
     try {
       if (!imageKeys || imageKeys.length === 0) {
@@ -619,14 +606,20 @@ export class AvatarService {
         }
       )
 
-      const groupId = createGroupResponse.data?.data?.id || 
-                     createGroupResponse.data?.data?.group_id ||
-                     createGroupResponse.data?.id ||
-                     createGroupResponse.data?.group_id
+        const groupId =
+          createGroupResponse.data?.data?.id ||
+          createGroupResponse.data?.data?.group_id ||
+          createGroupResponse.data?.id ||
+          createGroupResponse.data?.group_id
 
-      if (!groupId) {
-        throw new Error('Failed to get group_id from avatar group creation response')
-      }
+        if (!groupId) {
+          throw new Error('Failed to get group_id from avatar group creation response')
+        }
+
+        const sanitizedImageUrls = Array.isArray(imageUrls)
+          ? imageUrls.filter((url): url is string => typeof url === 'string' && url.trim().length > 0)
+          : []
+        const primaryImageUrl = sanitizedImageUrls[0] || null
 
       // Add additional images as looks if there are more
       if (imageKeys.length > 1) {
@@ -642,49 +635,65 @@ export class AvatarService {
       }
 
       // Update the avatar record in database
-      const { data: existingAvatar } = await supabase
-        .from('avatars')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('heygen_avatar_id', generationId)
-        .single()
-
-      if (existingAvatar) {
-        // Update existing record
-        const { data, error } = await supabase
+        const { data: existingAvatar } = await supabase
           .from('avatars')
-          .update({
-            heygen_avatar_id: groupId,
-            status: 'active',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', existingAvatar.id)
-          .select()
+          .select('*')
+          .eq('user_id', userId)
+          .eq('heygen_avatar_id', generationId)
           .single()
 
-        if (error) throw error
-        return data
-      } else {
-        // Create new record
-        const { data, error } = await supabase
-          .from('avatars')
-          .insert({
-            user_id: userId,
-            heygen_avatar_id: groupId,
-            avatar_name: avatarName,
-            avatar_url: null,
-            preview_url: null,
-            thumbnail_url: null,
-            gender: null,
-            status: 'active',
-            is_default: false,
-          })
-          .select()
-          .single()
+        if (existingAvatar) {
+          const fallbackImageUrl =
+            existingAvatar.avatar_url ||
+            existingAvatar.preview_url ||
+            existingAvatar.thumbnail_url ||
+            null
+          const resolvedImageUrl = primaryImageUrl || fallbackImageUrl
+          const resolvedSource: AvatarSource =
+            existingAvatar.source && existingAvatar.source !== 'synced'
+              ? existingAvatar.source
+              : 'ai_generated'
 
-        if (error) throw error
-        return data
-      }
+          // Update existing record
+          const { data, error } = await supabase
+            .from('avatars')
+            .update({
+              heygen_avatar_id: groupId,
+              avatar_url: resolvedImageUrl,
+              preview_url: resolvedImageUrl,
+              thumbnail_url: resolvedImageUrl,
+              status: 'active',
+              updated_at: new Date().toISOString(),
+              source: resolvedSource,
+            })
+            .eq('id', existingAvatar.id)
+            .select()
+            .single()
+
+          if (error) throw error
+          return data
+        } else {
+          // Create new record
+          const { data, error } = await supabase
+            .from('avatars')
+            .insert({
+              user_id: userId,
+              heygen_avatar_id: groupId,
+              avatar_name: avatarName,
+              avatar_url: primaryImageUrl,
+              preview_url: primaryImageUrl,
+              thumbnail_url: primaryImageUrl,
+              gender: null,
+              status: 'active',
+              is_default: false,
+              source: 'ai_generated',
+            })
+            .select()
+            .single()
+
+          if (error) throw error
+          return data
+        }
     } catch (error: any) {
       console.error('Complete AI avatar generation error:', error)
       throw new Error(`Failed to complete AI avatar generation: ${error.message}`)

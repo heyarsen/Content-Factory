@@ -473,6 +473,7 @@ router.post('/generate-ai', async (req: AuthRequest, res: Response) => {
         gender: request.gender,
         status: 'generating',
         is_default: false,
+          source: 'ai_generated',
       })
       .select()
       .single()
@@ -543,7 +544,7 @@ router.get('/generation-status/:generationId', async (req: AuthRequest, res: Res
 router.post('/complete-ai-generation', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
-    const { generation_id, image_keys, avatar_name } = req.body
+    const { generation_id, image_keys, avatar_name, image_urls } = req.body
 
     if (!generation_id || !image_keys || !Array.isArray(image_keys) || image_keys.length === 0 || !avatar_name) {
       return res.status(400).json({ error: 'generation_id, image_keys array, and avatar_name are required' })
@@ -553,7 +554,8 @@ router.post('/complete-ai-generation', async (req: AuthRequest, res: Response) =
       userId,
       generation_id,
       image_keys,
-      avatar_name
+      avatar_name,
+      image_urls
     )
 
     return res.json({
