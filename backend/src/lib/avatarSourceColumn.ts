@@ -32,7 +32,10 @@ export async function executeWithAvatarSourceFallback<T>(
     false
   >
 ): Promise<PostgrestSingleResponse<T>> {
-  const result = await executor()
+  const executeOnce = (): Promise<PostgrestSingleResponse<T>> =>
+    executor().then((response) => response as PostgrestSingleResponse<T>)
+
+  const result = await executeOnce()
 
   if (
     avatarSourceColumnEnabled &&
@@ -41,7 +44,7 @@ export async function executeWithAvatarSourceFallback<T>(
   ) {
     avatarSourceColumnEnabled = false
     delete payload.source
-    return await executor()
+    return executeOnce()
   }
 
   return result
