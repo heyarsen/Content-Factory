@@ -286,7 +286,7 @@ async function runHeygenGeneration(
   video: Video,
   avatarId?: string,
   isPhotoAvatar: boolean = false,
-  outputResolution: string = DEFAULT_HEYGEN_RESOLUTION,
+  outputResolution: string = DEFAULT_VERTICAL_OUTPUT_RESOLUTION,
   planItemId?: string | null,
   aspectRatio: string | null = DEFAULT_VERTICAL_ASPECT_RATIO,
   dimension?: HeyGenDimensionInput
@@ -436,11 +436,9 @@ export class VideoService {
     }
     
     const video = await this.createVideoRecord(userId, input, avatarRecordId)
-    const outputResolution = input.output_resolution || DEFAULT_HEYGEN_RESOLUTION
-    const aspectRatio = input.aspect_ratio || DEFAULT_VERTICAL_ASPECT_RATIO
-    const dimension =
-      input.dimension ||
-      (aspectRatio === DEFAULT_VERTICAL_ASPECT_RATIO ? { ...DEFAULT_VERTICAL_DIMENSION } : undefined)
+    const outputResolution = DEFAULT_VERTICAL_OUTPUT_RESOLUTION
+    const aspectRatio = DEFAULT_VERTICAL_ASPECT_RATIO
+    const dimension = { ...DEFAULT_VERTICAL_DIMENSION }
     void runHeygenGeneration(
       video,
       avatarId,
