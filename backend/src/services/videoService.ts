@@ -143,7 +143,11 @@ interface TemplatePreferences {
   overrides: Record<string, any>
 }
 
-interface TemplateContext {
+interface TemplateContextRecord {
+  [key: string]: string | undefined
+}
+
+interface TemplateContext extends TemplateContextRecord {
   script: string
   topic: string
   avatar_id?: string
@@ -154,7 +158,7 @@ interface TemplateGenerationInput {
   userId: string
   topic: string
   script?: string | null
-  avatarId: string
+  avatarId?: string
   isPhotoAvatar: boolean
   dimension?: HeyGenDimensionInput
   title?: string
@@ -193,10 +197,10 @@ async function getTemplatePreferences(userId: string): Promise<TemplatePreferenc
   }
 }
 
-function replacePlaceholders(value: any, context: TemplateContext): any {
+function replacePlaceholders(value: any, context: TemplateContextRecord): any {
   if (typeof value === 'string') {
     return value.replace(PLACEHOLDER_REGEX, (_, token) => {
-      const replacement = (context as Record<string, string | undefined>)[token]
+      const replacement = context[token]
       return replacement !== undefined ? String(replacement) : ''
     })
   }
@@ -220,7 +224,7 @@ function buildTemplateVariables(
   rawVariables: Record<string, any>,
   scriptKey: string,
   scriptValue: string,
-  context: TemplateContext
+  context: TemplateContextRecord
 ): Record<string, any> {
   const sanitizedVariables = { ...rawVariables }
   const key = scriptKey?.trim() || 'script'
@@ -230,7 +234,7 @@ function buildTemplateVariables(
 
 function buildTemplateOverrides(
   rawOverrides: Record<string, any>,
-  context: TemplateContext
+  context: TemplateContextRecord
 ): Record<string, any> {
   if (!rawOverrides || Object.keys(rawOverrides).length === 0) {
     return {}
