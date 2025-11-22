@@ -632,8 +632,46 @@ router.post('/:avatarId/train', async (req: AuthRequest, res: Response) => {
 
     const groupId = avatar.heygen_avatar_id
 
-    // Start training
-    await startAvatarTraining(groupId, photo_avatar_ids)
+    // If photo_avatar_ids are not provided, fetch all looks from the group
+    // and use only the original looks (exclude AI-generated looks added later)
+    let looksToTrain = photo_avatar_ids
+    if (!looksToTrain || !Array.isArray(looksToTrain) || looksToTrain.length === 0) {
+      try {
+        // Fetch avatar details to get all looks
+        const details = await AvatarService.fetchPhotoAvatarDetails(avatarId, userId)
+        
+        // Get all looks from the group
+        const { getPhotoAvatarDetails } = await import('../lib/heygen.js')
+        const groupDetails = await getPhotoAvatarDetails(groupId)
+        
+        // Use all looks that are in "ready" or "active" status
+        // These should be the original looks created during avatar creation
+        if (groupDetails.looks && Array.isArray(groupDetails.looks)) {
+          const readyLooks = groupDetails.looks
+            .filter((look: any) => look.status === 'ready' || look.status === 'active')
+            .map((look: any) => look.id)
+            .filter((id: any): id is string => typeof id === 'string' && id.trim().length > 0)
+          
+          if (readyLooks.length > 0) {
+            looksToTrain = readyLooks
+            console.log(`[Training] Using ${readyLooks.length} ready look(s) for training:`, readyLooks)
+          } else {
+            // Fallback: use all looks if none are ready
+            looksToTrain = groupDetails.looks
+              .map((look: any) => look.id)
+              .filter((id: any): id is string => typeof id === 'string' && id.trim().length > 0)
+            console.log(`[Training] No ready looks found, using all ${looksToTrain.length} look(s) for training`)
+          }
+        }
+      } catch (detailsError: any) {
+        console.warn('[Training] Could not fetch avatar details to determine looks, training without specifying looks:', detailsError.message)
+        // Continue without specifying looks - HeyGen will use all looks in the group
+        looksToTrain = undefined
+      }
+    }
+
+    // Start training with the determined looks
+    await startAvatarTraining(groupId, looksToTrain)
 
     // Update avatar status to 'training'
     await supabase
@@ -647,6 +685,7 @@ router.post('/:avatarId/train', async (req: AuthRequest, res: Response) => {
     return res.json({
       message: 'Training started successfully',
       group_id: groupId,
+      looks_used: looksToTrain?.length || 'all looks in group',
     })
   } catch (error: any) {
     console.error('Start training error:', error)
