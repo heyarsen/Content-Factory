@@ -169,6 +169,10 @@ const TEMPLATE_ENV_SCRIPT_KEY = (process.env.HEYGEN_VERTICAL_TEMPLATE_SCRIPT_KEY
 const TEMPLATE_ENV_VARIABLES = process.env.HEYGEN_VERTICAL_TEMPLATE_VARIABLES
 const TEMPLATE_ENV_OVERRIDES = process.env.HEYGEN_VERTICAL_TEMPLATE_OVERRIDES
 
+// Default template ID to use when no other template is configured
+// This ensures all videos use templates by default
+const DEFAULT_TEMPLATE_ID = 'baf2ab03a4354aebac815fd42c10895b'
+
 const PLACEHOLDER_REGEX = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g
 
 function parseTemplateEnvJson(value?: string): Record<string, any> {
@@ -188,12 +192,17 @@ function parseTemplateEnvJson(value?: string): Record<string, any> {
 }
 
 function getEnvTemplatePreferences(): TemplatePreferences | null {
-  if (!TEMPLATE_ENV_ID) {
+  // Use env var if set, otherwise fall back to default template ID
+  const templateId = TEMPLATE_ENV_ID || DEFAULT_TEMPLATE_ID
+  
+  if (!templateId || templateId.trim().length === 0) {
     return null
   }
 
+  console.log(`[Template] Using template ID: ${templateId} (${TEMPLATE_ENV_ID ? 'from env var' : 'default fallback'})`)
+
   return {
-    templateId: TEMPLATE_ENV_ID,
+    templateId: templateId.trim(),
     scriptKey: TEMPLATE_ENV_SCRIPT_KEY,
     variables: parseTemplateEnvJson(TEMPLATE_ENV_VARIABLES),
     overrides: parseTemplateEnvJson(TEMPLATE_ENV_OVERRIDES),
@@ -232,11 +241,12 @@ async function getTemplatePreferences(userId: string): Promise<TemplatePreferenc
 
   const envPrefs = getEnvTemplatePreferences()
   if (envPrefs) {
-    console.log(`[Template] Using environment template: ${envPrefs.templateId}`)
+    // Logging is already done in getEnvTemplatePreferences
+    return envPrefs
   } else {
-    console.log(`[Template] No template configured (neither user preference nor HEYGEN_VERTICAL_TEMPLATE_ID env var)`)
+    console.error(`[Template] CRITICAL: No template available (default template ID is invalid)`)
+    return null
   }
-  return envPrefs
 }
 
 function replacePlaceholders(value: any, context: TemplateContextRecord): any {
