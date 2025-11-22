@@ -1614,8 +1614,13 @@ export async function createAvatarFromPhoto(
       const maxRetries = 3
       let lastError: any = null
       const trainingPayload: Record<string, any> = { group_id: groupId }
+      // Always specify which looks to train to ensure consistency
+      // This prevents training on auto-created looks or looks added later
       if (lookIds.length) {
         trainingPayload.photo_avatar_ids = lookIds
+        console.log(`[Training] Training with ${lookIds.length} specific look(s) to ensure consistency:`, lookIds)
+      } else {
+        console.warn(`[Training] No look IDs provided - HeyGen will train on all looks in the group, which may include auto-created or later-added looks`)
       }
 
     // Retry training start with exponential backoff (HeyGen may need more time to process looks)
@@ -2041,6 +2046,9 @@ export async function startAvatarTraining(
     const payload: Record<string, any> = { group_id: groupId }
     if (photoAvatarIds && photoAvatarIds.length > 0) {
       payload.photo_avatar_ids = photoAvatarIds
+      console.log(`[Training] Starting training for group ${groupId} with ${photoAvatarIds.length} specific look(s):`, photoAvatarIds)
+    } else {
+      console.warn(`[Training] Starting training for group ${groupId} without specifying looks - HeyGen will use all looks in the group. This may include auto-created or later-added looks which could cause inconsistent results.`)
     }
 
     const response = await axios.post(
@@ -2054,7 +2062,10 @@ export async function startAvatarTraining(
       }
     )
 
-    console.log('✅ Training started successfully for group:', groupId, response.data)
+    console.log('✅ Training started successfully for group:', groupId, {
+      looks_specified: photoAvatarIds?.length || 0,
+      response: response.data,
+    })
   } catch (error: any) {
     console.error('HeyGen API error (startAvatarTraining):', error.response?.data || error.message)
     const errorMessage = error.response?.data?.error?.message || 

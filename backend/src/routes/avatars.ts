@@ -1,4 +1,5 @@
 import { Router, Response } from 'express'
+import axios from 'axios'
 import { authenticate, AuthRequest } from '../middleware/auth.js'
 import { AvatarService } from '../services/avatarService.js'
 import type { Avatar } from '../services/avatarService.js'
@@ -633,41 +634,64 @@ router.post('/:avatarId/train', async (req: AuthRequest, res: Response) => {
     const groupId = avatar.heygen_avatar_id
 
     // If photo_avatar_ids are not provided, fetch all looks from the group
-    // and use only the original looks (exclude AI-generated looks added later)
+    // Use all looks in the group to ensure consistent training
     let looksToTrain = photo_avatar_ids
     if (!looksToTrain || !Array.isArray(looksToTrain) || looksToTrain.length === 0) {
       try {
-        // Fetch avatar details to get all looks
-        const details = await AvatarService.fetchPhotoAvatarDetails(avatarId, userId)
+        // Fetch all looks from the avatar group
+        // We'll use all looks to ensure consistent training with the same person
+        const { getHeyGenKey } = await import('../lib/heygen.js')
+        const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
+        const apiKey = getHeyGenKey()
         
-        // Get all looks from the group
-        const { getPhotoAvatarDetails } = await import('../lib/heygen.js')
-        const groupDetails = await getPhotoAvatarDetails(groupId)
-        
-        // Use all looks that are in "ready" or "active" status
-        // These should be the original looks created during avatar creation
-        if (groupDetails.looks && Array.isArray(groupDetails.looks)) {
-          const readyLooks = groupDetails.looks
-            .filter((look: any) => look.status === 'ready' || look.status === 'active')
+        const response = await axios.get(
+          `${HEYGEN_V2_API_URL}/avatar_group/${groupId}/avatars`,
+          {
+            headers: {
+              'X-Api-Key': apiKey,
+              'Content-Type': 'application/json',
+            },
+          }
+        )
+
+        const avatarList =
+          response.data?.data?.avatar_list ||
+          response.data?.avatar_list ||
+          response.data?.data ||
+          []
+
+        if (Array.isArray(avatarList) && avatarList.length > 0) {
+          // Use all looks from the group that are ready/active
+          // Filter to only use looks that are ready to ensure quality
+          const readyLooks = avatarList
+            .filter((look: any) => {
+              const status = look.status || look.look?.status
+              return status === 'ready' || status === 'active' || status === 'completed'
+            })
             .map((look: any) => look.id)
             .filter((id: any): id is string => typeof id === 'string' && id.trim().length > 0)
           
           if (readyLooks.length > 0) {
             looksToTrain = readyLooks
-            console.log(`[Training] Using ${readyLooks.length} ready look(s) for training:`, readyLooks)
+            console.log(`[Training] Found ${readyLooks.length} ready look(s) in group ${groupId}, using for training:`, readyLooks)
           } else {
             // Fallback: use all looks if none are ready
-            looksToTrain = groupDetails.looks
+            looksToTrain = avatarList
               .map((look: any) => look.id)
               .filter((id: any): id is string => typeof id === 'string' && id.trim().length > 0)
-            console.log(`[Training] No ready looks found, using all ${looksToTrain.length} look(s) for training`)
+            console.log(`[Training] No ready looks found, using all ${looksToTrain.length} look(s) for training:`, looksToTrain)
           }
+        } else {
+          console.warn(`[Training] No looks found in group ${groupId}, training without specifying looks`)
+          looksToTrain = undefined
         }
       } catch (detailsError: any) {
-        console.warn('[Training] Could not fetch avatar details to determine looks, training without specifying looks:', detailsError.message)
+        console.warn('[Training] Could not fetch looks from group, training without specifying looks:', detailsError.message)
         // Continue without specifying looks - HeyGen will use all looks in the group
         looksToTrain = undefined
       }
+    } else {
+      console.log(`[Training] Using provided ${looksToTrain.length} look ID(s) for training:`, looksToTrain)
     }
 
     // Start training with the determined looks
