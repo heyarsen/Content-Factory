@@ -52,7 +52,7 @@ interface PhotoAvatarDetails {
   [key: string]: any
 }
 
-type AiGenerationStage = 'idle' | 'creating' | 'photosReady' | 'completing' | 'completed'
+type AiGenerationStage = 'idle' | 'creating' | 'photosReady' | 'training' | 'completing' | 'completed'
 type AiStageVisualState = 'done' | 'current' | 'pending'
 
 export default function Avatars() {
@@ -92,18 +92,20 @@ export default function Avatars() {
     'At least 1024px resolution (a good phone selfie works)',
   ]
 
-  const aiStageFlow: Array<{ key: 'creating' | 'photosReady' | 'completing'; title: string; description: string }> = [
+  const aiStageFlow: Array<{ key: 'creating' | 'photosReady' | 'training' | 'completing'; title: string; description: string }> = [
     { key: 'creating', title: 'Generating reference photos', description: 'HeyGen creates a photo set from your description' },
     { key: 'photosReady', title: 'Building the talking photo', description: 'We convert the best look into a HeyGen avatar' },
+    { key: 'training', title: 'Training the avatar', description: 'Avatar is being trained to ensure high-quality video generation' },
     { key: 'completing', title: 'Saving to your workspace', description: 'Avatar is synced and ready for video generation' },
   ]
-  const aiStageOrder: Array<'creating' | 'photosReady' | 'completing'> = ['creating', 'photosReady', 'completing']
+  const aiStageOrder: Array<'creating' | 'photosReady' | 'training' | 'completing'> = ['creating', 'photosReady', 'training', 'completing']
   const aiStageWeights: Record<AiGenerationStage, number> = {
     idle: -1,
     creating: 0,
     photosReady: 1,
-    completing: 2,
-    completed: 3,
+    training: 2,
+    completing: 3,
+    completed: 4,
   }
   const getAiStageState = (stageKey: (typeof aiStageOrder)[number]): AiStageVisualState => {
     const currentWeight = aiStageWeights[aiGenerationStage]
@@ -145,6 +147,7 @@ export default function Avatars() {
   const addLooksInputRef = useRef<HTMLInputElement>(null)
   const statusCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const trainingStatusIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const aiTrainingStatusIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const { toast } = useToast()
   const toastRef = useRef(toast)
   
@@ -251,6 +254,9 @@ export default function Avatars() {
       }
       if (trainingStatusIntervalRef.current) {
         clearInterval(trainingStatusIntervalRef.current)
+      }
+      if (aiTrainingStatusIntervalRef.current) {
+        clearInterval(aiTrainingStatusIntervalRef.current)
       }
     }
   }, [])
@@ -766,25 +772,86 @@ export default function Avatars() {
           if (status.image_key_list && status.image_key_list.length > 0) {
             try {
               setAiGenerationStage('completing')
-                await api.post('/api/avatars/complete-ai-generation', {
-                  generation_id: genId,
-                  image_keys: status.image_key_list,
-                  image_urls: status.image_url_list,
-                  avatar_name: avatarNameOverride || aiName,
-                })
+              const completeResponse = await api.post('/api/avatars/complete-ai-generation', {
+                generation_id: genId,
+                image_keys: status.image_key_list,
+                image_urls: status.image_url_list,
+                avatar_name: avatarNameOverride || aiName,
+              })
               
-              setAiGenerationStage('completed')
-              toast.success('AI avatar created successfully!')
-              setShowGenerateAIModal(false)
-              resetAIGenerationForm()
-              await loadAvatars()
+              const avatar = completeResponse.data?.avatar
+              const avatarStatus = avatar?.status
+              const groupId = avatar?.heygen_avatar_id
+              
+              // Check if avatar needs training
+              if (avatarStatus === 'training' && groupId) {
+                setAiGenerationStage('training')
+                // Poll training status
+                if (aiTrainingStatusIntervalRef.current) {
+                  clearInterval(aiTrainingStatusIntervalRef.current)
+                }
+                aiTrainingStatusIntervalRef.current = setInterval(async () => {
+                  try {
+                    const trainingResponse = await api.get(`/api/avatars/training-status/${groupId}`)
+                    const trainingStatus = trainingResponse.data?.status
+                    
+                    if (trainingStatus === 'ready' || trainingStatus === 'active') {
+                      if (aiTrainingStatusIntervalRef.current) {
+                        clearInterval(aiTrainingStatusIntervalRef.current)
+                        aiTrainingStatusIntervalRef.current = null
+                      }
+                      setAiGenerationStage('completed')
+                      toast.success('AI avatar created and trained successfully!')
+                      setShowGenerateAIModal(false)
+                      resetAIGenerationForm()
+                      await loadAvatars()
+                      setCheckingStatus(false)
+                      setGeneratingAI(false)
+                    } else if (trainingStatus === 'failed') {
+                      if (aiTrainingStatusIntervalRef.current) {
+                        clearInterval(aiTrainingStatusIntervalRef.current)
+                        aiTrainingStatusIntervalRef.current = null
+                      }
+                      setAiGenerationStage('idle')
+                      toast.error('Avatar training failed. You can retry training from the avatars page.')
+                      setCheckingStatus(false)
+                      setGeneratingAI(false)
+                    }
+                    // If still training or pending, continue polling
+                  } catch (trainingErr: any) {
+                    console.error('Failed to check training status:', trainingErr)
+                    // Continue polling on error
+                  }
+                }, 10000) // Check every 10 seconds
+                
+                // Auto-cleanup after 10 minutes max
+                setTimeout(() => {
+                  if (aiTrainingStatusIntervalRef.current) {
+                    clearInterval(aiTrainingStatusIntervalRef.current)
+                    aiTrainingStatusIntervalRef.current = null
+                  }
+                }, 10 * 60 * 1000) // Max 10 minutes
+              } else {
+                // Avatar is already active (training completed immediately or not needed)
+                setAiGenerationStage('completed')
+                toast.success('AI avatar created successfully!')
+                setShowGenerateAIModal(false)
+                resetAIGenerationForm()
+                await loadAvatars()
+                setCheckingStatus(false)
+                setGeneratingAI(false)
+              }
             } catch (err: any) {
               console.error('Failed to complete AI avatar:', err)
               setAiGenerationStage('idle')
               toast.error(err.response?.data?.error || 'Failed to create avatar from generated images')
+              setCheckingStatus(false)
+              setGeneratingAI(false)
             }
           } else {
             toast.error('No images were generated')
+            setCheckingStatus(false)
+            setGeneratingAI(false)
           }
           
           setCheckingStatus(false)
@@ -828,6 +895,10 @@ export default function Avatars() {
         clearInterval(statusCheckIntervalRef.current)
         statusCheckIntervalRef.current = null
       }
+      if (aiTrainingStatusIntervalRef.current) {
+        clearInterval(aiTrainingStatusIntervalRef.current)
+        aiTrainingStatusIntervalRef.current = null
+      }
       setShowGenerateAIModal(false)
       resetAIGenerationForm()
     } else {
@@ -835,6 +906,10 @@ export default function Avatars() {
       if (statusCheckIntervalRef.current) {
         clearInterval(statusCheckIntervalRef.current)
         statusCheckIntervalRef.current = null
+      }
+      if (aiTrainingStatusIntervalRef.current) {
+        clearInterval(aiTrainingStatusIntervalRef.current)
+        aiTrainingStatusIntervalRef.current = null
       }
       setCheckingStatus(false)
       setGeneratingAI(false)
