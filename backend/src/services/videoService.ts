@@ -328,7 +328,61 @@ async function maybeGenerateVideoUsingTemplate(
   }
 
   const variables = buildTemplateVariables(preferences.variables, preferences.scriptKey, scriptValue, context)
-  const overrides = buildTemplateOverrides(preferences.overrides, context)
+  const userOverrides = buildTemplateOverrides(preferences.overrides, context)
+
+  // Build character override for the selected avatar
+  const characterOverride: Record<string, any> = input.isPhotoAvatar
+    ? {
+        type: 'talking_photo',
+        talking_photo_id: input.avatarId,
+      }
+    : {
+        type: 'avatar',
+        avatar_id: input.avatarId,
+      }
+
+  // Always add avatar override to use the selected avatar instead of template's default
+  // Merge user overrides with automatic avatar override
+  const avatarOverride: Record<string, any> = {
+    ...userOverrides,
+  }
+
+  // Add nodes_override to replace avatar in template if user hasn't already specified it
+  // HeyGen template API uses nodes_override array to override specific nodes
+  if (!avatarOverride.nodes_override && !avatarOverride.nodes) {
+    // Try to override all character nodes in the template
+    // This structure targets any node with a character property
+    avatarOverride.nodes_override = [
+      {
+        character: characterOverride,
+      },
+    ]
+  } else if (avatarOverride.nodes_override && Array.isArray(avatarOverride.nodes_override)) {
+    // If user provided nodes_override, ensure all character nodes use our avatar
+    avatarOverride.nodes_override = avatarOverride.nodes_override.map((node: any) => {
+      if (node.character) {
+        return {
+          ...node,
+          character: characterOverride,
+        }
+      }
+      return node
+    })
+  }
+
+  // Also add video_inputs_override as an alternative structure (some templates use this)
+  if (!avatarOverride.video_inputs_override) {
+    avatarOverride.video_inputs_override = [
+      {
+        character: characterOverride,
+      },
+    ]
+  }
+
+  // Add top-level character override as fallback
+  if (!avatarOverride.character) {
+    avatarOverride.character = characterOverride
+  }
 
   const request: GenerateTemplateVideoRequest = {
     template_id: preferences.templateId,
@@ -336,19 +390,17 @@ async function maybeGenerateVideoUsingTemplate(
     title: input.title?.trim() || topicValue,
     caption: false,
     dimension: input.dimension,
-  }
-
-  if (Object.keys(overrides).length > 0) {
-    request.overrides = overrides
+    overrides: avatarOverride,
   }
 
   console.log(`[Template Generation] Using HeyGen template ${preferences.templateId} for user ${input.userId}`, {
     templateId: preferences.templateId,
     scriptKey: preferences.scriptKey,
     hasVariables: Object.keys(variables).length > 0,
-    hasOverrides: Object.keys(overrides).length > 0,
+    hasOverrides: Object.keys(avatarOverride).length > 0,
     avatarId: input.avatarId,
     isPhotoAvatar: input.isPhotoAvatar,
+    overrideStructure: JSON.stringify(avatarOverride, null, 2).substring(0, 500),
   })
 
   try {
