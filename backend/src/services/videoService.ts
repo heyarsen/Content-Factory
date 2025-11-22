@@ -343,33 +343,48 @@ async function maybeGenerateVideoUsingTemplate(
 
   // HeyGen template API: If avatar is assigned a variable name in the template,
   // it should be passed in variables with type "character"
-  // Only update avatar variables if they're already defined in user's template variables
-  // (Don't add new ones automatically - the template must have the variable defined)
+  // The properties must include character_id (not avatar_id or talking_photo_id)
+  // Common variable names: "avatar", "character", "avatar_scene1", etc.
+  // Check if user has already specified an avatar variable, or try common names
   const avatarVariableNames = ['avatar', 'character', 'avatar_scene1', 'avatar_scene', 'talking_photo']
-  
+  let avatarVariableFound = false
+
+  // Build character properties with character_id (HeyGen template API requirement)
+  const characterProperties: Record<string, any> = {
+    type: input.isPhotoAvatar ? 'talking_photo' : 'avatar',
+    character_id: input.avatarId, // HeyGen template API uses character_id for both avatar and talking_photo
+  }
+
   for (const varName of avatarVariableNames) {
     if (variables[varName]) {
-      // User has this variable in their template config, update it with selected avatar
-      // Check if it's already formatted as a character variable or needs formatting
-      if (typeof variables[varName] === 'object' && 'type' in variables[varName]) {
-        // Already formatted, update properties if it's a character type
-        if (variables[varName].type === 'character') {
-          variables[varName] = {
-            ...variables[varName],
-            properties: characterOverride,
-          }
-          console.log(`[Template Generation] Updated existing character variable "${varName}" with selected avatar`)
-        }
-      } else {
-        // Variable exists but not formatted, format it as character variable
+      // User already has this variable, ensure it's set to character type
+      if (typeof variables[varName] === 'object' && variables[varName].type === 'character') {
+        // Already a character variable, update its properties
         variables[varName] = {
           name: varName,
           type: 'character',
-          properties: characterOverride,
+          properties: characterProperties,
         }
-        console.log(`[Template Generation] Formatted variable "${varName}" as character variable with selected avatar`)
+        avatarVariableFound = true
+        console.log(`[Template Generation] Found avatar variable "${varName}" in template variables, updating with selected avatar`)
+        break
       }
-      break
+    }
+  }
+
+  // If no avatar variable found, add it to the first common name that's not already used
+  if (!avatarVariableFound) {
+    for (const varName of avatarVariableNames) {
+      if (!variables[varName]) {
+        variables[varName] = {
+          name: varName,
+          type: 'character',
+          properties: characterProperties,
+        }
+        avatarVariableFound = true
+        console.log(`[Template Generation] Adding avatar as character variable "${varName}" to template variables`)
+        break
+      }
     }
   }
 
