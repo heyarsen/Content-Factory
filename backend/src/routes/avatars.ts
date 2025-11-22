@@ -724,39 +724,85 @@ router.get('/:avatarId/details', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { avatarId } = req.params
-    const details = await AvatarService.fetchPhotoAvatarDetails(avatarId, userId)
-
-    // Get the avatar record to check for default_look_id
+    
+    // Get the avatar record first to check if it's a photo avatar
     const { supabase } = await import('../lib/supabase.js')
-    const { data: avatarRecord } = await supabase
+    const { data: avatarRecord, error: avatarError } = await supabase
       .from('avatars')
-      .select('default_look_id')
+      .select('id, heygen_avatar_id, avatar_name, avatar_url, preview_url, thumbnail_url, status, source, default_look_id')
       .eq('id', avatarId)
       .eq('user_id', userId)
       .single()
 
-    // Also fetch all looks from the avatar group
-    const groupId = details.group_id || details.id
+    if (avatarError || !avatarRecord) {
+      return res.status(404).json({ error: 'Avatar not found' })
+    }
+
+    // Check if this is a photo avatar (user_photo or ai_generated)
+    const isPhotoAvatar = avatarRecord.source === 'user_photo' || avatarRecord.source === 'ai_generated'
+    
+    let details: any = {
+      id: avatarRecord.heygen_avatar_id,
+      group_id: avatarRecord.heygen_avatar_id, // For photo avatars, heygen_avatar_id is the group_id
+      status: avatarRecord.status,
+      image_url: avatarRecord.avatar_url || avatarRecord.preview_url,
+      preview_url: avatarRecord.preview_url,
+      thumbnail_url: avatarRecord.thumbnail_url,
+    }
+
+    // Try to fetch detailed info from HeyGen API (with timeout)
+    if (isPhotoAvatar) {
+      try {
+        const { getPhotoAvatarDetails } = await import('../lib/heygen.js')
+        // Set a timeout for the HeyGen API call
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('HeyGen API timeout')), 10000)
+        )
+        
+        const heygenDetails = await Promise.race([
+          getPhotoAvatarDetails(avatarRecord.heygen_avatar_id),
+          timeoutPromise
+        ]) as any
+        
+        if (heygenDetails) {
+          details = { ...details, ...heygenDetails }
+        }
+      } catch (heygenError: any) {
+        console.warn('Failed to fetch HeyGen details (non-critical):', heygenError.message)
+        // Continue with basic details
+      }
+    }
+
+    // Fetch all looks from the avatar group (only for photo avatars)
     let looks: any[] = []
-    if (groupId) {
+    if (isPhotoAvatar && details.group_id) {
       try {
         const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
         const apiKey = process.env.HEYGEN_KEY
         if (apiKey) {
-          const response = await axios.get(
-            `${HEYGEN_V2_API_URL}/avatar_group/${groupId}/avatars`,
-            {
-              headers: {
-                'X-Api-Key': apiKey,
-                'Content-Type': 'application/json',
-              },
-            }
+          // Set timeout for looks fetch
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Looks fetch timeout')), 8000)
           )
+          
+          const looksResponse = await Promise.race([
+            axios.get(
+              `${HEYGEN_V2_API_URL}/avatar_group/${details.group_id}/avatars`,
+              {
+                headers: {
+                  'X-Api-Key': apiKey,
+                  'Content-Type': 'application/json',
+                },
+                timeout: 8000, // 8 second timeout
+              }
+            ),
+            timeoutPromise
+          ]) as any
 
           const avatarList =
-            response.data?.data?.avatar_list ||
-            response.data?.avatar_list ||
-            response.data?.data ||
+            looksResponse.data?.data?.avatar_list ||
+            looksResponse.data?.avatar_list ||
+            looksResponse.data?.data ||
             []
 
           if (Array.isArray(avatarList)) {
@@ -774,7 +820,7 @@ router.get('/:avatarId/details', async (req: AuthRequest, res: Response) => {
           }
         }
       } catch (looksError: any) {
-        console.warn('Failed to fetch looks from group:', looksError.message)
+        console.warn('Failed to fetch looks from group (non-critical):', looksError.message)
         // Continue without looks - not critical
       }
     }
