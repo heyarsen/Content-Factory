@@ -640,9 +640,11 @@ router.post('/:avatarId/train', async (req: AuthRequest, res: Response) => {
       try {
         // Fetch all looks from the avatar group
         // We'll use all looks to ensure consistent training with the same person
-        const { getHeyGenKey } = await import('../lib/heygen.js')
         const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
-        const apiKey = getHeyGenKey()
+        const apiKey = process.env.HEYGEN_KEY
+        if (!apiKey) {
+          throw new Error('HEYGEN_KEY environment variable is not set')
+        }
         
         const response = await axios.get(
           `${HEYGEN_V2_API_URL}/avatar_group/${groupId}/avatars`,
