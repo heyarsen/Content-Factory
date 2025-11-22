@@ -461,7 +461,8 @@ export default function Avatars() {
       setDetailsModal({ avatar, data: response.data })
     } catch (error: any) {
       console.error('Failed to fetch avatar details:', error)
-      setDetailsModal(null)
+      // Keep modal open to show error, but set data to null so loading state shows
+      setDetailsModal({ avatar, data: null })
       toastRef.current.error(error.response?.data?.error || 'Failed to load avatar details')
     } finally {
       setDetailsLoadingId(null)
@@ -1226,7 +1227,11 @@ export default function Avatars() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {avatars.map((avatar) => (
-              <Card key={avatar.id} className="overflow-hidden">
+              <Card 
+                key={avatar.id} 
+                className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => handleViewDetails(avatar)}
+              >
                 <div className="relative">
                   {avatar.thumbnail_url || avatar.preview_url ? (
                     <img
@@ -1260,12 +1265,15 @@ export default function Avatars() {
                     </div>
                     {renderStatusBadge(avatar)}
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     {!avatar.is_default && (
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => handleSetDefault(avatar.id)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleSetDefault(avatar.id)
+                        }}
                         className="flex-1"
                       >
                         <Star className="h-4 w-4 mr-1" />
@@ -1276,7 +1284,10 @@ export default function Avatars() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleViewDetails(avatar)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleViewDetails(avatar)
+                        }}
                         className="text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                         title="View details"
                         disabled={detailsLoadingId === avatar.id}
@@ -1287,7 +1298,10 @@ export default function Avatars() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleRefreshTrainingStatus(avatar)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleRefreshTrainingStatus(avatar)
+                          }}
                           className="text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                           title="Refresh status"
                           disabled={!!statusLoadingMap[avatar.id]}
@@ -1305,7 +1319,10 @@ export default function Avatars() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleStartTraining(avatar)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleStartTraining(avatar)
+                            }}
                             className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
                             title="Train avatar"
                             disabled={!!statusLoadingMap[avatar.id]}
@@ -1316,7 +1333,10 @@ export default function Avatars() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleManageLooks(avatar)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleManageLooks(avatar)
+                          }}
                           className="text-brand-600 hover:text-brand-700 hover:bg-brand-50"
                           title="Manage Looks"
                         >
@@ -1325,7 +1345,10 @@ export default function Avatars() {
                         <Button
                           variant="ghost"
                           size="sm"
-                            onClick={() => handleDelete(avatar)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDelete(avatar)
+                            }}
                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
                             title="Delete avatar"
                         >
@@ -1985,8 +2008,8 @@ export default function Avatars() {
               {/* Display all looks from the avatar group */}
               {detailData.looks && Array.isArray(detailData.looks) && detailData.looks.length > 0 && (
                 <div className="space-y-3 pt-4 border-t border-slate-200">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-semibold text-slate-900">
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-900 mb-1">
                       Available Looks ({detailData.looks.length})
                     </h4>
                     <p className="text-xs text-slate-500">
@@ -2029,12 +2052,15 @@ export default function Avatars() {
                           </div>
                         )}
                         {!look.is_default && (
-                          <div className="absolute bottom-2 right-2">
+                          <div className="p-2 pt-0">
                             <Button
                               variant="secondary"
                               size="sm"
-                              onClick={() => handleSetDefaultLook(detailsModal.avatar.id, look.id)}
-                              className="text-xs"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleSetDefaultLook(detailsModal.avatar.id, look.id)
+                              }}
+                              className="w-full text-xs"
                             >
                               <Star className="h-3 w-3 mr-1" />
                               Set Default
