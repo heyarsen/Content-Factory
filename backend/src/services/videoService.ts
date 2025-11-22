@@ -343,41 +343,33 @@ async function maybeGenerateVideoUsingTemplate(
 
   // HeyGen template API: If avatar is assigned a variable name in the template,
   // it should be passed in variables with type "character"
-  // Common variable names: "avatar", "character", "avatar_scene1", etc.
-  // Check if user has already specified an avatar variable, or try common names
+  // Only update avatar variables if they're already defined in user's template variables
+  // (Don't add new ones automatically - the template must have the variable defined)
   const avatarVariableNames = ['avatar', 'character', 'avatar_scene1', 'avatar_scene', 'talking_photo']
-  let avatarVariableFound = false
-
+  
   for (const varName of avatarVariableNames) {
     if (variables[varName]) {
-      // User already has this variable, ensure it's set to character type
-      if (typeof variables[varName] === 'object' && variables[varName].type === 'character') {
-        // Already a character variable, update its properties
+      // User has this variable in their template config, update it with selected avatar
+      // Check if it's already formatted as a character variable or needs formatting
+      if (typeof variables[varName] === 'object' && 'type' in variables[varName]) {
+        // Already formatted, update properties if it's a character type
+        if (variables[varName].type === 'character') {
+          variables[varName] = {
+            ...variables[varName],
+            properties: characterOverride,
+          }
+          console.log(`[Template Generation] Updated existing character variable "${varName}" with selected avatar`)
+        }
+      } else {
+        // Variable exists but not formatted, format it as character variable
         variables[varName] = {
           name: varName,
           type: 'character',
           properties: characterOverride,
         }
-        avatarVariableFound = true
-        console.log(`[Template Generation] Found avatar variable "${varName}" in template variables, updating with selected avatar`)
-        break
+        console.log(`[Template Generation] Formatted variable "${varName}" as character variable with selected avatar`)
       }
-    }
-  }
-
-  // If no avatar variable found, add it to the first common name that's not already used
-  if (!avatarVariableFound) {
-    for (const varName of avatarVariableNames) {
-      if (!variables[varName]) {
-        variables[varName] = {
-          name: varName,
-          type: 'character',
-          properties: characterOverride,
-        }
-        avatarVariableFound = true
-        console.log(`[Template Generation] Adding avatar as character variable "${varName}" to template variables`)
-        break
-      }
+      break
     }
   }
 
