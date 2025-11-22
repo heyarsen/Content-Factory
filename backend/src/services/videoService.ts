@@ -212,18 +212,31 @@ async function getTemplatePreferences(userId: string): Promise<TemplatePreferenc
 
     const templateId = (data?.heygen_vertical_template_id || '').trim()
     if (!error && data && templateId.length > 0) {
+      console.log(`[Template] Found user template preference: ${templateId} for user ${userId}`)
       return {
         templateId,
         scriptKey: (data.heygen_vertical_template_script_key || 'script').trim() || 'script',
         variables: (data.heygen_vertical_template_variables || {}) as Record<string, any>,
         overrides: (data.heygen_vertical_template_overrides || {}) as Record<string, any>,
       }
+    } else {
+      if (error && error.code !== 'PGRST116') {
+        console.warn(`[Template] Error loading user preferences for ${userId}:`, error.message)
+      } else {
+        console.log(`[Template] No user template preference found for user ${userId}, checking env vars...`)
+      }
     }
   } catch (error) {
-    console.error('Failed to load HeyGen template preferences:', error)
+    console.error('[Template] Failed to load HeyGen template preferences:', error)
   }
 
-  return getEnvTemplatePreferences()
+  const envPrefs = getEnvTemplatePreferences()
+  if (envPrefs) {
+    console.log(`[Template] Using environment template: ${envPrefs.templateId}`)
+  } else {
+    console.log(`[Template] No template configured (neither user preference nor HEYGEN_VERTICAL_TEMPLATE_ID env var)`)
+  }
+  return envPrefs
 }
 
 function replacePlaceholders(value: any, context: TemplateContextRecord): any {
@@ -274,8 +287,21 @@ function buildTemplateOverrides(
 async function maybeGenerateVideoUsingTemplate(
   input: TemplateGenerationInput
 ): Promise<HeyGenVideoResponse | null> {
+  console.log(`[Template Generation] Attempting template generation for user ${input.userId}`, {
+    hasAvatarId: !!input.avatarId,
+    isPhotoAvatar: input.isPhotoAvatar,
+    hasScript: !!input.script,
+    topic: input.topic,
+  })
+
   const preferences = await getTemplatePreferences(input.userId)
   if (!preferences) {
+    console.log(`[Template Generation] No template preferences found, falling back to regular API`)
+    return null
+  }
+
+  if (!input.avatarId) {
+    console.warn(`[Template Generation] No avatarId provided, cannot use template (requires avatar for overrides)`)
     return null
   }
 
@@ -306,9 +332,28 @@ async function maybeGenerateVideoUsingTemplate(
     request.overrides = overrides
   }
 
-  console.log(`[Template Generation] Using HeyGen template ${preferences.templateId} for user ${input.userId}`)
+  console.log(`[Template Generation] Using HeyGen template ${preferences.templateId} for user ${input.userId}`, {
+    templateId: preferences.templateId,
+    scriptKey: preferences.scriptKey,
+    hasVariables: Object.keys(variables).length > 0,
+    hasOverrides: Object.keys(overrides).length > 0,
+    avatarId: input.avatarId,
+    isPhotoAvatar: input.isPhotoAvatar,
+  })
 
-  return generateVideoFromTemplate(request)
+  try {
+    const response = await generateVideoFromTemplate(request)
+    console.log(`[Template Generation] ✅ Successfully generated video using template: ${response.video_id}`)
+    return response
+  } catch (error: any) {
+    console.error(`[Template Generation] ❌ Template generation failed:`, {
+      error: error.message,
+      templateId: preferences.templateId,
+      userId: input.userId,
+    })
+    // Don't throw - let it fall back to regular API
+    return null
+  }
 }
 
 export interface ManualVideoInput {
@@ -483,6 +528,16 @@ async function runHeygenGeneration(
 
     const resolvedAvatarId = await resolveCharacterIdentifier(avatarId, isPhotoAvatar)
 
+    if (!resolvedAvatarId) {
+      throw new Error('Failed to resolve avatar identifier. Please check your avatar configuration.')
+    }
+
+    console.log(`[Video Generation] Attempting template generation first for video ${video.id}`, {
+      userId: video.user_id,
+      hasResolvedAvatarId: !!resolvedAvatarId,
+      isPhotoAvatar,
+    })
+
     const templateResponse = await maybeGenerateVideoUsingTemplate({
       userId: video.user_id,
       topic: video.topic,
@@ -494,10 +549,13 @@ async function runHeygenGeneration(
     })
 
     if (templateResponse) {
+      console.log(`[Video Generation] ✅ Template generation succeeded for video ${video.id}, video_id: ${templateResponse.video_id}`)
       await applyManualGenerationSuccess(video.id, templateResponse)
       await updatePlanItemStatus(planItemId, templateResponse.status)
       return
     }
+
+    console.log(`[Video Generation] Template generation not used, falling back to regular HeyGen API for video ${video.id}`)
 
     const payload = buildHeygenPayload(
       video.topic,
@@ -826,6 +884,17 @@ export class VideoService {
 
       const { avatarId, isPhotoAvatar } = await resolveAvatarContext(reel.user_id, null)
       const resolvedAvatarId = await resolveCharacterIdentifier(avatarId, isPhotoAvatar)
+      
+      if (!resolvedAvatarId) {
+        throw new Error('Failed to resolve avatar identifier for reel. Please check your avatar configuration.')
+      }
+
+      console.log(`[Reel Generation] Attempting template generation for reel ${reel.id}`, {
+        userId: reel.user_id,
+        hasResolvedAvatarId: !!resolvedAvatarId,
+        isPhotoAvatar,
+      })
+
       const templateDimension = { ...DEFAULT_VERTICAL_DIMENSION }
       const templateResponse = await maybeGenerateVideoUsingTemplate({
         userId: reel.user_id,
@@ -838,11 +907,14 @@ export class VideoService {
       })
 
       if (templateResponse) {
+        console.log(`[Reel Generation] ✅ Template generation succeeded for reel ${reel.id}, video_id: ${templateResponse.video_id}`)
         return {
           video_id: templateResponse.video_id,
           video_url: templateResponse.video_url || null,
         }
       }
+
+      console.log(`[Reel Generation] Template generation not used, falling back to regular HeyGen API for reel ${reel.id}`)
 
       const payload = buildHeygenPayload(
         reel.topic,
