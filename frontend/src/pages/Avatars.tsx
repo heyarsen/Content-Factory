@@ -454,16 +454,23 @@ export default function Avatars() {
   }, [avatars, handleRefreshTrainingStatus])
 
   const handleViewDetails = async (avatar: Avatar) => {
+    console.log('Opening details modal for avatar:', avatar.id)
     setDetailsModal({ avatar, data: null })
     setDetailsLoadingId(avatar.id)
     try {
-      const response = await api.get(`/api/avatars/${avatar.id}/details`)
+      console.log('Fetching avatar details from API...')
+      const response = await api.get(`/api/avatars/${avatar.id}/details`, {
+        timeout: 15000, // 15 second timeout
+      })
+      console.log('Received avatar details:', response.data)
       setDetailsModal({ avatar, data: response.data })
     } catch (error: any) {
       console.error('Failed to fetch avatar details:', error)
+      console.error('Error response:', error.response)
       // Keep modal open to show error, but set data to null so loading state shows
       setDetailsModal({ avatar, data: null })
-      toastRef.current.error(error.response?.data?.error || 'Failed to load avatar details')
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to load avatar details'
+      toastRef.current.error(errorMessage)
     } finally {
       setDetailsLoadingId(null)
     }
