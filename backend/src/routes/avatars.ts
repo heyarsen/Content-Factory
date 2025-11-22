@@ -726,13 +726,152 @@ router.get('/:avatarId/details', async (req: AuthRequest, res: Response) => {
     const { avatarId } = req.params
     const details = await AvatarService.fetchPhotoAvatarDetails(avatarId, userId)
 
-    return res.json(details)
+    // Get the avatar record to check for default_look_id
+    const { supabase } = await import('../lib/supabase.js')
+    const { data: avatarRecord } = await supabase
+      .from('avatars')
+      .select('default_look_id')
+      .eq('id', avatarId)
+      .eq('user_id', userId)
+      .single()
+
+    // Also fetch all looks from the avatar group
+    const groupId = details.group_id || details.id
+    let looks: any[] = []
+    if (groupId) {
+      try {
+        const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
+        const apiKey = process.env.HEYGEN_KEY
+        if (apiKey) {
+          const response = await axios.get(
+            `${HEYGEN_V2_API_URL}/avatar_group/${groupId}/avatars`,
+            {
+              headers: {
+                'X-Api-Key': apiKey,
+                'Content-Type': 'application/json',
+              },
+            }
+          )
+
+          const avatarList =
+            response.data?.data?.avatar_list ||
+            response.data?.avatar_list ||
+            response.data?.data ||
+            []
+
+          if (Array.isArray(avatarList)) {
+            looks = avatarList.map((look: any) => ({
+              id: look.id,
+              name: look.name,
+              status: look.status,
+              image_url: look.image_url,
+              preview_url: look.image_url,
+              thumbnail_url: look.image_url,
+              created_at: look.created_at,
+              updated_at: look.updated_at,
+              is_default: look.id === avatarRecord?.default_look_id,
+            }))
+          }
+        }
+      } catch (looksError: any) {
+        console.warn('Failed to fetch looks from group:', looksError.message)
+        // Continue without looks - not critical
+      }
+    }
+
+    return res.json({
+      ...details,
+      looks, // Add looks array to the response
+      default_look_id: avatarRecord?.default_look_id || null,
+    })
   } catch (error: any) {
     console.error('Get avatar details error:', error)
     if (error.message === 'Avatar not found') {
       return res.status(404).json({ error: error.message })
     }
     return res.status(500).json({ error: error.message || 'Failed to fetch avatar details' })
+  }
+})
+
+// Set default look for an avatar
+router.post('/:avatarId/set-default-look', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { avatarId } = req.params
+    const { look_id } = req.body
+
+    if (!look_id) {
+      return res.status(400).json({ error: 'look_id is required' })
+    }
+
+    // Verify avatar belongs to user
+    const { supabase } = await import('../lib/supabase.js')
+    const { data: avatar, error: avatarError } = await supabase
+      .from('avatars')
+      .select('id, heygen_avatar_id')
+      .eq('id', avatarId)
+      .eq('user_id', userId)
+      .single()
+
+    if (avatarError || !avatar) {
+      return res.status(404).json({ error: 'Avatar not found' })
+    }
+
+    // Verify the look exists in the avatar group
+    const groupId = avatar.heygen_avatar_id
+    const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
+    const apiKey = process.env.HEYGEN_KEY
+    if (!apiKey) {
+      return res.status(500).json({ error: 'HEYGEN_KEY not configured' })
+    }
+
+    try {
+      const response = await axios.get(
+        `${HEYGEN_V2_API_URL}/avatar_group/${groupId}/avatars`,
+        {
+          headers: {
+            'X-Api-Key': apiKey,
+            'Content-Type': 'application/json',
+          },
+        }
+      )
+
+      const avatarList =
+        response.data?.data?.avatar_list ||
+        response.data?.avatar_list ||
+        response.data?.data ||
+        []
+
+      const lookExists = Array.isArray(avatarList) && avatarList.some((look: any) => look.id === look_id)
+      if (!lookExists) {
+        return res.status(400).json({ error: 'Look not found in this avatar group' })
+      }
+    } catch (verifyError: any) {
+      console.warn('Could not verify look exists:', verifyError.message)
+      // Continue anyway - the look might still be valid
+    }
+
+    // Update the default look ID
+    const { error: updateError } = await supabase
+      .from('avatars')
+      .update({
+        default_look_id: look_id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', avatarId)
+      .eq('user_id', userId)
+
+    if (updateError) {
+      throw updateError
+    }
+
+    return res.json({
+      message: 'Default look updated successfully',
+      default_look_id: look_id,
+    })
+  } catch (error: any) {
+    console.error('Set default look error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to set default look' })
   }
 })
 

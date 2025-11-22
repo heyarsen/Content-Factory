@@ -31,6 +31,7 @@ type AvatarRecord = {
   heygen_avatar_id: string
   avatar_url: string | null
   source?: 'synced' | 'user_photo' | 'ai_generated' | null
+  default_look_id?: string | null
 }
 
 const isPhotoAvatarRecord = (avatar?: AvatarRecord | null): boolean => {
@@ -45,7 +46,8 @@ const isPhotoAvatarRecord = (avatar?: AvatarRecord | null): boolean => {
 
 async function resolveCharacterIdentifier(
   avatarId?: string,
-  isPhotoAvatar?: boolean
+  isPhotoAvatar?: boolean,
+  defaultLookId?: string | null
 ): Promise<string | undefined> {
   if (!avatarId) {
     return undefined
@@ -53,6 +55,12 @@ async function resolveCharacterIdentifier(
 
   if (!isPhotoAvatar) {
     return avatarId
+  }
+
+  // If a default look ID is specified, use it directly
+  if (defaultLookId && defaultLookId.trim().length > 0) {
+    console.log(`[Avatar Resolution] Using specified default look: ${defaultLookId}`)
+    return defaultLookId.trim()
   }
 
   try {
@@ -79,7 +87,10 @@ async function resolveCharacterIdentifier(
       []
 
     if (Array.isArray(avatarList) && avatarList.length > 0) {
-      return avatarList[0].id
+      // Use the first available avatar from the group
+      const selectedLookId = avatarList[0].id
+      console.log(`[Avatar Resolution] No default look specified, using first available look: ${selectedLookId} (from ${avatarList.length} total looks)`)
+      return selectedLookId
     }
   } catch (error: any) {
     console.warn('Failed to resolve talking_photo_id; using group id instead:', error?.response?.data || error?.message)
@@ -92,6 +103,7 @@ interface AvatarContext {
   avatarId: string
   avatarRecordId?: string
   isPhotoAvatar: boolean
+  defaultLookId?: string | null
 }
 
 async function resolveAvatarContext(
@@ -100,11 +112,12 @@ async function resolveAvatarContext(
   ): Promise<AvatarContext> {
     const { AvatarService } = await import('./avatarService.js')
 
-    const mapAvatarRecord = (avatar: AvatarRecord): AvatarContext => ({
-      avatarId: avatar.heygen_avatar_id,
-      avatarRecordId: avatar.id,
-      isPhotoAvatar: isPhotoAvatarRecord(avatar),
-    })
+  const mapAvatarRecord = (avatar: AvatarRecord): AvatarContext => ({
+    avatarId: avatar.heygen_avatar_id,
+    avatarRecordId: avatar.id,
+    isPhotoAvatar: isPhotoAvatarRecord(avatar),
+    defaultLookId: avatar.default_look_id || null,
+  })
 
   if (!requestedAvatarId) {
     const defaultAvatar = await AvatarService.getDefaultAvatar(userId)
@@ -619,7 +632,8 @@ async function runHeygenGeneration(
   outputResolution: string = DEFAULT_VERTICAL_OUTPUT_RESOLUTION,
   planItemId?: string | null,
   aspectRatio: string | null = DEFAULT_VERTICAL_ASPECT_RATIO,
-  dimension?: HeyGenDimensionInput
+  dimension?: HeyGenDimensionInput,
+  defaultLookId?: string | null
 ): Promise<void> {
   try {
     // Idempotency guard: if a HeyGen video was already created for this record, do not create again
@@ -635,7 +649,7 @@ async function runHeygenGeneration(
       throw new Error('No avatar available. Please configure an avatar in your settings.')
     }
 
-    const resolvedAvatarId = await resolveCharacterIdentifier(avatarId, isPhotoAvatar)
+    const resolvedAvatarId = await resolveCharacterIdentifier(avatarId, isPhotoAvatar, defaultLookId)
 
     if (!resolvedAvatarId) {
       throw new Error('Failed to resolve avatar identifier. Please check your avatar configuration.')
@@ -798,6 +812,7 @@ export class VideoService {
     const outputResolution = DEFAULT_VERTICAL_OUTPUT_RESOLUTION
     const aspectRatio = DEFAULT_VERTICAL_ASPECT_RATIO
     const dimension = { ...DEFAULT_VERTICAL_DIMENSION }
+    const avatarContext = await resolveAvatarContext(userId, input.avatar_id || null)
     void runHeygenGeneration(
       video,
       avatarId,
@@ -805,7 +820,8 @@ export class VideoService {
       outputResolution,
       input.plan_item_id || null,
       aspectRatio,
-      dimension
+      dimension,
+      avatarContext.defaultLookId
     )
     return video
   }
@@ -933,7 +949,7 @@ export class VideoService {
       throw new Error('Failed to reset video for retry')
     }
 
-    const { avatarId, isPhotoAvatar } = await resolveAvatarContext(userId, video.avatar_id)
+    const { avatarId, isPhotoAvatar, defaultLookId } = await resolveAvatarContext(userId, video.avatar_id)
 
     const refreshedVideo: Video = {
       ...video,
@@ -943,7 +959,7 @@ export class VideoService {
       error_message: null,
     }
 
-    void runHeygenGeneration(refreshedVideo, avatarId, isPhotoAvatar)
+    void runHeygenGeneration(refreshedVideo, avatarId, isPhotoAvatar, DEFAULT_VERTICAL_OUTPUT_RESOLUTION, null, DEFAULT_VERTICAL_ASPECT_RATIO, undefined, defaultLookId)
   }
 
   /**
@@ -991,8 +1007,8 @@ export class VideoService {
         throw new Error('Reel script is empty. Please provide a script before generating video.')
       }
 
-      const { avatarId, isPhotoAvatar } = await resolveAvatarContext(reel.user_id, null)
-      const resolvedAvatarId = await resolveCharacterIdentifier(avatarId, isPhotoAvatar)
+      const { avatarId, isPhotoAvatar, defaultLookId } = await resolveAvatarContext(reel.user_id, null)
+      const resolvedAvatarId = await resolveCharacterIdentifier(avatarId, isPhotoAvatar, defaultLookId)
       
       if (!resolvedAvatarId) {
         throw new Error('Failed to resolve avatar identifier for reel. Please check your avatar configuration.')
