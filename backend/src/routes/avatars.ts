@@ -322,7 +322,7 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
     }
 
     return res.status(201).json({
-      message: 'Avatar created successfully. Training has completed and the avatar is ready to use.',
+      message: 'Avatar created successfully. Training has started automatically and will complete in a few minutes.',
       avatar,
       photo_url: primaryPhotoUrl,
       additional_photo_urls: extraPhotoUrls,
@@ -412,7 +412,7 @@ router.post('/create-from-photo', async (req: AuthRequest, res: Response) => {
     const avatar = await AvatarService.createAvatarFromPhoto(userId, photo_url, avatar_name)
 
     return res.status(201).json({
-      message: 'Avatar creation started. It may take a few minutes to train.',
+      message: 'Avatar created successfully. Training has started automatically and will complete in a few minutes.',
       avatar,
     })
   } catch (error: any) {

@@ -393,6 +393,7 @@ export class AvatarService {
 
         // Save to database
         // Save photoUrl as avatar_url to identify user-created avatars
+        // Training is automatically started as part of avatar creation, so status should be 'training'
         const newPhotoAvatarPayload = {
           user_id: userId,
           heygen_avatar_id: result.avatar_id,
@@ -401,7 +402,7 @@ export class AvatarService {
           preview_url: photoUrl,
           thumbnail_url: photoUrl,
           gender: null,
-          status: result.status === 'training' ? 'training' : 'active',
+          status: result.status === 'active' ? 'active' : 'training', // Training is part of creation, so default to 'training'
           is_default: false,
         }
 

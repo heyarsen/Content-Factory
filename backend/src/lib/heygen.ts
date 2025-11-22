@@ -1719,36 +1719,26 @@ export async function createAvatarFromPhoto(
       )
     }
 
-    // Step 5: Monitor training status until complete (MANDATORY)
-    // According to HeyGen support: Must monitor training status and wait for "ready" status
-    console.log('Step 5: Monitoring training status until completion...')
-    let finalStatus = 'training'
+    // Step 5: Training has been started - return immediately
+    // Training will continue in the background and status can be checked via the training-status endpoint
+    // The frontend will poll for status updates automatically
+    console.log('✅ Training started successfully. Avatar creation complete. Training will continue in the background.')
     
+    // Check initial training status to return accurate status
+    let initialStatus = 'training'
     try {
-      const trainingResult = await waitForTrainingComplete(groupId, {
-        maxWaitTime: 10 * 60 * 1000, // 10 minutes max wait
-        pollInterval: 10 * 1000, // Check every 10 seconds
-        onStatusUpdate: (status) => {
-          console.log(`[Training Progress] Status: ${status.status}${status.error_msg ? `, Error: ${status.error_msg}` : ''}`)
-        },
-      })
-
-      finalStatus = trainingResult.status
-      console.log(`✅ Training completed with status: ${finalStatus}`)
-    } catch (waitError: any) {
-      console.error('❌ Error waiting for training to complete:', waitError.message)
-      // If training failed, we still return the group ID but with failed status
-      // The user can check status later or retry
-      finalStatus = 'failed'
-      throw new Error(
-        `Training did not complete successfully for avatar group ${groupId}: ${waitError.message}. ` +
-        `The avatar group was created but training failed. Please check the training status manually.`
-      )
+      const statusCheck = await checkTrainingStatus(groupId)
+      initialStatus = statusCheck.status === 'ready' ? 'active' : statusCheck.status
+      console.log(`Initial training status: ${initialStatus}`)
+    } catch (statusError: any) {
+      console.warn('Could not check initial training status, defaulting to "training":', statusError.message)
+      // Default to 'training' if status check fails
+      initialStatus = 'training'
     }
 
     return {
       avatar_id: groupId,
-      status: finalStatus === 'ready' ? 'active' : finalStatus,
+      status: initialStatus === 'ready' ? 'active' : 'training',
     }
   } catch (error: any) {
     console.error('HeyGen API error (createAvatarFromPhoto):', {
