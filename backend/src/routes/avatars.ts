@@ -7,6 +7,7 @@ import {
   checkGenerationStatus,
   addLooksToAvatarGroup,
   checkTrainingStatus,
+  startAvatarTraining,
   generateAvatarLook,
   type GenerateAIAvatarRequest,
   type AddLooksRequest,
@@ -606,6 +607,50 @@ router.get('/training-status/:groupId', async (req: AuthRequest, res: Response) 
   } catch (error: any) {
     console.error('Check training status error:', error)
     return res.status(500).json({ error: error.message || 'Failed to check training status' })
+  }
+})
+
+// Start training for an avatar
+router.post('/:avatarId/train', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { avatarId } = req.params
+    const { photo_avatar_ids } = req.body
+
+    // Get the avatar to find the group ID
+    const { supabase } = await import('../lib/supabase.js')
+    const { data: avatar, error: avatarError } = await supabase
+      .from('avatars')
+      .select('heygen_avatar_id, status')
+      .eq('id', avatarId)
+      .eq('user_id', userId)
+      .single()
+
+    if (avatarError || !avatar) {
+      return res.status(404).json({ error: 'Avatar not found' })
+    }
+
+    const groupId = avatar.heygen_avatar_id
+
+    // Start training
+    await startAvatarTraining(groupId, photo_avatar_ids)
+
+    // Update avatar status to 'training'
+    await supabase
+      .from('avatars')
+      .update({
+        status: 'training',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', avatarId)
+
+    return res.json({
+      message: 'Training started successfully',
+      group_id: groupId,
+    })
+  } catch (error: any) {
+    console.error('Start training error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to start training' })
   }
 })
 

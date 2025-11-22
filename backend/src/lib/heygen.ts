@@ -2035,6 +2035,47 @@ export async function checkTrainingStatus(
 }
 
 /**
+ * Start training for an existing avatar group
+ * @param groupId - The avatar group ID
+ * @param photoAvatarIds - Optional array of specific photo avatar IDs to train (if not provided, all looks in the group will be trained)
+ * @returns Promise that resolves when training starts
+ */
+export async function startAvatarTraining(
+  groupId: string,
+  photoAvatarIds?: string[]
+): Promise<void> {
+  try {
+    const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
+    const apiKey = getHeyGenKey()
+
+    const payload: Record<string, any> = { group_id: groupId }
+    if (photoAvatarIds && photoAvatarIds.length > 0) {
+      payload.photo_avatar_ids = photoAvatarIds
+    }
+
+    const response = await axios.post(
+      `${HEYGEN_V2_API_URL}/photo_avatar/train`,
+      payload,
+      {
+        headers: {
+          'X-Api-Key': apiKey,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
+
+    console.log('✅ Training started successfully for group:', groupId, response.data)
+  } catch (error: any) {
+    console.error('HeyGen API error (startAvatarTraining):', error.response?.data || error.message)
+    const errorMessage = error.response?.data?.error?.message || 
+                        error.response?.data?.message || 
+                        error.message || 
+                        'Failed to start training'
+    throw new Error(errorMessage)
+  }
+}
+
+/**
  * Wait for training to complete (polling with status checks)
  * According to HeyGen support: Training is mandatory and must complete before generating looks
  * 

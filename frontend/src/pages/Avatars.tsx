@@ -375,6 +375,36 @@ export default function Avatars() {
     []
   )
 
+  const handleStartTraining = async (avatar: Avatar) => {
+    if (!avatar) return
+    setStatusLoadingMap(prev => ({ ...prev, [avatar.id]: true }))
+    try {
+      const response = await api.post(`/api/avatars/${avatar.id}/train`)
+      toast.success(response.data.message || 'Training started successfully!')
+      
+      // Update avatar status to training
+      setAvatars(prev =>
+        prev.map(item =>
+          item.id === avatar.id
+            ? {
+                ...item,
+                status: 'training',
+              }
+            : item
+        )
+      )
+    } catch (error: any) {
+      console.error('Failed to start training:', error)
+      toast.error(error.response?.data?.error || 'Failed to start training')
+    } finally {
+      setStatusLoadingMap(prev => {
+        const next = { ...prev }
+        delete next[avatar.id]
+        return next
+      })
+    }
+  }
+
   useEffect(() => {
     if (trainingStatusIntervalRef.current) {
       clearInterval(trainingStatusIntervalRef.current)
@@ -1166,6 +1196,18 @@ export default function Avatars() {
                     )}
                     {isUserCreatedAvatar(avatar) && (
                       <>
+                        {(avatar.status === 'active' || avatar.status === 'failed') && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleStartTraining(avatar)}
+                            className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                            title="Train avatar"
+                            disabled={!!statusLoadingMap[avatar.id]}
+                          >
+                            <Sparkles className={`h-4 w-4 ${statusLoadingMap[avatar.id] ? 'animate-spin' : ''}`} />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
