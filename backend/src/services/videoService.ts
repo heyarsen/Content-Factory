@@ -341,6 +341,46 @@ async function maybeGenerateVideoUsingTemplate(
         avatar_id: input.avatarId,
       }
 
+  // HeyGen template API: If avatar is assigned a variable name in the template,
+  // it should be passed in variables with type "character"
+  // Common variable names: "avatar", "character", "avatar_scene1", etc.
+  // Check if user has already specified an avatar variable, or try common names
+  const avatarVariableNames = ['avatar', 'character', 'avatar_scene1', 'avatar_scene', 'talking_photo']
+  let avatarVariableFound = false
+
+  for (const varName of avatarVariableNames) {
+    if (variables[varName]) {
+      // User already has this variable, ensure it's set to character type
+      if (typeof variables[varName] === 'object' && variables[varName].type === 'character') {
+        // Already a character variable, update its properties
+        variables[varName] = {
+          name: varName,
+          type: 'character',
+          properties: characterOverride,
+        }
+        avatarVariableFound = true
+        console.log(`[Template Generation] Found avatar variable "${varName}" in template variables, updating with selected avatar`)
+        break
+      }
+    }
+  }
+
+  // If no avatar variable found, add it to the first common name that's not already used
+  if (!avatarVariableFound) {
+    for (const varName of avatarVariableNames) {
+      if (!variables[varName]) {
+        variables[varName] = {
+          name: varName,
+          type: 'character',
+          properties: characterOverride,
+        }
+        avatarVariableFound = true
+        console.log(`[Template Generation] Adding avatar as character variable "${varName}" to template variables`)
+        break
+      }
+    }
+  }
+
   // Always add avatar override to use the selected avatar instead of template's default
   // Merge user overrides with automatic avatar override
   const avatarOverride: Record<string, any> = {
