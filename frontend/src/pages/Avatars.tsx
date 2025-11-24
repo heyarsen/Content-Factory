@@ -1002,73 +1002,74 @@ export default function Avatars() {
 
   return (
     <Layout>
-      <div>
-        {avatars.length === 0 ? (
-          <div className="p-12 text-center">
-            <User className="h-16 w-16 mx-auto text-slate-400 mb-4" />
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">
-              {onlyCreated ? 'No avatars created yet' : 'No avatars found'}
-            </h3>
-            <p className="text-slate-600 mb-6">
-              {onlyCreated 
-                ? 'Create an avatar from a photo to get started'
-                : 'Sync avatars or create one from a photo to get started'}
-            </p>
-            <div className="flex gap-3 justify-center">
-              <Button
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  setShowCreateModal(true)
-                }}
-                className="flex items-center gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Create from Photo
-              </Button>
-              {onlyCreated && (
-                <Button onClick={() => setOnlyCreated(false)} variant="secondary">
-                  Show All Avatars
-                </Button>
-              )}
-              {!onlyCreated && (
-                <Button onClick={handleSync} disabled={syncing} variant="secondary">
-                  <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-                  Sync Avatars
-                </Button>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="overflow-x-auto pb-2">
-            <div className="flex gap-3 min-w-max">
-              {avatars.map((avatar) => (
-                <div
-                  key={avatar.id}
-                  onClick={() => handleViewDetails(avatar)}
-                  className="relative flex-shrink-0 w-24 cursor-pointer rounded-lg overflow-hidden transition-all hover:opacity-80"
-                >
-                  {avatar.thumbnail_url || avatar.preview_url ? (
-                    <img
-                      src={avatar.thumbnail_url || avatar.preview_url || ''}
-                      alt={avatar.avatar_name}
-                      className="w-24 h-32 object-contain bg-slate-50 rounded-lg"
-                    />
-                  ) : (
-                    <div className="w-24 h-32 bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center rounded-lg">
-                      <User className="h-8 w-8 text-white opacity-50" />
-                    </div>
+      <div className="overflow-x-auto">
+        <div className="flex gap-3 min-w-max py-2">
+          {avatars.length === 0 ? (
+            <div className="flex items-center justify-center min-w-full py-12">
+              <div className="text-center">
+                <User className="h-16 w-16 mx-auto text-slate-400 mb-4" />
+                <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                  {onlyCreated ? 'No avatars created yet' : 'No avatars found'}
+                </h3>
+                <p className="text-slate-600 mb-6">
+                  {onlyCreated 
+                    ? 'Create an avatar from a photo to get started'
+                    : 'Sync avatars or create one from a photo to get started'}
+                </p>
+                <div className="flex gap-3 justify-center">
+                  <Button
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setShowCreateModal(true)
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Create from Photo
+                  </Button>
+                  {onlyCreated && (
+                    <Button onClick={() => setOnlyCreated(false)} variant="secondary">
+                      Show All Avatars
+                    </Button>
                   )}
-                  {avatar.is_default && (
-                    <div className="absolute top-1 right-1 bg-brand-500 text-white px-1 py-0.5 rounded text-xs font-semibold flex items-center gap-0.5">
-                      <Star className="h-2 w-2 fill-current" />
-                    </div>
+                  {!onlyCreated && (
+                    <Button onClick={handleSync} disabled={syncing} variant="secondary">
+                      <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+                      Sync Avatars
+                    </Button>
                   )}
                 </div>
-              ))}
+              </div>
             </div>
-          </div>
-        )}
+          ) : (
+            avatars.map((avatar) => (
+              <div
+                key={avatar.id}
+                onClick={() => handleViewDetails(avatar)}
+                className="relative flex-shrink-0 w-24 cursor-pointer rounded-lg overflow-hidden transition-all hover:opacity-80"
+              >
+                {avatar.thumbnail_url || avatar.preview_url ? (
+                  <img
+                    src={avatar.thumbnail_url || avatar.preview_url || ''}
+                    alt={avatar.avatar_name}
+                    className="w-24 h-32 object-contain bg-slate-50 rounded-lg"
+                  />
+                ) : (
+                  <div className="w-24 h-32 bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center rounded-lg">
+                    <User className="h-8 w-8 text-white opacity-50" />
+                  </div>
+                )}
+                {avatar.is_default && (
+                  <div className="absolute top-1 right-1 bg-brand-500 text-white px-1 py-0.5 rounded text-xs font-semibold flex items-center gap-0.5">
+                    <Star className="h-2 w-2 fill-current" />
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
 
         {/* Create Avatar Modal */}
         <Modal
