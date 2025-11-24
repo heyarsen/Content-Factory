@@ -36,13 +36,13 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   }, [notificationsOpen])
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/60 bg-white/70 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 border-b border-slate-700/60 bg-slate-800/95 backdrop-blur-xl">
       <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6 sm:px-8 lg:px-12">
         <div className="flex items-center gap-4">
           <button
             type="button"
             onClick={onToggleSidebar}
-            className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/60 bg-white/70 text-slate-600 shadow-sm backdrop-blur transition hover:border-brand-200 hover:text-brand-600 lg:hidden"
+            className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-600/60 bg-slate-700/70 text-slate-300 shadow-sm backdrop-blur transition hover:border-brand-400 hover:text-brand-400 lg:hidden"
             aria-label="Open navigation"
           >
             <Menu className="h-5 w-5" />
@@ -50,7 +50,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
 
           <div className="hidden md:block">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Workspace</p>
-            <p className="mt-1 text-xl font-semibold text-primary">Welcome back, {greetingName}</p>
+            <p className="mt-1 text-xl font-semibold text-white">Welcome back, {greetingName}</p>
           </div>
         </div>
 
@@ -60,7 +60,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             <button
               type="button"
               onClick={() => setNotificationsOpen(!notificationsOpen)}
-              className="relative flex h-12 w-12 min-h-[44px] min-w-[44px] items-center justify-center rounded-2xl border border-white/60 bg-white/70 text-slate-400 shadow-sm backdrop-blur transition hover:border-brand-200 hover:text-brand-600 touch-manipulation"
+              className="relative flex h-12 w-12 min-h-[44px] min-w-[44px] items-center justify-center rounded-2xl border border-slate-600/60 bg-slate-700/70 text-slate-300 shadow-sm backdrop-blur transition hover:border-brand-400 hover:text-brand-400 touch-manipulation"
               aria-label="Notifications"
             >
               <Bell className="h-5 w-5" />
@@ -163,7 +163,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           <button
             type="button"
             onClick={() => navigate('/profile')}
-            className="flex h-12 w-12 min-h-[44px] min-w-[44px] items-center justify-center rounded-2xl border border-white/60 bg-white/70 text-slate-500 shadow-sm backdrop-blur transition hover:border-brand-200 hover:text-brand-600 touch-manipulation md:hidden"
+            className="flex h-12 w-12 min-h-[44px] min-w-[44px] items-center justify-center rounded-2xl border border-slate-600/60 bg-slate-700/70 text-slate-300 shadow-sm backdrop-blur transition hover:border-brand-400 hover:text-brand-400 touch-manipulation md:hidden"
             aria-label="Account"
           >
             <User className="h-5 w-5" />
@@ -173,11 +173,11 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           <button
             type="button"
             onClick={() => navigate('/profile')}
-            className="hidden items-center gap-3 rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm text-slate-500 shadow-sm backdrop-blur transition hover:border-brand-200 hover:text-brand-600 md:flex min-h-[44px] touch-manipulation"
+            className="hidden items-center gap-3 rounded-2xl border border-slate-600/60 bg-slate-700/70 px-4 py-3 text-sm text-slate-300 shadow-sm backdrop-blur transition hover:border-brand-400 hover:text-brand-400 md:flex min-h-[44px] touch-manipulation"
           >
             <div className="hidden flex-col leading-tight sm:flex">
               <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Account</span>
-              <span className="font-semibold text-primary">{user?.email}</span>
+              <span className="font-semibold text-white">{user?.email}</span>
             </div>
             <User className="h-4 w-4" />
           </button>

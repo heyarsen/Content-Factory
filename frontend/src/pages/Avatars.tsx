@@ -1900,12 +1900,12 @@ export default function Avatars() {
               <p className="text-sm text-slate-600">
                 Select the look you want to use for this avatar. This choice is permanent and cannot be changed later.
               </p>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
                 {lookSelectionModal.looks.map((look: PhotoAvatarLook) => (
                   <div
                     key={look.id}
                     onClick={() => setSelectedLookId(look.id)}
-                    className={`relative rounded-lg border-2 overflow-hidden transition-all cursor-pointer ${
+                    className={`relative flex-shrink-0 w-32 rounded-lg border-2 overflow-hidden transition-all cursor-pointer ${
                       selectedLookId === look.id
                         ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-200'
                         : 'border-slate-200 bg-white hover:border-brand-300'
@@ -1921,17 +1921,17 @@ export default function Avatars() {
                       </div>
                     ) : (
                       <div className="w-full aspect-[9/16] bg-slate-100 flex items-center justify-center">
-                        <User className="h-8 w-8 text-slate-400" />
+                        <User className="h-6 w-6 text-slate-400" />
                       </div>
                     )}
-                    <div className="p-2">
+                    <div className="p-1.5">
                       <p className="text-xs font-medium text-slate-900 truncate">
                         {look.name || 'Unnamed Look'}
                       </p>
                     </div>
                     {selectedLookId === look.id && (
-                      <div className="absolute top-2 right-2 bg-brand-500 text-white px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1">
-                        <Star className="h-3 w-3 fill-current" />
+                      <div className="absolute top-1.5 right-1.5 bg-brand-500 text-white px-1.5 py-0.5 rounded text-xs font-semibold flex items-center gap-1">
+                        <Star className="h-2.5 w-2.5 fill-current" />
                         Selected
                       </div>
                     )}
