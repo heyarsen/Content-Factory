@@ -1050,62 +1050,9 @@ export default function Avatars() {
 
   return (
     <Layout>
-      <div className="space-y-8">
-        <div className="flex justify-between items-center flex-wrap gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Settings</p>
-            <h1 className="mt-2 text-3xl font-semibold text-primary">Avatars</h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Manage your avatars for video generation
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <Button
-              variant={onlyCreated ? "primary" : "secondary"}
-              onClick={() => setOnlyCreated(!onlyCreated)}
-              className="flex items-center gap-2"
-            >
-              {onlyCreated ? '✓ ' : ''}
-              {onlyCreated ? 'My Avatars' : 'All Avatars'}
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                setShowGenerateAIModal(true)
-              }}
-              className="flex items-center gap-2"
-            >
-              <Sparkles className="h-4 w-4" />
-              Generate AI Avatar
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                console.log('Create avatar button clicked')
-                setShowCreateModal(true)
-              }}
-              className="flex items-center gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Create from Photo
-            </Button>
-            <Button
-              onClick={handleSync}
-              disabled={syncing}
-              className="flex items-center gap-2"
-            >
-              <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-              {syncing ? 'Syncing...' : 'Sync Avatars'}
-            </Button>
-          </div>
-        </div>
-
+      <div>
         {avatars.length === 0 ? (
-          <Card className="p-12 text-center">
+          <div className="p-12 text-center">
             <User className="h-16 w-16 mx-auto text-slate-400 mb-4" />
             <h3 className="text-lg font-semibold text-slate-900 mb-2">
               {onlyCreated ? 'No avatars created yet' : 'No avatars found'}
@@ -1139,99 +1086,35 @@ export default function Avatars() {
                 </Button>
               )}
             </div>
-          </Card>
+          </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {avatars.map((avatar) => (
-              <Card key={avatar.id} className="overflow-hidden">
-                <div className="relative">
+          <div className="overflow-x-auto pb-2">
+            <div className="flex gap-3 min-w-max">
+              {avatars.map((avatar) => (
+                <div
+                  key={avatar.id}
+                  onClick={() => handleViewDetails(avatar)}
+                  className="relative flex-shrink-0 w-24 cursor-pointer rounded-lg overflow-hidden transition-all hover:opacity-80"
+                >
                   {avatar.thumbnail_url || avatar.preview_url ? (
                     <img
                       src={avatar.thumbnail_url || avatar.preview_url || ''}
                       alt={avatar.avatar_name}
-                      className="w-full h-48 object-contain bg-slate-50"
+                      className="w-24 h-32 object-contain bg-slate-50 rounded-lg"
                     />
                   ) : (
-                    <div className="w-full h-48 bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">
-                      <User className="h-20 w-20 text-white opacity-50" />
+                    <div className="w-24 h-32 bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center rounded-lg">
+                      <User className="h-8 w-8 text-white opacity-50" />
                     </div>
                   )}
                   {avatar.is_default && (
-                    <div className="absolute top-2 right-2 bg-brand-500 text-white px-2 py-1 rounded-md text-xs font-semibold flex items-center gap-1">
-                      <Star className="h-3 w-3 fill-current" />
-                      Default
+                    <div className="absolute top-1 right-1 bg-brand-500 text-white px-1 py-0.5 rounded text-xs font-semibold flex items-center gap-0.5">
+                      <Star className="h-2 w-2 fill-current" />
                     </div>
                   )}
                 </div>
-                <div className="p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="font-semibold text-slate-900">
-                        {avatar.avatar_name}
-                      </h3>
-                      {avatar.gender && (
-                        <p className="text-sm text-slate-500 capitalize">
-                          {avatar.gender}
-                        </p>
-                      )}
-                    </div>
-                    {renderStatusBadge(avatar)}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-1 ml-auto">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleViewDetails(avatar)}
-                        className="text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                        title="View details"
-                        disabled={detailsLoadingId === avatar.id}
-                      >
-                        <Image className="h-4 w-4" />
-                      </Button>
-                      {['pending', 'training', 'generating'].includes(avatar.status) && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRefreshTrainingStatus(avatar)}
-                          className="text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                          title="Refresh status"
-                          disabled={!!statusLoadingMap[avatar.id]}
-                        >
-                          <RefreshCw
-                            className={`h-4 w-4 ${
-                              statusLoadingMap[avatar.id] ? 'animate-spin text-brand-600' : ''
-                            }`}
-                          />
-                        </Button>
-                      )}
-                      {isUserCreatedAvatar(avatar) && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleManageLooks(avatar)}
-                            className="text-brand-600 hover:text-brand-700 hover:bg-brand-50"
-                            title="Manage Looks"
-                          >
-                            <Image className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(avatar)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            title="Delete avatar"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            ))}
+              ))}
+            </div>
           </div>
         )}
 
