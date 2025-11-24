@@ -366,7 +366,40 @@ export class AvatarService {
       throw new Error('Avatar not found')
     }
 
-    return getPhotoAvatarDetails(avatar.heygen_avatar_id)
+    // Check if this is a photo avatar (user_photo or ai_generated)
+    const isPhotoAvatar = avatar.source === 'user_photo' || avatar.source === 'ai_generated' || 
+                         (avatar.avatar_url && avatar.avatar_url.includes('supabase.co/storage'))
+
+    if (!isPhotoAvatar) {
+      // For non-photo avatars, return basic information from the database
+      return {
+        id: avatar.heygen_avatar_id,
+        group_id: avatar.heygen_avatar_id,
+        status: avatar.status || 'active',
+        image_url: avatar.avatar_url || null,
+        preview_url: avatar.preview_url || null,
+        thumbnail_url: avatar.thumbnail_url || null,
+        created_at: avatar.created_at ? new Date(avatar.created_at).getTime() / 1000 : undefined,
+        updated_at: avatar.updated_at ? new Date(avatar.updated_at).getTime() / 1000 : null,
+      }
+    }
+
+    try {
+      return await getPhotoAvatarDetails(avatar.heygen_avatar_id)
+    } catch (error: any) {
+      // If fetching from HeyGen fails, return basic information from the database
+      console.warn('Failed to fetch photo avatar details from HeyGen, returning database info:', error.message)
+      return {
+        id: avatar.heygen_avatar_id,
+        group_id: avatar.heygen_avatar_id,
+        status: avatar.status || 'active',
+        image_url: avatar.avatar_url || null,
+        preview_url: avatar.preview_url || null,
+        thumbnail_url: avatar.thumbnail_url || null,
+        created_at: avatar.created_at ? new Date(avatar.created_at).getTime() / 1000 : undefined,
+        updated_at: avatar.updated_at ? new Date(avatar.updated_at).getTime() / 1000 : null,
+      }
+    }
   }
 
   static async upscaleAvatar(avatarId: string, userId: string) {

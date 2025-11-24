@@ -1944,6 +1944,7 @@ const fetchPhotoAvatarDetails = async (photoAvatarId: string): Promise<PhotoAvat
       'X-Api-Key': apiKey,
       'Content-Type': 'application/json',
     },
+    timeout: 10000, // 10 second timeout
   })
 
   const data = response.data?.data || response.data
@@ -1982,6 +1983,7 @@ const resolvePhotoAvatarTarget = async (
       'X-Api-Key': apiKey,
       'Content-Type': 'application/json',
     },
+    timeout: 10000, // 10 second timeout
   })
 
   const avatarList =
