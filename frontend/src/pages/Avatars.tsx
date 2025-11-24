@@ -207,6 +207,11 @@ export default function Avatars() {
 
   const checkForUnselectedLooks = useCallback(async (avatarsList: Avatar[]) => {
     try {
+      // Don't check if modal is already open
+      if (lookSelectionModal) {
+        return
+      }
+
       // Check user-created avatars that don't have a default_look_id
       const userCreatedAvatars = avatarsList.filter(avatar => 
         avatar && isUserCreatedAvatar(avatar) && avatar.status === 'active'
@@ -234,7 +239,7 @@ export default function Avatars() {
       console.error('Error in checkForUnselectedLooks:', error)
       // Don't throw - just log the error
     }
-  }, [])
+  }, [lookSelectionModal])
 
   const loadAvatars = useCallback(async () => {
     try {
@@ -605,7 +610,10 @@ export default function Avatars() {
           try {
             const detailsResponse = await api.get(`/api/avatars/${response.data.avatar.id}/details`)
             const looks = detailsResponse.data?.looks || []
-            if (looks.length > 0) {
+            const defaultLookId = detailsResponse.data?.default_look_id
+            
+            // Only show modal if there are looks and no default look is set
+            if (looks.length > 0 && !defaultLookId) {
               setLookSelectionModal({ avatar: response.data.avatar, looks })
             }
           } catch (err) {
