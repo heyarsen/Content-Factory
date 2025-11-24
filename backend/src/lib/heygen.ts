@@ -1912,7 +1912,7 @@ export async function addLooksToAvatarGroup(
  * Check training status for avatar group
  */
 export interface TrainingStatus {
-  status: 'pending' | 'training' | 'ready' | 'failed'
+  status: 'pending' | 'training' | 'ready' | 'failed' | 'empty'
   error_msg?: string | null
   created_at?: number
   updated_at?: number | null
