@@ -40,6 +40,18 @@ interface Avatar {
   source?: 'synced' | 'user_photo' | 'ai_generated' | null
 }
 
+interface PhotoAvatarLook {
+  id: string
+  name?: string
+  status?: string
+  image_url?: string
+  preview_url?: string
+  thumbnail_url?: string
+  created_at?: number
+  updated_at?: number | null
+  is_default?: boolean
+}
+
 interface PhotoAvatarDetails {
   id: string
   group_id?: string
@@ -49,6 +61,8 @@ interface PhotoAvatarDetails {
   thumbnail_url?: string
   created_at?: number
   updated_at?: number | null
+  looks?: PhotoAvatarLook[]
+  default_look_id?: string | null
   [key: string]: any
 }
 
