@@ -121,6 +121,53 @@ router.post('/:id/set-default', async (req: AuthRequest, res: Response) => {
   }
 })
 
+// Update avatar
+router.patch('/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { id } = req.params
+    const { avatar_name, gender } = req.body
+
+    // Verify avatar ownership
+    const { supabase } = await import('../lib/supabase.js')
+    const { data: avatar, error: avatarError } = await supabase
+      .from('avatars')
+      .select('id, user_id')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single()
+
+    if (avatarError || !avatar) {
+      return res.status(404).json({ error: 'Avatar not found' })
+    }
+
+    // Update avatar
+    const updateData: any = {}
+    if (avatar_name !== undefined) updateData.avatar_name = avatar_name
+    if (gender !== undefined) updateData.gender = gender
+
+    const { data: updatedAvatar, error: updateError } = await supabase
+      .from('avatars')
+      .update(updateData)
+      .eq('id', id)
+      .eq('user_id', userId)
+      .select()
+      .single()
+
+    if (updateError) {
+      throw updateError
+    }
+
+    return res.json({
+      message: 'Avatar updated successfully',
+      avatar: updatedAvatar,
+    })
+  } catch (error: any) {
+    console.error('Update avatar error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to update avatar' })
+  }
+})
+
 // Add avatar from HeyGen
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {

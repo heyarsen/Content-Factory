@@ -99,6 +99,12 @@ export default function Avatars() {
   const [upscalingId, setUpscalingId] = useState<string | null>(null)
   const [lookSelectionModal, setLookSelectionModal] = useState<{ avatar: Avatar; looks: PhotoAvatarLook[] } | null>(null)
   const [selectedLookId, setSelectedLookId] = useState<string | null>(null)
+  const [selectedAvatarForEdit, setSelectedAvatarForEdit] = useState<Avatar | null>(null)
+  const [avatarEditForm, setAvatarEditForm] = useState({
+    avatar_name: '',
+    gender: '',
+  })
+  const [savingAvatar, setSavingAvatar] = useState(false)
   const detailData = detailsModal?.data ?? null
 
   const photoChecklist = [
@@ -981,7 +987,7 @@ export default function Avatars() {
         pose: lookPose,
         style: lookStyle,
       })
-      
+
       const response = await api.post('/api/avatars/generate-look', {
         group_id: showLooksModal.heygen_avatar_id,
         prompt: lookPrompt,
@@ -1063,110 +1069,45 @@ export default function Avatars() {
     )
   }
 
+  useEffect(() => {
+    if (selectedAvatarForEdit) {
+      setAvatarEditForm({
+        avatar_name: selectedAvatarForEdit.avatar_name || '',
+        gender: selectedAvatarForEdit.gender || '',
+      })
+    }
+  }, [selectedAvatarForEdit])
+
+  const handleSaveAvatar = async () => {
+    if (!selectedAvatarForEdit) return
+    
+    setSavingAvatar(true)
+    try {
+      await api.patch(`/api/avatars/${selectedAvatarForEdit.id}`, {
+        avatar_name: avatarEditForm.avatar_name,
+        gender: avatarEditForm.gender,
+      })
+      toast.success('Avatar updated successfully')
+      await loadAvatars()
+      // Update selected avatar if it's still selected
+      if (selectedAvatarForEdit) {
+        const updated = avatars.find(a => a.id === selectedAvatarForEdit.id)
+        if (updated) {
+          setSelectedAvatarForEdit(updated)
+        }
+      }
+    } catch (error: any) {
+      console.error('Failed to update avatar:', error)
+      toast.error(error.response?.data?.error || 'Failed to update avatar')
+    } finally {
+      setSavingAvatar(false)
+    }
+  }
+
   return (
     <Layout>
       <div className="space-y-8">
-        <div className="flex justify-between items-center flex-wrap gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Settings</p>
-            <h1 className="mt-2 text-3xl font-semibold text-primary">Avatars</h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Manage your avatars for video generation
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <Button
-              variant={onlyCreated ? "primary" : "secondary"}
-              onClick={() => setOnlyCreated(!onlyCreated)}
-              className="flex items-center gap-2"
-            >
-              {onlyCreated ? '✓ ' : ''}
-              {onlyCreated ? 'My Avatars' : 'All Avatars'}
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                setShowGenerateAIModal(true)
-              }}
-              className="flex items-center gap-2"
-            >
-              <Sparkles className="h-4 w-4" />
-              Generate AI Avatar
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                console.log('Create avatar button clicked')
-                setShowCreateModal(true)
-              }}
-              className="flex items-center gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Create from Photo
-            </Button>
-            <Button
-              onClick={handleSync}
-              disabled={syncing}
-              className="flex items-center gap-2"
-            >
-              <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-              {syncing ? 'Syncing...' : 'Sync Avatars'}
-            </Button>
-          </div>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card className="p-5 space-y-4">
-            <div className="flex items-center gap-2 text-slate-900">
-              <Upload className="h-5 w-5 text-brand-600" />
-              <h3 className="text-base font-semibold">Best photo checklist</h3>
-            </div>
-            <ul className="space-y-2 text-sm text-slate-600">
-              {photoChecklist.map((tip, index) => (
-                <li key={tip} className="flex items-start gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-brand-500 mt-0.5" />
-                  <span>{tip}</span>
-                  {index === 0 && <span className="sr-only">Tip</span>}
-                </li>
-              ))}
-            </ul>
-            <div className="rounded-lg border border-slate-200 bg-white/60 p-3 text-xs text-slate-500">
-              We automatically crop, brighten, and sharpen every upload before it goes to HeyGen. One good phone selfie is enough—you can add extra angles if you have them.
-            </div>
-          </Card>
-
-          <Card className="p-5 space-y-4 bg-gradient-to-br from-brand-50 to-white">
-            <div className="flex items-center gap-2 text-slate-900">
-              <Sparkles className="h-5 w-5 text-brand-600" />
-              <h3 className="text-base font-semibold">No perfect photo? Generate one</h3>
-            </div>
-            <p className="text-sm text-slate-600">
-              Describe the persona you need (age, outfit, vibe) and we&apos;ll create a matching AI avatar automatically. No uploads required.
-            </p>
-            <div className="flex flex-wrap gap-2 text-xs text-slate-500">
-              <span className="rounded-full bg-white/70 px-3 py-1">Ready in ~2 min</span>
-              <span className="rounded-full bg-white/70 px-3 py-1">Full-body or close-up</span>
-              <span className="rounded-full bg-white/70 px-3 py-1">Always portrait-ready</span>
-            </div>
-            <Button
-              variant="secondary"
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                setShowGenerateAIModal(true)
-              }}
-              className="flex items-center gap-2"
-            >
-              <Sparkles className="h-4 w-4" />
-              Generate AI Avatar
-            </Button>
-          </Card>
-        </div>
-
+        {/* Avatars horizontal scroll */}
         {avatars.length === 0 ? (
           <Card className="p-12 text-center">
             <User className="h-16 w-16 mx-auto text-slate-400 mb-4" />
@@ -1204,110 +1145,130 @@ export default function Avatars() {
             </div>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="overflow-x-auto pb-4">
+            <div className="flex gap-4 min-w-max">
             {avatars.map((avatar) => (
-              <Card key={avatar.id} className="overflow-hidden">
-                <div className="relative">
+                <div
+                key={avatar.id} 
+                  onClick={() => setSelectedAvatarForEdit(avatar)}
+                  className={`relative flex-shrink-0 w-32 cursor-pointer rounded-lg border-2 overflow-hidden transition-all ${
+                    selectedAvatarForEdit?.id === avatar.id
+                      ? 'border-brand-500 ring-2 ring-brand-200'
+                      : 'border-slate-200 hover:border-brand-300'
+                  }`}
+                >
                   {avatar.thumbnail_url || avatar.preview_url ? (
                     <img
                       src={avatar.thumbnail_url || avatar.preview_url || ''}
                       alt={avatar.avatar_name}
-                      className="w-full h-48 object-contain bg-slate-50"
+                      className="w-32 h-40 object-contain bg-slate-50"
                     />
                   ) : (
-                    <div className="w-full h-48 bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">
-                      <User className="h-20 w-20 text-white opacity-50" />
+                    <div className="w-32 h-40 bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">
+                      <User className="h-12 w-12 text-white opacity-50" />
                     </div>
                   )}
                   {avatar.is_default && (
-                    <div className="absolute top-2 right-2 bg-brand-500 text-white px-2 py-1 rounded-md text-xs font-semibold flex items-center gap-1">
-                      <Star className="h-3 w-3 fill-current" />
-                      Default
+                    <div className="absolute top-1 right-1 bg-brand-500 text-white px-1.5 py-0.5 rounded text-xs font-semibold flex items-center gap-0.5">
+                      <Star className="h-2.5 w-2.5 fill-current" />
                     </div>
                   )}
-                </div>
-                <div className="p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="font-semibold text-slate-900">
+                  <div className="p-2 bg-white">
+                    <p className="text-xs font-medium text-slate-900 truncate">
                     {avatar.avatar_name}
-                  </h3>
-                  {avatar.gender && (
-                        <p className="text-sm text-slate-500 capitalize">
-                      {avatar.gender}
                     </p>
-                  )}
-                    </div>
                     {renderStatusBadge(avatar)}
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {!avatar.is_default && (
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Avatar Edit Form at Bottom */}
+        <Card className="p-6">
+          <div className="mb-6 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <User className="h-5 w-5 text-slate-400" />
+              <h2 className="text-lg font-semibold text-primary">
+                {selectedAvatarForEdit ? 'Edit Avatar' : 'Avatar Settings'}
+              </h2>
+            </div>
+            <div className="flex gap-2">
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => handleSetDefault(avatar.id)}
-                        className="flex-1"
-                      >
-                        <Star className="h-4 w-4 mr-1" />
-                        Set Default
+                onClick={() => setShowGenerateAIModal(true)}
+                className="flex items-center gap-2"
+              >
+                <Sparkles className="h-4 w-4" />
+                Generate AI
                       </Button>
-                    )}
-                    <div className="flex items-center gap-1 ml-auto">
                       <Button
-                        variant="ghost"
+                variant="secondary"
                         size="sm"
-                        onClick={() => handleViewDetails(avatar)}
-                        className="text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                        title="View details"
-                        disabled={detailsLoadingId === avatar.id}
-                      >
-                        <Info className={`h-4 w-4 ${detailsLoadingId === avatar.id ? 'animate-spin' : ''}`} />
+                onClick={() => setShowCreateModal(true)}
+                className="flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Create
                       </Button>
-                      {['pending', 'training', 'generating'].includes(avatar.status) && (
                         <Button
-                          variant="ghost"
+                variant="secondary"
                           size="sm"
-                          onClick={() => handleRefreshTrainingStatus(avatar)}
-                          className="text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                          title="Refresh status"
-                          disabled={!!statusLoadingMap[avatar.id]}
-                        >
-                          <RefreshCw
-                            className={`h-4 w-4 ${
-                              statusLoadingMap[avatar.id] ? 'animate-spin text-brand-600' : ''
-                            }`}
-                          />
+                onClick={handleSync}
+                disabled={syncing}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+                Sync
                       </Button>
-                    )}
-                    {isUserCreatedAvatar(avatar) && (
-                      <>
+            </div>
+          </div>
+          {selectedAvatarForEdit ? (
+            <div className="space-y-4">
+              <Input
+                label="Avatar Name"
+                value={avatarEditForm.avatar_name}
+                onChange={(e) => setAvatarEditForm({ ...avatarEditForm, avatar_name: e.target.value })}
+                placeholder="Enter avatar name"
+              />
+              <Select
+                label="Gender"
+                value={avatarEditForm.gender}
+                onChange={(e) => setAvatarEditForm({ ...avatarEditForm, gender: e.target.value })}
+                options={[
+                  { value: '', label: 'Not specified' },
+                  { value: 'male', label: 'Male' },
+                  { value: 'female', label: 'Female' },
+                  { value: 'other', label: 'Other' },
+                ]}
+              />
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
                           <Button
                             variant="ghost"
-                            size="sm"
-                          onClick={() => handleManageLooks(avatar)}
-                          className="text-brand-600 hover:text-brand-700 hover:bg-brand-50"
-                          title="Manage Looks"
-                        >
-                          <Image className="h-4 w-4" />
-                        </Button>
+                  onClick={() => {
+                    setSelectedAvatarForEdit(null)
+                    setAvatarEditForm({ avatar_name: '', gender: '' })
+                  }}
+                >
+                  Cancel
+                          </Button>
                         <Button
-                          variant="ghost"
-                          size="sm"
-                            onClick={() => handleDelete(avatar)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            title="Delete avatar"
-                        >
-                          <Trash2 className="h-4 w-4" />
+                  onClick={handleSaveAvatar}
+                  loading={savingAvatar}
+                  disabled={!avatarEditForm.avatar_name.trim()}
+                >
+                  Save Changes
                         </Button>
-                      </>
-                    )}
                     </div>
                   </div>
-                </div>
-              </Card>
-            ))}
+          ) : (
+            <div className="text-center py-8 text-slate-500">
+              <p className="text-sm">Select an avatar from above to edit its settings</p>
           </div>
         )}
+        </Card>
 
         {/* Create Avatar Modal */}
         <Modal
@@ -1976,64 +1937,64 @@ export default function Avatars() {
                   )
                 }
                 return (
-                  <div className="space-y-3 pt-4 border-t border-slate-200">
-                    <div>
-                      <h4 className="text-sm font-semibold text-slate-900 mb-1">
+                <div className="space-y-3 pt-4 border-t border-slate-200">
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-900 mb-1">
                         Available Looks ({looks.length})
-                      </h4>
-                      <p className="text-xs text-slate-500">
-                        Select which look to use for video generation
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    </h4>
+                    <p className="text-xs text-slate-500">
+                      Select which look to use for video generation
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
                       {looks.map((look: PhotoAvatarLook) => (
-                        <div
-                          key={look.id}
-                          className={`relative rounded-lg border-2 overflow-hidden transition-all ${
-                            look.is_default
-                              ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-200'
-                              : 'border-slate-200 bg-white hover:border-brand-300'
-                          }`}
-                        >
+                      <div
+                        key={look.id}
+                        className={`relative rounded-lg border-2 overflow-hidden transition-all ${
+                          look.is_default
+                            ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-200'
+                            : 'border-slate-200 bg-white hover:border-brand-300'
+                        }`}
+                      >
                         {look.thumbnail_url || look.image_url ? (
                           <div className="w-full aspect-[9/16] bg-slate-50 flex items-center justify-center overflow-hidden">
-                            <img
-                              src={look.thumbnail_url || look.image_url || ''}
-                              alt={look.name || 'Look'}
+                          <img
+                            src={look.thumbnail_url || look.image_url || ''}
+                            alt={look.name || 'Look'}
                               className="w-full h-full object-contain"
-                            />
+                          />
                           </div>
                         ) : (
                           <div className="w-full aspect-[9/16] bg-slate-100 flex items-center justify-center">
                             <User className="h-8 w-8 text-slate-400" />
                           </div>
                         )}
-                          <div className="p-2">
-                            <p className="text-xs font-medium text-slate-900 truncate">
-                              {look.name || 'Unnamed Look'}
-                            </p>
-                            {look.status && (
-                              <p className="text-xs text-slate-500 capitalize">{look.status}</p>
-                            )}
-                          </div>
-                          {look.is_default && (
-                            <div className="absolute top-2 right-2 bg-brand-500 text-white px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1">
-                              <Star className="h-3 w-3 fill-current" />
-                              Selected
-                            </div>
+                        <div className="p-2">
+                          <p className="text-xs font-medium text-slate-900 truncate">
+                            {look.name || 'Unnamed Look'}
+                          </p>
+                          {look.status && (
+                            <p className="text-xs text-slate-500 capitalize">{look.status}</p>
                           )}
-                          {!look.is_default && (
+                        </div>
+                        {look.is_default && (
+                          <div className="absolute top-2 right-2 bg-brand-500 text-white px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1">
+                            <Star className="h-3 w-3 fill-current" />
+                              Selected
+                          </div>
+                        )}
+                        {!look.is_default && (
                             <div className="p-2 pt-0 flex gap-1">
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleSetDefaultLook(detailsModal.avatar.id, look.id)
-                                }}
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleSetDefaultLook(detailsModal.avatar.id, look.id)
+                              }}
                                 className="flex-1 text-xs"
-                              >
-                                <Star className="h-3 w-3 mr-1" />
+                            >
+                              <Star className="h-3 w-3 mr-1" />
                                 Select
                               </Button>
                               <Button
@@ -2060,13 +2021,13 @@ export default function Avatars() {
                                 className="text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
                               >
                                 <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
+                </div>
                 )
               })()}
 
@@ -2207,3 +2168,4 @@ export default function Avatars() {
     </Layout>
   )
 }
+
