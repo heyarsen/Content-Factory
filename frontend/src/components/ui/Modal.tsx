@@ -8,9 +8,10 @@ interface ModalProps {
   children: ReactNode
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full'
   closeOnOverlayClick?: boolean
+  showCloseButton?: boolean
 }
 
-export function Modal({ isOpen, onClose, title, children, size = 'md', closeOnOverlayClick = true }: ModalProps) {
+export function Modal({ isOpen, onClose, title, children, size = 'md', closeOnOverlayClick = true, showCloseButton = true }: ModalProps) {
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden'
@@ -66,15 +67,17 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', closeOnOv
         }}
       >
         {/* Header - Fixed height */}
-        <div className="flex items-center justify-between border-b border-white/60 px-6 sm:px-8 py-4 sm:py-5 bg-gradient-to-r from-white to-slate-50/50 flex-shrink-0">
+        <div className={`flex items-center border-b border-white/60 px-6 sm:px-8 py-4 sm:py-5 bg-gradient-to-r from-white to-slate-50/50 flex-shrink-0 ${showCloseButton ? 'justify-between' : 'justify-center'}`}>
           <h3 className="text-lg sm:text-xl font-semibold text-primary truncate pr-2">{title}</h3>
-          <button 
-            onClick={onClose} 
-            className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100/70 hover:text-primary focus:outline-none focus:ring-2 focus:ring-brand-200 flex-shrink-0"
-            aria-label="Close modal"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          {showCloseButton && (
+            <button 
+              onClick={onClose} 
+              className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100/70 hover:text-primary focus:outline-none focus:ring-2 focus:ring-brand-200 flex-shrink-0"
+              aria-label="Close modal"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          )}
         </div>
         {/* Content - Scrollable */}
         <div className="px-6 sm:px-8 py-4 sm:py-6 overflow-y-auto flex-1 min-h-0">

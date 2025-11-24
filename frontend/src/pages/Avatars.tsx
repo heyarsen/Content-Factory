@@ -70,7 +70,7 @@ type AiStageVisualState = 'done' | 'current' | 'pending'
 
 export default function Avatars() {
   const [avatars, setAvatars] = useState<Avatar[]>([])
-  const [, setDefaultAvatarId] = useState<string | null>(null)
+  const [defaultAvatarId, setDefaultAvatarId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -344,6 +344,48 @@ export default function Avatars() {
       toast.error(errorMessage + '. Please check your API configuration.')
     } finally {
       setSyncing(false)
+    }
+  }
+
+  const handleSetDefault = async (avatarId: string) => {
+    try {
+      await api.post(`/api/avatars/${avatarId}/set-default`)
+      setDefaultAvatarId(avatarId)
+      setAvatars(avatars.map(a => ({
+        ...a,
+        is_default: a.id === avatarId
+      })))
+      toast.success('Default avatar updated')
+    } catch (error: any) {
+      console.error('Failed to set default avatar:', error)
+      toast.error(error.response?.data?.error || 'Failed to set default avatar')
+    }
+  }
+
+  const handleDelete = async (avatar: Avatar) => {
+    if (!confirm(`Are you sure you want to remove "${avatar.avatar_name}" from your avatar list?`)) {
+      return
+    }
+
+    let removeRemote = false
+    if (isUserCreatedAvatar(avatar)) {
+      removeRemote = confirm(
+        'Do you also want to delete this avatar from HeyGen (recommended to keep your account clean)?'
+      )
+    }
+
+    try {
+      await api.delete(`/api/avatars/${avatar.id}`, {
+        params: removeRemote ? { remove_remote: 'true' } : undefined,
+      })
+      setAvatars(avatars.filter(a => a.id !== avatar.id))
+      if (defaultAvatarId === avatar.id) {
+        setDefaultAvatarId(null)
+      }
+      toast.success('Avatar removed')
+    } catch (error: any) {
+      console.error('Failed to delete avatar:', error)
+      toast.error(error.response?.data?.error || 'Failed to delete avatar')
     }
   }
 
@@ -1065,7 +1107,59 @@ export default function Avatars() {
   return (
     <Layout>
       <div className="space-y-8">
-        {/* Avatars horizontal scroll */}
+        <div className="flex justify-between items-center flex-wrap gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Settings</p>
+            <h1 className="mt-2 text-3xl font-semibold text-primary">Avatars</h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Manage your avatars for video generation
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <Button
+              variant={onlyCreated ? "primary" : "secondary"}
+              onClick={() => setOnlyCreated(!onlyCreated)}
+              className="flex items-center gap-2"
+            >
+              {onlyCreated ? '✓ ' : ''}
+              {onlyCreated ? 'My Avatars' : 'All Avatars'}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setShowGenerateAIModal(true)
+              }}
+              className="flex items-center gap-2"
+            >
+              <Sparkles className="h-4 w-4" />
+              Generate AI Avatar
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                console.log('Create avatar button clicked')
+                setShowCreateModal(true)
+              }}
+              className="flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Create from Photo
+            </Button>
+            <Button
+              onClick={handleSync}
+              disabled={syncing}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing...' : 'Sync Avatars'}
+            </Button>
+          </div>
+        </div>
+
         {avatars.length === 0 ? (
           <Card className="p-12 text-center">
             <User className="h-16 w-16 mx-auto text-slate-400 mb-4" />
@@ -1103,130 +1197,99 @@ export default function Avatars() {
             </div>
           </Card>
         ) : (
-          <div className="overflow-x-auto pb-4">
-            <div className="flex gap-4 min-w-max">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {avatars.map((avatar) => (
-                <div
-                key={avatar.id} 
-                  onClick={() => setSelectedAvatarForEdit(avatar)}
-                  className={`relative flex-shrink-0 w-32 cursor-pointer rounded-lg border-2 overflow-hidden transition-all ${
-                    selectedAvatarForEdit?.id === avatar.id
-                      ? 'border-brand-500 ring-2 ring-brand-200'
-                      : 'border-slate-200 hover:border-brand-300'
-                  }`}
-                >
+              <Card key={avatar.id} className="overflow-hidden">
+                <div className="relative">
                   {avatar.thumbnail_url || avatar.preview_url ? (
                     <img
                       src={avatar.thumbnail_url || avatar.preview_url || ''}
                       alt={avatar.avatar_name}
-                      className="w-32 h-40 object-contain bg-slate-50"
+                      className="w-full h-48 object-contain bg-slate-50"
                     />
                   ) : (
-                    <div className="w-32 h-40 bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">
-                      <User className="h-12 w-12 text-white opacity-50" />
+                    <div className="w-full h-48 bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">
+                      <User className="h-20 w-20 text-white opacity-50" />
                     </div>
                   )}
                   {avatar.is_default && (
-                    <div className="absolute top-1 right-1 bg-brand-500 text-white px-1.5 py-0.5 rounded text-xs font-semibold flex items-center gap-0.5">
-                      <Star className="h-2.5 w-2.5 fill-current" />
+                    <div className="absolute top-2 right-2 bg-brand-500 text-white px-2 py-1 rounded-md text-xs font-semibold flex items-center gap-1">
+                      <Star className="h-3 w-3 fill-current" />
+                      Default
                     </div>
                   )}
-                  <div className="p-2 bg-white">
-                    <p className="text-xs font-medium text-slate-900 truncate">
-                    {avatar.avatar_name}
-                    </p>
+                </div>
+                <div className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold text-slate-900">
+                        {avatar.avatar_name}
+                      </h3>
+                      {avatar.gender && (
+                        <p className="text-sm text-slate-500 capitalize">
+                          {avatar.gender}
+                        </p>
+                      )}
+                    </div>
                     {renderStatusBadge(avatar)}
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Avatar Edit Form at Bottom */}
-        <Card className="p-6">
-          <div className="mb-6 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <User className="h-5 w-5 text-slate-400" />
-              <h2 className="text-lg font-semibold text-primary">
-                {selectedAvatarForEdit ? 'Edit Avatar' : 'Avatar Settings'}
-              </h2>
-            </div>
-            <div className="flex gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1 ml-auto">
                       <Button
-                        variant="secondary"
+                        variant="ghost"
                         size="sm"
-                onClick={() => setShowGenerateAIModal(true)}
-                className="flex items-center gap-2"
-              >
-                <Sparkles className="h-4 w-4" />
-                Generate AI
+                        onClick={() => handleViewDetails(avatar)}
+                        className="text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                        title="View details"
+                        disabled={detailsLoadingId === avatar.id}
+                      >
+                        <Image className="h-4 w-4" />
                       </Button>
-                      <Button
-                variant="secondary"
-                        size="sm"
-                onClick={() => setShowCreateModal(true)}
-                className="flex items-center gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Create
-                      </Button>
+                      {['pending', 'training', 'generating'].includes(avatar.status) && (
                         <Button
-                variant="secondary"
+                          variant="ghost"
                           size="sm"
-                onClick={handleSync}
-                disabled={syncing}
-                className="flex items-center gap-2"
-              >
-                <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-                Sync
-                      </Button>
-            </div>
-          </div>
-          {selectedAvatarForEdit ? (
-            <div className="space-y-4">
-              <Input
-                label="Avatar Name"
-                value={avatarEditForm.avatar_name}
-                onChange={(e) => setAvatarEditForm({ ...avatarEditForm, avatar_name: e.target.value })}
-                placeholder="Enter avatar name"
-              />
-              <Select
-                label="Gender"
-                value={avatarEditForm.gender}
-                onChange={(e) => setAvatarEditForm({ ...avatarEditForm, gender: e.target.value })}
-                options={[
-                  { value: '', label: 'Not specified' },
-                  { value: 'male', label: 'Male' },
-                  { value: 'female', label: 'Female' },
-                  { value: 'other', label: 'Other' },
-                ]}
-              />
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+                          onClick={() => handleRefreshTrainingStatus(avatar)}
+                          className="text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                          title="Refresh status"
+                          disabled={!!statusLoadingMap[avatar.id]}
+                        >
+                          <RefreshCw
+                            className={`h-4 w-4 ${
+                              statusLoadingMap[avatar.id] ? 'animate-spin text-brand-600' : ''
+                            }`}
+                          />
+                        </Button>
+                      )}
+                      {isUserCreatedAvatar(avatar) && (
+                        <>
                           <Button
                             variant="ghost"
-                  onClick={() => {
-                    setSelectedAvatarForEdit(null)
-                    setAvatarEditForm({ avatar_name: '', gender: '' })
-                  }}
-                >
-                  Cancel
+                            size="sm"
+                            onClick={() => handleManageLooks(avatar)}
+                            className="text-brand-600 hover:text-brand-700 hover:bg-brand-50"
+                            title="Manage Looks"
+                          >
+                            <Image className="h-4 w-4" />
                           </Button>
-                        <Button
-                  onClick={handleSaveAvatar}
-                  loading={savingAvatar}
-                  disabled={!avatarEditForm.avatar_name.trim()}
-                >
-                  Save Changes
-                        </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(avatar)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            title="Delete avatar"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
-          ) : (
-            <div className="text-center py-8 text-slate-500">
-              <p className="text-sm">Select an avatar from above to edit its settings</p>
+                </div>
+              </Card>
+            ))}
           </div>
         )}
-        </Card>
 
         {/* Create Avatar Modal */}
         <Modal
@@ -2050,6 +2113,7 @@ export default function Avatars() {
           title="Choose Your Avatar Look"
           size="lg"
           closeOnOverlayClick={false}
+          showCloseButton={false}
         >
           {lookSelectionModal && (
             <div className="space-y-4">
