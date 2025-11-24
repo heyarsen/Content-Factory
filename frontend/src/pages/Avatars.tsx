@@ -70,7 +70,7 @@ type AiStageVisualState = 'done' | 'current' | 'pending'
 
 export default function Avatars() {
   const [avatars, setAvatars] = useState<Avatar[]>([])
-  const [defaultAvatarId, setDefaultAvatarId] = useState<string | null>(null)
+  const [, setDefaultAvatarId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
