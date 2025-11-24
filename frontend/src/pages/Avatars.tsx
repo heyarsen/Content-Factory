@@ -1966,7 +1966,6 @@ export default function Avatars() {
             </div>
           )}
         </Modal>
-      </div>
     </Layout>
   )
 }
