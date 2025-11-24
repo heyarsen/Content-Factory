@@ -376,9 +376,9 @@ export class AvatarService {
         id: avatar.heygen_avatar_id,
         group_id: avatar.heygen_avatar_id,
         status: avatar.status || 'active',
-        image_url: avatar.avatar_url || null,
-        preview_url: avatar.preview_url || null,
-        thumbnail_url: avatar.thumbnail_url || null,
+        image_url: avatar.avatar_url ?? undefined,
+        preview_url: avatar.preview_url ?? undefined,
+        thumbnail_url: avatar.thumbnail_url ?? undefined,
         created_at: avatar.created_at ? new Date(avatar.created_at).getTime() / 1000 : undefined,
         updated_at: avatar.updated_at ? new Date(avatar.updated_at).getTime() / 1000 : null,
       }
@@ -393,9 +393,9 @@ export class AvatarService {
         id: avatar.heygen_avatar_id,
         group_id: avatar.heygen_avatar_id,
         status: avatar.status || 'active',
-        image_url: avatar.avatar_url || null,
-        preview_url: avatar.preview_url || null,
-        thumbnail_url: avatar.thumbnail_url || null,
+        image_url: avatar.avatar_url ?? undefined,
+        preview_url: avatar.preview_url ?? undefined,
+        thumbnail_url: avatar.thumbnail_url ?? undefined,
         created_at: avatar.created_at ? new Date(avatar.created_at).getTime() / 1000 : undefined,
         updated_at: avatar.updated_at ? new Date(avatar.updated_at).getTime() / 1000 : null,
       }
@@ -460,7 +460,7 @@ export class AvatarService {
 
   static async autoGenerateVerticalLook(
     groupId: string,
-    photoUrl: string,
+    photoUrl?: string,
     avatarName?: string
   ): Promise<{ type: 'ai_generation' | 'photo_look'; id: string } | null> {
     if (!AUTO_LOOKS_ENABLED) {
