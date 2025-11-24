@@ -145,6 +145,7 @@ export interface ManualVideoInput {
   style?: VideoStyle
   duration?: number
   avatar_id?: string | null
+  talking_photo_id?: string | null
   plan_item_id?: string | null
   output_resolution?: string
   generate_caption?: boolean
@@ -449,10 +450,37 @@ export class VideoService {
    * Create a manual video request and trigger HeyGen generation asynchronously
    */
   static async requestManualVideo(userId: string, input: ManualVideoInput): Promise<Video> {
-    const { avatarId, avatarRecordId, isPhotoAvatar } = await resolveAvatarContext(
-      userId,
-      input.avatar_id || null
-    )
+    // If talking_photo_id is provided, use it directly (it's a specific look ID)
+    // Otherwise, resolve the avatar context normally
+    let avatarId: string | undefined
+    let avatarRecordId: string | undefined
+    let isPhotoAvatar = false
+    
+    if (input.talking_photo_id) {
+      // Direct look ID provided - use it as talking_photo_id
+      avatarId = input.talking_photo_id
+      isPhotoAvatar = true
+      // Find the avatar record using the group_id (avatar_id) to get avatarRecordId
+      if (input.avatar_id) {
+        const { data: avatarRecord } = await supabase
+          .from('avatars')
+          .select('id, heygen_avatar_id')
+          .eq('heygen_avatar_id', input.avatar_id)
+          .eq('user_id', userId)
+          .single()
+        if (avatarRecord) {
+          avatarRecordId = avatarRecord.id
+        }
+      }
+    } else {
+      const resolved = await resolveAvatarContext(
+        userId,
+        input.avatar_id || null
+      )
+      avatarId = resolved.avatarId
+      avatarRecordId = resolved.avatarRecordId
+      isPhotoAvatar = resolved.isPhotoAvatar
+    }
     const templatePreference = await fetchUserTemplatePreference(userId)
     
     // Idempotency 1: If tied to a plan item, and it already has a video_id, reuse that video

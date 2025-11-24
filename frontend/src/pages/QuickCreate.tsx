@@ -72,6 +72,10 @@ export function QuickCreate() {
   }
   const [avatars, setAvatars] = useState<AvatarRecord[]>([])
   const [selectedAvatarId, setSelectedAvatarId] = useState<string>('')
+  const [selectedLookId, setSelectedLookId] = useState<string | null>(null)
+  const [avatarLooks, setAvatarLooks] = useState<any[]>([])
+  const [loadingLooks, setLoadingLooks] = useState(false)
+  const [lookModalOpen, setLookModalOpen] = useState(false)
   const [avatarModalOpen, setAvatarModalOpen] = useState(false)
   const [generatingVideo, setGeneratingVideo] = useState(false)
   const [videoError, setVideoError] = useState('')
@@ -141,7 +145,7 @@ export function QuickCreate() {
 
   const isAvatarReady = (avatar: AvatarRecord): boolean => avatar.status === 'active'
 
-  const handleSelectAvatar = (avatar: AvatarRecord) => {
+  const handleSelectAvatar = async (avatar: AvatarRecord) => {
     if (!isAvatarReady(avatar)) {
       addNotification({
         type: 'warning',
@@ -151,7 +155,42 @@ export function QuickCreate() {
       return
     }
     setSelectedAvatarId(avatar.heygen_avatar_id)
+    setSelectedLookId(null)
     setAvatarModalOpen(false)
+    
+    // Fetch looks for this avatar
+    await loadAvatarLooks(avatar.id)
+  }
+
+  const loadAvatarLooks = async (avatarId: string) => {
+    setLoadingLooks(true)
+    try {
+      const response = await api.get(`/api/avatars/${avatarId}/details`)
+      const looks = response.data?.looks || []
+      setAvatarLooks(looks)
+      
+      // If there are looks, open the look selection modal
+      if (looks.length > 0) {
+        // Auto-select default look if available, otherwise first look
+        const defaultLook = looks.find((look: any) => look.is_default) || looks[0]
+        setSelectedLookId(defaultLook?.id || null)
+        setLookModalOpen(true)
+      } else {
+        // No looks available, just use the group ID
+        setSelectedLookId(null)
+      }
+    } catch (error: any) {
+      console.error('Failed to load avatar looks:', error)
+      // If loading looks fails, just use the group ID
+      setSelectedLookId(null)
+    } finally {
+      setLoadingLooks(false)
+    }
+  }
+
+  const handleSelectLook = (lookId: string) => {
+    setSelectedLookId(lookId)
+    setLookModalOpen(false)
   }
 
   const loadAvatars = async () => {
@@ -334,13 +373,18 @@ export function QuickCreate() {
       })
       const verticalDimension = { ...DEFAULT_VERTICAL_DIMENSION }
       
+      // Use selected look ID if available, otherwise use avatar group ID
+      const avatarIdentifier = selectedLookId || selectedAvatarId
+      
       const response = await api.post('/api/videos/generate', {
         topic,
         script: generatedScript,
         style,
         duration,
         category: 'general', // Default category
-        avatar_id: selectedAvatarId || undefined,
+        avatar_id: selectedLookId ? undefined : selectedAvatarId || undefined,
+        talking_photo_id: selectedLookId || undefined,
+        look_id: selectedLookId || undefined,
         generate_caption: generateCaption,
         aspect_ratio: DEFAULT_VERTICAL_ASPECT_RATIO,
         dimension: verticalDimension,
@@ -769,36 +813,58 @@ export function QuickCreate() {
                         type="button"
                         variant="ghost"
                         size="sm"
-                        onClick={() => setAvatarModalOpen(true)}
+                        onClick={() => {
+                          setAvatarModalOpen(true)
+                          // Reset look selection when changing avatar
+                          setSelectedLookId(null)
+                          setAvatarLooks([])
+                        }}
                         className="text-xs"
                       >
                         {selectedAvatarId ? 'Change Avatar' : 'Select Avatar'}
                       </Button>
                     </div>
                     {selectedAvatarId && (
-                      <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                        {(() => {
-                          const selected = avatars.find(a => a.heygen_avatar_id === selectedAvatarId)
-                          return selected ? (
-                            <>
-                              {selected.thumbnail_url || selected.preview_url ? (
-                                <img
-                                  src={selected.thumbnail_url || selected.preview_url || ''}
-                                  alt={selected.avatar_name}
-                                  className="w-12 h-12 object-cover rounded-lg"
-                                />
-                              ) : (
-                                <div className="w-12 h-12 bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center">
-                                  <Users className="h-6 w-6 text-white opacity-50" />
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                          {(() => {
+                            const selected = avatars.find(a => a.heygen_avatar_id === selectedAvatarId)
+                            const selectedLook = avatarLooks.find((l: any) => l.id === selectedLookId)
+                            const displayImage = selectedLook?.thumbnail_url || selectedLook?.image_url || selectedLook?.preview_url || selected?.thumbnail_url || selected?.preview_url
+                            return selected ? (
+                              <>
+                                {displayImage ? (
+                                  <img
+                                    src={displayImage}
+                                    alt={selected.avatar_name}
+                                    className="w-12 h-12 object-cover rounded-lg"
+                                  />
+                                ) : (
+                                  <div className="w-12 h-12 bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center">
+                                    <Users className="h-6 w-6 text-white opacity-50" />
+                                  </div>
+                                )}
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-slate-700">{selected.avatar_name}</p>
+                                  <p className="text-xs text-slate-500">
+                                    {selectedLook ? (selectedLook.name || 'Selected Look') : 'Default Look'}
+                                  </p>
                                 </div>
-                              )}
-                              <div className="flex-1">
-                                <p className="text-sm font-medium text-slate-700">{selected.avatar_name}</p>
-                                <p className="text-xs text-slate-500">Selected</p>
-                              </div>
-                            </>
-                          ) : null
-                        })()}
+                              </>
+                            ) : null
+                          })()}
+                        </div>
+                        {avatarLooks.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setLookModalOpen(true)}
+                            className="w-full text-xs"
+                          >
+                            {selectedLookId ? 'Change Look' : 'Choose Look'} ({avatarLooks.length} available)
+                          </Button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -976,6 +1042,83 @@ export function QuickCreate() {
             </div>
           </div>
         )}
+
+        {/* Look Selection Modal */}
+        <Modal
+          isOpen={lookModalOpen}
+          onClose={() => setLookModalOpen(false)}
+          title="Choose Avatar Look"
+          size="lg"
+        >
+          <div className="space-y-6">
+            <p className="text-sm text-slate-500">
+              Select which look of the avatar you want to use for this video.
+            </p>
+            {loadingLooks ? (
+              <div className="py-12 text-center">
+                <Loader className="h-8 w-8 mx-auto mb-3 text-brand-500 animate-spin" />
+                <p className="text-sm text-slate-500">Loading looks...</p>
+              </div>
+            ) : avatarLooks.length === 0 ? (
+              <div className="py-12 text-center text-slate-500">
+                <Users className="h-12 w-12 mx-auto mb-3 text-slate-300" />
+                <p>No looks available for this avatar</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-h-[60vh] overflow-y-auto pr-2 -mr-2">
+                {avatarLooks.map((look: any) => (
+                  <button
+                    key={look.id}
+                    type="button"
+                    onClick={() => handleSelectLook(look.id)}
+                    className={`relative rounded-xl border-2 p-3 transition-all hover:scale-105 ${
+                      selectedLookId === look.id
+                        ? 'border-brand-500 bg-brand-50 shadow-lg ring-2 ring-brand-200'
+                        : 'border-slate-200 bg-white hover:border-brand-300 hover:shadow-md'
+                    }`}
+                  >
+                    {look.thumbnail_url || look.image_url || look.preview_url ? (
+                      <img
+                        src={look.thumbnail_url || look.image_url || look.preview_url || ''}
+                        alt={look.name || 'Look'}
+                        className="w-full h-32 object-cover rounded-lg mb-2 bg-slate-50"
+                      />
+                    ) : (
+                      <div className="w-full h-32 bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center mb-2">
+                        <Users className="h-12 w-12 text-white opacity-50" />
+                      </div>
+                    )}
+                    <p className="text-xs font-medium text-slate-700 truncate text-center">
+                      {look.name || 'Unnamed Look'}
+                    </p>
+                    {look.is_default && (
+                      <div className="absolute top-2 left-2 bg-brand-500 text-white px-2 py-0.5 rounded text-xs font-semibold">
+                        Default
+                      </div>
+                    )}
+                    {selectedLookId === look.id && (
+                      <div className="absolute top-2 right-2 bg-brand-500 text-white rounded-full p-1.5 shadow-lg ring-2 ring-white">
+                        <CheckCircle2 className="h-4 w-4" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+              <p className="text-xs text-slate-400">
+                {avatarLooks.length} look{avatarLooks.length !== 1 ? 's' : ''} available
+              </p>
+              <Button
+                variant="ghost"
+                onClick={() => setLookModalOpen(false)}
+                className="border border-white/60 bg-white/70 text-slate-500 hover:border-slate-200 hover:bg-white"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </Modal>
 
         {/* Avatar Selection Modal */}
         <Modal
