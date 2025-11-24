@@ -138,6 +138,7 @@ export default function Avatars() {
   
   // Generate look form fields
   const [lookPrompt, setLookPrompt] = useState('')
+  const [lookOrientation, setLookOrientation] = useState<'horizontal' | 'vertical' | 'square'>('vertical')
   const [lookPose, setLookPose] = useState<'half_body' | 'full_body' | 'close_up'>('close_up')
   const [lookStyle, setLookStyle] = useState<'Realistic' | 'Cartoon' | 'Anime'>('Realistic')
   
@@ -746,17 +747,17 @@ export default function Avatars() {
             try {
               setAiGenerationStage('completing')
                 await api.post('/api/avatars/complete-ai-generation', {
-                  generation_id: genId,
-                  image_keys: status.image_key_list,
-                  image_urls: status.image_url_list,
-                  avatar_name: avatarNameOverride || aiName,
-                })
+                generation_id: genId,
+                image_keys: status.image_key_list,
+                image_urls: status.image_url_list,
+                avatar_name: avatarNameOverride || aiName,
+              })
               
-              setAiGenerationStage('completed')
-              toast.success('AI avatar created successfully!')
-              setShowGenerateAIModal(false)
-              resetAIGenerationForm()
-              await loadAvatars()
+                setAiGenerationStage('completed')
+                toast.success('AI avatar created successfully!')
+                setShowGenerateAIModal(false)
+                resetAIGenerationForm()
+                await loadAvatars()
             } catch (err: any) {
               console.error('Failed to complete AI avatar:', err)
               setAiGenerationStage('idle')
@@ -868,9 +869,14 @@ export default function Avatars() {
 
       toast.success('Looks added successfully!')
       setShowAddLooksModal(false)
-      setShowLooksModal(null)
       setLookImageFiles([])
       setLookImagePreviews([])
+      
+      // Refresh avatar details to show new looks
+      if (showLooksModal) {
+        await handleViewDetails(showLooksModal)
+      }
+      
       await loadAvatars()
     } catch (error: any) {
       console.error('Failed to add looks:', error)
@@ -891,17 +897,20 @@ export default function Avatars() {
       await api.post('/api/avatars/generate-look', {
         group_id: showLooksModal.heygen_avatar_id,
         prompt: lookPrompt,
-        orientation: 'vertical',
+        orientation: lookOrientation,
         pose: lookPose,
         style: lookStyle,
       })
 
       toast.success('Look generation started! This may take a few minutes.')
       setShowGenerateLookModal(false)
-      setShowLooksModal(null)
       setLookPrompt('')
+      setLookOrientation('vertical')
       setLookPose('close_up')
       setLookStyle('Realistic')
+      
+      // Keep the looks modal open so user can see the generation status
+      // The looks will appear once generation completes
     } catch (error: any) {
       console.error('Failed to generate look:', error)
       toast.error(error.response?.data?.error || 'Failed to generate look')
@@ -1175,9 +1184,9 @@ export default function Avatars() {
                     )}
                     {isUserCreatedAvatar(avatar) && (
                       <>
-                        <Button
-                          variant="ghost"
-                          size="sm"
+                          <Button
+                            variant="ghost"
+                            size="sm"
                           onClick={() => handleManageLooks(avatar)}
                           className="text-brand-600 hover:text-brand-700 hover:bg-brand-50"
                           title="Manage Looks"
@@ -1676,6 +1685,7 @@ export default function Avatars() {
           onClose={() => {
             setShowGenerateLookModal(false)
             setLookPrompt('')
+            setLookOrientation('vertical')
             setLookPose('close_up')
             setLookStyle('Realistic')
           }}
@@ -1697,6 +1707,18 @@ export default function Avatars() {
             />
 
             <div className="grid gap-4 md:grid-cols-3">
+              <Select
+                label="Orientation *"
+                value={lookOrientation}
+                onChange={(e) => setLookOrientation(e.target.value as any)}
+                options={[
+                  { value: 'horizontal', label: 'Horizontal' },
+                  { value: 'vertical', label: 'Vertical' },
+                  { value: 'square', label: 'Square' },
+                ]}
+                disabled={generatingLook}
+              />
+
               <Select
                 label="Pose *"
                 value={lookPose}
@@ -1728,6 +1750,7 @@ export default function Avatars() {
                 onClick={() => {
                   setShowGenerateLookModal(false)
                   setLookPrompt('')
+                  setLookOrientation('vertical')
                   setLookPose('close_up')
                   setLookStyle('Realistic')
                 }}
