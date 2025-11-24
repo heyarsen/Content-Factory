@@ -98,12 +98,6 @@ export default function Avatars() {
   const [upscalingId, setUpscalingId] = useState<string | null>(null)
   const [lookSelectionModal, setLookSelectionModal] = useState<{ avatar: Avatar; looks: PhotoAvatarLook[] } | null>(null)
   const [selectedLookId, setSelectedLookId] = useState<string | null>(null)
-  const [selectedAvatarForEdit, setSelectedAvatarForEdit] = useState<Avatar | null>(null)
-  const [avatarEditForm, setAvatarEditForm] = useState({
-    avatar_name: '',
-    gender: '',
-  })
-  const [savingAvatar, setSavingAvatar] = useState(false)
   const detailData = detailsModal?.data ?? null
 
   const aiStageFlow: Array<{ key: 'creating' | 'photosReady' | 'completing'; title: string; description: string }> = [
@@ -344,21 +338,6 @@ export default function Avatars() {
       toast.error(errorMessage + '. Please check your API configuration.')
     } finally {
       setSyncing(false)
-    }
-  }
-
-  const handleSetDefault = async (avatarId: string) => {
-    try {
-      await api.post(`/api/avatars/${avatarId}/set-default`)
-      setDefaultAvatarId(avatarId)
-      setAvatars(avatars.map(a => ({
-        ...a,
-        is_default: a.id === avatarId
-      })))
-      toast.success('Default avatar updated')
-    } catch (error: any) {
-      console.error('Failed to set default avatar:', error)
-      toast.error(error.response?.data?.error || 'Failed to set default avatar')
     }
   }
 
@@ -1052,15 +1031,6 @@ export default function Avatars() {
     })
   }
 
-  useEffect(() => {
-    if (selectedAvatarForEdit) {
-      setAvatarEditForm({
-        avatar_name: selectedAvatarForEdit.avatar_name || '',
-        gender: selectedAvatarForEdit.gender || '',
-      })
-    }
-  }, [selectedAvatarForEdit])
-
   if (loading) {
     return (
       <Layout>
@@ -1076,32 +1046,6 @@ export default function Avatars() {
         </div>
       </Layout>
     )
-  }
-
-  const handleSaveAvatar = async () => {
-    if (!selectedAvatarForEdit) return
-    
-    setSavingAvatar(true)
-    try {
-      await api.patch(`/api/avatars/${selectedAvatarForEdit.id}`, {
-        avatar_name: avatarEditForm.avatar_name,
-        gender: avatarEditForm.gender,
-      })
-      toast.success('Avatar updated successfully')
-      await loadAvatars()
-      // Update selected avatar if it's still selected
-      if (selectedAvatarForEdit) {
-        const updated = avatars.find(a => a.id === selectedAvatarForEdit.id)
-        if (updated) {
-          setSelectedAvatarForEdit(updated)
-        }
-      }
-    } catch (error: any) {
-      console.error('Failed to update avatar:', error)
-      toast.error(error.response?.data?.error || 'Failed to update avatar')
-    } finally {
-      setSavingAvatar(false)
-    }
   }
 
   return (
