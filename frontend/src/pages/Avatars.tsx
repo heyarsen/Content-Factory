@@ -80,7 +80,7 @@ export default function Avatars() {
   const [lookImageFiles, setLookImageFiles] = useState<File[]>([])
   const [lookImagePreviews, setLookImagePreviews] = useState<string[]>([])
   const [statusLoadingMap, setStatusLoadingMap] = useState<Record<string, boolean>>({})
-  const [detailsModal, setDetailsModal] = useState<{ avatar: Avatar; data: PhotoAvatarDetails | null } | null>(null)
+  const [detailsModal, setDetailsModal] = useState<{ avatar: Avatar; data: PhotoAvatarDetails | null; error?: string } | null>(null)
   const [detailsLoadingId, setDetailsLoadingId] = useState<string | null>(null)
   const [upscalingId, setUpscalingId] = useState<string | null>(null)
   const detailData = detailsModal?.data ?? null
@@ -404,15 +404,23 @@ export default function Avatars() {
   }, [avatars, handleRefreshTrainingStatus])
 
   const handleViewDetails = async (avatar: Avatar) => {
+    console.log('Opening details modal for avatar:', avatar.id)
     setDetailsModal({ avatar, data: null })
     setDetailsLoadingId(avatar.id)
     try {
-      const response = await api.get(`/api/avatars/${avatar.id}/details`)
-      setDetailsModal({ avatar, data: response.data })
+      console.log('Fetching avatar details from API...')
+      const response = await api.get(`/api/avatars/${avatar.id}/details`, {
+        timeout: 15000, // 15 second timeout
+      })
+      console.log('Received avatar details:', response.data)
+      setDetailsModal({ avatar, data: response.data, error: undefined })
     } catch (error: any) {
       console.error('Failed to fetch avatar details:', error)
-      setDetailsModal(null)
-      toastRef.current.error(error.response?.data?.error || 'Failed to load avatar details')
+      console.error('Error response:', error.response)
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to load avatar details'
+      // Set error state so modal shows error instead of loading forever
+      setDetailsModal({ avatar, data: null, error: errorMessage })
+      toastRef.current.error(errorMessage)
     } finally {
       setDetailsLoadingId(null)
     }
@@ -433,6 +441,7 @@ export default function Avatars() {
 
   const handleCloseDetailsModal = () => {
     setDetailsModal(null)
+    setDetailsLoadingId(null)
   }
 
   const handleCopyToClipboard = async (value?: string | null) => {
@@ -1744,7 +1753,31 @@ export default function Avatars() {
           title={`Avatar Details${detailsModal?.avatar ? ` - ${detailsModal.avatar.avatar_name}` : ''}`}
           size="md"
         >
-          {!detailsModal ? null : detailData ? (
+          {!detailsModal ? null : detailsModal.error ? (
+            <div className="py-10 text-center space-y-3">
+              <div className="text-red-500 mb-2">
+                <X className="h-8 w-8 mx-auto" />
+              </div>
+              <p className="text-sm font-semibold text-slate-900">Failed to load avatar details</p>
+              <p className="text-sm text-slate-600">{detailsModal.error}</p>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => handleViewDetails(detailsModal.avatar)}
+                className="mt-4"
+                disabled={detailsLoadingId === detailsModal.avatar.id}
+              >
+                {detailsLoadingId === detailsModal.avatar.id ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Retrying...
+                  </>
+                ) : (
+                  'Retry'
+                )}
+              </Button>
+            </div>
+          ) : detailData ? (
             <div className="space-y-5">
               <div className="flex flex-col sm:flex-row gap-4">
                 {detailData.image_url || detailData.preview_url ? (
