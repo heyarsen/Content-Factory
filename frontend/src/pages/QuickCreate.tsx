@@ -362,19 +362,19 @@ export function QuickCreate() {
 
     try {
       console.log('Sending video generation request to:', '/api/videos/generate')
+      const verticalDimension = { ...DEFAULT_VERTICAL_DIMENSION }
+      
       console.log('Request payload:', {
         topic,
         hasScript: !!generatedScript,
         scriptLength: generatedScript?.length,
         style,
         duration,
-        category: 'general', // Default category
-        avatar_id: selectedAvatarId || undefined,
+        category: 'general',
+        avatar_id: selectedLookId ? undefined : selectedAvatarId || undefined,
+        talking_photo_id: selectedLookId || undefined,
+        look_id: selectedLookId || undefined,
       })
-      const verticalDimension = { ...DEFAULT_VERTICAL_DIMENSION }
-      
-      // Use selected look ID if available, otherwise use avatar group ID
-      const avatarIdentifier = selectedLookId || selectedAvatarId
       
       const response = await api.post('/api/videos/generate', {
         topic,
