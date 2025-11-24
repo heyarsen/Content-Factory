@@ -1,5 +1,9 @@
 import { supabase } from '../lib/supabase.js'
-import { generateVideo as requestHeygenVideo, getVideoStatus } from '../lib/heygen.js'
+import {
+  generateVideo as requestHeygenVideo,
+  generateVideoFromTemplate,
+  getVideoStatus,
+} from '../lib/heygen.js'
 import type {
   GenerateVideoRequest,
   HeyGenDimensionInput,
@@ -371,6 +375,75 @@ async function runHeygenGeneration(
   }
 }
 
+type TemplatePreference = {
+  templateId: string
+  scriptKey: string
+  variables: Record<string, any>
+  overrides: Record<string, any>
+}
+
+async function fetchUserTemplatePreference(userId: string): Promise<TemplatePreference | null> {
+  const { data, error } = await supabase
+    .from('user_preferences')
+    .select('heygen_vertical_template_id, heygen_vertical_template_script_key, heygen_vertical_template_variables, heygen_vertical_template_overrides')
+    .eq('user_id', userId)
+    .single()
+
+  if (error || !data) {
+    return null
+  }
+
+  if (!data.heygen_vertical_template_id) {
+    return null
+  }
+
+  return {
+    templateId: data.heygen_vertical_template_id,
+    scriptKey: data.heygen_vertical_template_script_key || 'script',
+    variables: data.heygen_vertical_template_variables || {},
+    overrides: data.heygen_vertical_template_overrides || {},
+  }
+}
+
+async function runTemplateGeneration(
+  video: Video,
+  preference: TemplatePreference,
+  scriptText: string,
+  planItemId?: string | null
+): Promise<void> {
+  try {
+    const variables: Record<string, any> = {
+      ...preference.variables,
+    }
+
+    const scriptKey = preference.scriptKey || 'script'
+    const scriptValue = scriptText || video.topic || ''
+    if (scriptValue) {
+      variables[scriptKey] = scriptValue
+    }
+
+    const payload = {
+      template_id: preference.templateId,
+      variables,
+      title: video.topic,
+      caption: true,
+      overrides: preference.overrides,
+    }
+
+    const response = await generateVideoFromTemplate(payload)
+    await applyManualGenerationSuccess(video.id, response)
+    await updatePlanItemStatus(planItemId, response.status)
+  } catch (error: any) {
+    console.error('Template generation error:', {
+      error: error.message || error,
+      templateId: preference.templateId,
+      videoId: video.id,
+    })
+    const errMessage = error?.message || 'Template video generation failed'
+    throw new Error(errMessage)
+  }
+}
+
 export class VideoService {
   /**
    * Create a manual video request and trigger HeyGen generation asynchronously
@@ -380,6 +453,7 @@ export class VideoService {
       userId,
       input.avatar_id || null
     )
+    const templatePreference = await fetchUserTemplatePreference(userId)
     
     // Idempotency 1: If tied to a plan item, and it already has a video_id, reuse that video
     if (input.plan_item_id) {
@@ -436,18 +510,37 @@ export class VideoService {
     }
     
     const video = await this.createVideoRecord(userId, input, avatarRecordId)
-    const outputResolution = DEFAULT_VERTICAL_OUTPUT_RESOLUTION
-    const aspectRatio = DEFAULT_VERTICAL_ASPECT_RATIO
-    const dimension = { ...DEFAULT_VERTICAL_DIMENSION }
-    void runHeygenGeneration(
-      video,
-      avatarId,
-      isPhotoAvatar,
-      outputResolution,
-      input.plan_item_id || null,
-      aspectRatio,
-      dimension
-    )
+    const outputResolution = input.output_resolution || DEFAULT_HEYGEN_RESOLUTION
+    const aspectRatio = input.aspect_ratio || DEFAULT_VERTICAL_ASPECT_RATIO
+    const dimension =
+      input.dimension ||
+      (aspectRatio === DEFAULT_VERTICAL_ASPECT_RATIO ? { ...DEFAULT_VERTICAL_DIMENSION } : undefined)
+    const scriptText = (input.script || '').trim() || input.topic
+
+    const scheduleManualGeneration = () =>
+      runHeygenGeneration(
+        video,
+        avatarId,
+        isPhotoAvatar,
+        outputResolution,
+        input.plan_item_id || null,
+        aspectRatio,
+        dimension
+      )
+
+    if (templatePreference) {
+      void runTemplateGeneration(video, templatePreference, scriptText, input.plan_item_id || null).catch(
+        (error) => {
+          console.warn('Template video generation failed; falling back to avatar-based generation:', {
+            error: error.message || error,
+            videoId: video.id,
+          })
+          void scheduleManualGeneration()
+        }
+      )
+    } else {
+      void scheduleManualGeneration()
+    }
     return video
   }
 
