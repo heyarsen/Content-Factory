@@ -9,7 +9,7 @@ interface ModalProps {
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full'
 }
 
-export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
+export function Modal({ isOpen, onClose, title, children, size = 'md', closeOnOverlayClick = true }: ModalProps) {
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden'
@@ -34,7 +34,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
   return (
     <div
       className="fixed inset-0 z-[9999]"
-      onClick={onClose}
+      onClick={closeOnOverlayClick ? onClose : undefined}
       style={{ 
         position: 'fixed', 
         top: 0, 

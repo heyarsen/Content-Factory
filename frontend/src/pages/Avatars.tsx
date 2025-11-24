@@ -242,14 +242,46 @@ export default function Avatars() {
     return date.toLocaleString()
   }
 
+  const checkForUnselectedLooks = async (avatarsList: Avatar[]) => {
+    // Check user-created avatars that don't have a default_look_id
+    const userCreatedAvatars = avatarsList.filter(avatar => 
+      isUserCreatedAvatar(avatar) && avatar.status === 'active'
+    )
+
+    for (const avatar of userCreatedAvatars) {
+      try {
+        // Check if avatar has default_look_id in database
+        const detailsResponse = await api.get(`/api/avatars/${avatar.id}/details`)
+        const looks = detailsResponse.data?.looks || []
+        const defaultLookId = detailsResponse.data?.default_look_id
+
+        // If avatar has looks but no default_look_id, show selection modal
+        if (looks.length > 0 && !defaultLookId) {
+          console.log('Found avatar without selected look:', avatar.id, 'showing selection modal')
+          setLookSelectionModal({ avatar, looks })
+          return // Only show for first avatar that needs selection
+        }
+      } catch (error: any) {
+        console.error('Failed to check looks for avatar:', avatar.id, error)
+        // Continue checking other avatars
+      }
+    }
+  }
+
   const loadAvatars = useCallback(async () => {
     try {
       setLoading(true)
       // Backend expects 'all=true' to show all avatars, default shows only user-created
       const params = onlyCreated ? {} : { all: 'true' }
       const response = await api.get('/api/avatars', { params })
-      setAvatars(response.data.avatars || [])
+      const avatarsList = response.data.avatars || []
+      setAvatars(avatarsList)
       setDefaultAvatarId(response.data.default_avatar_id || null)
+      
+      // After loading, check if any avatars need look selection
+      if (avatarsList.length > 0) {
+        await checkForUnselectedLooks(avatarsList)
+      }
     } catch (error: any) {
       console.error('Failed to load avatars:', error)
       toastRef.current.error(error.response?.data?.error || 'Failed to load avatars')
@@ -2084,12 +2116,13 @@ export default function Avatars() {
           )}
         </Modal>
 
-        {/* Look Selection Modal - shown after avatar creation */}
+        {/* Look Selection Modal - shown after avatar creation or when returning to platform */}
         <Modal
           isOpen={!!lookSelectionModal}
           onClose={() => {
-            if (selectedLookId) {
-              // Don't allow closing without selecting
+            // Prevent closing without selecting - user must choose a look
+            if (!selectedLookId) {
+              toast.warning('Please select a look to continue. This selection is required.')
               return
             }
             setLookSelectionModal(null)
@@ -2097,6 +2130,7 @@ export default function Avatars() {
           }}
           title="Choose Your Avatar Look"
           size="lg"
+          closeOnOverlayClick={false}
         >
           {lookSelectionModal && (
             <div className="space-y-4">
@@ -2143,18 +2177,11 @@ export default function Avatars() {
               </div>
               <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
                 <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setLookSelectionModal(null)
-                    setSelectedLookId(null)
-                  }}
-                  disabled={!!selectedLookId}
-                >
-                  Skip (Select Later)
-                </Button>
-                <Button
                   onClick={async () => {
-                    if (!selectedLookId || !lookSelectionModal) return
+                    if (!selectedLookId || !lookSelectionModal) {
+                      toast.warning('Please select a look to continue')
+                      return
+                    }
                     try {
                       await api.post(`/api/avatars/${lookSelectionModal.avatar.id}/set-default-look`, {
                         look_id: selectedLookId,
