@@ -471,6 +471,23 @@ export default function Avatars() {
     }
   }
 
+  const handleSetDefaultLook = async (avatarId: string, lookId: string) => {
+    try {
+      // Update the default_look_id in the database via API
+      await api.post(`/api/avatars/${avatarId}/set-default-look`, { look_id: lookId })
+      toast.success('Default look updated successfully!')
+      
+      // Refresh the details to show updated default look
+      if (detailsModal) {
+        const response = await api.get(`/api/avatars/${avatarId}/details`)
+        setDetailsModal({ ...detailsModal, data: response.data })
+      }
+    } catch (error: any) {
+      console.error('Failed to set default look:', error)
+      toast.error(error.response?.data?.error || 'Failed to set default look')
+    }
+  }
+
   const fileToDataUrl = (file: File): Promise<string> =>
     new Promise((resolve, reject) => {
       const reader = new FileReader()

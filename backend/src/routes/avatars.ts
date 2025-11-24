@@ -626,6 +626,51 @@ router.get('/:avatarId/details', async (req: AuthRequest, res: Response) => {
   }
 })
 
+// Set default look for avatar
+router.post('/:avatarId/set-default-look', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { avatarId } = req.params
+    const { look_id } = req.body
+
+    if (!look_id) {
+      return res.status(400).json({ error: 'look_id is required' })
+    }
+
+    // Verify avatar ownership
+    const { supabase } = await import('../lib/supabase.js')
+    const { data: avatar, error: avatarError } = await supabase
+      .from('avatars')
+      .select('id, user_id')
+      .eq('id', avatarId)
+      .eq('user_id', userId)
+      .single()
+
+    if (avatarError || !avatar) {
+      return res.status(404).json({ error: 'Avatar not found' })
+    }
+
+    // Update the default_look_id
+    const { error: updateError } = await supabase
+      .from('avatars')
+      .update({ default_look_id: look_id })
+      .eq('id', avatarId)
+      .eq('user_id', userId)
+
+    if (updateError) {
+      throw updateError
+    }
+
+    return res.json({
+      message: 'Default look updated successfully',
+      default_look_id: look_id,
+    })
+  } catch (error: any) {
+    console.error('Set default look error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to set default look' })
+  }
+})
+
 // Upscale photo avatar
 router.post('/:avatarId/upscale', async (req: AuthRequest, res: Response) => {
   try {
