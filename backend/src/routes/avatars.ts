@@ -671,6 +671,43 @@ router.post('/:avatarId/set-default-look', async (req: AuthRequest, res: Respons
   }
 })
 
+// Delete look from avatar
+router.delete('/:avatarId/looks/:lookId', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { avatarId, lookId } = req.params
+
+    // Verify avatar ownership
+    const { supabase } = await import('../lib/supabase.js')
+    const { data: avatar, error: avatarError } = await supabase
+      .from('avatars')
+      .select('id, user_id, default_look_id')
+      .eq('id', avatarId)
+      .eq('user_id', userId)
+      .single()
+
+    if (avatarError || !avatar) {
+      return res.status(404).json({ error: 'Avatar not found' })
+    }
+
+    // Prevent deleting the selected/default look
+    if (avatar.default_look_id === lookId) {
+      return res.status(400).json({ error: 'Cannot delete the selected look. Please select a different look first.' })
+    }
+
+    // Delete look from HeyGen
+    const { deletePhotoAvatar } = await import('../lib/heygen.js')
+    await deletePhotoAvatar(lookId)
+
+    return res.json({
+      message: 'Look deleted successfully',
+    })
+  } catch (error: any) {
+    console.error('Delete look error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to delete look' })
+  }
+})
+
 // Upscale photo avatar
 router.post('/:avatarId/upscale', async (req: AuthRequest, res: Response) => {
   try {
@@ -728,6 +765,21 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'All fields are required for look generation' })
     }
 
+    // Get the avatar to find the default look
+    const { supabase } = await import('../lib/supabase.js')
+    const { data: avatar } = await supabase
+      .from('avatars')
+      .select('id, default_look_id, heygen_avatar_id')
+      .eq('heygen_avatar_id', request.group_id)
+      .eq('user_id', userId)
+      .single()
+
+    // Use the default look as the base photo_avatar_id if available
+    if (avatar?.default_look_id) {
+      request.photo_avatar_id = avatar.default_look_id
+      console.log('[Generate Look] Using default look as base:', avatar.default_look_id)
+    }
+
     // Check training status before generating look
     const { checkTrainingStatus } = await import('../lib/heygen.js')
     try {
@@ -752,6 +804,7 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
       console.warn('[Generate Look] Failed to check training status:', statusError.message)
     }
 
+    console.log('[Generate Look] Request:', request)
     const result = await generateAvatarLook(request)
 
     return res.json({

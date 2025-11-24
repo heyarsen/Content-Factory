@@ -97,6 +97,8 @@ export default function Avatars() {
   const [detailsModal, setDetailsModal] = useState<{ avatar: Avatar; data: PhotoAvatarDetails | null; error?: string } | null>(null)
   const [detailsLoadingId, setDetailsLoadingId] = useState<string | null>(null)
   const [upscalingId, setUpscalingId] = useState<string | null>(null)
+  const [lookSelectionModal, setLookSelectionModal] = useState<{ avatar: Avatar; looks: PhotoAvatarLook[] } | null>(null)
+  const [selectedLookId, setSelectedLookId] = useState<string | null>(null)
   const detailData = detailsModal?.data ?? null
 
   const photoChecklist = [
@@ -145,14 +147,16 @@ export default function Avatars() {
     'Hispanic',
   ] as const
   const [aiEthnicity, setAiEthnicity] = useState<(typeof AI_ETHNICITY_OPTIONS)[number]>('Unspecified')
-  const [aiOrientation, setAiOrientation] = useState<'horizontal' | 'vertical' | 'square'>('square')
+  // Always use square orientation for AI avatar generation (will be converted to vertical looks)
+  const aiOrientation = 'square' as const
   const [aiPose, setAiPose] = useState<'half_body' | 'full_body' | 'close_up'>('close_up')
   const [aiStyle, setAiStyle] = useState<'Realistic' | 'Cartoon' | 'Anime'>('Realistic')
   const [aiAppearance, setAiAppearance] = useState('')
   
   // Generate look form fields
   const [lookPrompt, setLookPrompt] = useState('')
-  const [lookOrientation, setLookOrientation] = useState<'horizontal' | 'vertical' | 'square'>('vertical')
+  // Always use vertical orientation for looks
+  const lookOrientation = 'vertical' as const
   const [lookPose, setLookPose] = useState<'half_body' | 'full_body' | 'close_up'>('close_up')
   const [lookStyle, setLookStyle] = useState<'Realistic' | 'Cartoon' | 'Anime'>('Realistic')
   
@@ -635,6 +639,19 @@ export default function Avatars() {
           createPhotoInputRef.current.value = ''
         }
         
+        // Wait a bit for looks to be created, then show look selection
+        setTimeout(async () => {
+          try {
+            const detailsResponse = await api.get(`/api/avatars/${response.data.avatar.id}/details`)
+            const looks = detailsResponse.data?.looks || []
+            if (looks.length > 0) {
+              setLookSelectionModal({ avatar: response.data.avatar, looks })
+            }
+          } catch (err) {
+            console.error('Failed to fetch looks for selection:', err)
+          }
+        }, 3000)
+        
         // Reload avatars
         await loadAvatars()
       } else {
@@ -826,7 +843,6 @@ export default function Avatars() {
     setAiAge('Unspecified')
     setAiGender('Man')
     setAiEthnicity('Unspecified')
-    setAiOrientation('square')
     setAiPose('close_up')
     setAiStyle('Realistic')
     setAiAppearance('')
@@ -926,7 +942,15 @@ export default function Avatars() {
 
     setGeneratingLook(true)
     try {
-      await api.post('/api/avatars/generate-look', {
+      console.log('Generating look with:', {
+        group_id: showLooksModal.heygen_avatar_id,
+        prompt: lookPrompt,
+        orientation: lookOrientation,
+        pose: lookPose,
+        style: lookStyle,
+      })
+      
+      const response = await api.post('/api/avatars/generate-look', {
         group_id: showLooksModal.heygen_avatar_id,
         prompt: lookPrompt,
         orientation: lookOrientation,
@@ -934,18 +958,27 @@ export default function Avatars() {
         style: lookStyle,
       })
 
+      console.log('Look generation response:', response.data)
       toast.success('Look generation started! This may take a few minutes.')
       setShowGenerateLookModal(false)
       setLookPrompt('')
-      setLookOrientation('vertical')
       setLookPose('close_up')
       setLookStyle('Realistic')
       
-      // Keep the looks modal open so user can see the generation status
-      // The looks will appear once generation completes
+      // Refresh looks after a delay to show the new look
+      setTimeout(async () => {
+        if (showLooksModal) {
+          await handleViewDetails(showLooksModal)
+        }
+      }, 5000)
     } catch (error: any) {
       console.error('Failed to generate look:', error)
-      toast.error(error.response?.data?.error || 'Failed to generate look')
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      })
+      toast.error(error.response?.data?.error || error.message || 'Failed to generate look')
     } finally {
       setGeneratingLook(false)
     }
@@ -1499,18 +1532,6 @@ export default function Avatars() {
                   />
 
                   <Select
-                    label="Orientation *"
-                    value={aiOrientation}
-                    onChange={(e) => setAiOrientation(e.target.value as any)}
-                    options={[
-                      { value: 'horizontal', label: 'Horizontal' },
-                      { value: 'vertical', label: 'Vertical' },
-                      { value: 'square', label: 'Square' },
-                    ]}
-                    disabled={generatingAI}
-                  />
-
-                  <Select
                     label="Pose *"
                     value={aiPose}
                     onChange={(e) => setAiPose(e.target.value as any)}
@@ -1717,7 +1738,6 @@ export default function Avatars() {
           onClose={() => {
             setShowGenerateLookModal(false)
             setLookPrompt('')
-            setLookOrientation('vertical')
             setLookPose('close_up')
             setLookStyle('Realistic')
           }}
@@ -1738,19 +1758,7 @@ export default function Avatars() {
               disabled={generatingLook}
             />
 
-            <div className="grid gap-4 md:grid-cols-3">
-              <Select
-                label="Orientation *"
-                value={lookOrientation}
-                onChange={(e) => setLookOrientation(e.target.value as any)}
-                options={[
-                  { value: 'horizontal', label: 'Horizontal' },
-                  { value: 'vertical', label: 'Vertical' },
-                  { value: 'square', label: 'Square' },
-                ]}
-                disabled={generatingLook}
-              />
-
+            <div className="grid gap-4 md:grid-cols-2">
               <Select
                 label="Pose *"
                 value={lookPose}
@@ -1782,7 +1790,6 @@ export default function Avatars() {
                 onClick={() => {
                   setShowGenerateLookModal(false)
                   setLookPrompt('')
-                  setLookOrientation('vertical')
                   setLookPose('close_up')
                   setLookStyle('Realistic')
                 }}
@@ -1956,17 +1963,19 @@ export default function Avatars() {
                               : 'border-slate-200 bg-white hover:border-brand-300'
                           }`}
                         >
-                          {look.thumbnail_url || look.image_url ? (
+                        {look.thumbnail_url || look.image_url ? (
+                          <div className="w-full aspect-[9/16] bg-slate-50 flex items-center justify-center overflow-hidden">
                             <img
                               src={look.thumbnail_url || look.image_url || ''}
                               alt={look.name || 'Look'}
-                              className="w-full h-32 object-cover"
+                              className="w-full h-full object-contain"
                             />
-                          ) : (
-                            <div className="w-full h-32 bg-slate-100 flex items-center justify-center">
-                              <User className="h-8 w-8 text-slate-400" />
-                            </div>
-                          )}
+                          </div>
+                        ) : (
+                          <div className="w-full aspect-[9/16] bg-slate-100 flex items-center justify-center">
+                            <User className="h-8 w-8 text-slate-400" />
+                          </div>
+                        )}
                           <div className="p-2">
                             <p className="text-xs font-medium text-slate-900 truncate">
                               {look.name || 'Unnamed Look'}
@@ -1978,11 +1987,11 @@ export default function Avatars() {
                           {look.is_default && (
                             <div className="absolute top-2 right-2 bg-brand-500 text-white px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1">
                               <Star className="h-3 w-3 fill-current" />
-                              Default
+                              Selected
                             </div>
                           )}
                           {!look.is_default && (
-                            <div className="p-2 pt-0">
+                            <div className="p-2 pt-0 flex gap-1">
                               <Button
                                 variant="secondary"
                                 size="sm"
@@ -1990,10 +1999,35 @@ export default function Avatars() {
                                   e.stopPropagation()
                                   handleSetDefaultLook(detailsModal.avatar.id, look.id)
                                 }}
-                                className="w-full text-xs"
+                                className="flex-1 text-xs"
                               >
                                 <Star className="h-3 w-3 mr-1" />
-                                Set Default
+                                Select
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={async (e) => {
+                                  e.stopPropagation()
+                                  if (!confirm(`Are you sure you want to delete this look? This action cannot be undone.`)) {
+                                    return
+                                  }
+                                  try {
+                                    // Delete look from HeyGen
+                                    await api.delete(`/api/avatars/${detailsModal.avatar.id}/looks/${look.id}`)
+                                    toast.success('Look deleted successfully')
+                                    // Refresh details
+                                    if (detailsModal) {
+                                      await handleViewDetails(detailsModal.avatar)
+                                    }
+                                  } catch (error: any) {
+                                    console.error('Failed to delete look:', error)
+                                    toast.error(error.response?.data?.error || 'Failed to delete look')
+                                  }
+                                }}
+                                className="text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-3 w-3" />
                               </Button>
                             </div>
                           )}
@@ -2046,6 +2080,99 @@ export default function Avatars() {
             <div className="py-10 text-center space-y-3">
               <Loader2 className="h-8 w-8 mx-auto text-brand-500 animate-spin" />
               <p className="text-sm text-slate-600">Loading avatar details...</p>
+            </div>
+          )}
+        </Modal>
+
+        {/* Look Selection Modal - shown after avatar creation */}
+        <Modal
+          isOpen={!!lookSelectionModal}
+          onClose={() => {
+            if (selectedLookId) {
+              // Don't allow closing without selecting
+              return
+            }
+            setLookSelectionModal(null)
+            setSelectedLookId(null)
+          }}
+          title="Choose Your Avatar Look"
+          size="lg"
+        >
+          {lookSelectionModal && (
+            <div className="space-y-4">
+              <p className="text-sm text-slate-600">
+                Select the look you want to use for this avatar. This choice is permanent and cannot be changed later.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                {lookSelectionModal.looks.map((look: PhotoAvatarLook) => (
+                  <div
+                    key={look.id}
+                    onClick={() => setSelectedLookId(look.id)}
+                    className={`relative rounded-lg border-2 overflow-hidden transition-all cursor-pointer ${
+                      selectedLookId === look.id
+                        ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-200'
+                        : 'border-slate-200 bg-white hover:border-brand-300'
+                    }`}
+                  >
+                    {look.thumbnail_url || look.image_url ? (
+                      <div className="w-full aspect-[9/16] bg-slate-50 flex items-center justify-center overflow-hidden">
+                        <img
+                          src={look.thumbnail_url || look.image_url || ''}
+                          alt={look.name || 'Look'}
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-full aspect-[9/16] bg-slate-100 flex items-center justify-center">
+                        <User className="h-8 w-8 text-slate-400" />
+                      </div>
+                    )}
+                    <div className="p-2">
+                      <p className="text-xs font-medium text-slate-900 truncate">
+                        {look.name || 'Unnamed Look'}
+                      </p>
+                    </div>
+                    {selectedLookId === look.id && (
+                      <div className="absolute top-2 right-2 bg-brand-500 text-white px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1">
+                        <Star className="h-3 w-3 fill-current" />
+                        Selected
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setLookSelectionModal(null)
+                    setSelectedLookId(null)
+                  }}
+                  disabled={!!selectedLookId}
+                >
+                  Skip (Select Later)
+                </Button>
+                <Button
+                  onClick={async () => {
+                    if (!selectedLookId || !lookSelectionModal) return
+                    try {
+                      await api.post(`/api/avatars/${lookSelectionModal.avatar.id}/set-default-look`, {
+                        look_id: selectedLookId,
+                      })
+                      toast.success('Look selected! This is now your permanent avatar look.')
+                      setLookSelectionModal(null)
+                      setSelectedLookId(null)
+                      await loadAvatars()
+                    } catch (error: any) {
+                      console.error('Failed to set default look:', error)
+                      toast.error(error.response?.data?.error || 'Failed to set default look')
+                    }
+                  }}
+                  disabled={!selectedLookId}
+                >
+                  Confirm Selection
+                </Button>
+              </div>
             </div>
           )}
         </Modal>
