@@ -683,6 +683,30 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'All fields are required for look generation' })
     }
 
+    // Check training status before generating look
+    const { checkTrainingStatus } = await import('../lib/heygen.js')
+    try {
+      const trainingStatus = await checkTrainingStatus(request.group_id)
+      if (trainingStatus.status !== 'ready') {
+        if (trainingStatus.status === 'empty') {
+          return res.status(400).json({ 
+            error: 'Avatar group is not trained yet. Please wait for training to complete before generating looks.' 
+          })
+        } else if (trainingStatus.status === 'failed') {
+          return res.status(400).json({ 
+            error: `Avatar training failed: ${trainingStatus.error_msg || 'Unknown error'}. Cannot generate looks.` 
+          })
+        } else if (trainingStatus.status === 'training' || trainingStatus.status === 'pending') {
+          return res.status(400).json({ 
+            error: `Avatar is still training (status: ${trainingStatus.status}). Please wait for training to complete before generating looks.` 
+          })
+        }
+      }
+    } catch (statusError: any) {
+      // If we can't check status, log warning but continue (might work if training is complete)
+      console.warn('[Generate Look] Failed to check training status:', statusError.message)
+    }
+
     const result = await generateAvatarLook(request)
 
     return res.json({
@@ -691,7 +715,23 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
     })
   } catch (error: any) {
     console.error('Generate look error:', error)
-    return res.status(error.response?.status || 500).json({ error: error.message || 'Failed to generate look' })
+    
+    // Provide more user-friendly error messages
+    let errorMessage = error.message || 'Failed to generate look'
+    if (error.response?.data?.error) {
+      const apiError = error.response.data.error
+      if (typeof apiError === 'string') {
+        errorMessage = apiError
+      } else if (apiError.message) {
+        errorMessage = apiError.message
+        // Special handling for "Model not found" error
+        if (apiError.message === 'Model not found' || apiError.code === 'invalid_parameter') {
+          errorMessage = 'Avatar is not trained yet. Please wait for training to complete before generating looks.'
+        }
+      }
+    }
+    
+    return res.status(error.response?.status || 500).json({ error: errorMessage })
   }
 })
 

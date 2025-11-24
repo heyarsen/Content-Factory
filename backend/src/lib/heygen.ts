@@ -1939,22 +1939,30 @@ interface ResolvedPhotoAvatarTarget {
 
 const fetchPhotoAvatarDetails = async (photoAvatarId: string): Promise<PhotoAvatarDetails> => {
   const apiKey = getHeyGenKey()
-  const response = await axios.get(`${HEYGEN_V2_API_URL}/photo_avatar/details/${photoAvatarId}`, {
-    headers: {
-      'X-Api-Key': apiKey,
-      'Content-Type': 'application/json',
-    },
-    timeout: 10000, // 10 second timeout
-  })
+  try {
+    const response = await axios.get(`${HEYGEN_V2_API_URL}/photo_avatar/details/${photoAvatarId}`, {
+      headers: {
+        'X-Api-Key': apiKey,
+        'Content-Type': 'application/json',
+      },
+      timeout: 10000, // 10 second timeout
+    })
 
-  const data = response.data?.data || response.data
-  if (!data) {
-    throw new Error('Failed to fetch photo avatar details')
-  }
+    const data = response.data?.data || response.data
+    if (!data) {
+      throw new Error('Failed to fetch photo avatar details')
+    }
 
-  return {
-    id: data.id || photoAvatarId,
-    ...data,
+    return {
+      id: data.id || photoAvatarId,
+      ...data,
+    }
+  } catch (error: any) {
+    // If 404, it might be a group_id instead of a photo_avatar_id
+    if (error.response?.status === 404) {
+      throw new Error(`Photo avatar not found: ${photoAvatarId}. This might be a group ID instead of an individual avatar ID.`)
+    }
+    throw error
   }
 }
 
@@ -2121,6 +2129,16 @@ export async function getPhotoAvatarDetails(
     }
     return fetchPhotoAvatarDetails(resolved.photoAvatarId)
   } catch (error: any) {
+    // If it's a 404, it might be a group_id - try to get basic info from the group
+    if (error.response?.status === 404 || error.message?.includes('not found')) {
+      console.warn('Photo avatar details not found, might be a group ID:', identifier)
+      // Return basic structure with the identifier as ID
+      return {
+        id: identifier,
+        group_id: identifier,
+        status: 'unknown',
+      }
+    }
     console.error('HeyGen API error (getPhotoAvatarDetails):', error.response?.data || error.message)
     throw error
   }

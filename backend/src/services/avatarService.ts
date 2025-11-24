@@ -552,6 +552,13 @@ export class AvatarService {
           note: 'AI look generation will be available once training completes (status: "ready")',
         })
         return null
+      } else if (trainingStatus.status === 'empty') {
+        console.warn('[Auto Look] Avatar group is empty or not trained yet. Cannot generate AI look.', {
+          groupId,
+          status: trainingStatus.status,
+          note: 'Avatar must be trained first before generating looks',
+        })
+        return null
       } else {
         // Unknown status - log warning but try anyway
         console.warn('[Auto Look] Unknown training status:', trainingStatus.status, 'Attempting generation anyway...')
