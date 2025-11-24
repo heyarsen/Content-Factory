@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Layout } from '../components/layout/Layout'
-import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { Modal } from '../components/ui/Modal'
@@ -191,34 +190,6 @@ export default function Avatars() {
     return false
   }
 
-  const renderStatusBadge = (avatar: Avatar) => {
-    const statusMap: Record<
-      string,
-      {
-        label: string
-        classes: string
-      }
-    > = {
-      active: { label: 'Ready', classes: 'bg-emerald-100 text-emerald-700' },
-      training: { label: 'Training', classes: 'bg-amber-100 text-amber-700' },
-      pending: { label: 'Pending', classes: 'bg-slate-100 text-slate-600' },
-      generating: { label: 'Generating', classes: 'bg-blue-100 text-blue-700' },
-      failed: { label: 'Failed', classes: 'bg-red-100 text-red-600' },
-    }
-
-    const config = statusMap[avatar.status] || {
-      label: avatar.status || 'Unknown',
-      classes: 'bg-slate-100 text-slate-600',
-    }
-
-    return (
-      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${config.classes}`}>
-        {config.label}
-        {statusLoadingMap[avatar.id] && <Loader2 className="h-3 w-3 animate-spin" />}
-      </span>
-    )
-  }
-
   const formatTimestamp = (value?: number | string | null) => {
     if (!value) return '—'
     let date: Date
@@ -338,33 +309,6 @@ export default function Avatars() {
       toast.error(errorMessage + '. Please check your API configuration.')
     } finally {
       setSyncing(false)
-    }
-  }
-
-  const handleDelete = async (avatar: Avatar) => {
-    if (!confirm(`Are you sure you want to remove "${avatar.avatar_name}" from your avatar list?`)) {
-      return
-    }
-
-    let removeRemote = false
-    if (isUserCreatedAvatar(avatar)) {
-      removeRemote = confirm(
-        'Do you also want to delete this avatar from HeyGen (recommended to keep your account clean)?'
-      )
-    }
-
-    try {
-      await api.delete(`/api/avatars/${avatar.id}`, {
-        params: removeRemote ? { remove_remote: 'true' } : undefined,
-      })
-      setAvatars(avatars.filter(a => a.id !== avatar.id))
-      if (defaultAvatarId === avatar.id) {
-        setDefaultAvatarId(null)
-      }
-      toast.success('Avatar removed')
-    } catch (error: any) {
-      console.error('Failed to delete avatar:', error)
-      toast.error(error.response?.data?.error || 'Failed to delete avatar')
     }
   }
 
