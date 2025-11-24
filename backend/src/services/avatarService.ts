@@ -385,7 +385,59 @@ export class AvatarService {
     }
 
     try {
-      return await getPhotoAvatarDetails(avatar.heygen_avatar_id)
+      // Fetch photo avatar details
+      const details = await getPhotoAvatarDetails(avatar.heygen_avatar_id)
+      
+      // Also fetch looks from the avatar group
+      let looks: any[] = []
+      if (avatar.heygen_avatar_id) {
+        try {
+          const axios = (await import('axios')).default
+          const apiKey = process.env.HEYGEN_KEY
+          if (apiKey) {
+            const looksResponse = await axios.get(
+              `${process.env.HEYGEN_V2_API_URL || 'https://api.heygen.com/v2'}/avatar_group/${avatar.heygen_avatar_id}/avatars`,
+              {
+                headers: {
+                  'X-Api-Key': apiKey,
+                  'Content-Type': 'application/json',
+                },
+                timeout: 5000, // 5 second timeout
+              }
+            )
+
+            const avatarList =
+              looksResponse.data?.data?.avatar_list ||
+              looksResponse.data?.avatar_list ||
+              looksResponse.data?.data ||
+              []
+
+            if (Array.isArray(avatarList)) {
+              looks = avatarList.map((look: any) => ({
+                id: look.id,
+                name: look.name,
+                status: look.status,
+                image_url: look.image_url,
+                preview_url: look.image_url,
+                thumbnail_url: look.image_url,
+                created_at: look.created_at,
+                updated_at: look.updated_at,
+                is_default: (avatar as any)?.default_look_id === look.id,
+              }))
+              console.log(`[Avatar Details] Found ${looks.length} looks for avatar ${avatarId}`)
+            }
+          }
+        } catch (looksError: any) {
+          console.warn(`[Avatar Details] Failed to fetch looks (returning without looks):`, looksError.message)
+          // Continue without looks - not critical
+        }
+      }
+      
+      return {
+        ...details,
+        looks,
+        default_look_id: (avatar as any)?.default_look_id || null,
+      }
     } catch (error: any) {
       // If fetching from HeyGen fails, return basic information from the database
       console.warn('Failed to fetch photo avatar details from HeyGen, returning database info:', error.message)
