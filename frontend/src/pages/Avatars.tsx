@@ -414,6 +414,7 @@ export default function Avatars() {
         timeout: 15000, // 15 second timeout
       })
       console.log('Received avatar details:', response.data)
+      console.log('Looks in response:', response.data?.looks, 'Count:', response.data?.looks?.length)
       setDetailsModal({ avatar, data: response.data, error: undefined })
     } catch (error: any) {
       console.error('Failed to fetch avatar details:', error)
@@ -1891,7 +1892,99 @@ export default function Avatars() {
                 )}
               </dl>
 
+              {/* Display all looks from the avatar group */}
+              {(() => {
+                const looks = detailData.looks || []
+                console.log('Rendering looks section:', { looksCount: looks.length, looks, detailData })
+                if (looks.length === 0) {
+                  return (
+                    <div className="pt-4 border-t border-slate-200">
+                      <p className="text-sm text-slate-500 text-center py-4">
+                        No looks available. Use "Manage Looks" to add looks to this avatar.
+                      </p>
+                    </div>
+                  )
+                }
+                return (
+                  <div className="space-y-3 pt-4 border-t border-slate-200">
+                    <div>
+                      <h4 className="text-sm font-semibold text-slate-900 mb-1">
+                        Available Looks ({looks.length})
+                      </h4>
+                      <p className="text-xs text-slate-500">
+                        Select which look to use for video generation
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {looks.map((look: PhotoAvatarLook) => (
+                        <div
+                          key={look.id}
+                          className={`relative rounded-lg border-2 overflow-hidden transition-all ${
+                            look.is_default
+                              ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-200'
+                              : 'border-slate-200 bg-white hover:border-brand-300'
+                          }`}
+                        >
+                          {look.thumbnail_url || look.image_url ? (
+                            <img
+                              src={look.thumbnail_url || look.image_url || ''}
+                              alt={look.name || 'Look'}
+                              className="w-full h-32 object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-32 bg-slate-100 flex items-center justify-center">
+                              <User className="h-8 w-8 text-slate-400" />
+                            </div>
+                          )}
+                          <div className="p-2">
+                            <p className="text-xs font-medium text-slate-900 truncate">
+                              {look.name || 'Unnamed Look'}
+                            </p>
+                            {look.status && (
+                              <p className="text-xs text-slate-500 capitalize">{look.status}</p>
+                            )}
+                          </div>
+                          {look.is_default && (
+                            <div className="absolute top-2 right-2 bg-brand-500 text-white px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1">
+                              <Star className="h-3 w-3 fill-current" />
+                              Default
+                            </div>
+                          )}
+                          {!look.is_default && (
+                            <div className="p-2 pt-0">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleSetDefaultLook(detailsModal.avatar.id, look.id)
+                                }}
+                                className="w-full text-xs"
+                              >
+                                <Star className="h-3 w-3 mr-1" />
+                                Set Default
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
+
               <div className="flex flex-wrap items-center gap-3 justify-end pt-4 border-t border-slate-200">
+                {isUserCreatedAvatar(detailsModal.avatar) && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleManageLooks(detailsModal.avatar)}
+                    className="flex items-center gap-2"
+                  >
+                    <Image className="h-4 w-4" />
+                    Manage Looks
+                  </Button>
+                )}
                 <Button
                   variant="secondary"
                   size="sm"
