@@ -7,6 +7,7 @@ interface ModalProps {
   title: string
   children: ReactNode
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full'
+  closeOnOverlayClick?: boolean
 }
 
 export function Modal({ isOpen, onClose, title, children, size = 'md', closeOnOverlayClick = true }: ModalProps) {
