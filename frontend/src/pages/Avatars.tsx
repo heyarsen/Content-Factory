@@ -240,7 +240,7 @@ export default function Avatars() {
     return date.toLocaleString()
   }
 
-  const checkForUnselectedLooks = async (avatarsList: Avatar[]) => {
+  const checkForUnselectedLooks = useCallback(async (avatarsList: Avatar[]) => {
     // Check user-created avatars that don't have a default_look_id
     const userCreatedAvatars = avatarsList.filter(avatar => 
       isUserCreatedAvatar(avatar) && avatar.status === 'active'
@@ -264,7 +264,7 @@ export default function Avatars() {
         // Continue checking other avatars
       }
     }
-  }
+  }, [])
 
   const loadAvatars = useCallback(async () => {
     try {
@@ -278,7 +278,12 @@ export default function Avatars() {
       
       // After loading, check if any avatars need look selection
       if (avatarsList.length > 0) {
-        await checkForUnselectedLooks(avatarsList)
+        try {
+          await checkForUnselectedLooks(avatarsList)
+        } catch (err) {
+          console.error('Error checking for unselected looks:', err)
+          // Don't block page load if this fails
+        }
       }
     } catch (error: any) {
       console.error('Failed to load avatars:', error)
@@ -286,7 +291,7 @@ export default function Avatars() {
     } finally {
       setLoading(false)
     }
-  }, [onlyCreated])
+  }, [onlyCreated, checkForUnselectedLooks])
 
   useEffect(() => {
     loadAvatars()
