@@ -1071,7 +1071,7 @@ export default function Avatars() {
         </div>
       </div>
 
-        {/* Create Avatar Modal */}
+      {/* Create Avatar Modal */}
         <Modal
           isOpen={showCreateModal}
           onClose={handleCloseCreateModal}
