@@ -241,28 +241,33 @@ export default function Avatars() {
   }
 
   const checkForUnselectedLooks = useCallback(async (avatarsList: Avatar[]) => {
-    // Check user-created avatars that don't have a default_look_id
-    const userCreatedAvatars = avatarsList.filter(avatar => 
-      isUserCreatedAvatar(avatar) && avatar.status === 'active'
-    )
+    try {
+      // Check user-created avatars that don't have a default_look_id
+      const userCreatedAvatars = avatarsList.filter(avatar => 
+        avatar && isUserCreatedAvatar(avatar) && avatar.status === 'active'
+      )
 
-    for (const avatar of userCreatedAvatars) {
-      try {
-        // Check if avatar has default_look_id in database
-        const detailsResponse = await api.get(`/api/avatars/${avatar.id}/details`)
-        const looks = detailsResponse.data?.looks || []
-        const defaultLookId = detailsResponse.data?.default_look_id
+      for (const avatar of userCreatedAvatars) {
+        try {
+          // Check if avatar has default_look_id in database
+          const detailsResponse = await api.get(`/api/avatars/${avatar.id}/details`)
+          const looks = detailsResponse.data?.looks || []
+          const defaultLookId = detailsResponse.data?.default_look_id
 
-        // If avatar has looks but no default_look_id, show selection modal
-        if (looks.length > 0 && !defaultLookId) {
-          console.log('Found avatar without selected look:', avatar.id, 'showing selection modal')
-          setLookSelectionModal({ avatar, looks })
-          return // Only show for first avatar that needs selection
+          // If avatar has looks but no default_look_id, show selection modal
+          if (looks.length > 0 && !defaultLookId) {
+            console.log('Found avatar without selected look:', avatar.id, 'showing selection modal')
+            setLookSelectionModal({ avatar, looks })
+            return // Only show for first avatar that needs selection
+          }
+        } catch (error: any) {
+          console.error('Failed to check looks for avatar:', avatar.id, error)
+          // Continue checking other avatars
         }
-      } catch (error: any) {
-        console.error('Failed to check looks for avatar:', avatar.id, error)
-        // Continue checking other avatars
       }
+    } catch (error: any) {
+      console.error('Error in checkForUnselectedLooks:', error)
+      // Don't throw - just log the error
     }
   }, [])
 
@@ -272,18 +277,16 @@ export default function Avatars() {
       // Backend expects 'all=true' to show all avatars, default shows only user-created
       const params = onlyCreated ? {} : { all: 'true' }
       const response = await api.get('/api/avatars', { params })
-      const avatarsList = response.data.avatars || []
+      const avatarsList = response.data?.avatars || []
       setAvatars(avatarsList)
-      setDefaultAvatarId(response.data.default_avatar_id || null)
+      setDefaultAvatarId(response.data?.default_avatar_id || null)
       
-      // After loading, check if any avatars need look selection
-      if (avatarsList.length > 0) {
-        try {
-          await checkForUnselectedLooks(avatarsList)
-        } catch (err) {
+      // After loading, check if any avatars need look selection (don't block on errors)
+      if (avatarsList.length > 0 && checkForUnselectedLooks) {
+        // Run this asynchronously without blocking
+        checkForUnselectedLooks(avatarsList).catch(err => {
           console.error('Error checking for unselected looks:', err)
-          // Don't block page load if this fails
-        }
+        })
       }
     } catch (error: any) {
       console.error('Failed to load avatars:', error)
@@ -1007,6 +1010,15 @@ export default function Avatars() {
     })
   }
 
+  useEffect(() => {
+    if (selectedAvatarForEdit) {
+      setAvatarEditForm({
+        avatar_name: selectedAvatarForEdit.avatar_name || '',
+        gender: selectedAvatarForEdit.gender || '',
+      })
+    }
+  }, [selectedAvatarForEdit])
+
   if (loading) {
     return (
       <Layout>
@@ -1023,15 +1035,6 @@ export default function Avatars() {
       </Layout>
     )
   }
-
-  useEffect(() => {
-    if (selectedAvatarForEdit) {
-      setAvatarEditForm({
-        avatar_name: selectedAvatarForEdit.avatar_name || '',
-        gender: selectedAvatarForEdit.gender || '',
-      })
-    }
-  }, [selectedAvatarForEdit])
 
   const handleSaveAvatar = async () => {
     if (!selectedAvatarForEdit) return
