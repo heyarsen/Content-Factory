@@ -16,7 +16,6 @@ import {
   Sparkles,
   Image,
   X,
-  Info,
   ArrowUpCircle,
   Loader2,
   Copy,
@@ -106,13 +105,6 @@ export default function Avatars() {
   })
   const [savingAvatar, setSavingAvatar] = useState(false)
   const detailData = detailsModal?.data ?? null
-
-  const photoChecklist = [
-    'Face centered, looking straight at the camera',
-    'Even lighting, no harsh shadows or heavy filters',
-    'Plain background and minimal accessories',
-    'At least 1024px resolution (a good phone selfie works)',
-  ]
 
   const aiStageFlow: Array<{ key: 'creating' | 'photosReady' | 'completing'; title: string; description: string }> = [
     { key: 'creating', title: 'Generating reference photos', description: 'HeyGen creates a photo set from your description' },
@@ -344,48 +336,6 @@ export default function Avatars() {
       toast.error(errorMessage + '. Please check your API configuration.')
     } finally {
       setSyncing(false)
-    }
-  }
-
-  const handleSetDefault = async (avatarId: string) => {
-    try {
-      await api.post(`/api/avatars/${avatarId}/set-default`)
-      setDefaultAvatarId(avatarId)
-      setAvatars(avatars.map(a => ({
-        ...a,
-        is_default: a.id === avatarId
-      })))
-      toast.success('Default avatar updated')
-    } catch (error: any) {
-      console.error('Failed to set default avatar:', error)
-      toast.error(error.response?.data?.error || 'Failed to set default avatar')
-    }
-  }
-
-  const handleDelete = async (avatar: Avatar) => {
-    if (!confirm(`Are you sure you want to remove "${avatar.avatar_name}" from your avatar list?`)) {
-      return
-    }
-
-    let removeRemote = false
-    if (isUserCreatedAvatar(avatar)) {
-      removeRemote = confirm(
-        'Do you also want to delete this avatar from HeyGen (recommended to keep your account clean)?'
-      )
-    }
-
-    try {
-      await api.delete(`/api/avatars/${avatar.id}`, {
-        params: removeRemote ? { remove_remote: 'true' } : undefined,
-      })
-      setAvatars(avatars.filter(a => a.id !== avatar.id))
-      if (defaultAvatarId === avatar.id) {
-        setDefaultAvatarId(null)
-      }
-      toast.success('Avatar removed')
-    } catch (error: any) {
-      console.error('Failed to delete avatar:', error)
-      toast.error(error.response?.data?.error || 'Failed to delete avatar')
     }
   }
 
