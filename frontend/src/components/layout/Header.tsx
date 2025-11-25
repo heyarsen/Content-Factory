@@ -36,25 +36,25 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   }, [notificationsOpen])
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/80 backdrop-blur-xl">
-      <div className="flex h-16 w-full items-center justify-between px-6 sm:px-8 lg:px-14">
-        <div className="flex items-center gap-4">
+    <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/80 backdrop-blur-xl overflow-hidden">
+      <div className="flex h-16 w-full items-center justify-between px-4 sm:px-6 lg:px-8 gap-4">
+        <div className="flex items-center gap-4 min-w-0 flex-1">
           <button
             type="button"
             onClick={onToggleSidebar}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 lg:hidden"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 lg:hidden"
             aria-label="Open navigation"
           >
             <Menu className="h-5 w-5" />
           </button>
 
-          <div className="hidden md:block">
+          <div className="hidden md:block min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Workspace</p>
-            <p className="mt-0.5 text-lg font-semibold text-slate-900">Welcome back, {greetingName}</p>
+            <p className="mt-0.5 text-lg font-semibold text-slate-900 truncate">Welcome back, {greetingName}</p>
           </div>
         </div>
 
-        <div className="flex flex-1 items-center justify-end gap-2 sm:gap-3">
+        <div className="flex items-center justify-end gap-2 sm:gap-3 shrink-0">
           {/* Notifications */}
           <div className="relative" ref={notificationRef}>
             <button
@@ -173,13 +173,13 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           <button
             type="button"
             onClick={() => navigate('/profile')}
-            className="hidden items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 md:flex min-h-[44px] touch-manipulation"
+            className="hidden items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 md:flex min-h-[44px] touch-manipulation max-w-[200px]"
           >
-            <div className="hidden flex-col leading-tight sm:flex">
+            <div className="flex flex-col leading-tight min-w-0">
               <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Account</span>
-              <span className="font-semibold text-slate-900">{user?.email}</span>
+              <span className="font-semibold text-slate-900 truncate">{user?.email}</span>
             </div>
-            <User className="h-4 w-4" />
+            <User className="h-4 w-4 shrink-0" />
           </button>
         </div>
       </div>
