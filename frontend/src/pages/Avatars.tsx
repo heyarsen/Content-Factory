@@ -81,6 +81,7 @@ export default function Avatars() {
   // Get all looks from all avatars for the grid display
   const [allLooks, setAllLooks] = useState<Array<{ look: PhotoAvatarLook; avatar: Avatar }>>([])
   const [loadingLooks, setLoadingLooks] = useState(false)
+  const [generatingLookIds, setGeneratingLookIds] = useState<Set<string>>(new Set()) // Track avatars with generating looks
 
   const aiStageFlow: Array<{ key: 'creating' | 'photosReady' | 'completing'; title: string; description: string }> = [
     { key: 'creating', title: 'Generating reference photos', description: 'HeyGen creates a photo set from your description' },
@@ -245,7 +246,8 @@ export default function Avatars() {
     for (const avatar of avatarsList) {
       try {
         const response = await api.get(`/api/avatars/${avatar.id}/details`)
-        const details = response.data?.details
+        // API returns data directly, not wrapped in 'details'
+        const details = response.data
         if (details?.looks && Array.isArray(details.looks)) {
           for (const look of details.looks) {
             looks.push({ look, avatar })
@@ -782,6 +784,54 @@ export default function Avatars() {
     }
   }
 
+  // Poll for look generation status
+  const pollLookGenerationStatus = async (generationId: string, avatarId: string, attempt = 1, maxAttempts = 60) => {
+    if (attempt > maxAttempts) {
+      console.error('Look generation polling timeout')
+      setGeneratingLookIds(prev => {
+        const next = new Set(prev)
+        next.delete(avatarId)
+        return next
+      })
+      return
+    }
+
+    try {
+      const response = await api.get(`/api/avatars/generation-status/${generationId}`)
+      const status = response.data?.status
+
+      if (status === 'success') {
+        // Generation complete, refresh looks
+        setGeneratingLookIds(prev => {
+          const next = new Set(prev)
+          next.delete(avatarId)
+          return next
+        })
+        toast.success('Look generation completed!')
+        // Refresh avatars first, then looks will be refreshed via useEffect
+        await loadAvatars()
+      } else if (status === 'failed') {
+        setGeneratingLookIds(prev => {
+          const next = new Set(prev)
+          next.delete(avatarId)
+          return next
+        })
+        toast.error('Look generation failed')
+      } else if (status === 'in_progress') {
+        // Still generating, poll again after delay
+        setTimeout(() => {
+          pollLookGenerationStatus(generationId, avatarId, attempt + 1, maxAttempts)
+        }, 5000) // Poll every 5 seconds
+      }
+    } catch (error: any) {
+      console.error('Failed to check generation status:', error)
+      // Continue polling on error
+      setTimeout(() => {
+        pollLookGenerationStatus(generationId, avatarId, attempt + 1, maxAttempts)
+      }, 5000)
+    }
+  }
+
   const handleGenerateLook = async () => {
     // Use selectedAvatarForLook (from the new flow) or fall back to showLooksModal
     const targetAvatar = selectedAvatarForLook || showLooksModal
@@ -810,6 +860,16 @@ export default function Avatars() {
       })
 
       console.log('Look generation response:', response.data)
+      const generationId = response.data?.generation_id
+      
+      if (generationId) {
+        // Mark this avatar as generating
+        setGeneratingLookIds(prev => new Set(prev).add(targetAvatar.id))
+        
+        // Start polling for generation status
+        pollLookGenerationStatus(generationId, targetAvatar.id)
+      }
+      
       toast.success('Look generation started! This may take a few minutes.')
       
       // Reset all modal states
@@ -819,11 +879,6 @@ export default function Avatars() {
       setLookPrompt('')
       setLookPose('close_up')
       setLookStyle('Realistic')
-      
-      // Refresh looks after a delay to show the new look
-      setTimeout(async () => {
-        await loadAvatars()
-      }, 5000)
     } catch (error: any) {
       console.error('Failed to generate look:', error)
       console.error('Error details:', {
@@ -831,6 +886,14 @@ export default function Avatars() {
         response: error.response?.data,
         status: error.response?.status,
       })
+      // Remove from generating state on error
+      if (targetAvatar) {
+        setGeneratingLookIds(prev => {
+          const next = new Set(prev)
+          next.delete(targetAvatar.id)
+          return next
+        })
+      }
       toast.error(error.response?.data?.error || error.message || 'Failed to generate look')
     } finally {
       setGeneratingLook(false)
@@ -1050,6 +1113,28 @@ export default function Avatars() {
               </div>
               <span className="text-sm font-medium text-slate-700">Create new</span>
             </button>
+            
+            {/* Generating indicators */}
+            {Array.from(generatingLookIds)
+              .filter(avatarId => !selectedAvatarFilter || avatarId === selectedAvatarFilter)
+              .map(avatarId => {
+                const avatar = avatars.find(a => a.id === avatarId)
+                if (!avatar) return null
+                return (
+                  <div
+                    key={`generating-${avatarId}`}
+                    className="group relative aspect-[3/4] rounded-2xl overflow-hidden bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-200 flex flex-col items-center justify-center gap-3"
+                  >
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center shadow-lg">
+                      <Loader2 className="h-8 w-8 text-white animate-spin" />
+                    </div>
+                    <div className="text-center px-4">
+                      <p className="text-sm font-medium text-slate-700">Generating...</p>
+                      <p className="text-xs text-slate-500 mt-1">{avatar.avatar_name}</p>
+                    </div>
+                  </div>
+                )
+              })}
             
             {/* Look cards */}
             {loadingLooks ? (
