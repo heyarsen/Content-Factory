@@ -983,17 +983,49 @@ export default function Avatars() {
     })
   }
 
+  // Get status badge styling
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'active':
+        return { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Active' }
+      case 'training':
+        return { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Training' }
+      case 'pending':
+        return { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Pending' }
+      case 'generating':
+        return { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Generating' }
+      default:
+        return { bg: 'bg-slate-100', text: 'text-slate-700', label: status }
+    }
+  }
+
+  // Get source label
+  const getSourceLabel = (avatar: Avatar) => {
+    if (avatar.source === 'user_photo') return 'Photo Upload'
+    if (avatar.source === 'ai_generated') return 'AI Generated'
+    if (avatar.source === 'synced') return 'HeyGen Library'
+    return isUserCreatedAvatar(avatar) ? 'Custom' : 'Library'
+  }
+
   if (loading) {
     return (
       <Layout>
-        <div className="space-y-8">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-slate-200 rounded w-1/4"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="h-64 bg-slate-200 rounded"></div>
-              ))}
-            </div>
+        <div className="space-y-6">
+          {/* Header skeleton */}
+          <div className="animate-pulse">
+            <div className="h-4 bg-slate-200 rounded w-20 mb-2"></div>
+            <div className="h-8 bg-slate-200 rounded w-48 mb-2"></div>
+            <div className="h-4 bg-slate-200 rounded w-72"></div>
+          </div>
+          {/* Grid skeleton */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <div key={i} className="animate-pulse">
+                <div className="aspect-[3/4] bg-slate-200 rounded-xl mb-3"></div>
+                <div className="h-4 bg-slate-200 rounded w-3/4 mb-2"></div>
+                <div className="h-3 bg-slate-200 rounded w-1/2"></div>
+              </div>
+            ))}
           </div>
         </div>
       </Layout>
@@ -1002,73 +1034,194 @@ export default function Avatars() {
 
   return (
     <Layout>
-      <div className="overflow-x-auto">
-        <div className="flex gap-3 min-w-max py-2">
-          {avatars.length === 0 ? (
-            <div className="flex items-center justify-center min-w-full py-12">
-              <div className="text-center">
-                <User className="h-16 w-16 mx-auto text-slate-400 mb-4" />
-                <h3 className="text-lg font-semibold text-slate-900 mb-2">
-                  {onlyCreated ? 'No avatars created yet' : 'No avatars found'}
-                </h3>
-                <p className="text-slate-600 mb-6">
-                  {onlyCreated 
-                    ? 'Create an avatar from a photo to get started'
-                    : 'Sync avatars or create one from a photo to get started'}
-                </p>
-                <div className="flex gap-3 justify-center">
-                  <Button
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      setShowCreateModal(true)
-                    }}
-                    className="flex items-center gap-2"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Create from Photo
-                  </Button>
-                  {onlyCreated && (
-                    <Button onClick={() => setOnlyCreated(false)} variant="secondary">
-                      Show All Avatars
-                    </Button>
-                  )}
-                  {!onlyCreated && (
-                    <Button onClick={handleSync} disabled={syncing} variant="secondary">
-                      <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-                      Sync Avatars
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : (
-            avatars.map((avatar) => (
-              <div
-                key={avatar.id}
-                onClick={() => handleViewDetails(avatar)}
-                className="relative flex-shrink-0 w-24 cursor-pointer rounded-lg overflow-hidden transition-all hover:opacity-80"
-              >
-                {avatar.thumbnail_url || avatar.preview_url ? (
-                  <img
-                    src={avatar.thumbnail_url || avatar.preview_url || ''}
-                    alt={avatar.avatar_name}
-                    className="w-24 h-32 object-contain bg-slate-50 rounded-lg"
-                  />
-                ) : (
-                  <div className="w-24 h-32 bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center rounded-lg">
-                    <User className="h-8 w-8 text-white opacity-50" />
-                  </div>
-                )}
-                {avatar.is_default && (
-                  <div className="absolute top-1 right-1 bg-brand-500 text-white px-1 py-0.5 rounded text-xs font-semibold flex items-center gap-0.5">
-                    <Star className="h-2 w-2 fill-current" />
-                  </div>
-                )}
-              </div>
-            ))
-          )}
+      <div className="space-y-6">
+        {/* Page Header */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 mb-1">Library</p>
+            <h1 className="text-2xl font-bold text-slate-900">Avatars</h1>
+            <p className="text-sm text-slate-500 mt-1">
+              Manage your AI avatars for video generation
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              onClick={() => setShowGenerateAIModal(true)}
+              variant="secondary"
+              size="sm"
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              Generate AI
+            </Button>
+            <Button
+              onClick={() => setShowCreateModal(true)}
+              size="sm"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Upload Photo
+            </Button>
+          </div>
         </div>
+
+        {/* Filter Bar */}
+        <div className="flex flex-wrap items-center gap-3 pb-2 border-b border-slate-200">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setOnlyCreated(true)}
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
+                onlyCreated
+                  ? 'bg-brand-100 text-brand-700'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              My Avatars
+            </button>
+            <button
+              onClick={() => setOnlyCreated(false)}
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
+                !onlyCreated
+                  ? 'bg-brand-100 text-brand-700'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              All Avatars
+            </button>
+          </div>
+          <div className="flex-1" />
+          {!onlyCreated && (
+            <Button
+              onClick={handleSync}
+              disabled={syncing}
+              variant="ghost"
+              size="sm"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+              Sync from HeyGen
+            </Button>
+          )}
+          <span className="text-sm text-slate-500">
+            {avatars.length} avatar{avatars.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+
+        {/* Avatar Grid or Empty State */}
+        {avatars.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 px-4">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-brand-100 to-indigo-100 flex items-center justify-center mb-6">
+              <User className="h-10 w-10 text-brand-500" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-900 mb-2 text-center">
+              {onlyCreated ? 'No custom avatars yet' : 'No avatars found'}
+            </h3>
+            <p className="text-sm text-slate-500 text-center max-w-md mb-6">
+              {onlyCreated 
+                ? 'Create your first avatar by uploading a photo or generating one with AI. Your avatars will appear here.'
+                : 'Sync avatars from your HeyGen account or create a new one to get started.'}
+            </p>
+            <div className="flex flex-wrap gap-3 justify-center">
+              <Button onClick={() => setShowCreateModal(true)}>
+                <Upload className="h-4 w-4 mr-2" />
+                Upload Photo
+              </Button>
+              <Button onClick={() => setShowGenerateAIModal(true)} variant="secondary">
+                <Sparkles className="h-4 w-4 mr-2" />
+                Generate with AI
+              </Button>
+              {onlyCreated && (
+                <Button onClick={() => setOnlyCreated(false)} variant="ghost">
+                  Browse Library
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            {avatars.map((avatar) => {
+              const statusBadge = getStatusBadge(avatar.status)
+              const isProcessing = ['training', 'pending', 'generating'].includes(avatar.status)
+              
+              return (
+                <div
+                  key={avatar.id}
+                  onClick={() => handleViewDetails(avatar)}
+                  className="group relative bg-white rounded-xl border border-slate-200 overflow-hidden cursor-pointer transition-all hover:shadow-lg hover:border-brand-300 hover:-translate-y-0.5"
+                >
+                  {/* Avatar Image */}
+                  <div className="relative aspect-[3/4] bg-gradient-to-br from-slate-100 to-slate-50 overflow-hidden">
+                    {avatar.thumbnail_url || avatar.preview_url ? (
+                      <img
+                        src={avatar.thumbnail_url || avatar.preview_url || ''}
+                        alt={avatar.avatar_name}
+                        className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-brand-400 to-indigo-500">
+                        <User className="h-12 w-12 text-white/70" />
+                      </div>
+                    )}
+                    
+                    {/* Processing overlay */}
+                    {isProcessing && (
+                      <div className="absolute inset-0 bg-slate-900/40 flex items-center justify-center">
+                        <div className="bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin text-brand-600" />
+                          <span className="text-xs font-medium text-slate-700">{statusBadge.label}</span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Default badge */}
+                    {avatar.is_default && (
+                      <div className="absolute top-2 left-2 bg-brand-500 text-white px-2 py-1 rounded-md text-xs font-semibold flex items-center gap-1 shadow-sm">
+                        <Star className="h-3 w-3 fill-current" />
+                        Default
+                      </div>
+                    )}
+                    
+                    {/* Source badge */}
+                    {isUserCreatedAvatar(avatar) && !avatar.is_default && (
+                      <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm text-slate-700 px-2 py-1 rounded-md text-xs font-medium shadow-sm">
+                        {avatar.source === 'ai_generated' ? (
+                          <span className="flex items-center gap-1">
+                            <Sparkles className="h-3 w-3 text-purple-500" />
+                            AI
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1">
+                            <Upload className="h-3 w-3 text-brand-500" />
+                            Photo
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Quick actions on hover */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-3">
+                      <span className="text-white text-xs font-medium bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-full">
+                        View Details
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Avatar Info */}
+                  <div className="p-3">
+                    <h3 className="font-medium text-slate-900 text-sm truncate mb-1">
+                      {avatar.avatar_name}
+                    </h3>
+                    <div className="flex items-center justify-between">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge.bg} ${statusBadge.text}`}>
+                        {statusBadge.label}
+                      </span>
+                      {avatar.gender && (
+                        <span className="text-xs text-slate-400 capitalize">{avatar.gender}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* Create Avatar Modal */}
