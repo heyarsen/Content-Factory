@@ -18,6 +18,45 @@ import {
 } from '../lib/avatarSourceColumn.js'
 const router = Router()
 
+// Helper function to poll for look generation status
+async function pollLookGenerationStatus(generationId: string, groupId: string): Promise<void> {
+  const maxAttempts = 30 // Poll for up to 5 minutes (30 * 10 seconds)
+  const pollInterval = 10000 // 10 seconds
+  
+  console.log(`[Generate Look] Starting background polling for generation ${generationId}`)
+  
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    await new Promise(resolve => setTimeout(resolve, pollInterval))
+    
+    try {
+      const status = await checkGenerationStatus(generationId)
+      console.log(`[Generate Look] Poll attempt ${attempt}/${maxAttempts} - Status:`, status)
+      
+      if (status.status === 'success') {
+        console.log(`[Generate Look] ✅ Generation completed successfully!`, {
+          generationId,
+          groupId,
+          imageCount: status.image_url_list?.length || 0,
+        })
+        return
+      } else if (status.status === 'failed' || status.status === 'error') {
+        console.error(`[Generate Look] ❌ Generation failed:`, {
+          generationId,
+          groupId,
+          error: status.msg,
+        })
+        return
+      }
+      // Status is still 'in_progress' or 'pending', continue polling
+    } catch (error: any) {
+      console.warn(`[Generate Look] Poll attempt ${attempt} failed:`, error.message)
+      // Continue polling despite errors
+    }
+  }
+  
+  console.warn(`[Generate Look] ⚠️ Polling timed out after ${maxAttempts} attempts for generation ${generationId}`)
+}
+
 // All routes require authentication
 router.use(authenticate)
 
@@ -590,12 +629,18 @@ router.post('/generate-ai', async (req: AuthRequest, res: Response) => {
 router.get('/generation-status/:generationId', async (req: AuthRequest, res: Response) => {
   try {
     const { generationId } = req.params
+    console.log('[Generation Status] Checking status for:', generationId)
     const status = await checkGenerationStatus(generationId)
+    console.log('[Generation Status] Result:', status)
 
     return res.json(status)
   } catch (error: any) {
     console.error('Check generation status error:', error)
-    return res.status(500).json({ error: error.message || 'Failed to check generation status' })
+    console.error('Check generation status response:', error.response?.data)
+    return res.status(500).json({ 
+      error: error.message || 'Failed to check generation status',
+      details: error.response?.data
+    })
   }
 })
 
@@ -821,10 +866,50 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
       .eq('user_id', userId)
       .single()
 
-    // Use the default look as the base photo_avatar_id if available
-    if (avatar?.default_look_id) {
-      request.photo_avatar_id = avatar.default_look_id
-      console.log('[Generate Look] Using default look as base:', avatar.default_look_id)
+    // Get the actual look IDs from the avatar group to use as base
+    const { default: axios } = await import('axios')
+    const apiKey = process.env.HEYGEN_KEY
+    
+    if (apiKey) {
+      try {
+        const looksResponse = await axios.get(
+          `${process.env.HEYGEN_V2_API_URL || 'https://api.heygen.com/v2'}/avatar_group/${request.group_id}/avatars`,
+          {
+            headers: {
+              'X-Api-Key': apiKey,
+              'Content-Type': 'application/json',
+            },
+            timeout: 10000,
+          }
+        )
+
+        const avatarList =
+          looksResponse.data?.data?.avatar_list ||
+          looksResponse.data?.avatar_list ||
+          looksResponse.data?.data ||
+          []
+
+        if (Array.isArray(avatarList) && avatarList.length > 0) {
+          // Use the default look if it exists and matches a look in the group
+          // Otherwise use the first available look
+          let baseLookId = avatarList[0].id
+          
+          if (avatar?.default_look_id) {
+            const defaultLook = avatarList.find((look: any) => look.id === avatar.default_look_id)
+            if (defaultLook) {
+              baseLookId = defaultLook.id
+            }
+          }
+          
+          request.photo_avatar_id = baseLookId
+          console.log('[Generate Look] Using look as base:', baseLookId, '(from', avatarList.length, 'available looks)')
+        } else {
+          console.log('[Generate Look] No looks found in group, generating without base photo_avatar_id')
+        }
+      } catch (looksError: any) {
+        console.warn('[Generate Look] Could not fetch looks for base selection:', looksError.message)
+        // Continue without setting photo_avatar_id
+      }
     }
 
     // Check training status before generating look (with timeout)
@@ -874,6 +959,13 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
     try {
       const result = await generateAvatarLook(request)
       console.log('[Generate Look] Generation result:', result)
+      
+      // Start polling for generation status in the background
+      if (result.generation_id) {
+        pollLookGenerationStatus(result.generation_id, request.group_id).catch(err => {
+          console.error('[Generate Look] Background polling failed:', err.message)
+        })
+      }
       
       return res.json({
         message: 'Look generation started',
