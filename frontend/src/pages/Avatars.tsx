@@ -386,6 +386,15 @@ export default function Avatars() {
       console.log('Received avatar details:', response.data)
       console.log('Looks in response:', response.data?.looks, 'Count:', response.data?.looks?.length)
       setDetailsModal({ avatar, data: response.data, error: undefined })
+      
+      // Update the avatar status in the list if it changed
+      const newStatus = response.data?.status
+      if (newStatus && newStatus !== avatar.status) {
+        console.log(`[Avatar Details] Status changed from ${avatar.status} to ${newStatus}`)
+        setAvatars(prev => prev.map(a => 
+          a.id === avatar.id ? { ...a, status: newStatus } : a
+        ))
+      }
     } catch (error: any) {
       console.error('Failed to fetch avatar details:', error)
       console.error('Error response:', error.response)

@@ -388,6 +388,35 @@ export class AvatarService {
       // Fetch photo avatar details
       const details = await getPhotoAvatarDetails(avatar.heygen_avatar_id)
       
+      // Also fetch training status to get the real status from HeyGen
+      let trainingStatus: string = details.status || 'active'
+      try {
+        const { checkTrainingStatus } = await import('../lib/heygen.js')
+        const status = await checkTrainingStatus(avatar.heygen_avatar_id)
+        if (status.status) {
+          // Map HeyGen training status to our status
+          if (status.status === 'ready') {
+            trainingStatus = 'active'
+          } else if (status.status === 'empty' || status.status === 'failed') {
+            trainingStatus = status.status
+          } else if (status.status === 'training' || status.status === 'pending') {
+            trainingStatus = 'training'
+          }
+          
+          // Update database if status differs
+          if (avatar.status !== trainingStatus) {
+            console.log(`[Avatar Details] Updating avatar ${avatarId} status from ${avatar.status} to ${trainingStatus}`)
+            await supabase
+              .from('avatars')
+              .update({ status: trainingStatus })
+              .eq('id', avatarId)
+          }
+        }
+      } catch (statusError: any) {
+        console.warn(`[Avatar Details] Failed to fetch training status:`, statusError.message)
+        // Continue with existing status
+      }
+      
       // Also fetch looks from the avatar group
       let looks: any[] = []
       if (avatar.heygen_avatar_id) {
@@ -435,6 +464,7 @@ export class AvatarService {
       
       return {
         ...details,
+        status: trainingStatus, // Use the real training status
         looks,
         default_look_id: (avatar as any)?.default_look_id || null,
       }
