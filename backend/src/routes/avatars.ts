@@ -39,7 +39,7 @@ async function pollLookGenerationStatus(generationId: string, groupId: string): 
           imageCount: status.image_url_list?.length || 0,
         })
         return
-      } else if (status.status === 'failed' || status.status === 'error') {
+      } else if (status.status === 'failed') {
         console.error(`[Generate Look] ❌ Generation failed:`, {
           generationId,
           groupId,
