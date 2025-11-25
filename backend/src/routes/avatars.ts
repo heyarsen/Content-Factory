@@ -18,8 +18,8 @@ import {
 } from '../lib/avatarSourceColumn.js'
 const router = Router()
 
-// Helper function to poll for look generation status
-async function pollLookGenerationStatus(generationId: string, groupId: string): Promise<void> {
+// Helper function to poll for look generation status and add looks when complete
+async function pollLookGenerationStatus(generationId: string, groupId: string, lookName?: string): Promise<void> {
   const maxAttempts = 30 // Poll for up to 5 minutes (30 * 10 seconds)
   const pollInterval = 10000 // 10 seconds
   
@@ -38,6 +38,29 @@ async function pollLookGenerationStatus(generationId: string, groupId: string): 
           groupId,
           imageCount: status.image_url_list?.length || 0,
         })
+        
+        // Now add the generated images as looks to the avatar group
+        if (status.image_key_list && status.image_key_list.length > 0) {
+          try {
+            console.log(`[Generate Look] Adding ${status.image_key_list.length} generated images as looks to group ${groupId}`)
+            
+            const addLooksRequest: AddLooksRequest = {
+              group_id: groupId,
+              image_keys: status.image_key_list,
+              name: lookName || `Generated Look ${new Date().toISOString().split('T')[0]}`,
+            }
+            
+            const addLooksResult = await addLooksToAvatarGroup(addLooksRequest)
+            console.log(`[Generate Look] ✅ Successfully added ${addLooksResult.photo_avatar_list?.length || 0} looks to avatar group!`, {
+              groupId,
+              lookIds: addLooksResult.photo_avatar_list?.map(l => l.id),
+            })
+          } catch (addError: any) {
+            console.error(`[Generate Look] ❌ Failed to add generated images as looks:`, addError.response?.data || addError.message)
+          }
+        } else {
+          console.warn(`[Generate Look] ⚠️ Generation succeeded but no image keys returned`)
+        }
         return
       } else if (status.status === 'failed') {
         console.error(`[Generate Look] ❌ Generation failed:`, {
@@ -961,8 +984,10 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
       console.log('[Generate Look] Generation result:', result)
       
       // Start polling for generation status in the background
+      // When complete, it will automatically add the generated images as looks
       if (result.generation_id) {
-        pollLookGenerationStatus(result.generation_id, request.group_id).catch(err => {
+        const lookName = prompt || `Look ${new Date().toISOString().split('T')[0]}`
+        pollLookGenerationStatus(result.generation_id, request.group_id, lookName).catch(err => {
           console.error('[Generate Look] Background polling failed:', err.message)
         })
       }
