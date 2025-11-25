@@ -977,12 +977,15 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
     
     // Provide more user-friendly error messages
     let errorMessage = error.message || 'Failed to generate look'
+    let errorCode: string | undefined
+    
     if (error.response?.data?.error) {
       const apiError = error.response.data.error
       if (typeof apiError === 'string') {
         errorMessage = apiError
       } else if (apiError.message) {
         errorMessage = apiError.message
+        errorCode = apiError.code
         // Special handling for "Model not found" error
         if (apiError.message === 'Model not found' || apiError.code === 'invalid_parameter') {
           errorMessage = 'Avatar is not trained yet. Please wait for training to complete before generating looks.'
@@ -990,7 +993,10 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
       }
     }
     
-    return res.status(error.response?.status || 500).json({ error: errorMessage })
+    return res.status(error.response?.status || 500).json({ 
+      error: errorMessage,
+      code: errorCode 
+    })
   }
 })
 

@@ -906,14 +906,17 @@ export default function Avatars() {
       
       // Handle specific error types
       const errorData = error.response?.data
-      if (errorData?.error?.code === 'insufficient_credit' || errorData?.error?.message?.includes('Insufficient credit')) {
+      const errorCode = errorData?.code || errorData?.error?.code
+      const errorMessage = errorData?.error?.message || errorData?.error || errorData?.message || error.message
+      
+      if (errorCode === 'insufficient_credit' || errorMessage?.includes('Insufficient credit')) {
         toast.error('Insufficient credit. Please add credits to your HeyGen account to generate looks.')
       } else if (errorData?.error) {
-        toast.error(errorData.error.message || errorData.error || 'Failed to generate look')
+        toast.error(typeof errorData.error === 'string' ? errorData.error : (errorData.error.message || 'Failed to generate look'))
       } else if (error.message?.includes('timeout')) {
         toast.error('Request timed out. Please try again.')
       } else {
-        toast.error(error.message || 'Failed to generate look')
+        toast.error(errorMessage || 'Failed to generate look')
       }
     } finally {
       setGeneratingLook(false)
@@ -985,14 +988,17 @@ export default function Avatars() {
       
       // Handle specific error types
       const errorData = error.response?.data
-      if (errorData?.error?.code === 'insufficient_credit' || errorData?.error?.message?.includes('Insufficient credit')) {
+      const errorCode = errorData?.code || errorData?.error?.code
+      const errorMessage = errorData?.error?.message || errorData?.error || errorData?.message || error.message
+      
+      if (errorCode === 'insufficient_credit' || errorMessage?.includes('Insufficient credit')) {
         toast.error('Insufficient credit. Please add credits to your HeyGen account to generate looks.')
       } else if (errorData?.error) {
-        toast.error(errorData.error.message || errorData.error || 'Failed to generate look')
+        toast.error(typeof errorData.error === 'string' ? errorData.error : (errorData.error.message || 'Failed to generate look'))
       } else if (error.message?.includes('timeout')) {
         toast.error('Request timed out. Please try again.')
       } else {
-        toast.error(error.message || 'Failed to generate look')
+        toast.error(errorMessage || 'Failed to generate look')
       }
     } finally {
       setGeneratingLook(false)
@@ -1219,8 +1225,8 @@ export default function Avatars() {
               .map(avatarId => {
                 const avatar = avatars.find(a => a.id === avatarId)
                 if (!avatar) return null
-                return (
-                  <div
+              return (
+                <div
                     key={`generating-${avatarId}`}
                     className="group relative aspect-[3/4] rounded-2xl overflow-hidden bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-200 flex flex-col items-center justify-center gap-3"
                   >
@@ -1323,8 +1329,8 @@ export default function Avatars() {
                       ) : (
                         <div className="w-full h-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
                           <User className="h-5 w-5 text-white" />
-                        </div>
-                      )}
+                      </div>
+                    )}
                     </div>
                     <input
                       type="text"
@@ -1356,13 +1362,13 @@ export default function Avatars() {
                   </>
                 ) : null
               })()}
-            </div>
+                    </div>
           ) : (
             // Show default prompt when no avatar is selected
             <div className="bg-white rounded-full shadow-2xl border border-slate-200 px-5 py-3 flex items-center gap-4 max-w-xl">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center flex-shrink-0">
                 <User className="h-5 w-5 text-white" />
-              </div>
+                  </div>
               <p className="text-sm text-slate-600 flex-1">
                 Choose an identity to customize with new styles and scenes
               </p>
@@ -1378,8 +1384,8 @@ export default function Avatars() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </button>
-            </div>
-          )}
+          </div>
+        )}
         </div>
       </div>
 
