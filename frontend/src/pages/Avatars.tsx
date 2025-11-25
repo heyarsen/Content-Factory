@@ -12,7 +12,6 @@ import {
   Upload,
   Plus,
   Sparkles,
-  Image,
   X,
   Loader2,
   CheckCircle2,
@@ -47,20 +46,6 @@ interface PhotoAvatarLook {
   is_default?: boolean
 }
 
-interface PhotoAvatarDetails {
-  id: string
-  group_id?: string
-  status?: string
-  image_url?: string
-  preview_url?: string
-  thumbnail_url?: string
-  created_at?: number
-  updated_at?: number | null
-  looks?: PhotoAvatarLook[]
-  default_look_id?: string | null
-  [key: string]: any
-}
-
 type AiGenerationStage = 'idle' | 'creating' | 'photosReady' | 'completing' | 'completed'
 type AiStageVisualState = 'done' | 'current' | 'pending'
 
@@ -89,10 +74,8 @@ export default function Avatars() {
   const [generatingLook, setGeneratingLook] = useState(false)
   const [lookImageFiles, setLookImageFiles] = useState<File[]>([])
   const [lookImagePreviews, setLookImagePreviews] = useState<string[]>([])
-  const [statusLoadingMap, setStatusLoadingMap] = useState<Record<string, boolean>>({})
   const [lookSelectionModal, setLookSelectionModal] = useState<{ avatar: Avatar; looks: PhotoAvatarLook[] } | null>(null)
   const [selectedLookId, setSelectedLookId] = useState<string | null>(null)
-  const [trainingId, setTrainingId] = useState<string | null>(null)
   const [selectedAvatarFilter, setSelectedAvatarFilter] = useState<string | null>(null) // null = "All"
   
   // Get all looks from all avatars for the grid display
@@ -188,21 +171,6 @@ export default function Avatars() {
       return true
     }
     return false
-  }
-
-  const formatTimestamp = (value?: number | string | null) => {
-    if (!value) return '—'
-    let date: Date
-    if (typeof value === 'number') {
-      date = new Date(value < 1e12 ? value * 1000 : value)
-    } else {
-      const numeric = Number(value)
-      date = new Date(Number.isFinite(numeric) && numeric > 0 ? (numeric < 1e12 ? numeric * 1000 : numeric) : Date.parse(value))
-    }
-    if (Number.isNaN(date.getTime())) {
-      return '—'
-    }
-    return date.toLocaleString()
   }
 
   const checkForUnselectedLooks = useCallback(async (avatarsList: Avatar[]) => {
@@ -383,36 +351,6 @@ export default function Avatars() {
       }
     }
   }, [avatars, handleRefreshTrainingStatus])
-
-  const handleTriggerTraining = async (avatar: Avatar) => {
-    setTrainingId(avatar.id)
-    try {
-      const response = await api.post(`/api/avatars/${avatar.id}/train`)
-      toast.success(response.data.message || 'Training started!')
-      
-      // Refresh the avatars list and looks
-      await loadAvatars()
-    } catch (error: any) {
-      console.error('Failed to trigger training:', error)
-      toast.error(error.response?.data?.error || 'Failed to start training')
-    } finally {
-      setTrainingId(null)
-    }
-  }
-
-  const handleSetDefaultLook = async (avatarId: string, lookId: string) => {
-    try {
-      // Update the default_look_id in the database via API
-      await api.post(`/api/avatars/${avatarId}/set-default-look`, { look_id: lookId })
-      toast.success('Default look updated successfully!')
-      
-      // Refresh avatars and looks
-      await loadAvatars()
-    } catch (error: any) {
-      console.error('Failed to set default look:', error)
-      toast.error(error.response?.data?.error || 'Failed to set default look')
-    }
-  }
 
   const fileToDataUrl = (file: File): Promise<string> =>
     new Promise((resolve, reject) => {
@@ -797,10 +735,6 @@ export default function Avatars() {
     }
   }
 
-  const handleManageLooks = (avatar: Avatar) => {
-    setShowLooksModal(avatar)
-  }
-
   const handleAddLooks = async () => {
     if (!showLooksModal || lookImageFiles.length === 0) {
       toast.error('Please select at least one image')
@@ -941,26 +875,6 @@ export default function Avatars() {
   }
 
   // Get status badge styling
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-      case 'ready':
-        return { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Active' }
-      case 'training':
-        return { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Training' }
-      case 'pending':
-        return { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Pending' }
-      case 'generating':
-        return { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Generating' }
-      case 'empty':
-        return { bg: 'bg-rose-100', text: 'text-rose-700', label: 'Not Trained' }
-      case 'failed':
-        return { bg: 'bg-red-100', text: 'text-red-700', label: 'Failed' }
-      default:
-        return { bg: 'bg-slate-100', text: 'text-slate-700', label: status }
-    }
-  }
-
   // Filter looks based on selected avatar
   const filteredLooks = selectedAvatarFilter 
     ? allLooks.filter(item => item.avatar.id === selectedAvatarFilter)
@@ -1014,7 +928,7 @@ export default function Avatars() {
               <span className={`text-sm font-semibold ${
                 selectedAvatarFilter === null ? 'text-slate-900' : 'text-slate-600'
               }`}>All</span>
-            </div>
+          </div>
           </button>
           
           {/* Avatar circles */}
@@ -1178,26 +1092,26 @@ export default function Avatars() {
                   className="group relative aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 hover:shadow-xl transition-all duration-300"
                 >
                   {look.image_url || look.preview_url || look.thumbnail_url ? (
-                    <img
+                      <img
                       src={look.image_url || look.preview_url || look.thumbnail_url || ''}
                       alt={look.name || avatar.avatar_name}
                       className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                  ) : (
+                      />
+                    ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-200 to-slate-300">
                       <User className="h-12 w-12 text-slate-400" />
-                    </div>
-                  )}
-                  
+                      </div>
+                    )}
+                    
                   {/* Default look indicator */}
                   {look.is_default && (
                     <div className="absolute top-3 right-3">
                       <div className="w-8 h-8 rounded-full bg-cyan-500 flex items-center justify-center shadow-lg">
                         <Star className="h-4 w-4 text-white fill-current" />
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  
+                    )}
+                    
                   {/* Look name and avatar name at bottom */}
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-3 pt-8">
                     <p className="text-white text-sm font-medium truncate">
@@ -1206,19 +1120,19 @@ export default function Avatars() {
                     <p className="text-white/70 text-xs truncate mt-0.5">
                       {avatar.avatar_name}
                     </p>
-                  </div>
+                      </div>
                 </div>
               ))
-            )}
-          </div>
-        )}
-        
+                        )}
+                      </div>
+                    )}
+                    
         {/* Bottom prompt bar (HeyGen style) */}
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
           <div className="bg-white rounded-full shadow-2xl border border-slate-200 px-5 py-3 flex items-center gap-4 max-w-xl">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center flex-shrink-0">
               <User className="h-5 w-5 text-white" />
-            </div>
+                    </div>
             <p className="text-sm text-slate-600 flex-1">
               Choose an identity to customize with new styles and scenes
             </p>
@@ -1234,8 +1148,8 @@ export default function Avatars() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
-          </div>
-        </div>
+                  </div>
+                    </div>
       </div>
 
       {/* Create Avatar Modal */}
@@ -1723,7 +1637,7 @@ export default function Avatars() {
           {generateLookStep === 'select-avatar' ? (
             /* Step 1: Select Avatar */
             <div className="space-y-4">
-              <p className="text-sm text-slate-600">
+            <p className="text-sm text-slate-600">
                 Choose an avatar to generate a new look for. Only trained avatars can have new looks generated.
               </p>
               
@@ -1807,64 +1721,64 @@ export default function Avatars() {
                 </div>
               )}
 
-              <Textarea
-                label="Look Description *"
-                value={lookPrompt}
-                onChange={(e) => setLookPrompt(e.target.value)}
-                placeholder="e.g., Professional business suit, formal attire, confident expression"
-                rows={4}
+            <Textarea
+              label="Look Description *"
+              value={lookPrompt}
+              onChange={(e) => setLookPrompt(e.target.value)}
+              placeholder="e.g., Professional business suit, formal attire, confident expression"
+              rows={4}
+              disabled={generatingLook}
+            />
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <Select
+                label="Pose *"
+                value={lookPose}
+                onChange={(e) => setLookPose(e.target.value as any)}
+                options={[
+                  { value: 'close_up', label: 'Close Up' },
+                  { value: 'half_body', label: 'Half Body' },
+                  { value: 'full_body', label: 'Full Body' },
+                ]}
                 disabled={generatingLook}
               />
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <Select
-                  label="Pose *"
-                  value={lookPose}
-                  onChange={(e) => setLookPose(e.target.value as any)}
-                  options={[
-                    { value: 'close_up', label: 'Close Up' },
-                    { value: 'half_body', label: 'Half Body' },
-                    { value: 'full_body', label: 'Full Body' },
-                  ]}
-                  disabled={generatingLook}
-                />
+              <Select
+                label="Style *"
+                value={lookStyle}
+                onChange={(e) => setLookStyle(e.target.value as any)}
+                options={[
+                  { value: 'Realistic', label: 'Realistic' },
+                  { value: 'Cartoon', label: 'Cartoon' },
+                  { value: 'Anime', label: 'Anime' },
+                ]}
+                disabled={generatingLook}
+              />
+            </div>
 
-                <Select
-                  label="Style *"
-                  value={lookStyle}
-                  onChange={(e) => setLookStyle(e.target.value as any)}
-                  options={[
-                    { value: 'Realistic', label: 'Realistic' },
-                    { value: 'Cartoon', label: 'Cartoon' },
-                    { value: 'Anime', label: 'Anime' },
-                  ]}
-                  disabled={generatingLook}
-                />
-              </div>
-
-              <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setShowGenerateLookModal(false)
+            <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowGenerateLookModal(false)
                     setGenerateLookStep('select-avatar')
                     setSelectedAvatarForLook(null)
-                    setLookPrompt('')
-                    setLookPose('close_up')
-                    setLookStyle('Realistic')
-                  }}
-                  disabled={generatingLook}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleGenerateLook}
-                  disabled={generatingLook || !lookPrompt.trim()}
-                  loading={generatingLook}
-                >
-                  {generatingLook ? 'Generating...' : 'Generate Look'}
-                </Button>
-              </div>
+                  setLookPrompt('')
+                  setLookPose('close_up')
+                  setLookStyle('Realistic')
+                }}
+                disabled={generatingLook}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleGenerateLook}
+                disabled={generatingLook || !lookPrompt.trim()}
+                loading={generatingLook}
+              >
+                {generatingLook ? 'Generating...' : 'Generate Look'}
+              </Button>
+            </div>
             </div>
           )}
         </Modal>

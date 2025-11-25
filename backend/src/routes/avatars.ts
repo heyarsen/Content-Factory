@@ -950,7 +950,7 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
     console.log('[Generate Look] Calling generateAvatarLook with request:', JSON.stringify(request, null, 2))
     
     try {
-      const result = await generateAvatarLook(request)
+    const result = await generateAvatarLook(request)
       console.log('[Generate Look] Generation result:', result)
       
       // Start polling for generation status in the background
@@ -961,11 +961,11 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
           console.error('[Generate Look] Background polling failed:', err.message)
         })
       }
-      
-      return res.json({
-        message: 'Look generation started',
-        generation_id: result.generation_id,
-      })
+
+    return res.json({
+      message: 'Look generation started',
+      generation_id: result.generation_id,
+    })
     } catch (genError: any) {
       console.error('[Generate Look] generateAvatarLook failed:', genError.message)
       console.error('[Generate Look] Full generation error:', genError)
