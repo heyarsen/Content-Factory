@@ -8,16 +8,13 @@ import api from '../lib/api'
 import {
   RefreshCw,
   Star,
-  Trash2,
   User,
   Upload,
   Plus,
   Sparkles,
   Image,
   X,
-  ArrowUpCircle,
   Loader2,
-  Copy,
   CheckCircle2,
   Circle,
 } from 'lucide-react'
@@ -93,14 +90,10 @@ export default function Avatars() {
   const [lookImageFiles, setLookImageFiles] = useState<File[]>([])
   const [lookImagePreviews, setLookImagePreviews] = useState<string[]>([])
   const [statusLoadingMap, setStatusLoadingMap] = useState<Record<string, boolean>>({})
-  const [detailsModal, setDetailsModal] = useState<{ avatar: Avatar; data: PhotoAvatarDetails | null; error?: string } | null>(null)
-  const [detailsLoadingId, setDetailsLoadingId] = useState<string | null>(null)
-  const [upscalingId, setUpscalingId] = useState<string | null>(null)
   const [lookSelectionModal, setLookSelectionModal] = useState<{ avatar: Avatar; looks: PhotoAvatarLook[] } | null>(null)
   const [selectedLookId, setSelectedLookId] = useState<string | null>(null)
   const [trainingId, setTrainingId] = useState<string | null>(null)
   const [selectedAvatarFilter, setSelectedAvatarFilter] = useState<string | null>(null) // null = "All"
-  const detailData = detailsModal?.data ?? null
   
   // Get all looks from all avatars for the grid display
   const [allLooks, setAllLooks] = useState<Array<{ look: PhotoAvatarLook; avatar: Avatar }>>([])
@@ -397,10 +390,7 @@ export default function Avatars() {
       const response = await api.post(`/api/avatars/${avatar.id}/train`)
       toast.success(response.data.message || 'Training started!')
       
-      // Refresh the avatar details
-      await handleViewDetails(avatar)
-      
-      // Also refresh the avatars list
+      // Refresh the avatars list and looks
       await loadAvatars()
     } catch (error: any) {
       console.error('Failed to trigger training:', error)
@@ -410,79 +400,14 @@ export default function Avatars() {
     }
   }
 
-  const handleViewDetails = async (avatar: Avatar) => {
-    console.log('Opening details modal for avatar:', avatar.id)
-    setDetailsModal({ avatar, data: null })
-    setDetailsLoadingId(avatar.id)
-    try {
-      console.log('Fetching avatar details from API...')
-      const response = await api.get(`/api/avatars/${avatar.id}/details`, {
-        timeout: 15000, // 15 second timeout
-      })
-      console.log('Received avatar details:', response.data)
-      console.log('Looks in response:', response.data?.looks, 'Count:', response.data?.looks?.length)
-      setDetailsModal({ avatar, data: response.data, error: undefined })
-      
-      // Update the avatar status in the list if it changed
-      const newStatus = response.data?.status
-      if (newStatus && newStatus !== avatar.status) {
-        console.log(`[Avatar Details] Status changed from ${avatar.status} to ${newStatus}`)
-        setAvatars(prev => prev.map(a => 
-          a.id === avatar.id ? { ...a, status: newStatus } : a
-        ))
-      }
-    } catch (error: any) {
-      console.error('Failed to fetch avatar details:', error)
-      console.error('Error response:', error.response)
-      const errorMessage = error.response?.data?.error || error.message || 'Failed to load avatar details'
-      // Set error state so modal shows error instead of loading forever
-      setDetailsModal({ avatar, data: null, error: errorMessage })
-      toastRef.current.error(errorMessage)
-    } finally {
-      setDetailsLoadingId(null)
-    }
-  }
-
-  const handleUpscaleAvatar = async (avatar: Avatar) => {
-    setUpscalingId(avatar.id)
-    try {
-      const response = await api.post(`/api/avatars/${avatar.id}/upscale`)
-      toastRef.current.success(response.data?.message || 'Upscale requested successfully')
-    } catch (error: any) {
-      console.error('Failed to upscale avatar:', error)
-      toastRef.current.error(error.response?.data?.error || 'Failed to upscale avatar')
-    } finally {
-      setUpscalingId(null)
-    }
-  }
-
-  const handleCloseDetailsModal = () => {
-    setDetailsModal(null)
-    setDetailsLoadingId(null)
-  }
-
-  const handleCopyToClipboard = async (value?: string | null) => {
-    if (!value) return
-    try {
-      await navigator.clipboard.writeText(value)
-      toastRef.current.success('Copied to clipboard')
-    } catch (error) {
-      console.error('Clipboard copy failed:', error)
-      toastRef.current.error('Failed to copy')
-    }
-  }
-
   const handleSetDefaultLook = async (avatarId: string, lookId: string) => {
     try {
       // Update the default_look_id in the database via API
       await api.post(`/api/avatars/${avatarId}/set-default-look`, { look_id: lookId })
       toast.success('Default look updated successfully!')
       
-      // Refresh the details to show updated default look
-      if (detailsModal) {
-        const response = await api.get(`/api/avatars/${avatarId}/details`)
-        setDetailsModal({ ...detailsModal, data: response.data })
-      }
+      // Refresh avatars and looks
+      await loadAvatars()
     } catch (error: any) {
       console.error('Failed to set default look:', error)
       toast.error(error.response?.data?.error || 'Failed to set default look')
@@ -920,11 +845,7 @@ export default function Avatars() {
       setLookImageFiles([])
       setLookImagePreviews([])
       
-      // Refresh avatar details to show new looks
-      if (showLooksModal) {
-        await handleViewDetails(showLooksModal)
-      }
-      
+      // Refresh avatars and looks
       await loadAvatars()
     } catch (error: any) {
       console.error('Failed to add looks:', error)
@@ -974,9 +895,7 @@ export default function Avatars() {
       
       // Refresh looks after a delay to show the new look
       setTimeout(async () => {
-        if (targetAvatar) {
-          await handleViewDetails(targetAvatar)
-        }
+        await loadAvatars()
       }, 5000)
     } catch (error: any) {
       console.error('Failed to generate look:', error)
