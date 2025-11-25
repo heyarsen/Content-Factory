@@ -999,14 +999,6 @@ export default function Avatars() {
     }
   }
 
-  // Get source label
-  const getSourceLabel = (avatar: Avatar) => {
-    if (avatar.source === 'user_photo') return 'Photo Upload'
-    if (avatar.source === 'ai_generated') return 'AI Generated'
-    if (avatar.source === 'synced') return 'HeyGen Library'
-    return isUserCreatedAvatar(avatar) ? 'Custom' : 'Library'
-  }
-
   if (loading) {
     return (
       <Layout>
