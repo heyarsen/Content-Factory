@@ -36,13 +36,13 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   }, [notificationsOpen])
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-700/60 bg-slate-800/95 backdrop-blur-xl">
-      <div className="flex h-20 w-full items-center justify-between px-6 sm:px-8 lg:px-14">
+    <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/80 backdrop-blur-xl">
+      <div className="flex h-16 w-full items-center justify-between px-6 sm:px-8 lg:px-14">
         <div className="flex items-center gap-4">
           <button
             type="button"
             onClick={onToggleSidebar}
-            className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-600/60 bg-slate-700/70 text-slate-300 shadow-sm backdrop-blur transition hover:border-brand-400 hover:text-brand-400 lg:hidden"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 lg:hidden"
             aria-label="Open navigation"
           >
             <Menu className="h-5 w-5" />
@@ -50,22 +50,22 @@ export function Header({ onToggleSidebar }: HeaderProps) {
 
           <div className="hidden md:block">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Workspace</p>
-            <p className="mt-1 text-xl font-semibold text-white">Welcome back, {greetingName}</p>
+            <p className="mt-0.5 text-lg font-semibold text-slate-900">Welcome back, {greetingName}</p>
           </div>
         </div>
 
-        <div className="flex flex-1 items-center justify-end gap-2 sm:gap-3 md:gap-5">
+        <div className="flex flex-1 items-center justify-end gap-2 sm:gap-3">
           {/* Notifications */}
           <div className="relative" ref={notificationRef}>
             <button
               type="button"
               onClick={() => setNotificationsOpen(!notificationsOpen)}
-              className="relative flex h-12 w-12 min-h-[44px] min-w-[44px] items-center justify-center rounded-2xl border border-slate-600/60 bg-slate-700/70 text-slate-300 shadow-sm backdrop-blur transition hover:border-brand-400 hover:text-brand-400 touch-manipulation"
+              className="relative flex h-10 w-10 min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 touch-manipulation"
               aria-label="Notifications"
             >
               <Bell className="h-5 w-5" />
               {unreadCount > 0 && (
-              <span className="absolute right-2 top-2 inline-flex h-2.5 w-2.5 rounded-full bg-brand-500" />
+              <span className="absolute right-1.5 top-1.5 inline-flex h-2.5 w-2.5 rounded-full bg-brand-500 ring-2 ring-white" />
               )}
             </button>
 
@@ -163,7 +163,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           <button
             type="button"
             onClick={() => navigate('/profile')}
-            className="flex h-12 w-12 min-h-[44px] min-w-[44px] items-center justify-center rounded-2xl border border-slate-600/60 bg-slate-700/70 text-slate-300 shadow-sm backdrop-blur transition hover:border-brand-400 hover:text-brand-400 touch-manipulation md:hidden"
+            className="flex h-10 w-10 min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 touch-manipulation md:hidden"
             aria-label="Account"
           >
             <User className="h-5 w-5" />
@@ -173,11 +173,11 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           <button
             type="button"
             onClick={() => navigate('/profile')}
-            className="hidden items-center gap-3 rounded-2xl border border-slate-600/60 bg-slate-700/70 px-4 py-3 text-sm text-slate-300 shadow-sm backdrop-blur transition hover:border-brand-400 hover:text-brand-400 md:flex min-h-[44px] touch-manipulation"
+            className="hidden items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 md:flex min-h-[44px] touch-manipulation"
           >
             <div className="hidden flex-col leading-tight sm:flex">
               <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Account</span>
-              <span className="font-semibold text-white">{user?.email}</span>
+              <span className="font-semibold text-slate-900">{user?.email}</span>
             </div>
             <User className="h-4 w-4" />
           </button>

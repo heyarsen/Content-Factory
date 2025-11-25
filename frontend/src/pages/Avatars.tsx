@@ -1940,7 +1940,7 @@ export default function Avatars() {
               </div>
               <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
                 <Button
-                  onClick={async (e: React.MouseEvent<HTMLButtonElement>) => {
+                  onClick={(e) => {
                     e.preventDefault()
                     e.stopPropagation()
                     console.log('Confirm Selection button clicked', { selectedLookId, lookSelectionModal })
@@ -1948,26 +1948,29 @@ export default function Avatars() {
                       toast.warning('Please select a look to continue')
                       return
                     }
-                    try {
-                      console.log('Calling API:', `/api/avatars/${lookSelectionModal.avatar.id}/set-default-look`, { look_id: selectedLookId })
-                      const response = await api.post(`/api/avatars/${lookSelectionModal.avatar.id}/set-default-look`, {
-                        look_id: selectedLookId,
-                      })
-                      console.log('Set default look response:', response.data)
-                      toast.success('Look selected! This is now your permanent avatar look.')
-                      setLookSelectionModal(null)
-                      setSelectedLookId(null)
-                      await loadAvatars()
-                    } catch (error: any) {
-                      console.error('Failed to set default look:', error)
-                      console.error('Error details:', {
-                        message: error.message,
-                        response: error.response?.data,
-                        status: error.response?.status,
-                        url: error.config?.url,
-                      })
-                      toast.error(error.response?.data?.error || error.message || 'Failed to set default look')
-                    }
+                    // Use async IIFE to handle the API call
+                    (async () => {
+                      try {
+                        console.log('Calling API:', `/api/avatars/${lookSelectionModal.avatar.id}/set-default-look`, { look_id: selectedLookId })
+                        const response = await api.post(`/api/avatars/${lookSelectionModal.avatar.id}/set-default-look`, {
+                          look_id: selectedLookId,
+                        })
+                        console.log('Set default look response:', response.data)
+                        toast.success('Look selected! This is now your permanent avatar look.')
+                        setLookSelectionModal(null)
+                        setSelectedLookId(null)
+                        await loadAvatars()
+                      } catch (error: any) {
+                        console.error('Failed to set default look:', error)
+                        console.error('Error details:', {
+                          message: error.message,
+                          response: error.response?.data,
+                          status: error.response?.status,
+                          url: error.config?.url,
+                        })
+                        toast.error(error.response?.data?.error || error.message || 'Failed to set default look')
+                      }
+                    })()
                   }}
                   disabled={!selectedLookId}
                   type="button"

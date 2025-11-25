@@ -44,9 +44,8 @@ code {
   .modal-content {
     left: calc(9rem + 50vw) !important;
     max-width: calc(100vw - 20rem) !important; /* Account for sidebar (18rem) + padding (2rem) */
-    /* Center vertically in space below header */
-    /* Formula: header + padding + (viewport - header - padding) / 2 */
-    top: calc(5rem + 2rem + (100vh - 5rem - 4rem) / 2) !important;
+    /* Center vertically in viewport */
+    top: 50% !important;
     transform: translate(-50%, -50%) !important;
   }
 }
@@ -55,8 +54,8 @@ code {
   .modal-content {
     left: 50% !important;
     max-width: calc(100vw - 2rem) !important; /* Just padding on mobile */
-    /* Center vertically in space below header */
-    top: calc(5rem + 2rem + (100vh - 5rem - 4rem) / 2) !important;
+    /* Center vertically in viewport */
+    top: 50% !important;
     transform: translate(-50%, -50%) !important;
   }
 }
