@@ -284,7 +284,6 @@ export default function Avatars() {
   const handleRefreshTrainingStatus = useCallback(
     async (avatar: Avatar, options: { silent?: boolean } = {}) => {
       if (!avatar) return
-      setStatusLoadingMap(prev => ({ ...prev, [avatar.id]: true }))
       try {
         const response = await api.get(`/api/avatars/training-status/${avatar.heygen_avatar_id}`)
         const status = response.data?.status
@@ -313,12 +312,6 @@ export default function Avatars() {
         if (!options.silent) {
           toastRef.current.error(error.response?.data?.error || 'Failed to refresh training status')
         }
-      } finally {
-        setStatusLoadingMap(prev => {
-          const next = { ...prev }
-          delete next[avatar.id]
-          return next
-        })
       }
     },
     []
