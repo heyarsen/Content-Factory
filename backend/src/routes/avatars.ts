@@ -827,37 +827,64 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
       console.log('[Generate Look] Using default look as base:', avatar.default_look_id)
     }
 
-    // Check training status before generating look
+    // Check training status before generating look (with timeout)
     const { checkTrainingStatus } = await import('../lib/heygen.js')
+    console.log('[Generate Look] Checking training status for group:', request.group_id)
+    
     try {
-      const trainingStatus = await checkTrainingStatus(request.group_id)
+      // Add a timeout to prevent hanging
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Training status check timed out after 10s')), 10000)
+      )
+      
+      const trainingStatus = await Promise.race([
+        checkTrainingStatus(request.group_id),
+        timeoutPromise
+      ])
+      
+      console.log('[Generate Look] Training status result:', trainingStatus)
       if (trainingStatus.status !== 'ready') {
         if (trainingStatus.status === 'empty') {
+          console.log('[Generate Look] Training status is empty, returning error')
           return res.status(400).json({ 
             error: 'Avatar group is not trained yet. Please wait for training to complete before generating looks.' 
           })
         } else if (trainingStatus.status === 'failed') {
+          console.log('[Generate Look] Training failed, returning error')
           return res.status(400).json({ 
             error: `Avatar training failed: ${trainingStatus.error_msg || 'Unknown error'}. Cannot generate looks.` 
           })
         } else if (trainingStatus.status === 'training' || trainingStatus.status === 'pending') {
+          console.log('[Generate Look] Training in progress, returning error')
           return res.status(400).json({ 
             error: `Avatar is still training (status: ${trainingStatus.status}). Please wait for training to complete before generating looks.` 
           })
         }
       }
+      console.log('[Generate Look] Training status is ready, proceeding with look generation')
     } catch (statusError: any) {
       // If we can't check status, log warning but continue (might work if training is complete)
       console.warn('[Generate Look] Failed to check training status:', statusError.message)
+      console.warn('[Generate Look] Full error:', statusError)
+      console.warn('[Generate Look] Will attempt to generate look anyway')
     }
 
-    console.log('[Generate Look] Request:', request)
-    const result = await generateAvatarLook(request)
-
-    return res.json({
-      message: 'Look generation started',
-      generation_id: result.generation_id,
-    })
+    console.log('[Generate Look] Calling generateAvatarLook with request:', JSON.stringify(request, null, 2))
+    
+    try {
+      const result = await generateAvatarLook(request)
+      console.log('[Generate Look] Generation result:', result)
+      
+      return res.json({
+        message: 'Look generation started',
+        generation_id: result.generation_id,
+      })
+    } catch (genError: any) {
+      console.error('[Generate Look] generateAvatarLook failed:', genError.message)
+      console.error('[Generate Look] Full generation error:', genError)
+      console.error('[Generate Look] Response data:', genError.response?.data)
+      throw genError
+    }
   } catch (error: any) {
     console.error('Generate look error:', error)
     
