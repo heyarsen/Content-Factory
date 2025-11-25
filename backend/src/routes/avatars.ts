@@ -889,51 +889,21 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
       .eq('user_id', userId)
       .single()
 
-    // Get the actual look IDs from the avatar group to use as base
-    const { default: axios } = await import('axios')
-    const apiKey = process.env.HEYGEN_KEY
+    // Log avatar info for debugging
+    console.log('[Generate Look] Avatar from database:', avatar ? {
+      id: avatar.id,
+      heygen_avatar_id: avatar.heygen_avatar_id,
+      default_look_id: avatar.default_look_id,
+    } : 'not found')
     
-    if (apiKey) {
-      try {
-        const looksResponse = await axios.get(
-          `${process.env.HEYGEN_V2_API_URL || 'https://api.heygen.com/v2'}/avatar_group/${request.group_id}/avatars`,
-          {
-            headers: {
-              'X-Api-Key': apiKey,
-              'Content-Type': 'application/json',
-            },
-            timeout: 10000,
-          }
-        )
-
-        const avatarList =
-          looksResponse.data?.data?.avatar_list ||
-          looksResponse.data?.avatar_list ||
-          looksResponse.data?.data ||
-          []
-
-        if (Array.isArray(avatarList) && avatarList.length > 0) {
-          // Use the default look if it exists and matches a look in the group
-          // Otherwise use the first available look
-          let baseLookId = avatarList[0].id
-          
-          if (avatar?.default_look_id) {
-            const defaultLook = avatarList.find((look: any) => look.id === avatar.default_look_id)
-            if (defaultLook) {
-              baseLookId = defaultLook.id
-            }
-          }
-          
-          request.photo_avatar_id = baseLookId
-          console.log('[Generate Look] Using look as base:', baseLookId, '(from', avatarList.length, 'available looks)')
-        } else {
-          console.log('[Generate Look] No looks found in group, generating without base photo_avatar_id')
-        }
-      } catch (looksError: any) {
-        console.warn('[Generate Look] Could not fetch looks for base selection:', looksError.message)
-        // Continue without setting photo_avatar_id
-      }
-    }
+    // IMPORTANT: Do NOT set photo_avatar_id
+    // The group_id alone should be sufficient for HeyGen to generate a look
+    // that matches the avatar's identity. Setting photo_avatar_id incorrectly
+    // can cause HeyGen to generate looks from a different avatar.
+    // 
+    // The photo_avatar_id parameter is meant for using a specific look as
+    // a style reference, not for identifying which avatar to use.
+    console.log('[Generate Look] Using group_id only (no photo_avatar_id) to ensure correct avatar identity')
 
     // Check training status before generating look (with timeout)
     const { checkTrainingStatus } = await import('../lib/heygen.js')
@@ -986,7 +956,7 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
       // Start polling for generation status in the background
       // When complete, it will automatically add the generated images as looks
       if (result.generation_id) {
-        const lookName = prompt || `Look ${new Date().toISOString().split('T')[0]}`
+        const lookName = request.prompt || `Look ${new Date().toISOString().split('T')[0]}`
         pollLookGenerationStatus(result.generation_id, request.group_id, lookName).catch(err => {
           console.error('[Generate Look] Background polling failed:', err.message)
         })
