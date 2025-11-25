@@ -71,14 +71,13 @@ export default function Avatars() {
   const [avatars, setAvatars] = useState<Avatar[]>([])
   const [, setDefaultAvatarId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [syncing, setSyncing] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [avatarName, setAvatarName] = useState('')
   const MAX_PHOTOS = 5
   const [photoFiles, setPhotoFiles] = useState<File[]>([])
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
   const [creating, setCreating] = useState(false)
-  const [onlyCreated, setOnlyCreated] = useState(true) // Default to showing only user-created avatars
+  // Always show only user-created avatars (removed "All Avatars" option)
   const [showGenerateAIModal, setShowGenerateAIModal] = useState(false)
   const [generatingAI, setGeneratingAI] = useState(false)
   const [checkingStatus, setCheckingStatus] = useState(false)
@@ -244,9 +243,8 @@ export default function Avatars() {
   const loadAvatars = useCallback(async () => {
     try {
       setLoading(true)
-      // Backend expects 'all=true' to show all avatars, default shows only user-created
-      const params = onlyCreated ? {} : { all: 'true' }
-      const response = await api.get('/api/avatars', { params })
+      // Only show user-created avatars
+      const response = await api.get('/api/avatars')
       const avatarsList = response.data?.avatars || []
       setAvatars(avatarsList)
       setDefaultAvatarId(response.data?.default_avatar_id || null)
@@ -264,7 +262,7 @@ export default function Avatars() {
     } finally {
       setLoading(false)
     }
-  }, [onlyCreated, checkForUnselectedLooks])
+  }, [checkForUnselectedLooks])
 
   useEffect(() => {
     loadAvatars()
@@ -282,40 +280,6 @@ export default function Avatars() {
     }
   }, [])
 
-  const handleSync = async () => {
-    setSyncing(true)
-    try {
-      console.log('Syncing avatars...')
-      const response = await api.post('/api/avatars/sync')
-      console.log('Sync response:', response.data)
-      
-      if (response.data.count === 0) {
-        toast.error('No avatars found. Please check your API configuration.')
-      } else {
-        toast.success(`Synced ${response.data.count || 0} avatars`)
-      }
-      
-      // Reload avatars with current filter
-      await loadAvatars()
-    } catch (error: any) {
-      console.error('Failed to sync avatars:', error)
-      console.error('Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-      })
-      
-      const errorMessage = 
-        error.response?.data?.error || 
-        error.response?.data?.message ||
-        error.message || 
-        'Failed to sync avatars'
-      
-      toast.error(errorMessage + '. Please check your API configuration.')
-    } finally {
-      setSyncing(false)
-    }
-  }
 
   const handleRefreshTrainingStatus = useCallback(
     async (avatar: Avatar, options: { silent?: boolean } = {}) => {
@@ -1055,44 +1019,10 @@ export default function Avatars() {
           </div>
         </div>
 
-        {/* Filter Bar */}
-        <div className="flex flex-wrap items-center gap-3 pb-2 border-b border-slate-200">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setOnlyCreated(true)}
-              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
-                onlyCreated
-                  ? 'bg-brand-100 text-brand-700'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              My Avatars
-            </button>
-            <button
-              onClick={() => setOnlyCreated(false)}
-              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
-                !onlyCreated
-                  ? 'bg-brand-100 text-brand-700'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              All Avatars
-            </button>
-          </div>
-          <div className="flex-1" />
-          {!onlyCreated && (
-            <Button
-              onClick={handleSync}
-              disabled={syncing}
-              variant="ghost"
-              size="sm"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-              Sync from HeyGen
-            </Button>
-          )}
+        {/* Stats Bar */}
+        <div className="flex items-center justify-between pb-2 border-b border-slate-200">
           <span className="text-sm text-slate-500">
-            {avatars.length} avatar{avatars.length !== 1 ? 's' : ''}
+            {avatars.length} avatar{avatars.length !== 1 ? 's' : ''} in your library
           </span>
         </div>
 
@@ -1103,12 +1033,10 @@ export default function Avatars() {
               <User className="h-10 w-10 text-brand-500" />
             </div>
             <h3 className="text-lg font-semibold text-slate-900 mb-2 text-center">
-              {onlyCreated ? 'No custom avatars yet' : 'No avatars found'}
+              No avatars yet
             </h3>
             <p className="text-sm text-slate-500 text-center max-w-md mb-6">
-              {onlyCreated 
-                ? 'Create your first avatar by uploading a photo or generating one with AI. Your avatars will appear here.'
-                : 'Sync avatars from your HeyGen account or create a new one to get started.'}
+              Create your first avatar by uploading a photo or generating one with AI. Your avatars will be optimized for TikTok and vertical video formats.
             </p>
             <div className="flex flex-wrap gap-3 justify-center">
               <Button onClick={() => setShowCreateModal(true)}>
@@ -1119,11 +1047,6 @@ export default function Avatars() {
                 <Sparkles className="h-4 w-4 mr-2" />
                 Generate with AI
               </Button>
-              {onlyCreated && (
-                <Button onClick={() => setOnlyCreated(false)} variant="ghost">
-                  Browse Library
-                </Button>
-              )}
             </div>
           </div>
         ) : (
@@ -1422,10 +1345,18 @@ export default function Avatars() {
               </div>
             ) : (
               <>
-                <div className="rounded-lg bg-brand-50 border border-brand-200 p-4 mb-2">
-                  <p className="text-sm text-slate-700">
-                    <span className="font-semibold">AI Avatar Generation:</span> Describe the avatar you want to generate. AI will create a unique avatar based on your detailed description.
-                  </p>
+                <div className="rounded-lg bg-gradient-to-r from-brand-50 to-purple-50 border border-brand-200 p-4 mb-2">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-purple-500 flex items-center justify-center shrink-0">
+                      <Sparkles className="h-4 w-4 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900 mb-1">Optimized for TikTok & Vertical Video</p>
+                      <p className="text-xs text-slate-600">
+                        Your AI avatar will be generated in vertical format (9:16), perfect for TikTok, Instagram Reels, and YouTube Shorts.
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
@@ -1747,25 +1678,25 @@ export default function Avatars() {
           </div>
         </Modal>
 
-        {/* Avatar Details Modal */}
+        {/* Avatar Details Modal - Redesigned */}
         <Modal
           isOpen={!!detailsModal}
           onClose={handleCloseDetailsModal}
-          title={`Avatar Details${detailsModal?.avatar ? ` - ${detailsModal.avatar.avatar_name}` : ''}`}
-          size="md"
+          title={detailsModal?.avatar?.avatar_name || 'Avatar Details'}
+          size="lg"
         >
           {!detailsModal ? null : detailsModal.error ? (
-            <div className="py-10 text-center space-y-3">
-              <div className="text-red-500 mb-2">
-                <X className="h-8 w-8 mx-auto" />
+            <div className="py-12 text-center space-y-4">
+              <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto">
+                <X className="h-8 w-8 text-red-500" />
               </div>
-              <p className="text-sm font-semibold text-slate-900">Failed to load avatar details</p>
-              <p className="text-sm text-slate-600">{detailsModal.error}</p>
+              <div>
+                <p className="text-base font-semibold text-slate-900">Failed to load avatar</p>
+                <p className="text-sm text-slate-500 mt-1">{detailsModal.error}</p>
+              </div>
               <Button
                 variant="secondary"
-                size="sm"
                 onClick={() => handleViewDetails(detailsModal.avatar)}
-                className="mt-4"
                 disabled={detailsLoadingId === detailsModal.avatar.id}
               >
                 {detailsLoadingId === detailsModal.avatar.id ? (
@@ -1774,251 +1705,242 @@ export default function Avatars() {
                     Retrying...
                   </>
                 ) : (
-                  'Retry'
+                  'Try Again'
                 )}
               </Button>
             </div>
           ) : detailData ? (
-            <div className="space-y-5">
-              <div className="flex flex-col sm:flex-row gap-4">
-                {detailData.image_url || detailData.preview_url ? (
-                  <img
-                    src={detailData.image_url || detailData.preview_url || ''}
-                    alt="Avatar preview"
-                    className="w-full sm:w-40 h-40 object-cover rounded-lg border border-slate-200"
-                  />
-                ) : (
-                  <div className="w-full sm:w-40 h-40 rounded-lg bg-slate-100 flex items-center justify-center">
-                    <User className="h-12 w-12 text-slate-400" />
-                  </div>
-                )}
-                <dl className="flex-1 space-y-2 text-sm">
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-slate-500">Photo Avatar ID</dt>
-                    <dd className="flex items-center gap-1 text-slate-900">
-                      <span className="font-mono text-xs">{detailData.id}</span>
-                      <button
-                        onClick={() => handleCopyToClipboard(detailData.id)}
-                        className="text-slate-500 hover:text-slate-900"
-                        title="Copy ID"
-                      >
-                        <Copy className="h-4 w-4" />
-                      </button>
-                    </dd>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-slate-500">Group ID</dt>
-                    <dd className="flex items-center gap-1 text-slate-900">
-                      <span className="font-mono text-xs">{detailData.group_id || '—'}</span>
-                      {detailData.group_id && (
-                        <button
-                          onClick={() => handleCopyToClipboard(detailData.group_id)}
-                          className="text-slate-500 hover:text-slate-900"
-                          title="Copy Group ID"
-                        >
-                          <Copy className="h-4 w-4" />
-                        </button>
-                      )}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-slate-500">Status</dt>
-                    <dd>{detailData.status || '—'}</dd>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-slate-500">Created</dt>
-                    <dd>{formatTimestamp(detailData.created_at)}</dd>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-slate-500">Updated</dt>
-                    <dd>{formatTimestamp(detailData.updated_at)}</dd>
-                  </div>
-                </dl>
-              </div>
-
-              <dl className="space-y-2 text-sm">
-                {detailData.image_url && (
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-slate-500">Image URL</dt>
-                    <dd className="text-right">
-                      <a
-                        href={detailData.image_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-brand-600 hover:text-brand-700 text-xs break-all"
-                      >
-                        Open in new tab
-                      </a>
-                    </dd>
-                  </div>
-                )}
-                {detailData.preview_url && (
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-slate-500">Preview URL</dt>
-                    <dd className="text-right">
-                      <a
-                        href={detailData.preview_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-brand-600 hover:text-brand-700 text-xs break-all"
-                      >
-                        Open in new tab
-                      </a>
-                    </dd>
-                  </div>
-                )}
-              </dl>
-
-              {/* Display all looks from the avatar group */}
-              {(() => {
-                const looks = detailData.looks || []
-                console.log('Rendering looks section:', { looksCount: looks.length, looks, detailData })
-                if (looks.length === 0) {
-                  return (
-                    <div className="pt-4 border-t border-slate-200">
-                      <p className="text-sm text-slate-500 text-center py-4">
-                        No looks available. Use "Manage Looks" to add looks to this avatar.
+            <div className="space-y-6">
+              {/* Hero Section */}
+              <div className="flex gap-6">
+                {/* Main Avatar Preview */}
+                <div className="w-32 shrink-0">
+                  {detailData.image_url || detailData.preview_url ? (
+                    <div className="aspect-[3/4] rounded-xl overflow-hidden border border-slate-200 shadow-sm">
+                      <img
+                        src={detailData.image_url || detailData.preview_url || ''}
+                        alt="Avatar preview"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="aspect-[3/4] rounded-xl bg-gradient-to-br from-brand-400 to-indigo-500 flex items-center justify-center">
+                      <User className="h-12 w-12 text-white/70" />
+                    </div>
+                  )}
+                </div>
+                
+                {/* Avatar Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-4 mb-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        {detailsModal.avatar.is_default && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-100 text-brand-700 text-xs font-semibold">
+                            <Star className="h-3 w-3 fill-current" />
+                            Default
+                          </span>
+                        )}
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(detailData.status || 'active').bg} ${getStatusBadge(detailData.status || 'active').text}`}>
+                          {getStatusBadge(detailData.status || 'active').label}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500">
+                        Created {formatTimestamp(detailData.created_at)}
                       </p>
                     </div>
-                  )
-                }
-                return (
-                <div className="space-y-3 pt-4 border-t border-slate-200">
+                  </div>
+                  
+                  {/* Quick Actions */}
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleRefreshTrainingStatus(detailsModal.avatar)}
+                      disabled={!!statusLoadingMap[detailsModal.avatar.id]}
+                    >
+                      <RefreshCw className={`h-4 w-4 mr-1.5 ${statusLoadingMap[detailsModal.avatar.id] ? 'animate-spin' : ''}`} />
+                      Refresh
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleUpscaleAvatar(detailsModal.avatar)}
+                      disabled={upscalingId === detailsModal.avatar.id}
+                    >
+                      <ArrowUpCircle className={`h-4 w-4 mr-1.5 ${upscalingId === detailsModal.avatar.id ? 'animate-spin' : ''}`} />
+                      Upscale
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleCopyToClipboard(detailData.id)}
+                    >
+                      <Copy className="h-4 w-4 mr-1.5" />
+                      Copy ID
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Looks Section */}
+              <div className="border-t border-slate-200 pt-6">
+                <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h4 className="text-sm font-semibold text-slate-900 mb-1">
-                        Available Looks ({looks.length})
-                    </h4>
-                    <p className="text-xs text-slate-500">
-                      Select which look to use for video generation
+                    <h3 className="text-base font-semibold text-slate-900">Avatar Looks</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Different styles and poses for your avatar
                     </p>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                      {looks.map((look: PhotoAvatarLook) => (
-                      <div
-                        key={look.id}
-                        className={`relative rounded-lg border-2 overflow-hidden transition-all ${
-                          look.is_default
-                            ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-200'
-                            : 'border-slate-200 bg-white hover:border-brand-300'
-                        }`}
+                  {isUserCreatedAvatar(detailsModal.avatar) && (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          handleManageLooks(detailsModal.avatar)
+                          setShowAddLooksModal(true)
+                        }}
                       >
-                        {look.thumbnail_url || look.image_url ? (
-                          <div className="w-full aspect-[9/16] bg-slate-50 flex items-center justify-center overflow-hidden">
-                          <img
-                            src={look.thumbnail_url || look.image_url || ''}
-                            alt={look.name || 'Look'}
-                              className="w-full h-full object-contain"
-                          />
-                          </div>
-                        ) : (
-                          <div className="w-full aspect-[9/16] bg-slate-100 flex items-center justify-center">
-                            <User className="h-8 w-8 text-slate-400" />
-                          </div>
-                        )}
-                        <div className="p-2">
-                          <p className="text-xs font-medium text-slate-900 truncate">
-                            {look.name || 'Unnamed Look'}
-                          </p>
-                          {look.status && (
-                            <p className="text-xs text-slate-500 capitalize">{look.status}</p>
-                          )}
-                        </div>
-                        {look.is_default && (
-                          <div className="absolute top-2 right-2 bg-brand-500 text-white px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1">
-                            <Star className="h-3 w-3 fill-current" />
-                              Selected
-                          </div>
-                        )}
-                        {!look.is_default && (
-                            <div className="p-2 pt-0 flex gap-1">
+                        <Upload className="h-4 w-4 mr-1.5" />
+                        Upload Look
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          handleManageLooks(detailsModal.avatar)
+                          setShowGenerateLookModal(true)
+                        }}
+                      >
+                        <Sparkles className="h-4 w-4 mr-1.5" />
+                        Generate Look
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                
+                {(() => {
+                  const looks = detailData.looks || []
+                  if (looks.length === 0) {
+                    return (
+                      <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                        <Image className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+                        <p className="text-sm text-slate-600 mb-1">No looks yet</p>
+                        <p className="text-xs text-slate-500 mb-4">
+                          Add different looks to customize your avatar&apos;s appearance
+                        </p>
+                        {isUserCreatedAvatar(detailsModal.avatar) && (
+                          <div className="flex gap-2 justify-center">
                             <Button
                               variant="secondary"
                               size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleSetDefaultLook(detailsModal.avatar.id, look.id)
+                              onClick={() => {
+                                handleManageLooks(detailsModal.avatar)
+                                setShowAddLooksModal(true)
                               }}
-                                className="flex-1 text-xs"
                             >
-                              <Star className="h-3 w-3 mr-1" />
-                                Select
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={async (e) => {
-                                  e.stopPropagation()
-                                  if (!confirm(`Are you sure you want to delete this look? This action cannot be undone.`)) {
-                                    return
-                                  }
-                                  try {
-                                    // Delete look from HeyGen
-                                    await api.delete(`/api/avatars/${detailsModal.avatar.id}/looks/${look.id}`)
-                                    toast.success('Look deleted successfully')
-                                    // Refresh details
-                                    if (detailsModal) {
-                                      await handleViewDetails(detailsModal.avatar)
-                                    }
-                                  } catch (error: any) {
-                                    console.error('Failed to delete look:', error)
-                                    toast.error(error.response?.data?.error || 'Failed to delete look')
-                                  }
-                                }}
-                                className="text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
-                              >
-                                <Trash2 className="h-3 w-3" />
+                              <Upload className="h-4 w-4 mr-1.5" />
+                              Upload
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                handleManageLooks(detailsModal.avatar)
+                                setShowGenerateLookModal(true)
+                              }}
+                            >
+                              <Sparkles className="h-4 w-4 mr-1.5" />
+                              Generate with AI
                             </Button>
                           </div>
                         )}
                       </div>
-                    ))}
-                  </div>
-                </div>
-                )
-              })()}
-
-              <div className="flex flex-wrap items-center gap-3 justify-end pt-4 border-t border-slate-200">
-                {isUserCreatedAvatar(detailsModal.avatar) && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => handleManageLooks(detailsModal.avatar)}
-                    className="flex items-center gap-2"
-                  >
-                    <Image className="h-4 w-4" />
-                    Manage Looks
-                  </Button>
-                )}
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => handleRefreshTrainingStatus(detailsModal.avatar)}
-                  disabled={!!statusLoadingMap[detailsModal.avatar.id]}
-                  className="flex items-center gap-2"
-                >
-                  <RefreshCw
-                    className={`h-4 w-4 ${
-                      statusLoadingMap[detailsModal.avatar.id] ? 'animate-spin text-brand-600' : ''
-                    }`}
-                  />
-                  Refresh Status
-                </Button>
-                <Button
-                  onClick={() => handleUpscaleAvatar(detailsModal.avatar)}
-                  disabled={upscalingId === detailsModal.avatar.id}
-                  className="flex items-center gap-2"
-                >
-                  <ArrowUpCircle
-                    className={`h-4 w-4 ${upscalingId === detailsModal.avatar.id ? 'animate-spin' : ''}`}
-                  />
-                  {upscalingId === detailsModal.avatar.id ? 'Upscaling...' : 'Request Upscale'}
-                </Button>
+                    )
+                  }
+                  return (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                      {looks.map((look: PhotoAvatarLook) => (
+                        <div
+                          key={look.id}
+                          className={`group relative rounded-xl overflow-hidden transition-all cursor-pointer ${
+                            look.is_default
+                              ? 'ring-2 ring-brand-500 ring-offset-2'
+                              : 'border border-slate-200 hover:border-brand-300 hover:shadow-md'
+                          }`}
+                          onClick={() => {
+                            if (!look.is_default) {
+                              handleSetDefaultLook(detailsModal.avatar.id, look.id)
+                            }
+                          }}
+                        >
+                          {look.thumbnail_url || look.image_url ? (
+                            <div className="aspect-[3/4] bg-slate-100">
+                              <img
+                                src={look.thumbnail_url || look.image_url || ''}
+                                alt={look.name || 'Look'}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="aspect-[3/4] bg-slate-100 flex items-center justify-center">
+                              <User className="h-8 w-8 text-slate-400" />
+                            </div>
+                          )}
+                          
+                          {/* Selected Badge */}
+                          {look.is_default && (
+                            <div className="absolute top-2 right-2 bg-brand-500 text-white p-1 rounded-full shadow-sm">
+                              <CheckCircle2 className="h-4 w-4" />
+                            </div>
+                          )}
+                          
+                          {/* Hover Overlay */}
+                          {!look.is_default && (
+                            <div className="absolute inset-0 bg-slate-900/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <span className="text-white text-xs font-medium bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-full">
+                                Set as Active
+                              </span>
+                            </div>
+                          )}
+                          
+                          {/* Delete Button */}
+                          {!look.is_default && (
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation()
+                                if (!confirm('Delete this look?')) return
+                                try {
+                                  await api.delete(`/api/avatars/${detailsModal.avatar.id}/looks/${look.id}`)
+                                  toast.success('Look deleted')
+                                  await handleViewDetails(detailsModal.avatar)
+                                } catch (error: any) {
+                                  toast.error(error.response?.data?.error || 'Failed to delete')
+                                }
+                              }}
+                              className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-red-600"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          )}
+                          
+                          {/* Look Name */}
+                          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-slate-900/80 to-transparent p-2 pt-6">
+                            <p className="text-xs font-medium text-white truncate">
+                              {look.name || 'Look'}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })()}
               </div>
             </div>
           ) : (
-            <div className="py-10 text-center space-y-3">
-              <Loader2 className="h-8 w-8 mx-auto text-brand-500 animate-spin" />
-              <p className="text-sm text-slate-600">Loading avatar details...</p>
+            <div className="py-16 text-center space-y-4">
+              <Loader2 className="h-10 w-10 mx-auto text-brand-500 animate-spin" />
+              <p className="text-sm text-slate-500">Loading avatar details...</p>
             </div>
           )}
         </Modal>
