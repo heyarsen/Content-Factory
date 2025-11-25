@@ -794,6 +794,7 @@ export default function Avatars() {
         next.delete(avatarId)
         return next
       })
+      toast.error('Look generation is taking longer than expected. Please check back later or refresh the page.')
       return
     }
 
@@ -826,10 +827,27 @@ export default function Avatars() {
       }
     } catch (error: any) {
       console.error('Failed to check generation status:', error)
-      // Continue polling on error
-      setTimeout(() => {
-        pollLookGenerationStatus(generationId, avatarId, attempt + 1, maxAttempts)
-      }, 5000)
+      // For 502 errors or network issues, continue polling (these are temporary)
+      // For other errors, also continue but log them
+      if (error.response?.status === 502 || error.code === 'ECONNRESET' || error.message?.includes('Bad Gateway')) {
+        // Temporary server issue, continue polling
+        setTimeout(() => {
+          pollLookGenerationStatus(generationId, avatarId, attempt + 1, maxAttempts)
+        }, 5000)
+      } else if (attempt < maxAttempts) {
+        // Other errors, continue polling but with longer delay
+        setTimeout(() => {
+          pollLookGenerationStatus(generationId, avatarId, attempt + 1, maxAttempts)
+        }, 10000) // Wait 10 seconds on error
+      } else {
+        // Max attempts reached
+        setGeneratingLookIds(prev => {
+          const next = new Set(prev)
+          next.delete(avatarId)
+          return next
+        })
+        toast.error('Unable to check generation status. Please refresh the page to see if looks were generated.')
+      }
     }
   }
 
@@ -885,7 +903,18 @@ export default function Avatars() {
         next.delete(targetAvatar.id)
         return next
       })
-      toast.error(error.response?.data?.error || error.message || 'Failed to generate look')
+      
+      // Handle specific error types
+      const errorData = error.response?.data
+      if (errorData?.error?.code === 'insufficient_credit' || errorData?.error?.message?.includes('Insufficient credit')) {
+        toast.error('Insufficient credit. Please add credits to your HeyGen account to generate looks.')
+      } else if (errorData?.error) {
+        toast.error(errorData.error.message || errorData.error || 'Failed to generate look')
+      } else if (error.message?.includes('timeout')) {
+        toast.error('Request timed out. Please try again.')
+      } else {
+        toast.error(error.message || 'Failed to generate look')
+      }
     } finally {
       setGeneratingLook(false)
     }
@@ -953,7 +982,18 @@ export default function Avatars() {
           return next
         })
       }
-      toast.error(error.response?.data?.error || error.message || 'Failed to generate look')
+      
+      // Handle specific error types
+      const errorData = error.response?.data
+      if (errorData?.error?.code === 'insufficient_credit' || errorData?.error?.message?.includes('Insufficient credit')) {
+        toast.error('Insufficient credit. Please add credits to your HeyGen account to generate looks.')
+      } else if (errorData?.error) {
+        toast.error(errorData.error.message || errorData.error || 'Failed to generate look')
+      } else if (error.message?.includes('timeout')) {
+        toast.error('Request timed out. Please try again.')
+      } else {
+        toast.error(error.message || 'Failed to generate look')
+      }
     } finally {
       setGeneratingLook(false)
     }
