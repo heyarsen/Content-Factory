@@ -956,16 +956,45 @@ router.post('/:id/train', async (req: AuthRequest, res: Response) => {
     }
 
     // Status is 'empty' or 'failed' - need to trigger training
-    // First, we need to get the looks/photos for this avatar
-    const { getPhotoAvatarDetails } = await import('../lib/heygen.js')
+    // First, we need to get the looks/photos for this avatar using the avatar_group endpoint
+    const { default: axios } = await import('axios')
+    const apiKey = process.env.HEYGEN_KEY
+    
+    if (!apiKey) {
+      return res.status(500).json({ error: 'HeyGen API key not configured' })
+    }
     
     let looks: any[] = []
     try {
-      const details = await getPhotoAvatarDetails(groupId)
-      looks = details.looks || []
+      // Use the avatar_group endpoint which works for these avatars
+      const looksResponse = await axios.get(
+        `${process.env.HEYGEN_V2_API_URL || 'https://api.heygen.com/v2'}/avatar_group/${groupId}/avatars`,
+        {
+          headers: {
+            'X-Api-Key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          timeout: 10000,
+        }
+      )
+
+      const avatarList =
+        looksResponse.data?.data?.avatar_list ||
+        looksResponse.data?.avatar_list ||
+        looksResponse.data?.data ||
+        []
+
+      if (Array.isArray(avatarList)) {
+        looks = avatarList.map((look: any) => ({
+          id: look.id,
+          name: look.name,
+          status: look.status,
+        }))
+      }
       console.log('[Train Avatar] Found', looks.length, 'looks for avatar')
     } catch (detailsError: any) {
-      console.warn('[Train Avatar] Could not get avatar details:', detailsError.message)
+      console.warn('[Train Avatar] Could not get avatar looks:', detailsError.message)
+      console.warn('[Train Avatar] Response:', detailsError.response?.data)
     }
 
     if (looks.length === 0) {
@@ -988,13 +1017,7 @@ router.post('/:id/train', async (req: AuthRequest, res: Response) => {
     console.log('[Train Avatar] Triggering training with look IDs:', lookIds)
 
     // Trigger training
-    const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
-    const { default: axios } = await import('axios')
-    
-    const apiKey = process.env.HEYGEN_KEY
-    if (!apiKey) {
-      return res.status(500).json({ error: 'HeyGen API key not configured' })
-    }
+    const HEYGEN_V2_API_URL = process.env.HEYGEN_V2_API_URL || 'https://api.heygen.com/v2'
 
     const trainResponse = await axios.post(
       `${HEYGEN_V2_API_URL}/photo_avatar/train`,
