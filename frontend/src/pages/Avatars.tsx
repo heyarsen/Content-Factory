@@ -99,7 +99,12 @@ export default function Avatars() {
   const [lookSelectionModal, setLookSelectionModal] = useState<{ avatar: Avatar; looks: PhotoAvatarLook[] } | null>(null)
   const [selectedLookId, setSelectedLookId] = useState<string | null>(null)
   const [trainingId, setTrainingId] = useState<string | null>(null)
+  const [selectedAvatarFilter, setSelectedAvatarFilter] = useState<string | null>(null) // null = "All"
   const detailData = detailsModal?.data ?? null
+  
+  // Get all looks from all avatars for the grid display
+  const [allLooks, setAllLooks] = useState<Array<{ look: PhotoAvatarLook; avatar: Avatar }>>([])
+  const [loadingLooks, setLoadingLooks] = useState(false)
 
   const aiStageFlow: Array<{ key: 'creating' | 'photosReady' | 'completing'; title: string; description: string }> = [
     { key: 'creating', title: 'Generating reference photos', description: 'HeyGen creates a photo set from your description' },
@@ -270,6 +275,37 @@ export default function Avatars() {
   useEffect(() => {
     loadAvatars()
   }, [loadAvatars])
+
+  // Load all looks for all avatars (for the HeyGen-style grid)
+  const loadAllLooks = useCallback(async (avatarsList: Avatar[]) => {
+    setLoadingLooks(true)
+    const looks: Array<{ look: PhotoAvatarLook; avatar: Avatar }> = []
+    
+    for (const avatar of avatarsList) {
+      try {
+        const response = await api.get(`/api/avatars/${avatar.id}/details`)
+        const details = response.data?.details
+        if (details?.looks && Array.isArray(details.looks)) {
+          for (const look of details.looks) {
+            looks.push({ look, avatar })
+          }
+        }
+      } catch (error) {
+        // Silently skip avatars that fail to load
+        console.error(`Failed to load looks for avatar ${avatar.id}:`, error)
+      }
+    }
+    
+    setAllLooks(looks)
+    setLoadingLooks(false)
+  }, [])
+
+  // Load looks when avatars change
+  useEffect(() => {
+    if (avatars.length > 0) {
+      loadAllLooks(avatars)
+    }
+  }, [avatars, loadAllLooks])
 
   // Cleanup status check interval on unmount
   useEffect(() => {
@@ -1006,23 +1042,33 @@ export default function Avatars() {
     }
   }
 
+  // Filter looks based on selected avatar
+  const filteredLooks = selectedAvatarFilter 
+    ? allLooks.filter(item => item.avatar.id === selectedAvatarFilter)
+    : allLooks
+  
+  // Count how many more avatars beyond the visible ones
+  const visibleAvatarCount = 7
+  const extraAvatarsCount = Math.max(0, avatars.length - visibleAvatarCount)
+
   if (loading) {
     return (
       <Layout>
-        <div className="space-y-6">
-          {/* Header skeleton */}
-          <div className="animate-pulse">
-            <div className="h-4 bg-slate-200 rounded w-20 mb-2"></div>
-            <div className="h-8 bg-slate-200 rounded w-48 mb-2"></div>
-            <div className="h-4 bg-slate-200 rounded w-72"></div>
+        <div className="space-y-8">
+          {/* Avatar selector skeleton */}
+          <div className="flex items-center gap-4 overflow-x-auto pb-2">
+            {[1, 2, 3, 4, 5, 6, 7].map(i => (
+              <div key={i} className="flex flex-col items-center gap-2 flex-shrink-0">
+                <div className="w-20 h-20 rounded-full bg-slate-200 animate-pulse"></div>
+                <div className="h-3 w-12 bg-slate-200 rounded animate-pulse"></div>
+              </div>
+            ))}
           </div>
           {/* Grid skeleton */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {[1, 2, 3, 4, 5, 6].map(i => (
               <div key={i} className="animate-pulse">
-                <div className="aspect-[3/4] bg-slate-200 rounded-xl mb-3"></div>
-                <div className="h-4 bg-slate-200 rounded w-3/4 mb-2"></div>
-                <div className="h-3 bg-slate-200 rounded w-1/2"></div>
+                <div className="aspect-[3/4] bg-slate-200 rounded-2xl"></div>
               </div>
             ))}
           </div>
@@ -1034,16 +1080,82 @@ export default function Avatars() {
   return (
     <Layout>
       <div className="space-y-6">
-        {/* Page Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 mb-1">Library</p>
-            <h1 className="text-2xl font-bold text-slate-900">Avatars</h1>
-            <p className="text-sm text-slate-500 mt-1">
-              Manage your AI avatars for video generation
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+        {/* HeyGen-style Avatar Selector */}
+        <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-hide">
+          {/* "All" button */}
+          <button
+            onClick={() => setSelectedAvatarFilter(null)}
+            className={`flex flex-col items-center gap-2 flex-shrink-0 group transition-all duration-200`}
+          >
+            <div className={`w-20 h-20 rounded-full flex items-center justify-center border-2 transition-all duration-200 ${
+              selectedAvatarFilter === null 
+                ? 'border-cyan-400 bg-white shadow-lg shadow-cyan-100' 
+                : 'border-slate-200 bg-white hover:border-slate-300'
+            }`}>
+              <span className={`text-sm font-semibold ${
+                selectedAvatarFilter === null ? 'text-slate-900' : 'text-slate-600'
+              }`}>All</span>
+            </div>
+          </button>
+          
+          {/* Avatar circles */}
+          {avatars.slice(0, visibleAvatarCount).map((avatar) => (
+            <button
+              key={avatar.id}
+              onClick={() => setSelectedAvatarFilter(avatar.id === selectedAvatarFilter ? null : avatar.id)}
+              className="flex flex-col items-center gap-2 flex-shrink-0 group transition-all duration-200"
+            >
+              <div className={`w-20 h-20 rounded-full overflow-hidden border-2 transition-all duration-200 ${
+                selectedAvatarFilter === avatar.id 
+                  ? 'border-cyan-400 shadow-lg shadow-cyan-100' 
+                  : 'border-transparent hover:border-slate-300'
+              }`}>
+                {avatar.thumbnail_url || avatar.preview_url ? (
+                  <img
+                    src={avatar.thumbnail_url || avatar.preview_url || ''}
+                    alt={avatar.avatar_name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-300 to-slate-400">
+                    <User className="h-8 w-8 text-white" />
+                  </div>
+                )}
+              </div>
+              <span className={`text-xs font-medium max-w-[72px] truncate ${
+                selectedAvatarFilter === avatar.id ? 'text-slate-900' : 'text-slate-600'
+              }`}>
+                {avatar.avatar_name}
+              </span>
+            </button>
+          ))}
+          
+          {/* "+N more" button */}
+          {extraAvatarsCount > 0 && (
+            <button
+              onClick={() => {
+                // Show a modal or expand to show all avatars
+                // For now, just cycle through or show first hidden avatar
+                const hiddenAvatars = avatars.slice(visibleAvatarCount)
+                if (hiddenAvatars.length > 0) {
+                  setSelectedAvatarFilter(hiddenAvatars[0].id)
+                }
+              }}
+              className="flex flex-col items-center gap-2 flex-shrink-0 group"
+            >
+              <div className="w-20 h-20 rounded-full bg-slate-800 flex items-center justify-center border-2 border-transparent hover:border-slate-600 transition-all duration-200">
+                <span className="text-white font-semibold">+{extraAvatarsCount}</span>
+              </div>
+            </button>
+          )}
+        </div>
+
+        {/* Section header */}
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium text-slate-500">
+            {selectedAvatarFilter ? `${avatars.find(a => a.id === selectedAvatarFilter)?.avatar_name}'s looks` : 'All avatar looks'}
+          </h2>
+          <div className="flex items-center gap-2">
             <Button
               onClick={() => setShowGenerateAIModal(true)}
               variant="secondary"
@@ -1062,135 +1174,159 @@ export default function Avatars() {
           </div>
         </div>
 
-        {/* Stats Bar */}
-        <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-          <span className="text-sm text-slate-500">
-            {avatars.length} avatar{avatars.length !== 1 ? 's' : ''} in your library
-          </span>
-        </div>
-
-        {/* Avatar Grid or Empty State */}
+        {/* Looks Grid */}
         {avatars.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 px-4">
-            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-brand-100 to-indigo-100 flex items-center justify-center mb-6">
-              <User className="h-10 w-10 text-brand-500" />
+          <div className="flex flex-col items-center justify-center py-20 px-4">
+            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center mb-6">
+              <User className="h-12 w-12 text-slate-400" />
             </div>
             <h3 className="text-lg font-semibold text-slate-900 mb-2 text-center">
               No avatars yet
             </h3>
-            <p className="text-sm text-slate-500 text-center max-w-md mb-6">
-              Create your first avatar by uploading a photo or generating one with AI. Your avatars will be optimized for TikTok and vertical video formats.
+            <p className="text-sm text-slate-500 text-center max-w-md mb-8">
+              Create your first avatar by uploading a photo or generating one with AI
             </p>
             <div className="flex flex-wrap gap-3 justify-center">
-              <Button onClick={() => setShowCreateModal(true)}>
+              <Button onClick={() => setShowCreateModal(true)} size="lg">
                 <Upload className="h-4 w-4 mr-2" />
                 Upload Photo
               </Button>
-              <Button onClick={() => setShowGenerateAIModal(true)} variant="secondary">
+              <Button onClick={() => setShowGenerateAIModal(true)} variant="secondary" size="lg">
                 <Sparkles className="h-4 w-4 mr-2" />
-                Generate Avatar
-              </Button>
-              <Button 
-                onClick={() => {
-                  setGenerateLookStep('select-avatar')
-                  setSelectedAvatarForLook(null)
-                  setShowGenerateLookModal(true)
-                }} 
-                variant="secondary"
-              >
-                <Image className="h-4 w-4 mr-2" />
-                Generate Look
+                Generate AI Avatar
               </Button>
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {avatars.map((avatar) => {
-              const statusBadge = getStatusBadge(avatar.status)
-              const isProcessing = ['training', 'pending', 'generating'].includes(avatar.status)
-              
-              return (
-                <div
-                  key={avatar.id}
-                  onClick={() => handleViewDetails(avatar)}
-                  className="group relative bg-white rounded-xl border border-slate-200 overflow-hidden cursor-pointer transition-all hover:shadow-lg hover:border-brand-300 hover:-translate-y-0.5"
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            {/* Create new card */}
+            <button
+              onClick={() => {
+                if (selectedAvatarFilter) {
+                  // Generate look for selected avatar
+                  const avatar = avatars.find(a => a.id === selectedAvatarFilter)
+                  if (avatar) {
+                    setSelectedAvatarForLook(avatar)
+                    setGenerateLookStep('generate')
+                    setShowGenerateLookModal(true)
+                  }
+                } else {
+                  // Show avatar selection first
+                  setGenerateLookStep('select-avatar')
+                  setSelectedAvatarForLook(null)
+                  setShowGenerateLookModal(true)
+                }
+              }}
+              className="aspect-[3/4] rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 border-2 border-dashed border-slate-200 hover:border-slate-300 hover:from-slate-100 hover:to-slate-150 flex flex-col items-center justify-center gap-3 transition-all duration-200 group"
+            >
+              <div className="w-12 h-12 rounded-full bg-slate-900 flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+                <Plus className="h-6 w-6 text-white" />
+              </div>
+              <span className="text-sm font-medium text-slate-700">Create new</span>
+            </button>
+            
+            {/* Look cards */}
+            {loadingLooks ? (
+              // Loading skeleton for looks
+              [1, 2, 3].map(i => (
+                <div key={i} className="aspect-[3/4] rounded-2xl bg-slate-200 animate-pulse"></div>
+              ))
+            ) : filteredLooks.length === 0 && avatars.length > 0 ? (
+              // No looks yet for this avatar
+              <div className="col-span-full flex flex-col items-center justify-center py-12">
+                <p className="text-sm text-slate-500 mb-4">No looks yet for this avatar</p>
+                <Button 
+                  onClick={() => {
+                    const avatar = selectedAvatarFilter 
+                      ? avatars.find(a => a.id === selectedAvatarFilter)
+                      : avatars[0]
+                    if (avatar) {
+                      setSelectedAvatarForLook(avatar)
+                      setGenerateLookStep('generate')
+                      setShowGenerateLookModal(true)
+                    }
+                  }}
+                  size="sm"
                 >
-                  {/* Avatar Image */}
-                  <div className="relative aspect-[3/4] bg-gradient-to-br from-slate-100 to-slate-50 overflow-hidden">
-                    {avatar.thumbnail_url || avatar.preview_url ? (
-                      <img
-                        src={avatar.thumbnail_url || avatar.preview_url || ''}
-                        alt={avatar.avatar_name}
-                        className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-brand-400 to-indigo-500">
-                        <User className="h-12 w-12 text-white/70" />
-                      </div>
-                    )}
-                    
-                    {/* Processing overlay */}
-                    {isProcessing && (
-                      <div className="absolute inset-0 bg-slate-900/40 flex items-center justify-center">
-                        <div className="bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 flex items-center gap-2">
-                          <Loader2 className="h-4 w-4 animate-spin text-brand-600" />
-                          <span className="text-xs font-medium text-slate-700">{statusBadge.label}</span>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Default badge */}
-                    {avatar.is_default && (
-                      <div className="absolute top-2 left-2 bg-brand-500 text-white px-2 py-1 rounded-md text-xs font-semibold flex items-center gap-1 shadow-sm">
-                        <Star className="h-3 w-3 fill-current" />
-                        Default
-                      </div>
-                    )}
-                    
-                    {/* Source badge */}
-                    {isUserCreatedAvatar(avatar) && !avatar.is_default && (
-                      <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm text-slate-700 px-2 py-1 rounded-md text-xs font-medium shadow-sm">
-                        {avatar.source === 'ai_generated' ? (
-                          <span className="flex items-center gap-1">
-                            <Sparkles className="h-3 w-3 text-purple-500" />
-                            AI
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1">
-                            <Upload className="h-3 w-3 text-brand-500" />
-                            Photo
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    
-                    {/* Quick actions on hover */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-3">
-                      <span className="text-white text-xs font-medium bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-full">
-                        View Details
-                      </span>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Generate Look
+                </Button>
+              </div>
+            ) : (
+              filteredLooks.map(({ look, avatar }) => (
+                <div
+                  key={`${avatar.id}-${look.id}`}
+                  onClick={() => handleViewDetails(avatar)}
+                  className="group relative aspect-[3/4] rounded-2xl overflow-hidden cursor-pointer bg-slate-100 hover:shadow-xl transition-all duration-300"
+                >
+                  {look.image_url || look.preview_url || look.thumbnail_url ? (
+                    <img
+                      src={look.image_url || look.preview_url || look.thumbnail_url || ''}
+                      alt={look.name || avatar.avatar_name}
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-200 to-slate-300">
+                      <User className="h-12 w-12 text-slate-400" />
                     </div>
+                  )}
+                  
+                  {/* Default look indicator */}
+                  {look.is_default && (
+                    <div className="absolute top-3 right-3">
+                      <div className="w-8 h-8 rounded-full bg-cyan-500 flex items-center justify-center shadow-lg">
+                        <Star className="h-4 w-4 text-white fill-current" />
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Hover overlay with name */}
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <p className="text-white text-sm font-medium truncate">
+                      {look.name || avatar.avatar_name}
+                    </p>
+                    {!selectedAvatarFilter && (
+                      <p className="text-white/70 text-xs truncate mt-0.5">
+                        {avatar.avatar_name}
+                      </p>
+                    )}
                   </div>
                   
-                  {/* Avatar Info */}
-                  <div className="p-3">
-                    <h3 className="font-medium text-slate-900 text-sm truncate mb-1">
-                      {avatar.avatar_name}
-                    </h3>
-                    <div className="flex items-center justify-between">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge.bg} ${statusBadge.text}`}>
-                        {statusBadge.label}
-                      </span>
-                      {avatar.gender && (
-                        <span className="text-xs text-slate-400 capitalize">{avatar.gender}</span>
-                      )}
-                    </div>
+                  {/* Look name label (always visible) */}
+                  <div className="absolute inset-x-0 bottom-0 p-3 group-hover:opacity-0 transition-opacity duration-200">
+                    <p className="text-slate-700 text-sm font-medium truncate drop-shadow-sm">
+                      {look.name || avatar.avatar_name}
+                    </p>
                   </div>
                 </div>
-              )
-            })}
+              ))
+            )}
           </div>
         )}
+        
+        {/* Bottom prompt bar (HeyGen style) */}
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
+          <div className="bg-white rounded-full shadow-2xl border border-slate-200 px-5 py-3 flex items-center gap-4 max-w-xl">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center flex-shrink-0">
+              <User className="h-5 w-5 text-white" />
+            </div>
+            <p className="text-sm text-slate-600 flex-1">
+              Choose an identity to customize with new styles and scenes
+            </p>
+            <button 
+              onClick={() => {
+                setGenerateLookStep('select-avatar')
+                setSelectedAvatarForLook(null)
+                setShowGenerateLookModal(true)
+              }}
+              className="text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Create Avatar Modal */}
