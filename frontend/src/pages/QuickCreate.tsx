@@ -197,13 +197,20 @@ export function QuickCreate() {
     try {
       const response = await api.get('/api/avatars', { params: { all: 'true' } })
       const allAvatars: AvatarRecord[] = (response.data.avatars || []) as AvatarRecord[]
-      const userAvatars = allAvatars.filter((avatar) => isUserCreatedAvatar(avatar))
-      setAvatars(userAvatars)
-      const defaultAvatar = userAvatars.find((a: any) => a.is_default)
+      // First try to get user-created avatars
+      let avatarsToUse = allAvatars.filter((avatar) => isUserCreatedAvatar(avatar))
+      
+      // If no user-created avatars, fall back to all available avatars
+      if (avatarsToUse.length === 0) {
+        avatarsToUse = allAvatars
+      }
+      
+      setAvatars(avatarsToUse)
+      const defaultAvatar = avatarsToUse.find((a: any) => a.is_default)
       if (defaultAvatar) {
         setSelectedAvatarId(defaultAvatar.heygen_avatar_id)
-      } else if (userAvatars.length > 0) {
-        setSelectedAvatarId(userAvatars[0].heygen_avatar_id)
+      } else if (avatarsToUse.length > 0) {
+        setSelectedAvatarId(avatarsToUse[0].heygen_avatar_id)
       }
     } catch (error: any) {
       console.error('Failed to load avatars:', error)
@@ -803,7 +810,7 @@ export function QuickCreate() {
                 </div>
 
                 {/* Avatar Selection */}
-                {avatars.length > 0 && (
+                {avatars.length > 0 ? (
                   <div className="rounded-2xl border border-white/60 bg-white/70 p-6">
                     <div className="flex items-center justify-between mb-4">
                       <label className="block text-sm font-semibold text-primary">
@@ -868,6 +875,22 @@ export function QuickCreate() {
                       </div>
                     )}
                   </div>
+                ) : (
+                  <div className="rounded-2xl border border-amber-200/80 bg-amber-50/80 p-6">
+                    <div className="flex items-start gap-3">
+                      <Users className="h-5 w-5 text-amber-600 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-semibold text-amber-800">No Avatars Available</p>
+                        <p className="mt-1 text-xs text-amber-700">
+                          You need to create an avatar before generating videos.{' '}
+                          <a href="/avatars" className="underline hover:text-amber-900">
+                            Go to Avatars page
+                          </a>{' '}
+                          to create one.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 )}
 
                 {/* Caption Generation Toggle */}
@@ -904,7 +927,7 @@ export function QuickCreate() {
                   </Button>
                   <Button
                     onClick={handleGenerateVideo}
-                    disabled={generatingVideo}
+                    disabled={generatingVideo || avatars.length === 0 || !selectedAvatarId}
                     loading={generatingVideo}
                     leftIcon={!generatingVideo ? <Video className="h-4 w-4" /> : undefined}
                     className="min-w-[160px]"
