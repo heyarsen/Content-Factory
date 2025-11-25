@@ -1940,25 +1940,34 @@ export default function Avatars() {
               </div>
               <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
                 <Button
-                  onClick={async () => {
+                  onClick={async (e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
                     if (!selectedLookId || !lookSelectionModal) {
                       toast.warning('Please select a look to continue')
                       return
                     }
                     try {
-                      await api.post(`/api/avatars/${lookSelectionModal.avatar.id}/set-default-look`, {
+                      const response = await api.post(`/api/avatars/${lookSelectionModal.avatar.id}/set-default-look`, {
                         look_id: selectedLookId,
                       })
+                      console.log('Set default look response:', response.data)
                       toast.success('Look selected! This is now your permanent avatar look.')
                       setLookSelectionModal(null)
                       setSelectedLookId(null)
                       await loadAvatars()
                     } catch (error: any) {
                       console.error('Failed to set default look:', error)
-                      toast.error(error.response?.data?.error || 'Failed to set default look')
+                      console.error('Error details:', {
+                        message: error.message,
+                        response: error.response?.data,
+                        status: error.response?.status,
+                      })
+                      toast.error(error.response?.data?.error || error.message || 'Failed to set default look')
                     }
                   }}
                   disabled={!selectedLookId}
+                  type="button"
                 >
                   Confirm Selection
                 </Button>

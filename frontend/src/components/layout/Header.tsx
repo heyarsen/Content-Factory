@@ -37,7 +37,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-700/60 bg-slate-800/95 backdrop-blur-xl">
-      <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6 sm:px-8 lg:px-12">
+      <div className="flex h-20 w-full items-center justify-between px-6 sm:px-8 lg:pl-14 lg:pr-12">
         <div className="flex items-center gap-4">
           <button
             type="button"
