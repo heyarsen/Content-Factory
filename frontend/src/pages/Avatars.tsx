@@ -1940,14 +1940,16 @@ export default function Avatars() {
               </div>
               <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
                 <Button
-                  onClick={async (e) => {
+                  onClick={async (e: React.MouseEvent<HTMLButtonElement>) => {
                     e.preventDefault()
                     e.stopPropagation()
+                    console.log('Confirm Selection button clicked', { selectedLookId, lookSelectionModal })
                     if (!selectedLookId || !lookSelectionModal) {
                       toast.warning('Please select a look to continue')
                       return
                     }
                     try {
+                      console.log('Calling API:', `/api/avatars/${lookSelectionModal.avatar.id}/set-default-look`, { look_id: selectedLookId })
                       const response = await api.post(`/api/avatars/${lookSelectionModal.avatar.id}/set-default-look`, {
                         look_id: selectedLookId,
                       })
@@ -1962,6 +1964,7 @@ export default function Avatars() {
                         message: error.message,
                         response: error.response?.data,
                         status: error.response?.status,
+                        url: error.config?.url,
                       })
                       toast.error(error.response?.data?.error || error.message || 'Failed to set default look')
                     }

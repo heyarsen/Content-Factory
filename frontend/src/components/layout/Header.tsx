@@ -37,7 +37,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-700/60 bg-slate-800/95 backdrop-blur-xl">
-      <div className="flex h-20 w-full items-center justify-between px-6 sm:px-8 lg:pl-14 lg:pr-12">
+      <div className="flex h-20 w-full items-center justify-between px-6 sm:px-8 lg:px-14">
         <div className="flex items-center gap-4">
           <button
             type="button"
@@ -181,6 +181,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             </div>
             <User className="h-4 w-4" />
           </button>
+        </div>
         </div>
       </div>
     </header>
