@@ -77,6 +77,7 @@ export default function Avatars() {
   const [lookSelectionModal, setLookSelectionModal] = useState<{ avatar: Avatar; looks: PhotoAvatarLook[] } | null>(null)
   const [selectedLookId, setSelectedLookId] = useState<string | null>(null)
   const [selectedAvatarFilter, setSelectedAvatarFilter] = useState<string | null>(null) // null = "All"
+  const [quickPrompt, setQuickPrompt] = useState('') // Quick prompt input for generating looks
   
   // Get all looks from all avatars for the grid display
   const [allLooks, setAllLooks] = useState<Array<{ look: PhotoAvatarLook; avatar: Avatar }>>([])
@@ -832,6 +833,64 @@ export default function Avatars() {
     }
   }
 
+  // Quick generate look from bottom prompt bar
+  const handleQuickGenerateLook = async () => {
+    if (!selectedAvatarFilter || !quickPrompt.trim()) {
+      toast.error('Please select an avatar and enter a prompt')
+      return
+    }
+
+    const targetAvatar = avatars.find(a => a.id === selectedAvatarFilter)
+    if (!targetAvatar) {
+      toast.error('Avatar not found')
+      return
+    }
+
+    // Check if avatar is trained
+    if (targetAvatar.status !== 'active' && targetAvatar.status !== 'ready') {
+      toast.error('Avatar must be trained before generating looks. Please train the avatar first.')
+      return
+    }
+
+    setGeneratingLook(true)
+    try {
+      const response = await api.post('/api/avatars/generate-look', {
+        group_id: targetAvatar.heygen_avatar_id,
+        prompt: quickPrompt.trim(),
+        orientation: 'vertical',
+        pose: 'half_body',
+        style: 'Realistic',
+      })
+
+      console.log('Quick look generation response:', response.data)
+      const generationId = response.data?.generation_id
+      
+      if (generationId) {
+        // Mark this avatar as generating
+        setGeneratingLookIds(prev => new Set(prev).add(targetAvatar.id))
+        
+        // Start polling for generation status
+        pollLookGenerationStatus(generationId, targetAvatar.id)
+      }
+      
+      toast.success('Look generation started! This may take a few minutes.')
+      
+      // Clear the prompt
+      setQuickPrompt('')
+    } catch (error: any) {
+      console.error('Failed to generate look:', error)
+      // Remove from generating state on error
+      setGeneratingLookIds(prev => {
+        const next = new Set(prev)
+        next.delete(targetAvatar.id)
+        return next
+      })
+      toast.error(error.response?.data?.error || error.message || 'Failed to generate look')
+    } finally {
+      setGeneratingLook(false)
+    }
+  }
+
   const handleGenerateLook = async () => {
     // Use selectedAvatarForLook (from the new flow) or fall back to showLooksModal
     const targetAvatar = selectedAvatarForLook || showLooksModal
@@ -1207,27 +1266,81 @@ export default function Avatars() {
                     
         {/* Bottom prompt bar (HeyGen style) */}
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
-          <div className="bg-white rounded-full shadow-2xl border border-slate-200 px-5 py-3 flex items-center gap-4 max-w-xl">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center flex-shrink-0">
-              <User className="h-5 w-5 text-white" />
+          {selectedAvatarFilter ? (
+            // Show input field when avatar is selected
+            <div className="bg-white rounded-full shadow-2xl border border-slate-200 px-4 py-2 flex items-center gap-3 max-w-2xl w-full">
+              {(() => {
+                const selectedAvatar = avatars.find(a => a.id === selectedAvatarFilter)
+                return selectedAvatar ? (
+                  <>
+                    <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border-2 border-slate-200">
+                      {selectedAvatar.thumbnail_url || selectedAvatar.avatar_url ? (
+                        <img
+                          src={selectedAvatar.thumbnail_url || selectedAvatar.avatar_url || ''}
+                          alt={selectedAvatar.avatar_name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
+                          <User className="h-5 w-5 text-white" />
+                        </div>
+                      )}
                     </div>
-            <p className="text-sm text-slate-600 flex-1">
-              Choose an identity to customize with new styles and scenes
-            </p>
-            <button 
-              onClick={() => {
-                setGenerateLookStep('select-avatar')
-                setSelectedAvatarForLook(null)
-                setShowGenerateLookModal(true)
-              }}
-              className="text-slate-400 hover:text-slate-600 transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-                  </div>
-                    </div>
+                    <input
+                      type="text"
+                      value={quickPrompt}
+                      onChange={(e) => setQuickPrompt(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          handleQuickGenerateLook()
+                        }
+                      }}
+                      placeholder="Describe the look you'd like to generate..."
+                      className="flex-1 bg-transparent border-none outline-none text-sm text-slate-700 placeholder:text-slate-400"
+                      disabled={generatingLook}
+                    />
+                    <button
+                      onClick={handleQuickGenerateLook}
+                      disabled={!quickPrompt.trim() || generatingLook}
+                      className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center flex-shrink-0 hover:from-cyan-500 hover:to-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {generatingLook ? (
+                        <Loader2 className="h-5 w-5 text-white animate-spin" />
+                      ) : (
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                        </svg>
+                      )}
+                    </button>
+                  </>
+                ) : null
+              })()}
+            </div>
+          ) : (
+            // Show default prompt when no avatar is selected
+            <div className="bg-white rounded-full shadow-2xl border border-slate-200 px-5 py-3 flex items-center gap-4 max-w-xl">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center flex-shrink-0">
+                <User className="h-5 w-5 text-white" />
+              </div>
+              <p className="text-sm text-slate-600 flex-1">
+                Choose an identity to customize with new styles and scenes
+              </p>
+              <button 
+                onClick={() => {
+                  setGenerateLookStep('select-avatar')
+                  setSelectedAvatarForLook(null)
+                  setShowGenerateLookModal(true)
+                }}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Create Avatar Modal */}
