@@ -86,6 +86,8 @@ export default function Avatars() {
   const [showLooksModal, setShowLooksModal] = useState<Avatar | null>(null)
   const [showAddLooksModal, setShowAddLooksModal] = useState(false)
   const [showGenerateLookModal, setShowGenerateLookModal] = useState(false)
+  const [generateLookStep, setGenerateLookStep] = useState<'select-avatar' | 'generate'>('select-avatar')
+  const [selectedAvatarForLook, setSelectedAvatarForLook] = useState<Avatar | null>(null)
   const [addingLooks, setAddingLooks] = useState(false)
   const [generatingLook, setGeneratingLook] = useState(false)
   const [lookImageFiles, setLookImageFiles] = useState<File[]>([])
@@ -888,15 +890,18 @@ export default function Avatars() {
   }
 
   const handleGenerateLook = async () => {
-    if (!showLooksModal || !lookPrompt.trim()) {
-      toast.error('Please enter a prompt for the look')
+    // Use selectedAvatarForLook (from the new flow) or fall back to showLooksModal
+    const targetAvatar = selectedAvatarForLook || showLooksModal
+    
+    if (!targetAvatar || !lookPrompt.trim()) {
+      toast.error('Please select an avatar and enter a prompt for the look')
       return
     }
 
     setGeneratingLook(true)
     try {
       console.log('Generating look with:', {
-        group_id: showLooksModal.heygen_avatar_id,
+        group_id: targetAvatar.heygen_avatar_id,
         prompt: lookPrompt,
         orientation: lookOrientation,
         pose: lookPose,
@@ -904,7 +909,7 @@ export default function Avatars() {
       })
 
       const response = await api.post('/api/avatars/generate-look', {
-        group_id: showLooksModal.heygen_avatar_id,
+        group_id: targetAvatar.heygen_avatar_id,
         prompt: lookPrompt,
         orientation: lookOrientation,
         pose: lookPose,
@@ -913,15 +918,19 @@ export default function Avatars() {
 
       console.log('Look generation response:', response.data)
       toast.success('Look generation started! This may take a few minutes.')
+      
+      // Reset all modal states
       setShowGenerateLookModal(false)
+      setGenerateLookStep('select-avatar')
+      setSelectedAvatarForLook(null)
       setLookPrompt('')
       setLookPose('close_up')
       setLookStyle('Realistic')
       
       // Refresh looks after a delay to show the new look
       setTimeout(async () => {
-        if (showLooksModal) {
-          await handleViewDetails(showLooksModal)
+        if (targetAvatar) {
+          await handleViewDetails(targetAvatar)
         }
       }, 5000)
     } catch (error: any) {
@@ -1070,7 +1079,18 @@ export default function Avatars() {
               </Button>
               <Button onClick={() => setShowGenerateAIModal(true)} variant="secondary">
                 <Sparkles className="h-4 w-4 mr-2" />
-                Generate with AI
+                Generate Avatar
+              </Button>
+              <Button 
+                onClick={() => {
+                  setGenerateLookStep('select-avatar')
+                  setSelectedAvatarForLook(null)
+                  setShowGenerateLookModal(true)
+                }} 
+                variant="secondary"
+              >
+                <Image className="h-4 w-4 mr-2" />
+                Generate Look
               </Button>
             </div>
           </div>
@@ -1514,6 +1534,11 @@ export default function Avatars() {
               </Button>
               <Button
                 onClick={() => {
+                  // Skip avatar selection since we already have an avatar selected
+                  if (showLooksModal) {
+                    setSelectedAvatarForLook(showLooksModal)
+                    setGenerateLookStep('generate')
+                  }
                   setShowGenerateLookModal(true)
                   setShowAddLooksModal(false)
                 }}
@@ -1627,80 +1652,167 @@ export default function Avatars() {
           </div>
         </Modal>
 
-        {/* Generate Look Modal */}
+        {/* Generate Look Modal - Two Step Flow */}
         <Modal
-          isOpen={showGenerateLookModal && !!showLooksModal}
+          isOpen={showGenerateLookModal}
           onClose={() => {
             setShowGenerateLookModal(false)
+            setGenerateLookStep('select-avatar')
+            setSelectedAvatarForLook(null)
             setLookPrompt('')
             setLookPose('close_up')
             setLookStyle('Realistic')
           }}
-          title="Generate AI Look"
-          size="md"
+          title={generateLookStep === 'select-avatar' ? 'Select Avatar' : 'Generate AI Look'}
+          size={generateLookStep === 'select-avatar' ? 'xl' : 'md'}
         >
-          <div className="space-y-6">
-            <p className="text-sm text-slate-600">
-              Generate a new look for this avatar using AI. Describe the look you want to create.
-            </p>
+          {generateLookStep === 'select-avatar' ? (
+            /* Step 1: Select Avatar */
+            <div className="space-y-4">
+              <p className="text-sm text-slate-600">
+                Choose an avatar to generate a new look for. Only trained avatars can have new looks generated.
+              </p>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-h-[60vh] overflow-y-auto pr-2 -mr-2">
+                {avatars
+                  .filter(avatar => avatar.status === 'active')
+                  .map((avatar) => (
+                    <button
+                      key={avatar.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedAvatarForLook(avatar)
+                        setShowLooksModal(avatar)
+                        setGenerateLookStep('generate')
+                      }}
+                      className="relative rounded-xl border-2 border-slate-200 bg-white p-3 transition-all hover:scale-105 hover:border-brand-300 hover:shadow-md text-left"
+                    >
+                      {avatar.thumbnail_url || avatar.preview_url ? (
+                        <img
+                          src={avatar.thumbnail_url || avatar.preview_url || ''}
+                          alt={avatar.avatar_name}
+                          className="w-full aspect-[3/4] object-cover rounded-lg mb-2 bg-slate-50"
+                        />
+                      ) : (
+                        <div className="w-full aspect-[3/4] bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center mb-2">
+                          <User className="h-12 w-12 text-white opacity-50" />
+                        </div>
+                      )}
+                      <p className="text-xs font-medium text-slate-700 truncate text-center">
+                        {avatar.avatar_name}
+                      </p>
+                    </button>
+                  ))}
+              </div>
 
-            <Textarea
-              label="Look Description *"
-              value={lookPrompt}
-              onChange={(e) => setLookPrompt(e.target.value)}
-              placeholder="e.g., Professional business suit, formal attire, confident expression"
-              rows={4}
-              disabled={generatingLook}
-            />
+              {avatars.filter(avatar => avatar.status === 'active').length === 0 && (
+                <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                  <User className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+                  <p className="text-sm text-slate-600 mb-1">No trained avatars available</p>
+                  <p className="text-xs text-slate-500">
+                    Train an avatar first before generating looks
+                  </p>
+                </div>
+              )}
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <Select
-                label="Pose *"
-                value={lookPose}
-                onChange={(e) => setLookPose(e.target.value as any)}
-                options={[
-                  { value: 'close_up', label: 'Close Up' },
-                  { value: 'half_body', label: 'Half Body' },
-                  { value: 'full_body', label: 'Full Body' },
-                ]}
+              <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setShowGenerateLookModal(false)
+                    setGenerateLookStep('select-avatar')
+                    setSelectedAvatarForLook(null)
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            /* Step 2: Generate Look Form (Avatar is locked) */
+            <div className="space-y-6">
+              {/* Selected Avatar Display - Locked, no option to change */}
+              {selectedAvatarForLook && (
+                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  {selectedAvatarForLook.thumbnail_url || selectedAvatarForLook.preview_url ? (
+                    <img
+                      src={selectedAvatarForLook.thumbnail_url || selectedAvatarForLook.preview_url || ''}
+                      alt={selectedAvatarForLook.avatar_name}
+                      className="w-12 h-12 object-cover rounded-lg"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center">
+                      <User className="h-6 w-6 text-white opacity-50" />
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-slate-700">{selectedAvatarForLook.avatar_name}</p>
+                    <p className="text-xs text-slate-500">Selected avatar</p>
+                  </div>
+                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                </div>
+              )}
+
+              <Textarea
+                label="Look Description *"
+                value={lookPrompt}
+                onChange={(e) => setLookPrompt(e.target.value)}
+                placeholder="e.g., Professional business suit, formal attire, confident expression"
+                rows={4}
                 disabled={generatingLook}
               />
 
-              <Select
-                label="Style *"
-                value={lookStyle}
-                onChange={(e) => setLookStyle(e.target.value as any)}
-                options={[
-                  { value: 'Realistic', label: 'Realistic' },
-                  { value: 'Cartoon', label: 'Cartoon' },
-                  { value: 'Anime', label: 'Anime' },
-                ]}
-                disabled={generatingLook}
-              />
-            </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Select
+                  label="Pose *"
+                  value={lookPose}
+                  onChange={(e) => setLookPose(e.target.value as any)}
+                  options={[
+                    { value: 'close_up', label: 'Close Up' },
+                    { value: 'half_body', label: 'Half Body' },
+                    { value: 'full_body', label: 'Full Body' },
+                  ]}
+                  disabled={generatingLook}
+                />
 
-            <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setShowGenerateLookModal(false)
-                  setLookPrompt('')
-                  setLookPose('close_up')
-                  setLookStyle('Realistic')
-                }}
-                disabled={generatingLook}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleGenerateLook}
-                disabled={generatingLook || !lookPrompt.trim()}
-                loading={generatingLook}
-              >
-                {generatingLook ? 'Generating...' : 'Generate Look'}
-              </Button>
+                <Select
+                  label="Style *"
+                  value={lookStyle}
+                  onChange={(e) => setLookStyle(e.target.value as any)}
+                  options={[
+                    { value: 'Realistic', label: 'Realistic' },
+                    { value: 'Cartoon', label: 'Cartoon' },
+                    { value: 'Anime', label: 'Anime' },
+                  ]}
+                  disabled={generatingLook}
+                />
+              </div>
+
+              <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setShowGenerateLookModal(false)
+                    setGenerateLookStep('select-avatar')
+                    setSelectedAvatarForLook(null)
+                    setLookPrompt('')
+                    setLookPose('close_up')
+                    setLookStyle('Realistic')
+                  }}
+                  disabled={generatingLook}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleGenerateLook}
+                  disabled={generatingLook || !lookPrompt.trim()}
+                  loading={generatingLook}
+                >
+                  {generatingLook ? 'Generating...' : 'Generate Look'}
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </Modal>
 
         {/* Avatar Details Modal - Redesigned */}
@@ -1868,6 +1980,9 @@ export default function Avatars() {
                         variant="secondary"
                         size="sm"
                         onClick={() => {
+                          // Skip avatar selection since we're in avatar details
+                          setSelectedAvatarForLook(detailsModal.avatar)
+                          setGenerateLookStep('generate')
                           handleManageLooks(detailsModal.avatar)
                           setShowGenerateLookModal(true)
                         }}
@@ -1905,6 +2020,9 @@ export default function Avatars() {
                             <Button
                               size="sm"
                               onClick={() => {
+                                // Skip avatar selection since we're in avatar details
+                                setSelectedAvatarForLook(detailsModal.avatar)
+                                setGenerateLookStep('generate')
                                 handleManageLooks(detailsModal.avatar)
                                 setShowGenerateLookModal(true)
                               }}
