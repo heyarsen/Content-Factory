@@ -96,6 +96,7 @@ export default function Avatars() {
   const [upscalingId, setUpscalingId] = useState<string | null>(null)
   const [lookSelectionModal, setLookSelectionModal] = useState<{ avatar: Avatar; looks: PhotoAvatarLook[] } | null>(null)
   const [selectedLookId, setSelectedLookId] = useState<string | null>(null)
+  const [trainingId, setTrainingId] = useState<string | null>(null)
   const detailData = detailsModal?.data ?? null
 
   const aiStageFlow: Array<{ key: 'creating' | 'photosReady' | 'completing'; title: string; description: string }> = [
@@ -351,6 +352,25 @@ export default function Avatars() {
       }
     }
   }, [avatars, handleRefreshTrainingStatus])
+
+  const handleTriggerTraining = async (avatar: Avatar) => {
+    setTrainingId(avatar.id)
+    try {
+      const response = await api.post(`/api/avatars/${avatar.id}/train`)
+      toast.success(response.data.message || 'Training started!')
+      
+      // Refresh the avatar details
+      await handleViewDetails(avatar)
+      
+      // Also refresh the avatars list
+      await loadAvatars()
+    } catch (error: any) {
+      console.error('Failed to trigger training:', error)
+      toast.error(error.response?.data?.error || 'Failed to start training')
+    } finally {
+      setTrainingId(null)
+    }
+  }
 
   const handleViewDetails = async (avatar: Avatar) => {
     console.log('Opening details modal for avatar:', avatar.id)
@@ -951,6 +971,7 @@ export default function Avatars() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
+      case 'ready':
         return { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Active' }
       case 'training':
         return { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Training' }
@@ -958,6 +979,10 @@ export default function Avatars() {
         return { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Pending' }
       case 'generating':
         return { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Generating' }
+      case 'empty':
+        return { bg: 'bg-rose-100', text: 'text-rose-700', label: 'Not Trained' }
+      case 'failed':
+        return { bg: 'bg-red-100', text: 'text-red-700', label: 'Failed' }
       default:
         return { bg: 'bg-slate-100', text: 'text-slate-700', label: status }
     }
@@ -1762,6 +1787,17 @@ export default function Avatars() {
                       <RefreshCw className={`h-4 w-4 mr-1.5 ${statusLoadingMap[detailsModal.avatar.id] ? 'animate-spin' : ''}`} />
                       Refresh
                     </Button>
+                    {(detailData.status === 'empty' || detailData.status === 'failed') && (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => handleTriggerTraining(detailsModal.avatar)}
+                        disabled={trainingId === detailsModal.avatar.id}
+                      >
+                        <Sparkles className={`h-4 w-4 mr-1.5 ${trainingId === detailsModal.avatar.id ? 'animate-spin' : ''}`} />
+                        {trainingId === detailsModal.avatar.id ? 'Starting...' : 'Train Avatar'}
+                      </Button>
+                    )}
                     <Button
                       variant="secondary"
                       size="sm"
@@ -1783,6 +1819,29 @@ export default function Avatars() {
                 </div>
               </div>
 
+              {/* Training Warning Banner */}
+              {(detailData.status === 'empty' || detailData.status === 'failed') && (
+                <div className="border-t border-slate-200 pt-6">
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="shrink-0 mt-0.5">
+                        <Sparkles className="h-5 w-5 text-amber-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-semibold text-amber-800">
+                          {detailData.status === 'failed' ? 'Training Failed' : 'Avatar Not Trained'}
+                        </h4>
+                        <p className="text-xs text-amber-700 mt-1">
+                          {detailData.status === 'failed' 
+                            ? 'The avatar training failed. Please try training again.'
+                            : 'This avatar needs to be trained before you can generate new looks. Click the "Train Avatar" button above to start training.'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Looks Section */}
               <div className="border-t border-slate-200 pt-6">
                 <div className="flex items-center justify-between mb-4">
@@ -1792,7 +1851,7 @@ export default function Avatars() {
                       Different styles and poses for your avatar
                     </p>
                   </div>
-                  {isUserCreatedAvatar(detailsModal.avatar) && (
+                  {isUserCreatedAvatar(detailsModal.avatar) && detailData.status !== 'empty' && detailData.status !== 'failed' && (
                     <div className="flex gap-2">
                       <Button
                         variant="secondary"

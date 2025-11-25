@@ -907,6 +907,137 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
   }
 })
 
+// Trigger training for an avatar that wasn't trained
+router.post('/:id/train', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { id } = req.params
+
+    const { supabase } = await import('../lib/supabase.js')
+    
+    // Get the avatar
+    const { data: avatar, error: avatarError } = await supabase
+      .from('avatars')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single()
+
+    if (avatarError || !avatar) {
+      return res.status(404).json({ error: 'Avatar not found' })
+    }
+
+    const groupId = avatar.heygen_avatar_id
+    console.log('[Train Avatar] Starting training for avatar:', avatar.avatar_name, 'group:', groupId)
+
+    // Check current training status
+    const { checkTrainingStatus } = await import('../lib/heygen.js')
+    const currentStatus = await checkTrainingStatus(groupId)
+    console.log('[Train Avatar] Current training status:', currentStatus)
+
+    if (currentStatus.status === 'ready') {
+      // Update avatar status in database
+      await supabase
+        .from('avatars')
+        .update({ status: 'active' })
+        .eq('id', id)
+      
+      return res.json({ 
+        message: 'Avatar is already trained and ready to use',
+        status: 'ready'
+      })
+    }
+
+    if (currentStatus.status === 'training' || currentStatus.status === 'pending') {
+      return res.json({ 
+        message: `Avatar is currently ${currentStatus.status}. Please wait for training to complete.`,
+        status: currentStatus.status
+      })
+    }
+
+    // Status is 'empty' or 'failed' - need to trigger training
+    // First, we need to get the looks/photos for this avatar
+    const { getPhotoAvatarDetails } = await import('../lib/heygen.js')
+    
+    let looks: any[] = []
+    try {
+      const details = await getPhotoAvatarDetails(groupId)
+      looks = details.looks || []
+      console.log('[Train Avatar] Found', looks.length, 'looks for avatar')
+    } catch (detailsError: any) {
+      console.warn('[Train Avatar] Could not get avatar details:', detailsError.message)
+    }
+
+    if (looks.length === 0) {
+      return res.status(400).json({ 
+        error: 'No photos found for this avatar. Please add photos before training.' 
+      })
+    }
+
+    // Get look IDs that are ready for training
+    const lookIds = looks
+      .filter((look: any) => look.status === 'uploaded' || look.status === 'ready' || !look.status)
+      .map((look: any) => look.id)
+
+    if (lookIds.length === 0) {
+      return res.status(400).json({ 
+        error: 'No photos are ready for training. Please wait for photo upload to complete.' 
+      })
+    }
+
+    console.log('[Train Avatar] Triggering training with look IDs:', lookIds)
+
+    // Trigger training
+    const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
+    const { default: axios } = await import('axios')
+    
+    const apiKey = process.env.HEYGEN_KEY
+    if (!apiKey) {
+      return res.status(500).json({ error: 'HeyGen API key not configured' })
+    }
+
+    const trainResponse = await axios.post(
+      `${HEYGEN_V2_API_URL}/photo_avatar/train`,
+      {
+        group_id: groupId,
+        photo_avatar_ids: lookIds,
+      },
+      {
+        headers: {
+          'X-Api-Key': apiKey,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
+
+    console.log('[Train Avatar] Training started:', trainResponse.data)
+
+    // Update avatar status to training
+    await supabase
+      .from('avatars')
+      .update({ status: 'training' })
+      .eq('id', id)
+
+    return res.json({
+      message: 'Training started successfully. This may take a few minutes.',
+      status: 'training',
+      data: trainResponse.data?.data || trainResponse.data,
+    })
+  } catch (error: any) {
+    console.error('[Train Avatar] Error:', error)
+    console.error('[Train Avatar] Response data:', error.response?.data)
+    
+    let errorMessage = error.message || 'Failed to start training'
+    if (error.response?.data?.error) {
+      errorMessage = typeof error.response.data.error === 'string' 
+        ? error.response.data.error 
+        : error.response.data.error.message || JSON.stringify(error.response.data.error)
+    }
+    
+    return res.status(error.response?.status || 500).json({ error: errorMessage })
+  }
+})
+
 // Upload look image to HeyGen and get image_key
 router.post('/upload-look-image', authenticate, async (req: AuthRequest, res: Response) => {
   try {
