@@ -592,7 +592,15 @@ export class AvatarService {
 
         try {
           // Fetch looks to see if we can train
-          const looks = await fetchAvatarGroupLooks(groupId)
+          // Retry a few times as looks might take a moment to appear after group creation
+          let looks: any[] = []
+          for (let attempt = 1; attempt <= 5; attempt++) {
+            looks = await fetchAvatarGroupLooks(groupId)
+            if (looks.length > 0) break
+            console.log(`[Auto Look] No looks found yet (attempt ${attempt}/5), waiting...`)
+            await delay(2000)
+          }
+
           const lookIds = looks
             .filter((l) => l.status === 'uploaded' || l.status === 'ready' || !l.status)
             .map((l) => l.id)
@@ -608,7 +616,7 @@ export class AvatarService {
               .update({ status: 'training' })
               .eq('heygen_avatar_id', groupId)
           } else {
-            console.warn('[Auto Look] No valid looks found to train.')
+            console.warn('[Auto Look] No valid looks found to train after retries.')
           }
         } catch (err: any) {
           console.error('[Auto Look] Failed to trigger training:', err.message)
