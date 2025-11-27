@@ -65,7 +65,7 @@ async function processScriptGeneration(job: BackgroundJob): Promise<void> {
   }
 
   // Generate script
-  const script = await ScriptService.generateScriptFromContent(contentItem)
+  const script = await ScriptService.generateScriptFromContent(contentItem, contentItem.user_id)
 
   // Create reel
   const research = contentItem.research
@@ -187,7 +187,7 @@ async function processResearch(job: BackgroundJob): Promise<void> {
   }
 
   // Research topic
-  const research = await ResearchService.researchTopic(contentItem.topic, contentItem.category)
+  const research = await ResearchService.researchTopic(contentItem.topic, contentItem.category, contentItem.user_id)
 
   // Update content item with research
   await ContentService.updateContentResearch(content_item_id, research)

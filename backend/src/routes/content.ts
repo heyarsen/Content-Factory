@@ -521,7 +521,8 @@ router.post('/research', async (req: AuthRequest, res: Response) => {
 
     const research = await ResearchService.researchTopic(
       topic,
-      category as 'Trading' | 'Lifestyle' | 'Fin. Freedom'
+      category as 'Trading' | 'Lifestyle' | 'Fin. Freedom',
+      userId
     )
 
     // If content_item_id provided, update it with research
@@ -580,7 +581,7 @@ router.post('/generate-script', async (req: AuthRequest, res: Response) => {
     }
 
     // Generate script
-    const script = await ScriptService.generateScriptFromContent(contentItem)
+    const script = await ScriptService.generateScriptFromContent(contentItem, userId)
 
     // Create reel with script
     const research = contentItem.research
@@ -675,7 +676,7 @@ router.post('/quick-create/generate-script', authenticate, async (req: AuthReque
       whyItMatters: whyImportant || '',
       usefulTips: usefulTips || '',
       category: categoryName,
-    })
+    }, userId)
 
     return res.json({ script })
   } catch (error: any) {

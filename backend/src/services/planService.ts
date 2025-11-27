@@ -500,7 +500,8 @@ export class PlanService {
         // Research the existing topic
         const research = await ResearchService.researchTopic(
           existingItem.topic,
-          item.category || 'general'
+          item.category || 'general',
+          userId
         )
 
         // Update the plan item with research data but keep the original topic
@@ -564,7 +565,8 @@ export class PlanService {
       // Research the topic
       const research = await ResearchService.researchTopic(
         availableTopic.Idea,
-        availableTopic.Category as string
+        availableTopic.Category as string,
+        userId
       )
 
       // Update the plan item

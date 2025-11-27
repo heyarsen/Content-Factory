@@ -165,6 +165,19 @@ export class AutomationService {
    * Generate scripts for today's items in a specific plan
    */
   static async generateScriptsForTodayItems(planId: string, today: string, autoApprove: boolean): Promise<void> {
+    // Get plan to get userId
+    const { data: plan } = await supabase
+      .from('video_plans')
+      .select('user_id')
+      .eq('id', planId)
+      .single()
+
+    if (!plan) {
+      throw new Error('Plan not found')
+    }
+
+    const userId = plan.user_id
+
     // Get items with research data for today
     const { data: itemsWithResearch } = await supabase
       .from('video_plan_items')
@@ -220,7 +233,7 @@ export class AutomationService {
           whyItMatters: item.why_important || research?.WhyItMatters || '',
           usefulTips: item.useful_tips || research?.UsefulTips || '',
           category: item.category || research?.Category || 'general',
-        })
+        }, userId)
 
         const newStatus = autoApprove ? 'approved' : 'draft'
         const scriptStatus = autoApprove ? 'approved' : 'draft'
@@ -562,7 +575,7 @@ export class AutomationService {
     // Get all enabled plans with trigger times
     const { data: plans } = await supabase
       .from('video_plans')
-      .select('id, trigger_time, timezone, auto_approve')
+      .select('id, trigger_time, timezone, auto_approve, user_id')
       .eq('enabled', true)
       .in('auto_schedule_trigger', ['daily', 'time_based'])
       .not('trigger_time', 'is', null)
@@ -669,7 +682,7 @@ export class AutomationService {
           whyItMatters: item.why_important || research?.WhyItMatters || '',
           usefulTips: item.useful_tips || research?.UsefulTips || '',
           category: item.category || research?.Category || 'general',
-        })
+        }, plan.user_id)
             
             console.log(`[Script Generation] Generated script for today's item ${item.id}, topic: "${topicToUse}"`)
 
@@ -2022,7 +2035,7 @@ export class AutomationService {
       whyItMatters: item.why_important || research?.WhyItMatters || '',
       usefulTips: item.useful_tips || research?.UsefulTips || '',
       category: item.category || research?.Category || 'Trading',
-    })
+    }, userId)
     
     console.log(`[Script Generation] Generated script for topic: "${topicToUse}" (item topic: "${item.topic || 'N/A'}")`)
 

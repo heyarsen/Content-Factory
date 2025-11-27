@@ -15,6 +15,7 @@ export interface ScriptGenerationRequest {
   whyItMatters: string
   usefulTips: string
   category: string // Allow any category name
+  persona?: string
 }
 
 export interface ScriptGenerationResponse {
@@ -153,6 +154,11 @@ Moderation & Safety Criteria (must always be followed):
 
   const systemPrompt = systemPrompts[data.category as keyof typeof systemPrompts] || defaultPrompt
   
+  // Build persona context if provided
+  const personaContext = data.persona
+    ? `\n\nTarget Audience Context:\n${data.persona}\n\nWhen writing the script, keep this audience in mind and tailor the language, examples, and tone to resonate with them.`
+    : ''
+  
   // Build comprehensive user prompt that emphasizes using ALL information
   const userPrompt = `Create a script using ALL the following information provided:
 
@@ -160,7 +166,7 @@ Topic/Idea: ${data.idea || '(not provided)'}
 Description: ${data.description || '(not provided)'}
 Why It Matters: ${data.whyItMatters || '(not provided)'}
 Useful Tips: ${data.usefulTips || '(not provided)'}
-Category: ${data.category}
+Category: ${data.category}${personaContext}
 
 IMPORTANT: You MUST incorporate information from ALL provided fields (Description, Why It Matters, and Useful Tips) into your script. If a field contains "(not provided)", focus on the fields that have actual content. Do not ignore any field that has actual content. The script should synthesize insights from all available fields to create a comprehensive and informative video script.`
 

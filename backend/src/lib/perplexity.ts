@@ -10,8 +10,18 @@ if (!PERPLEXITY_API_KEY) {
   console.warn('PERPLEXITY_API_KEY not set - Perplexity features will not work')
 }
 
+export interface PromptConfig {
+  persona?: string
+  business_model?: string
+  focus?: string
+  categories?: string
+  core_message?: string
+  rules?: string
+}
+
 export interface TopicGenerationRequest {
   recentTopics?: Array<{ topic: string; category: string }>
+  promptConfig?: PromptConfig
 }
 
 export interface Topic {
@@ -26,6 +36,7 @@ export interface TopicGenerationResponse {
 export interface ResearchRequest {
   topic: string
   category: string
+  promptConfig?: PromptConfig
 }
 
 export interface ResearchResponse {
@@ -89,45 +100,58 @@ export async function generateTopics(
 
   const recentTopicsList = request.recentTopics || []
   const topicsArrayString = JSON.stringify(recentTopicsList)
+  const config = request.promptConfig || {}
 
-  const systemPrompt = `Every day, find 3 fresh and relevant topics for short videos (Reels/Shorts) that would interest the target persona. Provide topics ONLY as a list in a JSON array (see "Output Format").
+  // Parse categories from config or use default
+  const categoriesList = config.categories 
+    ? config.categories.split(',').map(c => c.trim()).filter(Boolean)
+    : ['Trading', 'Lifestyle', 'Financial Freedom']
+  
+  const categoriesString = categoriesList.map(c => `"${c}"`).join(' | ')
 
-Persona:
-	•	Name (placeholder): Max. M.
-	•	Age: 27–38
-	•	Location: Europe (DE/PL/CZ/Nordics/Baltics) and Asia (TH/SG/ID/VN)
-	•	Content language: English
-	•	Experience: 1.5–5 years of trading (Forex, some futures)
-	•	Goals: scale capital without risking personal funds; move from hobby to profession; financial freedom and geographic flexibility
-	•	Pains: blown accounts; lack of capital; distrust of prop firms; information overload
-	•	Interests: funded accounts/prop; futures vs Forex; financial freedom; digital nomad lifestyle; minimalism/efficiency
+  // Build persona section
+  const personaSection = config.persona 
+    ? `Persona:\n${config.persona.split('\n').map(line => `\t•\t${line.replace(/^-\s*/, '')}`).join('\n')}`
+    : `Persona:
+	•	Target audience: General content consumers
+	•	Interests: Educational and engaging content
+	•	Goals: Learn something new or get inspired`
 
-Business-model lens:
-	•	Prop trading funded accounts on futures (CME/EUREX).
-	•	Subscription-based evaluation; 1-stage / no strict deadline; EOD trailing drawdown; no daily loss limit; overnight on weekdays; closed on weekends.
-	•	Execution platform: VolFix.
-	•	Profit sharing: 100% of the first payouts, then 90/10.
-	•	Payouts via Deel.
-	•	Restrictions: futures only; single platform; consistency rules.
+  // Build business model section
+  const businessModelSection = config.business_model
+    ? `Business-model lens:\n${config.business_model.split('\n').map(line => `\t•\t${line.replace(/^-\s*/, '')}`).join('\n')}`
+    : `Business-model lens:
+	•	Content creation for educational and informational purposes
+	•	Focus on value-driven, authentic content`
 
-Focus:
-	•	Highlight advantages and opportunities: "no risk of personal deposit," "easy to try," "access to larger capital," "financial freedom."
-	•	Mention restrictions briefly and as secondary.
-	•	Avoid promises of easy money and clickbait.
-	•	Topics must be fact-checked, but framed positively.
-	•	Never repeat or slightly rephrase any of the last 10 topics provided in the user prompt. Always suggest new and distinct topics. If needed, invent adjacent but different angles.
+  // Build focus section
+  const focusSection = config.focus
+    ? `Focus:\n${config.focus.split('\n').map(line => `\t•\t${line.replace(/^-\s*/, '')}`).join('\n')}`
+    : `Focus:
+	•	Create engaging, educational content that provides value
+	•	Topics must be fact-checked and framed positively
+	•	Avoid clickbait and misleading claims
+	•	Never repeat or slightly rephrase any of the last 10 topics provided in the user prompt. Always suggest new and distinct topics. If needed, invent adjacent but different angles.`
+
+  const systemPrompt = `Every day, find ${categoriesList.length} fresh and relevant topics for short videos (Reels/Shorts) that would interest the target persona. Provide topics ONLY as a list in a JSON array (see "Output Format").
+
+${personaSection}
+
+${businessModelSection}
+
+${focusSection}
 
 Output format:
 	•	Strictly a JSON array, first line must be [.
-	•	Exactly 3 objects: 1) Trading, 2) Fin. Freedom, 3) Lifestyle.
+	•	Exactly ${categoriesList.length} objects, one for each category: ${categoriesList.join(', ')}.
 	•	Each object only with the fields:
 "Idea": short topic in English
-"Category": "Trading" | "Fin. Freedom" | "Lifestyle"`
+"Category": ${categoriesString}`
 
-  const userPrompt = `Collect 3 fresh and relevant topics for the persona "Max. M." for today.
+  const userPrompt = `Collect ${categoriesList.length} fresh and relevant topics for today.
 Do not repeat or rephrase any of these past topics: ${topicsArrayString}.
 Output strictly as a JSON array with objects in the form {"Idea": "...", "Category": "..."}.
-Categories and order are fixed: Trading, Fin. Freedom, Lifestyle.`
+Categories and order are fixed: ${categoriesList.join(', ')}.`
 
   try {
     const response = await retryWithBackoff(async () => {
@@ -163,8 +187,8 @@ Categories and order are fixed: Trading, Fin. Freedom, Lifestyle.`
 
     const topics = JSON.parse(jsonMatch[0]) as Topic[]
 
-    if (!Array.isArray(topics) || topics.length !== 3) {
-      throw new Error('Invalid topics format: expected array of 3 topics')
+    if (!Array.isArray(topics) || topics.length === 0) {
+      throw new Error(`Invalid topics format: expected array with at least one topic`)
     }
 
     return { topics }
@@ -197,24 +221,48 @@ export async function researchTopic(
     throw new Error('PERPLEXITY_API_KEY is not configured')
   }
 
+  const config = request.promptConfig || {}
+
+  // Build persona section
+  const personaSection = config.persona
+    ? `Persona:\n${config.persona.split('\n').map(line => `\t•\t${line.replace(/^-\s*/, '')}`).join('\n')}`
+    : `Persona:
+	•	Target audience: General content consumers
+	•	Interests: Educational and engaging content
+	•	Goals: Learn something new or get inspired`
+
+  // Build core message section
+  const coreMessageSection = config.core_message
+    ? `Core message:\n${config.core_message.split('\n').map(line => `\t•\t${line.replace(/^-\s*/, '')}`).join('\n')}`
+    : `Core message:
+	•	Provide valuable, educational content that helps the audience
+	•	Focus on practical insights and actionable information`
+
+  // Parse categories from config or use default
+  const categoriesList = config.categories
+    ? config.categories.split(',').map(c => c.trim()).filter(Boolean)
+    : ['Trading', 'Lifestyle', 'Financial Freedom']
+  
+  const categoriesString = categoriesList.map(c => `"${c}"`).join(' | ')
+
+  // Build rules section
+  const rulesSection = config.rules
+    ? config.rules
+    : `For each Idea, return only one research object. Do not split into multiple subtopics, countries, or variations. Condense into one structured result.
+	•	Style: friendly, simple English.
+	•	Focus on benefits and solutions that address the persona's goals and pains.
+	•	Always connect the research back to the persona's context and needs.
+	•	End with a light invitation or call to action.
+	•	Category must always be one of: ${categoriesList.join(', ')}. Never invent new categories.`
+
   const systemPrompt = `System Prompt – Research Analyst
 
 You are Research Analyst.
 Your role: when Research Scout provides a topic (Idea), you must return exactly one structured research object.
 
-Persona:
-	•	Name: Max M.
-	•	Age: 27–38
-	•	Location: Europe (DE/PL/CZ/Nordics/Baltics) and Asia (TH/SG/ID/VN)
-	•	Experience: 1.5–5 years in trading (Forex, some futures)
-	•	Goals: scale capital without risking personal funds; move from hobby to profession; financial freedom and geographic flexibility
-	•	Pains: blown accounts; lack of capital; distrust of prop firms; information overload
-	•	Interests: funded accounts/prop; futures vs Forex; financial freedom; digital nomad lifestyle; minimalism/efficiency
+${personaSection}
 
-Core message:
-	•	Funded accounts = fast access to capital without risking personal funds.
-	•	Removes fear of losing deposits and lack of funds.
-	•	Living as a digital nomad and growing as a trader is realistic through the prop model.
+${coreMessageSection}
 
 Output format:
 Always return a JSON array with exactly one object in this structure:
@@ -225,17 +273,12 @@ Always return a JSON array with exactly one object in this structure:
     "Description": "...",
     "WhyItMatters": "...",
     "UsefulTips": "...",
-    "Category": "Trading" | "Fin. Freedom" | "Lifestyle"
+    "Category": ${categoriesString}
   }
 ]
 
 Rules:
-	•	For each Idea, return only one research object. Do not split into multiple subtopics, countries, or variations. Condense into one structured result.
-	•	Style: friendly, simple English.
-	•	70% focus on trader benefits/solutions, 30% on rules/limits.
-	•	Always connect the research back to funded accounts and the persona's pains/goals.
-	•	End with a light invitation ("try", "start", "join").
-	•	Category must always be one of: "Trading", "Fin. Freedom", "Lifestyle". Never invent new categories.`
+	•	${rulesSection.split('\n').join('\n\t•\t')}`
 
   const userPrompt = `Take the following topics and do research with internet sources:  
 ${request.topic}, category ${request.category}
