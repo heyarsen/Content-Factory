@@ -2025,9 +2025,9 @@ export async function getPhotoAvatarDetails(
     }
     return fetchPhotoAvatarDetails(resolved.photoAvatarId)
   } catch (error: any) {
-    // If it's a 404, it might be a group_id - try to get basic info from the group
-    if (error.response?.status === 404 || error.message?.includes('not found')) {
-      console.warn('Photo avatar details not found, might be a group ID:', identifier)
+    // If it's a 404 or "not found", it might be a group_id or deleted avatar
+    if (error.response?.status === 404 || error.message?.includes('not found') || error.message?.includes('No avatars found')) {
+      // Don't log as error - this is expected for group IDs or deleted avatars
       // Return basic structure with the identifier as ID
       return {
         id: identifier,
@@ -2035,7 +2035,10 @@ export async function getPhotoAvatarDetails(
         status: 'unknown',
       }
     }
-    console.error('HeyGen API error (getPhotoAvatarDetails):', error.response?.data || error.message)
+    // Only log actual errors (not 404s)
+    if (error.response?.status !== 404) {
+      console.error('HeyGen API error (getPhotoAvatarDetails):', error.response?.data || error.message)
+    }
     throw error
   }
 }

@@ -390,6 +390,23 @@ export class AvatarService {
       // Fetch photo avatar details
       const details = await getPhotoAvatarDetails(avatar.heygen_avatar_id)
 
+      // If avatar doesn't exist in HeyGen (status is 'unknown'), mark it as invalid
+      if (details.status === 'unknown') {
+        console.warn(`[Avatar Details] Avatar ${avatarId} (${avatar.avatar_name}) not found in HeyGen - may have been deleted`)
+        // Don't throw - return what we have from database
+        return {
+          id: avatar.heygen_avatar_id,
+          group_id: avatar.heygen_avatar_id,
+          status: avatar.status || 'unknown',
+          image_url: avatar.avatar_url ?? undefined,
+          preview_url: avatar.preview_url ?? undefined,
+          thumbnail_url: avatar.thumbnail_url ?? undefined,
+          created_at: avatar.created_at ? new Date(avatar.created_at).getTime() / 1000 : undefined,
+          updated_at: avatar.updated_at ? new Date(avatar.updated_at).getTime() / 1000 : null,
+          looks: [],
+        }
+      }
+
       // Also fetch training status to get the real status from HeyGen
       let trainingStatus: string = details.status || 'active'
       try {
