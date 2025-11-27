@@ -308,11 +308,17 @@ export default function Avatars() {
 
         // Update training modal if this avatar is being tracked
         if (trainingAvatar && trainingAvatar.id === avatar.id) {
-          const newStatus = normalizedStatus as 'training' | 'pending' | 'ready' | 'failed'
+          // Convert 'active' to 'ready' for trainingStatus since it only accepts 'training' | 'pending' | 'ready' | 'failed'
+          let newStatus: 'training' | 'pending' | 'ready' | 'failed' = 'training'
+          if (normalizedStatus === 'active') {
+            newStatus = 'ready'
+          } else if (['training', 'pending', 'ready', 'failed'].includes(normalizedStatus)) {
+            newStatus = normalizedStatus as 'training' | 'pending' | 'ready' | 'failed'
+          }
           setTrainingStatus(newStatus)
           setTrainingAvatar(prev => prev ? { ...prev, status: normalizedStatus } : null)
           
-          if (normalizedStatus === 'active') {
+          if (newStatus === 'ready') {
             // Training completed, close modal after a short delay
             toast.success('Avatar training completed! Your avatar is now ready to use.')
             setTimeout(() => {
@@ -2156,7 +2162,10 @@ export default function Avatars() {
                           const updatedAvatar = avatarResponse.data.avatars.find((a: Avatar) => a.id === avatarIdToTrain)
                           
                           if (updatedAvatar) {
-                            const newStatus = trainResponse.data.status === 'ready' ? 'active' : trainResponse.data.status || 'training'
+                            // Use status from trainResponse if available, otherwise use updatedAvatar status, default to 'training'
+                            const responseStatus = trainResponse.data?.status
+                            const avatarStatus = updatedAvatar.status
+                            const newStatus = responseStatus === 'ready' ? 'active' : (responseStatus || avatarStatus || 'training')
                             const avatarToTrain = { ...updatedAvatar, status: newStatus }
                             
                             // Update avatar in state
@@ -2167,17 +2176,46 @@ export default function Avatars() {
                             )
                             
                             // Set training modal state
+                            // Convert 'active' to 'ready' for trainingStatus since it only accepts 'training' | 'pending' | 'ready' | 'failed'
+                            let trainingStatusValue: 'training' | 'pending' | 'ready' | 'failed' = 'training'
+                            if (newStatus === 'active') {
+                              trainingStatusValue = 'ready'
+                            } else if (['training', 'pending', 'ready', 'failed'].includes(newStatus)) {
+                              trainingStatusValue = newStatus as 'training' | 'pending' | 'ready' | 'failed'
+                            }
+                            console.log('Setting training modal:', { newStatus, trainingStatusValue, avatarToTrain })
                             setTrainingAvatar(avatarToTrain)
-                            setTrainingStatus(newStatus as 'training' | 'pending' | 'ready' | 'failed')
+                            setTrainingStatus(trainingStatusValue)
                             setShowTrainingModal(true)
                             
                             // If already ready, close modal after short delay
-                            if (newStatus === 'active' || trainResponse.data.status === 'ready') {
+                            if (trainingStatusValue === 'ready') {
                               setTimeout(() => {
                                 setShowTrainingModal(false)
                                 setTrainingAvatar(null)
                                 setTrainingStatus(null)
                               }, 2000)
+                            }
+                          } else {
+                            // If avatar not found, still show modal with training status
+                            // Find the avatar from current state as fallback
+                            const currentAvatar = avatars.find(a => a.id === avatarIdToTrain)
+                            if (currentAvatar) {
+                              const responseStatus = trainResponse.data?.status || 'training'
+                              const newStatus = responseStatus === 'ready' ? 'active' : responseStatus
+                              let trainingStatusValue: 'training' | 'pending' | 'ready' | 'failed' = 'training'
+                              if (newStatus === 'active') {
+                                trainingStatusValue = 'ready'
+                              } else if (['training', 'pending', 'ready', 'failed'].includes(newStatus)) {
+                                trainingStatusValue = newStatus as 'training' | 'pending' | 'ready' | 'failed'
+                              }
+                              console.log('Setting training modal (fallback):', { newStatus, trainingStatusValue, currentAvatar })
+                              const avatarToTrain = { ...currentAvatar, status: newStatus }
+                              setTrainingAvatar(avatarToTrain)
+                              setTrainingStatus(trainingStatusValue)
+                              setShowTrainingModal(true)
+                            } else {
+                              console.error('Avatar not found for training modal:', avatarIdToTrain)
                             }
                           }
                         } catch (trainError: any) {
