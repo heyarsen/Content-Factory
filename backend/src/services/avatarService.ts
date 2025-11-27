@@ -904,11 +904,8 @@ export class AvatarService {
         savedAvatar = data
       }
 
-      try {
-        await this.autoGenerateVerticalLook(groupId, undefined, avatarName)
-      } catch (lookError: any) {
-        console.warn('[Auto Look] Failed to generate 9:16 look for AI avatar:', lookError?.message || lookError)
-      }
+      // Auto-generation of vertical look disabled; will be triggered after user selects a look
+
 
       return savedAvatar
     } catch (error: any) {
