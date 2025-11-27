@@ -2216,7 +2216,7 @@ export default function Avatars() {
           isOpen={showTrainingModal}
           onClose={() => {
             // Only allow closing if training is complete
-            if (trainingStatus === 'active' || trainingStatus === 'ready') {
+            if (trainingStatus === 'ready') {
               setShowTrainingModal(false)
               setTrainingAvatar(null)
               setTrainingStatus(null)
@@ -2224,8 +2224,8 @@ export default function Avatars() {
           }}
           title="Avatar Training in Progress"
           size="md"
-          closeOnOverlayClick={trainingStatus === 'active' || trainingStatus === 'ready'}
-          showCloseButton={trainingStatus === 'active' || trainingStatus === 'ready'}
+          closeOnOverlayClick={trainingStatus === 'ready'}
+          showCloseButton={trainingStatus === 'ready'}
         >
           {trainingAvatar && (
             <div className="space-y-6">
@@ -2266,7 +2266,7 @@ export default function Avatars() {
                       </p>
                     </div>
                   </>
-                ) : trainingStatus === 'active' || trainingStatus === 'ready' ? (
+                ) : trainingStatus === 'ready' ? (
                   <>
                     <div className="flex items-center justify-center gap-3">
                       <CheckCircle2 className="h-6 w-6 text-emerald-500" />
@@ -2293,7 +2293,7 @@ export default function Avatars() {
                 ) : null}
               </div>
 
-              {(trainingStatus === 'active' || trainingStatus === 'ready') && (
+              {trainingStatus === 'ready' && (
                 <div className="flex justify-end pt-4 border-t border-slate-200">
                   <Button
                     onClick={() => {
