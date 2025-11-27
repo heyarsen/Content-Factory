@@ -1236,24 +1236,79 @@ router.get('/test-fixtures', authenticate, async (req: AuthRequest, res: Respons
 })
 
 // POST /avatars/test-fixtures/sync - Sync existing avatars from database to test fixtures
-// Query param: ?all=false to only sync untrained avatars (default: true, syncs all user-created avatars)
+// Query param: ?all=false to only sync untrained avatars (default: true, syncs ALL avatars)
 router.post('/test-fixtures/sync', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
-    const allAvatars = req.query.all !== 'false' // Default to true, sync all user-created avatars
+    const allAvatars = req.query.all !== 'false' // Default to true, sync ALL avatars
+    
+    console.log(`[Test Fixtures Sync] Starting sync for user ${userId}, allAvatars=${allAvatars}`)
+    
     const result = await syncUntrainedAvatarsFromDatabase(userId, allAvatars)
     
     return res.json({
-      message: `Synced ${result.saved} avatars to test fixtures (${result.total} total found)`,
+      message: `Synced ${result.saved} avatars to test fixtures (${result.total} total found in database)`,
       saved_count: result.saved,
       total_count: result.total,
       by_status: result.byStatus,
+      by_source: result.bySource,
+      avatars_found: result.avatars,
       all_avatars: allAvatars,
     })
   } catch (error: any) {
     console.error('Sync test fixtures error:', error)
     return res.status(500).json({
       error: error.message || 'Failed to sync test fixtures',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+    })
+  }
+})
+
+// GET /avatars/test-fixtures/debug - Debug endpoint to see what avatars exist in database
+router.get('/test-fixtures/debug', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { supabase } = await import('../lib/supabase.js')
+    
+    // Get ALL avatars for this user
+    const { data: avatars, error } = await supabase
+      .from('avatars')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      return res.status(500).json({ error: error.message })
+    }
+
+    const byStatus: Record<string, number> = {}
+    const bySource: Record<string, number> = {}
+    
+    avatars?.forEach(avatar => {
+      const status = avatar.status || 'null'
+      const source = avatar.source || 'null'
+      byStatus[status] = (byStatus[status] || 0) + 1
+      bySource[source] = (bySource[source] || 0) + 1
+    })
+
+    return res.json({
+      total_avatars: avatars?.length || 0,
+      by_status: byStatus,
+      by_source: bySource,
+      avatars: avatars?.map(a => ({
+        id: a.id,
+        avatar_name: a.avatar_name,
+        status: a.status,
+        source: a.source,
+        heygen_avatar_id: a.heygen_avatar_id,
+        created_at: a.created_at,
+        avatar_url: a.avatar_url ? 'has_url' : 'no_url',
+      })) || [],
+    })
+  } catch (error: any) {
+    console.error('Debug avatars error:', error)
+    return res.status(500).json({
+      error: error.message || 'Failed to debug avatars',
     })
   }
 })

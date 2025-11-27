@@ -139,22 +139,20 @@ export function clearTestAvatars(): void {
 /**
  * Sync existing avatars from database to test fixtures
  * @param userId - User ID to sync avatars for
- * @param allAvatars - If true, sync ALL user-created avatars. If false, only sync untrained ones (default: true)
+ * @param allAvatars - If true, sync ALL avatars. If false, only sync untrained ones (default: true)
  */
-export async function syncUntrainedAvatarsFromDatabase(userId: string, allAvatars: boolean = true): Promise<{ saved: number; total: number; byStatus: Record<string, number> }> {
+export async function syncUntrainedAvatarsFromDatabase(userId: string, allAvatars: boolean = true): Promise<{ saved: number; total: number; byStatus: Record<string, number>; bySource: Record<string, number>; avatars: any[] }> {
   try {
     const { supabase } = await import('../lib/supabase.js')
     
+    // Get ALL avatars for this user - don't filter by source because old avatars might not have it set
     let query = supabase
       .from('avatars')
       .select('*')
       .eq('user_id', userId)
 
-    // If allAvatars is true, get all user-created avatars (not synced from HeyGen)
-    if (allAvatars) {
-      query = query.in('source', ['user_photo', 'ai_generated'])
-    } else {
-      // Only get untrained avatars
+    // If allAvatars is false, only get untrained avatars
+    if (!allAvatars) {
       const untrainedStatuses = ['generating', 'training', 'pending']
       query = query.in('status', untrainedStatuses)
     }
@@ -167,17 +165,31 @@ export async function syncUntrainedAvatarsFromDatabase(userId: string, allAvatar
     }
 
     if (!avatars || avatars.length === 0) {
-      console.log(`[Test Fixtures] No avatars found in database (allAvatars=${allAvatars})`)
-      return { saved: 0, total: 0, byStatus: {} }
+      console.log(`[Test Fixtures] No avatars found in database for user ${userId} (allAvatars=${allAvatars})`)
+      return { saved: 0, total: 0, byStatus: {}, bySource: {}, avatars: [] }
     }
 
+    console.log(`[Test Fixtures] Found ${avatars.length} avatars in database for user ${userId}`)
+    console.log(`[Test Fixtures] Avatar details:`, avatars.map(a => ({
+      id: a.id,
+      name: a.avatar_name,
+      status: a.status,
+      source: a.source,
+      heygen_id: a.heygen_avatar_id,
+    })))
+
     const byStatus: Record<string, number> = {}
+    const bySource: Record<string, number> = {}
     let savedCount = 0
     
     for (const avatar of avatars) {
       // Track status distribution
       const status = avatar.status || 'unknown'
       byStatus[status] = (byStatus[status] || 0) + 1
+      
+      // Track source distribution
+      const source = avatar.source || 'null'
+      bySource[source] = (bySource[source] || 0) + 1
 
       // Check if already saved
       const existing = getUntrainedAvatarFromTest(avatar.id)
@@ -185,15 +197,25 @@ export async function syncUntrainedAvatarsFromDatabase(userId: string, allAvatar
         // Use forceSave=true if allAvatars is true, so we save regardless of status
         saveUntrainedAvatarToTest(avatar as any, null, allAvatars)
         savedCount++
+        console.log(`[Test Fixtures] ✅ Saved avatar: ${avatar.avatar_name} (${avatar.id}) - status: ${avatar.status}, source: ${avatar.source}`)
+      } else {
+        console.log(`[Test Fixtures] ⏭️  Skipped avatar (already saved): ${avatar.avatar_name} (${avatar.id})`)
       }
     }
 
     console.log(`[Test Fixtures] Synced ${savedCount} new avatars from database (${avatars.length} total found)`, {
       byStatus,
+      bySource,
       allAvatars,
     })
     
-    return { saved: savedCount, total: avatars.length, byStatus }
+    return { saved: savedCount, total: avatars.length, byStatus, bySource, avatars: avatars.map(a => ({
+      id: a.id,
+      avatar_name: a.avatar_name,
+      status: a.status,
+      source: a.source,
+      heygen_avatar_id: a.heygen_avatar_id,
+    })) }
   } catch (error: any) {
     console.error('[Test Fixtures] Failed to sync avatars from database:', error.message)
     throw error

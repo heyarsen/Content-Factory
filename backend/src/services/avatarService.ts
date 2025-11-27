@@ -739,21 +739,19 @@ export class AvatarService {
    * We exclude avatars that were synced from HeyGen (which typically have avatar_url from HeyGen CDN)
    */
   static async getUserCreatedAvatars(userId: string): Promise<Avatar[]> {
+    // Get ALL avatars for the user - no status or source filtering
+    // This ensures all user-created avatars are shown, including old ones
     const { data, error } = await supabase
       .from('avatars')
       .select('*')
       .eq('user_id', userId)
-      .in('status', ['active', 'training', 'pending', 'generating'])
       .order('is_default', { ascending: false })
+      .order('created_at', { ascending: false }) // Show newest first
       .order('avatar_name', { ascending: true })
 
     if (error) throw error
 
-    const avatars = data || []
-    if (!isAvatarSourceColumnEnabled()) {
-      return avatars
-    }
-    return avatars.filter((avatar) => this.isUserCreatedAvatar(avatar))
+    return data || []
   }
 
   /**
