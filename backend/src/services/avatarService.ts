@@ -592,13 +592,17 @@ export class AvatarService {
 
         try {
           // Fetch looks to see if we can train
-          // Retry a few times as looks might take a moment to appear after group creation
+          // Wait a few seconds first to avoid unnecessary API calls (economic optimization)
+          // The API often takes a moment to register the new looks
+          await delay(4000)
+
           let looks: any[] = []
-          for (let attempt = 1; attempt <= 5; attempt++) {
+          // Try just 3 times with longer intervals to minimize calls
+          for (let attempt = 1; attempt <= 3; attempt++) {
             looks = await fetchAvatarGroupLooks(groupId)
             if (looks.length > 0) break
-            console.log(`[Auto Look] No looks found yet (attempt ${attempt}/5), waiting...`)
-            await delay(2000)
+            console.log(`[Auto Look] No looks found yet (attempt ${attempt}/3), waiting...`)
+            await delay(3000)
           }
 
           const lookIds = looks
