@@ -81,7 +81,7 @@ export default function Avatars() {
   const [showTrainingModal, setShowTrainingModal] = useState(false)
   const [trainingAvatar, setTrainingAvatar] = useState<Avatar | null>(null)
   const [trainingStatus, setTrainingStatus] = useState<'training' | 'pending' | 'ready' | 'failed' | null>(null)
-  
+
   // Get all looks from all avatars for the grid display
   const [allLooks, setAllLooks] = useState<Array<{ look: PhotoAvatarLook; avatar: Avatar }>>([])
   const [loadingLooks, setLoadingLooks] = useState(false)
@@ -107,7 +107,7 @@ export default function Avatars() {
     if (currentWeight === targetIndex) return 'current'
     return 'pending'
   }
-  
+
   // AI Generation form fields
   const [aiName, setAiName] = useState('')
   type AIAgeOption = 'Young Adult' | 'Early Middle Age' | 'Late Middle Age' | 'Senior' | 'Unspecified'
@@ -131,21 +131,21 @@ export default function Avatars() {
   const [aiPose, setAiPose] = useState<'half_body' | 'full_body' | 'close_up'>('close_up')
   const [aiStyle, setAiStyle] = useState<'Realistic' | 'Cartoon' | 'Anime'>('Realistic')
   const [aiAppearance, setAiAppearance] = useState('')
-  
+
   // Generate look form fields
   const [lookPrompt, setLookPrompt] = useState('')
   // Always use vertical orientation for looks
   const lookOrientation = 'vertical' as const
   const [lookPose, setLookPose] = useState<'half_body' | 'full_body' | 'close_up'>('close_up')
   const [lookStyle, setLookStyle] = useState<'Realistic' | 'Cartoon' | 'Anime'>('Realistic')
-  
+
   const createPhotoInputRef = useRef<HTMLInputElement>(null)
   const addLooksInputRef = useRef<HTMLInputElement>(null)
   const statusCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const trainingStatusIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const { toast } = useToast()
   const toastRef = useRef(toast)
-  
+
   // Update ref when toast changes
   useEffect(() => {
     toastRef.current = toast
@@ -186,7 +186,7 @@ export default function Avatars() {
       }
 
       // Check user-created avatars that don't have a default_look_id
-      const userCreatedAvatars = avatarsList.filter(avatar => 
+      const userCreatedAvatars = avatarsList.filter(avatar =>
         avatar && isUserCreatedAvatar(avatar) && avatar.status === 'active'
       )
 
@@ -222,7 +222,7 @@ export default function Avatars() {
       const avatarsList = response.data?.avatars || []
       setAvatars(avatarsList)
       setDefaultAvatarId(response.data?.default_avatar_id || null)
-      
+
       // After loading, check if any avatars need look selection (don't block on errors)
       if (avatarsList.length > 0 && checkForUnselectedLooks) {
         // Run this asynchronously without blocking
@@ -246,7 +246,7 @@ export default function Avatars() {
   const loadAllLooks = useCallback(async (avatarsList: Avatar[]) => {
     setLoadingLooks(true)
     const looks: Array<{ look: PhotoAvatarLook; avatar: Avatar }> = []
-    
+
     for (const avatar of avatarsList) {
       try {
         const response = await api.get(`/api/avatars/${avatar.id}/details`)
@@ -262,7 +262,7 @@ export default function Avatars() {
         console.error(`Failed to load looks for avatar ${avatar.id}:`, error)
       }
     }
-    
+
     setAllLooks(looks)
     setLoadingLooks(false)
   }, [])
@@ -299,9 +299,9 @@ export default function Avatars() {
           prev.map(item =>
             item.id === avatar.id
               ? {
-                  ...item,
-                  status: normalizedStatus,
-                }
+                ...item,
+                status: normalizedStatus,
+              }
               : item
           )
         )
@@ -317,7 +317,7 @@ export default function Avatars() {
           }
           setTrainingStatus(newStatus)
           setTrainingAvatar(prev => prev ? { ...prev, status: normalizedStatus } : null)
-          
+
           if (newStatus === 'ready') {
             // Training completed, close modal after a short delay
             toast.success('Avatar training completed! Your avatar is now ready to use.')
@@ -358,8 +358,8 @@ export default function Avatars() {
     )
 
     if (avatarsNeedingUpdate.length === 0) {
-        return
-      }
+      return
+    }
 
     trainingStatusIntervalRef.current = setInterval(() => {
       avatarsNeedingUpdate.forEach(avatar => {
@@ -383,7 +383,7 @@ export default function Avatars() {
           resolve(reader.result)
         } else {
           reject(new Error('Failed to read file'))
-      }
+        }
       }
       reader.onerror = () => reject(new Error('Failed to read file'))
       reader.readAsDataURL(file)
@@ -392,8 +392,8 @@ export default function Avatars() {
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     if (!files.length) {
-        return
-      }
+      return
+    }
 
     const validFiles = files.filter(file => {
       if (!file.type.startsWith('image/')) {
@@ -408,8 +408,8 @@ export default function Avatars() {
     })
 
     if (!validFiles.length) {
-        return
-      }
+      return
+    }
 
     const availableSlots = Math.max(0, MAX_PHOTOS - photoFiles.length)
     if (availableSlots === 0) {
@@ -453,9 +453,9 @@ export default function Avatars() {
   const handleCreateAvatar = async (e?: React.MouseEvent) => {
     e?.preventDefault()
     e?.stopPropagation()
-    
+
     console.log('handleCreateAvatar called', { avatarName, photoCount: photoFiles.length })
-    
+
     if (!avatarName.trim()) {
       toast.error('Please enter an avatar name')
       return
@@ -466,44 +466,44 @@ export default function Avatars() {
     }
 
     setCreating(true)
-    
+
     try {
       const base64Photos = await Promise.all(photoFiles.map(fileToDataUrl))
       const [primaryPhoto, ...additionalPhotos] = base64Photos
-      
+
       console.log('Primary photo prepared, sending to API...', { additionalCount: additionalPhotos.length })
-      
+
       // Send to API - upload photo and create avatar
       console.log('Uploading photo and creating avatar...')
-      
+
       // Add timeout handling
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 120000) // 2 minutes
-      
+
       let response
       try {
         response = await api.post(
           '/api/avatars/upload-photo',
           {
             photo_data: primaryPhoto,
-          avatar_name: avatarName,
+            avatar_name: avatarName,
             additional_photos: additionalPhotos.length ? additionalPhotos : undefined,
           },
           {
-          signal: controller.signal,
+            signal: controller.signal,
           }
         )
-        
+
         clearTimeout(timeoutId)
       } catch (error: any) {
         clearTimeout(timeoutId)
-        
+
         if (error.name === 'AbortError' || error.code === 'ECONNABORTED') {
           throw new Error('Request timed out. The avatar creation is taking longer than expected. Your photo may have been saved - please check your avatars list.')
         }
         throw error
       }
-      
+
       console.log('API response:', response.data)
 
       if (response.data.avatar) {
@@ -513,7 +513,7 @@ export default function Avatars() {
         } else {
           toast.success(response.data.message || 'Avatar creation started! It may take a few minutes to train.')
         }
-        
+
         setShowCreateModal(false)
         setAvatarName('')
         setPhotoFiles([])
@@ -521,14 +521,14 @@ export default function Avatars() {
         if (createPhotoInputRef.current) {
           createPhotoInputRef.current.value = ''
         }
-        
+
         // Wait a bit for looks to be created, then show look selection
         setTimeout(async () => {
           try {
             const detailsResponse = await api.get(`/api/avatars/${response.data.avatar.id}/details`)
             const looks = detailsResponse.data?.looks || []
             const defaultLookId = detailsResponse.data?.default_look_id
-            
+
             // Only show modal if there are looks and no default look is set
             if (looks.length > 0 && !defaultLookId) {
               setLookSelectionModal({ avatar: response.data.avatar, looks })
@@ -537,7 +537,7 @@ export default function Avatars() {
             console.error('Failed to fetch looks for selection:', err)
           }
         }, 3000)
-        
+
         // Reload avatars
         await loadAvatars()
       } else {
@@ -551,23 +551,23 @@ export default function Avatars() {
         status: error.response?.status,
         fullError: error,
       })
-      
-      let errorMessage = 
-        error.response?.data?.error || 
+
+      let errorMessage =
+        error.response?.data?.error ||
         error.response?.data?.message ||
-        error.message || 
+        error.message ||
         'Failed to create avatar. Please check console for details.'
-      
+
       // If it's a storage bucket error, make it more user-friendly
       if (errorMessage.includes('bucket') || errorMessage.includes('Bucket')) {
         errorMessage = 'Storage bucket not configured. Please contact support to set up avatar storage, or create the "avatars" bucket in Supabase Dashboard > Storage with public access.'
       }
-      
+
       // Show full error in console for debugging
       if (error.response?.data) {
         console.error('Full API error response:', JSON.stringify(error.response.data, null, 2))
       }
-      
+
       toast.error(errorMessage)
       setCreating(false) // Set here too in case finally doesn't run
     } finally {
@@ -588,7 +588,7 @@ export default function Avatars() {
   }
 
   const handleGenerateAI = async () => {
-  if (!aiName.trim() || !aiAppearance.trim()) {
+    if (!aiName.trim() || !aiAppearance.trim()) {
       toast.error('Please fill in all required fields')
       return
     }
@@ -609,7 +609,7 @@ export default function Avatars() {
         style: aiStyle,
         appearance: aiAppearance,
       })
-      
+
       const response = await api.post('/api/avatars/generate-ai', {
         name: aiName,
         age: aiAge,
@@ -624,7 +624,7 @@ export default function Avatars() {
       console.log('AI avatar generation response:', response.data)
       const genId = response.data.generation_id
       toast.success('AI avatar generation started! This may take a few minutes.')
-      
+
       // Start polling for status
       startStatusCheck(genId, requestedAiName)
     } catch (error: any) {
@@ -640,18 +640,18 @@ export default function Avatars() {
           baseURL: error.config?.baseURL,
         },
       })
-      
+
       let errorMessage = 'Failed to generate AI avatar'
-      
+
       if (error.response?.status === 404) {
-        errorMessage = error.response?.data?.error || 
+        errorMessage = error.response?.data?.error ||
           'AI avatar generation endpoint not found (404). Please check if the feature is available.'
       } else if (error.response?.data?.error) {
         errorMessage = error.response.data.error
       } else if (error.message) {
         errorMessage = error.message
       }
-      
+
       toast.error(errorMessage)
       setGeneratingAI(false)
       setAiGenerationStage('idle')
@@ -663,13 +663,13 @@ export default function Avatars() {
     setCheckingStatus(true)
     setAiGenerationStage('creating')
     setAiGenerationError(null)
-    
+
     // Check status every 5 seconds
     statusCheckIntervalRef.current = setInterval(async () => {
       try {
         const response = await api.get(`/api/avatars/generation-status/${genId}`)
         const status = response.data
-        
+
         if (status.status === 'success') {
           setAiGenerationStage('photosReady')
           // Generation complete - create avatar group
@@ -677,22 +677,22 @@ export default function Avatars() {
             clearInterval(statusCheckIntervalRef.current)
             statusCheckIntervalRef.current = null
           }
-          
+
           if (status.image_key_list && status.image_key_list.length > 0) {
             try {
               setAiGenerationStage('completing')
-                await api.post('/api/avatars/complete-ai-generation', {
+              await api.post('/api/avatars/complete-ai-generation', {
                 generation_id: genId,
                 image_keys: status.image_key_list,
                 image_urls: status.image_url_list,
                 avatar_name: avatarNameOverride || aiName,
               })
-              
-                setAiGenerationStage('completed')
-                toast.success('AI avatar created successfully!')
-                setShowGenerateAIModal(false)
-                resetAIGenerationForm()
-                await loadAvatars()
+
+              setAiGenerationStage('completed')
+              toast.success('AI avatar created successfully!')
+              setShowGenerateAIModal(false)
+              resetAIGenerationForm()
+              await loadAvatars()
             } catch (err: any) {
               console.error('Failed to complete AI avatar:', err)
               setAiGenerationStage('idle')
@@ -701,7 +701,7 @@ export default function Avatars() {
           } else {
             toast.error('No images were generated')
           }
-          
+
           setCheckingStatus(false)
           setGeneratingAI(false)
         } else if (status.status === 'failed') {
@@ -801,7 +801,7 @@ export default function Avatars() {
       setShowAddLooksModal(false)
       setLookImageFiles([])
       setLookImagePreviews([])
-      
+
       // Refresh avatars and looks
       await loadAvatars()
     } catch (error: any) {
@@ -909,17 +909,17 @@ export default function Avatars() {
 
       console.log('Quick look generation response:', response.data)
       const generationId = response.data?.generation_id
-      
+
       if (generationId) {
         // Mark this avatar as generating
         setGeneratingLookIds(prev => new Set(prev).add(targetAvatar.id))
-        
+
         // Start polling for generation status
         pollLookGenerationStatus(generationId, targetAvatar.id)
       }
-      
+
       toast.success('Look generation started! This may take a few minutes.')
-      
+
       // Clear the prompt
       setQuickPrompt('')
     } catch (error: any) {
@@ -930,12 +930,12 @@ export default function Avatars() {
         next.delete(targetAvatar.id)
         return next
       })
-      
+
       // Handle specific error types
       const errorData = error.response?.data
       const errorCode = errorData?.code || errorData?.error?.code
       const errorMessage = errorData?.error?.message || errorData?.error || errorData?.message || error.message
-      
+
       if (errorCode === 'insufficient_credit' || errorMessage?.includes('Insufficient credit')) {
         toast.error('Insufficient credit. Please add credits to your HeyGen account to generate looks.')
       } else if (errorData?.error) {
@@ -953,7 +953,7 @@ export default function Avatars() {
   const handleGenerateLook = async () => {
     // Use selectedAvatarForLook (from the new flow) or fall back to showLooksModal
     const targetAvatar = selectedAvatarForLook || showLooksModal
-    
+
     if (!targetAvatar || !lookPrompt.trim()) {
       toast.error('Please select an avatar and enter a prompt for the look')
       return
@@ -979,17 +979,17 @@ export default function Avatars() {
 
       console.log('Look generation response:', response.data)
       const generationId = response.data?.generation_id
-      
+
       if (generationId) {
         // Mark this avatar as generating
         setGeneratingLookIds(prev => new Set(prev).add(targetAvatar.id))
-        
+
         // Start polling for generation status
         pollLookGenerationStatus(generationId, targetAvatar.id)
       }
-      
+
       toast.success('Look generation started! This may take a few minutes.')
-      
+
       // Reset all modal states
       setShowGenerateLookModal(false)
       setGenerateLookStep('select-avatar')
@@ -1012,12 +1012,12 @@ export default function Avatars() {
           return next
         })
       }
-      
+
       // Handle specific error types
       const errorData = error.response?.data
       const errorCode = errorData?.code || errorData?.error?.code
       const errorMessage = errorData?.error?.message || errorData?.error || errorData?.message || error.message
-      
+
       if (errorCode === 'insufficient_credit' || errorMessage?.includes('Insufficient credit')) {
         toast.error('Insufficient credit. Please add credits to your HeyGen account to generate looks.')
       } else if (errorData?.error) {
@@ -1049,7 +1049,7 @@ export default function Avatars() {
     })
 
     setLookImageFiles(prev => [...prev, ...validFiles])
-    
+
     // Create previews
     validFiles.forEach(file => {
       const reader = new FileReader()
@@ -1064,10 +1064,10 @@ export default function Avatars() {
 
   // Get status badge styling
   // Filter looks based on selected avatar
-  const filteredLooks = selectedAvatarFilter 
+  const filteredLooks = selectedAvatarFilter
     ? allLooks.filter(item => item.avatar.id === selectedAvatarFilter)
     : allLooks
-  
+
   // Count how many more avatars beyond the visible ones
   const visibleAvatarCount = 7
   const extraAvatarsCount = Math.max(0, avatars.length - visibleAvatarCount)
@@ -1108,17 +1108,15 @@ export default function Avatars() {
             onClick={() => setSelectedAvatarFilter(null)}
             className={`flex flex-col items-center gap-2 flex-shrink-0 group transition-all duration-200`}
           >
-            <div className={`w-20 h-20 rounded-xl flex items-center justify-center border-2 transition-all duration-200 ${
-              selectedAvatarFilter === null 
-                ? 'border-cyan-400 bg-white shadow-lg shadow-cyan-100' 
+            <div className={`w-20 h-20 rounded-xl flex items-center justify-center border-2 transition-all duration-200 ${selectedAvatarFilter === null
+                ? 'border-cyan-400 bg-white shadow-lg shadow-cyan-100'
                 : 'border-slate-200 bg-white hover:border-slate-300'
-            }`}>
-              <span className={`text-sm font-semibold ${
-                selectedAvatarFilter === null ? 'text-slate-900' : 'text-slate-600'
-              }`}>All</span>
-          </div>
+              }`}>
+              <span className={`text-sm font-semibold ${selectedAvatarFilter === null ? 'text-slate-900' : 'text-slate-600'
+                }`}>All</span>
+            </div>
           </button>
-          
+
           {/* Avatar rounded squares */}
           {avatars.slice(0, visibleAvatarCount).map((avatar) => (
             <button
@@ -1126,11 +1124,10 @@ export default function Avatars() {
               onClick={() => setSelectedAvatarFilter(avatar.id === selectedAvatarFilter ? null : avatar.id)}
               className="flex flex-col items-center gap-2 flex-shrink-0 group transition-all duration-200"
             >
-              <div className={`w-20 h-20 rounded-xl overflow-hidden border-2 transition-all duration-200 ${
-                selectedAvatarFilter === avatar.id 
-                  ? 'border-cyan-400 shadow-lg shadow-cyan-100' 
+              <div className={`w-20 h-20 rounded-xl overflow-hidden border-2 transition-all duration-200 ${selectedAvatarFilter === avatar.id
+                  ? 'border-cyan-400 shadow-lg shadow-cyan-100'
                   : 'border-transparent hover:border-slate-300'
-              }`}>
+                }`}>
                 {avatar.thumbnail_url || avatar.preview_url ? (
                   <img
                     src={avatar.thumbnail_url || avatar.preview_url || ''}
@@ -1143,14 +1140,13 @@ export default function Avatars() {
                   </div>
                 )}
               </div>
-              <span className={`text-xs font-medium max-w-[72px] truncate ${
-                selectedAvatarFilter === avatar.id ? 'text-slate-900' : 'text-slate-600'
-              }`}>
+              <span className={`text-xs font-medium max-w-[72px] truncate ${selectedAvatarFilter === avatar.id ? 'text-slate-900' : 'text-slate-600'
+                }`}>
                 {avatar.avatar_name}
               </span>
             </button>
           ))}
-          
+
           {/* Create Avatar button */}
           <button
             onClick={() => setShowCreateModal(true)}
@@ -1163,7 +1159,7 @@ export default function Avatars() {
               Create Avatar
             </span>
           </button>
-          
+
           {/* "+N more" button */}
           {extraAvatarsCount > 0 && (
             <button
@@ -1258,15 +1254,15 @@ export default function Avatars() {
               </div>
               <span className="text-sm font-medium text-slate-700">Create new</span>
             </button>
-            
+
             {/* Generating indicators */}
             {Array.from(generatingLookIds)
               .filter(avatarId => !selectedAvatarFilter || avatarId === selectedAvatarFilter)
               .map(avatarId => {
                 const avatar = avatars.find(a => a.id === avatarId)
                 if (!avatar) return null
-              return (
-                <div
+                return (
+                  <div
                     key={`generating-${avatarId}`}
                     className="group relative aspect-[3/4] rounded-2xl overflow-hidden bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-200 flex flex-col items-center justify-center gap-3"
                   >
@@ -1280,7 +1276,7 @@ export default function Avatars() {
                   </div>
                 )
               })}
-            
+
             {/* Look cards */}
             {loadingLooks ? (
               // Loading skeleton for looks
@@ -1291,9 +1287,9 @@ export default function Avatars() {
               // No looks yet for this avatar
               <div className="col-span-full flex flex-col items-center justify-center py-12">
                 <p className="text-sm text-slate-500 mb-4">No looks yet for this avatar</p>
-                <Button 
+                <Button
                   onClick={() => {
-                    const avatar = selectedAvatarFilter 
+                    const avatar = selectedAvatarFilter
                       ? avatars.find(a => a.id === selectedAvatarFilter)
                       : avatars[0]
                     if (avatar) {
@@ -1315,26 +1311,26 @@ export default function Avatars() {
                   className="group relative aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 hover:shadow-xl transition-all duration-300"
                 >
                   {look.image_url || look.preview_url || look.thumbnail_url ? (
-                      <img
+                    <img
                       src={look.image_url || look.preview_url || look.thumbnail_url || ''}
                       alt={look.name || avatar.avatar_name}
                       className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                      />
-                    ) : (
+                    />
+                  ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-200 to-slate-300">
                       <User className="h-12 w-12 text-slate-400" />
-                      </div>
-                    )}
-                    
+                    </div>
+                  )}
+
                   {/* Default look indicator */}
                   {look.is_default && (
                     <div className="absolute top-3 right-3">
                       <div className="w-8 h-8 rounded-full bg-cyan-500 flex items-center justify-center shadow-lg">
                         <Star className="h-4 w-4 text-white fill-current" />
-                        </div>
                       </div>
-                    )}
-                    
+                    </div>
+                  )}
+
                   {/* Look name and avatar name at bottom */}
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-3 pt-8">
                     <p className="text-white text-sm font-medium truncate">
@@ -1343,13 +1339,13 @@ export default function Avatars() {
                     <p className="text-white/70 text-xs truncate mt-0.5">
                       {avatar.avatar_name}
                     </p>
-                      </div>
+                  </div>
                 </div>
               ))
-                        )}
-                      </div>
-                    )}
-                    
+            )}
+          </div>
+        )}
+
         {/* Bottom prompt bar (HeyGen style) */}
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
           {selectedAvatarFilter ? (
@@ -1369,8 +1365,8 @@ export default function Avatars() {
                       ) : (
                         <div className="w-full h-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
                           <User className="h-5 w-5 text-white" />
-                      </div>
-                    )}
+                        </div>
+                      )}
                     </div>
                     <input
                       type="text"
@@ -1402,17 +1398,17 @@ export default function Avatars() {
                   </>
                 ) : null
               })()}
-                    </div>
+            </div>
           ) : (
             // Show default prompt when no avatar is selected
             <div className="bg-white rounded-full shadow-2xl border border-slate-200 px-5 py-3 flex items-center gap-4 max-w-xl">
               <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center flex-shrink-0">
                 <User className="h-5 w-5 text-white" />
-                  </div>
+              </div>
               <p className="text-sm text-slate-600 flex-1">
                 Choose an identity to customize with new styles and scenes
               </p>
-              <button 
+              <button
                 onClick={() => {
                   setGenerateLookStep('select-avatar')
                   setSelectedAvatarForLook(null)
@@ -1424,579 +1420,579 @@ export default function Avatars() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </button>
-          </div>
-        )}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Create Avatar Modal */}
-        <Modal
-          isOpen={showCreateModal}
-          onClose={handleCloseCreateModal}
-          title="Create Avatar from Photo"
-          size="md"
-        >
-          <div className="space-y-6">
-            <div>
-              <p className="text-sm text-slate-600 mb-4">
-                Upload a front-facing photo to create a personalized avatar for your videos.
-              </p>
-            </div>
-
-            <Input
-              label="Avatar Name"
-              value={avatarName}
-              onChange={(e) => setAvatarName(e.target.value)}
-              placeholder="Enter avatar name (e.g., Professional Business Person)"
-              disabled={creating}
-              required
-            />
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Photos * (upload 1–5 best shots)
-              </label>
-              <p className="text-xs text-slate-500 mb-3">
-                Front-facing, good lighting, no heavy filters. Add multiple angles to improve training success.
-              </p>
-              {photoPreviews.length > 0 ? (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {photoPreviews.map((preview, index) => (
-                      <div key={`${preview}-${index}`} className="relative rounded-lg border-2 border-slate-200 overflow-hidden">
-                        <img
-                          src={preview}
-                          alt={`Preview ${index + 1}`}
-                          className="w-full h-48 object-cover"
-                        />
-                        <div className="absolute top-2 left-2">
-                          <span className={`rounded-full px-2 py-1 text-xs font-semibold ${index === 0 ? 'bg-brand-500 text-white' : 'bg-white/90 text-slate-700'}`}>
-                            {index === 0 ? 'Primary' : 'Secondary'}
-                          </span>
-                        </div>
-                        <div className="absolute top-2 right-2 flex gap-1">
-                          {index !== 0 && (
-                            <button
-                              onClick={() => handleSetPrimaryPhoto(index)}
-                              className="rounded-full bg-white/90 text-slate-700 hover:bg-brand-50 px-2 py-1 text-xs font-medium"
-                            >
-                              Make Primary
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleRemovePhoto(index)}
-                            className="rounded-full bg-red-500 text-white hover:bg-red-600 p-1"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => createPhotoInputRef.current?.click()}
-                    disabled={creating}
-                  >
-                    Add More Photos
-                  </Button>
-                </div>
-              ) : (
-                <div
-                  onClick={() => createPhotoInputRef.current?.click()}
-                  className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center cursor-pointer hover:border-brand-500 transition-colors"
-                >
-                  <Upload className="h-12 w-12 mx-auto text-slate-400 mb-3" />
-                  <p className="text-sm text-slate-600 mb-1">
-                    Click to upload your best photo
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    PNG/JPG up to 10MB each. You can add more after the first upload.
-                  </p>
-                </div>
-              )}
-                  <input
-                ref={createPhotoInputRef}
-                    type="file"
-                    accept="image/*"
-                multiple
-                    onChange={handleFileSelect}
-                    className="hidden"
-                    disabled={creating}
-                  />
-              <p className="mt-2 text-xs text-slate-500">
-                We upload your photo to HeyGen exactly as provided—no automatic cropping or enhancement is applied.
-              </p>
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                <span>Don&apos;t have a usable photo?</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCreateModal(false)
-                    setShowGenerateAIModal(true)
-                  }}
-                  className="font-semibold text-brand-600 hover:text-brand-700"
-                >
-                  Generate an AI avatar instead
-                </button>
-                </div>
-            </div>
-
-            <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
-              <Button
-                variant="ghost"
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  handleCloseCreateModal()
-                }}
-                disabled={creating}
-                type="button"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  console.log('Create Avatar button clicked', { 
-                    creating, 
-                    hasName: !!avatarName.trim(), 
-                    hasFile: photoFiles.length > 0,
-                    avatarName,
-                    photoCount: photoFiles.length
-                  })
-                  handleCreateAvatar(e).catch((err) => {
-                    console.error('Error in handleCreateAvatar:', err)
-                  })
-                }}
-                disabled={creating || !avatarName.trim() || photoFiles.length === 0}
-                loading={creating}
-                type="button"
-              >
-                {creating ? 'Creating...' : 'Create Avatar'}
-              </Button>
-            </div>
-          </div>
-        </Modal>
-
-        {/* Generate AI Avatar Modal */}
-        <Modal
-          isOpen={showGenerateAIModal}
-          onClose={handleCloseGenerateAIModal}
-          title="Generate AI Avatar"
-          size="md"
-        >
-          <div className="space-y-6">
-            {checkingStatus ? (
-              <div className="space-y-6">
-                <div className="text-center py-4">
-                  <RefreshCw className="h-10 w-10 mx-auto text-brand-500 animate-spin mb-3" />
-                  <p className="text-lg font-semibold text-slate-900 mb-1">
-                  Generating your avatar...
-                </p>
-                <p className="text-sm text-slate-600">
-                    This runs in the background—you can close this window and we&apos;ll keep working.
-                  </p>
-                  {aiGenerationError && (
-                    <p className="mt-3 text-sm text-red-600">
-                      {aiGenerationError}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-3">
-                  {aiStageFlow.map(({ key, title, description }) => {
-                    const state = getAiStageState(key)
-                    const colorClasses =
-                      state === 'done'
-                        ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
-                        : state === 'current'
-                          ? 'border-brand-200 bg-brand-50 text-brand-900'
-                          : 'border-slate-200 bg-white text-slate-600'
-                    return (
-                      <div
-                        key={key}
-                        className={`flex items-start gap-3 rounded-lg border p-3 text-sm ${colorClasses}`}
-                      >
-                        <div className="mt-0.5">
-                          {state === 'done' && <CheckCircle2 className="h-4 w-4" />}
-                          {state === 'current' && <Loader2 className="h-4 w-4 animate-spin" />}
-                          {state === 'pending' && <Circle className="h-4 w-4 text-slate-300" />}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-slate-900">{title}</p>
-                          <p className="mt-1 text-xs text-slate-600">{description}</p>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="rounded-lg bg-gradient-to-r from-brand-50 to-purple-50 border border-brand-200 p-4 mb-2">
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-purple-500 flex items-center justify-center shrink-0">
-                      <Sparkles className="h-4 w-4 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900 mb-1">Optimized for TikTok & Vertical Video</p>
-                      <p className="text-xs text-slate-600">
-                        Your AI avatar will be generated in vertical format (9:16), perfect for TikTok, Instagram Reels, and YouTube Shorts.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Input
-                    label="Avatar Name *"
-                    value={aiName}
-                    onChange={(e) => setAiName(e.target.value)}
-                    placeholder="e.g., Professional Business Person"
-                    disabled={generatingAI}
-                  />
-                  
-                  <Select
-                    label="Age *"
-                    value={aiAge}
-                    onChange={(e) => setAiAge(e.target.value as any)}
-                    options={[
-                      { value: 'Young Adult', label: 'Young Adult' },
-                      { value: 'Early Middle Age', label: 'Early Middle Age' },
-                      { value: 'Late Middle Age', label: 'Late Middle Age' },
-                      { value: 'Senior', label: 'Senior' },
-                      { value: 'Unspecified', label: 'Unspecified' },
-                    ]}
-                    disabled={generatingAI}
-                  />
-
-                  <Select
-                    label="Gender *"
-                    value={aiGender}
-                    onChange={(e) => setAiGender(e.target.value as any)}
-                    options={[
-                      { value: 'Man', label: 'Man' },
-                      { value: 'Woman', label: 'Woman' },
-                    ]}
-                    disabled={generatingAI}
-                  />
-
-                  <Select
-                    label="Ethnicity *"
-                    value={aiEthnicity}
-                    onChange={(e) => setAiEthnicity(e.target.value as (typeof AI_ETHNICITY_OPTIONS)[number])}
-                    options={AI_ETHNICITY_OPTIONS.map(value => ({ value, label: value }))}
-                    disabled={generatingAI}
-                  />
-
-                  <Select
-                    label="Pose *"
-                    value={aiPose}
-                    onChange={(e) => setAiPose(e.target.value as any)}
-                    options={[
-                      { value: 'close_up', label: 'Close Up' },
-                      { value: 'half_body', label: 'Half Body' },
-                      { value: 'full_body', label: 'Full Body' },
-                    ]}
-                    disabled={generatingAI}
-                  />
-
-                  <Select
-                    label="Style *"
-                    value={aiStyle}
-                    onChange={(e) => setAiStyle(e.target.value as any)}
-                    options={[
-                      { value: 'Realistic', label: 'Realistic' },
-                      { value: 'Cartoon', label: 'Cartoon' },
-                      { value: 'Anime', label: 'Anime' },
-                    ]}
-                    disabled={generatingAI}
-                  />
-                </div>
-
-                <Textarea
-                  label="Appearance Description *"
-                  value={aiAppearance}
-                  onChange={(e) => setAiAppearance(e.target.value)}
-                  placeholder="Describe the appearance in detail: hair color, clothing, expression, etc. e.g., 'Brown hair, professional business suit, friendly smile'"
-                  rows={4}
-                  disabled={generatingAI}
-                />
-                <p className="text-xs text-slate-500">
-                  Tip: include outfit, camera framing, vibe (e.g., &ldquo;vertical close-up, confident smile, soft office lighting&rdquo;).
-                </p>
-
-                <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
-                  <Button
-                    variant="ghost"
-                    onClick={handleCloseGenerateAIModal}
-                    disabled={generatingAI}
-                    type="button"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleGenerateAI}
-                    disabled={generatingAI || !aiName.trim() || !aiEthnicity.trim() || !aiAppearance.trim()}
-                    loading={generatingAI}
-                    type="button"
-                  >
-                    {generatingAI ? 'Generating...' : 'Generate Avatar'}
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-        </Modal>
-
-        {/* Manage Looks Modal */}
-        <Modal
-          isOpen={!!showLooksModal}
-          onClose={() => {
-            setShowLooksModal(null)
-            setShowAddLooksModal(false)
-            setShowGenerateLookModal(false)
-          }}
-          title={`Manage Looks - ${showLooksModal?.avatar_name || ''}`}
-          size="md"
-        >
-          <div className="space-y-4">
-            <p className="text-sm text-slate-600">
-              Add new looks to this avatar by uploading photos or generating them with AI.
+      <Modal
+        isOpen={showCreateModal}
+        onClose={handleCloseCreateModal}
+        title="Create Avatar from Photo"
+        size="md"
+      >
+        <div className="space-y-6">
+          <div>
+            <p className="text-sm text-slate-600 mb-4">
+              Upload a front-facing photo to create a personalized avatar for your videos.
             </p>
-            <div className="flex gap-3">
-              <Button
-                onClick={() => {
-                  setShowAddLooksModal(true)
-                  setShowGenerateLookModal(false)
-                }}
-                className="flex-1"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Upload Looks
-              </Button>
-              <Button
-                onClick={() => {
-                  // Skip avatar selection since we already have an avatar selected
-                  if (showLooksModal) {
-                    setSelectedAvatarForLook(showLooksModal)
-                    setGenerateLookStep('generate')
-                  }
-                  setShowGenerateLookModal(true)
-                  setShowAddLooksModal(false)
-                }}
-                variant="secondary"
-                className="flex-1"
-              >
-                <Sparkles className="h-4 w-4 mr-2" />
-                Generate Look
-              </Button>
-            </div>
           </div>
-        </Modal>
 
-        {/* Add Looks Modal */}
-        <Modal
-          isOpen={showAddLooksModal && !!showLooksModal}
-          onClose={() => {
-            setShowAddLooksModal(false)
-            setLookImageFiles([])
-            setLookImagePreviews([])
-          }}
-          title="Add Looks to Avatar"
-          size="md"
-        >
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Upload Photos *
-              </label>
-              {lookImagePreviews.length > 0 ? (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    {lookImagePreviews.map((preview, index) => (
-                      <div key={index} className="relative">
-                        <div
-                          className="rounded-lg border-2 border-slate-200 overflow-hidden"
-                          style={{ aspectRatio: '9 / 16' }}
-                        >
-                          <img
-                            src={preview}
-                            alt={`Preview ${index + 1}`}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
+          <Input
+            label="Avatar Name"
+            value={avatarName}
+            onChange={(e) => setAvatarName(e.target.value)}
+            placeholder="Enter avatar name (e.g., Professional Business Person)"
+            disabled={creating}
+            required
+          />
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Photos * (upload 1–5 best shots)
+            </label>
+            <p className="text-xs text-slate-500 mb-3">
+              Front-facing, good lighting, no heavy filters. Add multiple angles to improve training success.
+            </p>
+            {photoPreviews.length > 0 ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {photoPreviews.map((preview, index) => (
+                    <div key={`${preview}-${index}`} className="relative rounded-lg border-2 border-slate-200 overflow-hidden">
+                      <img
+                        src={preview}
+                        alt={`Preview ${index + 1}`}
+                        className="w-full h-48 object-cover"
+                      />
+                      <div className="absolute top-2 left-2">
+                        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${index === 0 ? 'bg-brand-500 text-white' : 'bg-white/90 text-slate-700'}`}>
+                          {index === 0 ? 'Primary' : 'Secondary'}
+                        </span>
+                      </div>
+                      <div className="absolute top-2 right-2 flex gap-1">
+                        {index !== 0 && (
+                          <button
+                            onClick={() => handleSetPrimaryPhoto(index)}
+                            className="rounded-full bg-white/90 text-slate-700 hover:bg-brand-50 px-2 py-1 text-xs font-medium"
+                          >
+                            Make Primary
+                          </button>
+                        )}
                         <button
-                          onClick={() => {
-                            setLookImageFiles(lookImageFiles.filter((_, i) => i !== index))
-                            setLookImagePreviews(lookImagePreviews.filter((_, i) => i !== index))
-                          }}
-                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                          onClick={() => handleRemovePhoto(index)}
+                          className="rounded-full bg-red-500 text-white hover:bg-red-600 p-1"
                         >
                           <X className="h-3 w-3" />
                         </button>
                       </div>
-                    ))}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => addLooksInputRef.current?.click()}
-                    disabled={addingLooks}
-                  >
-                    Add More Photos
-                  </Button>
+                    </div>
+                  ))}
                 </div>
-              ) : (
-                <div
-                  onClick={() => addLooksInputRef.current?.click()}
-                  className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center cursor-pointer hover:border-brand-500 transition-colors"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => createPhotoInputRef.current?.click()}
+                  disabled={creating}
                 >
-                  <Upload className="h-12 w-12 mx-auto text-slate-400 mb-3" />
-                  <p className="text-sm text-slate-600 mb-1">
-                    Click to upload photos
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    PNG, JPG up to 10MB. You can upload multiple photos.
-                  </p>
-                </div>
-              )}
-              <input
-                ref={addLooksInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleLookFileSelect}
-                className="hidden"
-                disabled={addingLooks}
-              />
+                  Add More Photos
+                </Button>
+              </div>
+            ) : (
+              <div
+                onClick={() => createPhotoInputRef.current?.click()}
+                className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center cursor-pointer hover:border-brand-500 transition-colors"
+              >
+                <Upload className="h-12 w-12 mx-auto text-slate-400 mb-3" />
+                <p className="text-sm text-slate-600 mb-1">
+                  Click to upload your best photo
+                </p>
+                <p className="text-xs text-slate-500">
+                  PNG/JPG up to 10MB each. You can add more after the first upload.
+                </p>
+              </div>
+            )}
+            <input
+              ref={createPhotoInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleFileSelect}
+              className="hidden"
+              disabled={creating}
+            />
+            <p className="mt-2 text-xs text-slate-500">
+              We upload your photo to HeyGen exactly as provided—no automatic cropping or enhancement is applied.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+              <span>Don&apos;t have a usable photo?</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCreateModal(false)
+                  setShowGenerateAIModal(true)
+                }}
+                className="font-semibold text-brand-600 hover:text-brand-700"
+              >
+                Generate an AI avatar instead
+              </button>
             </div>
+          </div>
+
+          <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
+            <Button
+              variant="ghost"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                handleCloseCreateModal()
+              }}
+              disabled={creating}
+              type="button"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                console.log('Create Avatar button clicked', {
+                  creating,
+                  hasName: !!avatarName.trim(),
+                  hasFile: photoFiles.length > 0,
+                  avatarName,
+                  photoCount: photoFiles.length
+                })
+                handleCreateAvatar(e).catch((err) => {
+                  console.error('Error in handleCreateAvatar:', err)
+                })
+              }}
+              disabled={creating || !avatarName.trim() || photoFiles.length === 0}
+              loading={creating}
+              type="button"
+            >
+              {creating ? 'Creating...' : 'Create Avatar'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Generate AI Avatar Modal */}
+      <Modal
+        isOpen={showGenerateAIModal}
+        onClose={handleCloseGenerateAIModal}
+        title="Generate AI Avatar"
+        size="md"
+      >
+        <div className="space-y-6">
+          {checkingStatus ? (
+            <div className="space-y-6">
+              <div className="text-center py-4">
+                <RefreshCw className="h-10 w-10 mx-auto text-brand-500 animate-spin mb-3" />
+                <p className="text-lg font-semibold text-slate-900 mb-1">
+                  Generating your avatar...
+                </p>
+                <p className="text-sm text-slate-600">
+                  This runs in the background—you can close this window and we&apos;ll keep working.
+                </p>
+                {aiGenerationError && (
+                  <p className="mt-3 text-sm text-red-600">
+                    {aiGenerationError}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-3">
+                {aiStageFlow.map(({ key, title, description }) => {
+                  const state = getAiStageState(key)
+                  const colorClasses =
+                    state === 'done'
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                      : state === 'current'
+                        ? 'border-brand-200 bg-brand-50 text-brand-900'
+                        : 'border-slate-200 bg-white text-slate-600'
+                  return (
+                    <div
+                      key={key}
+                      className={`flex items-start gap-3 rounded-lg border p-3 text-sm ${colorClasses}`}
+                    >
+                      <div className="mt-0.5">
+                        {state === 'done' && <CheckCircle2 className="h-4 w-4" />}
+                        {state === 'current' && <Loader2 className="h-4 w-4 animate-spin" />}
+                        {state === 'pending' && <Circle className="h-4 w-4 text-slate-300" />}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-900">{title}</p>
+                        <p className="mt-1 text-xs text-slate-600">{description}</p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="rounded-lg bg-gradient-to-r from-brand-50 to-purple-50 border border-brand-200 p-4 mb-2">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-purple-500 flex items-center justify-center shrink-0">
+                    <Sparkles className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900 mb-1">Optimized for TikTok & Vertical Video</p>
+                    <p className="text-xs text-slate-600">
+                      Your AI avatar will be generated in vertical format (9:16), perfect for TikTok, Instagram Reels, and YouTube Shorts.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Input
+                  label="Avatar Name *"
+                  value={aiName}
+                  onChange={(e) => setAiName(e.target.value)}
+                  placeholder="e.g., Professional Business Person"
+                  disabled={generatingAI}
+                />
+
+                <Select
+                  label="Age *"
+                  value={aiAge}
+                  onChange={(e) => setAiAge(e.target.value as any)}
+                  options={[
+                    { value: 'Young Adult', label: 'Young Adult' },
+                    { value: 'Early Middle Age', label: 'Early Middle Age' },
+                    { value: 'Late Middle Age', label: 'Late Middle Age' },
+                    { value: 'Senior', label: 'Senior' },
+                    { value: 'Unspecified', label: 'Unspecified' },
+                  ]}
+                  disabled={generatingAI}
+                />
+
+                <Select
+                  label="Gender *"
+                  value={aiGender}
+                  onChange={(e) => setAiGender(e.target.value as any)}
+                  options={[
+                    { value: 'Man', label: 'Man' },
+                    { value: 'Woman', label: 'Woman' },
+                  ]}
+                  disabled={generatingAI}
+                />
+
+                <Select
+                  label="Ethnicity *"
+                  value={aiEthnicity}
+                  onChange={(e) => setAiEthnicity(e.target.value as (typeof AI_ETHNICITY_OPTIONS)[number])}
+                  options={AI_ETHNICITY_OPTIONS.map(value => ({ value, label: value }))}
+                  disabled={generatingAI}
+                />
+
+                <Select
+                  label="Pose *"
+                  value={aiPose}
+                  onChange={(e) => setAiPose(e.target.value as any)}
+                  options={[
+                    { value: 'close_up', label: 'Close Up' },
+                    { value: 'half_body', label: 'Half Body' },
+                    { value: 'full_body', label: 'Full Body' },
+                  ]}
+                  disabled={generatingAI}
+                />
+
+                <Select
+                  label="Style *"
+                  value={aiStyle}
+                  onChange={(e) => setAiStyle(e.target.value as any)}
+                  options={[
+                    { value: 'Realistic', label: 'Realistic' },
+                    { value: 'Cartoon', label: 'Cartoon' },
+                    { value: 'Anime', label: 'Anime' },
+                  ]}
+                  disabled={generatingAI}
+                />
+              </div>
+
+              <Textarea
+                label="Appearance Description *"
+                value={aiAppearance}
+                onChange={(e) => setAiAppearance(e.target.value)}
+                placeholder="Describe the appearance in detail: hair color, clothing, expression, etc. e.g., 'Brown hair, professional business suit, friendly smile'"
+                rows={4}
+                disabled={generatingAI}
+              />
+              <p className="text-xs text-slate-500">
+                Tip: include outfit, camera framing, vibe (e.g., &ldquo;vertical close-up, confident smile, soft office lighting&rdquo;).
+              </p>
+
+              <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
+                <Button
+                  variant="ghost"
+                  onClick={handleCloseGenerateAIModal}
+                  disabled={generatingAI}
+                  type="button"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleGenerateAI}
+                  disabled={generatingAI || !aiName.trim() || !aiEthnicity.trim() || !aiAppearance.trim()}
+                  loading={generatingAI}
+                  type="button"
+                >
+                  {generatingAI ? 'Generating...' : 'Generate Avatar'}
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
+
+      {/* Manage Looks Modal */}
+      <Modal
+        isOpen={!!showLooksModal}
+        onClose={() => {
+          setShowLooksModal(null)
+          setShowAddLooksModal(false)
+          setShowGenerateLookModal(false)
+        }}
+        title={`Manage Looks - ${showLooksModal?.avatar_name || ''}`}
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Add new looks to this avatar by uploading photos or generating them with AI.
+          </p>
+          <div className="flex gap-3">
+            <Button
+              onClick={() => {
+                setShowAddLooksModal(true)
+                setShowGenerateLookModal(false)
+              }}
+              className="flex-1"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Upload Looks
+            </Button>
+            <Button
+              onClick={() => {
+                // Skip avatar selection since we already have an avatar selected
+                if (showLooksModal) {
+                  setSelectedAvatarForLook(showLooksModal)
+                  setGenerateLookStep('generate')
+                }
+                setShowGenerateLookModal(true)
+                setShowAddLooksModal(false)
+              }}
+              variant="secondary"
+              className="flex-1"
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              Generate Look
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Add Looks Modal */}
+      <Modal
+        isOpen={showAddLooksModal && !!showLooksModal}
+        onClose={() => {
+          setShowAddLooksModal(false)
+          setLookImageFiles([])
+          setLookImagePreviews([])
+        }}
+        title="Add Looks to Avatar"
+        size="md"
+      >
+        <div className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Upload Photos *
+            </label>
+            {lookImagePreviews.length > 0 ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  {lookImagePreviews.map((preview, index) => (
+                    <div key={index} className="relative">
+                      <div
+                        className="rounded-lg border-2 border-slate-200 overflow-hidden"
+                        style={{ aspectRatio: '9 / 16' }}
+                      >
+                        <img
+                          src={preview}
+                          alt={`Preview ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <button
+                        onClick={() => {
+                          setLookImageFiles(lookImageFiles.filter((_, i) => i !== index))
+                          setLookImagePreviews(lookImagePreviews.filter((_, i) => i !== index))
+                        }}
+                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => addLooksInputRef.current?.click()}
+                  disabled={addingLooks}
+                >
+                  Add More Photos
+                </Button>
+              </div>
+            ) : (
+              <div
+                onClick={() => addLooksInputRef.current?.click()}
+                className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center cursor-pointer hover:border-brand-500 transition-colors"
+              >
+                <Upload className="h-12 w-12 mx-auto text-slate-400 mb-3" />
+                <p className="text-sm text-slate-600 mb-1">
+                  Click to upload photos
+                </p>
+                <p className="text-xs text-slate-500">
+                  PNG, JPG up to 10MB. You can upload multiple photos.
+                </p>
+              </div>
+            )}
+            <input
+              ref={addLooksInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleLookFileSelect}
+              className="hidden"
+              disabled={addingLooks}
+            />
+          </div>
+
+          <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowAddLooksModal(false)
+                setLookImageFiles([])
+                setLookImagePreviews([])
+              }}
+              disabled={addingLooks}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddLooks}
+              disabled={addingLooks || lookImageFiles.length === 0}
+              loading={addingLooks}
+            >
+              {addingLooks ? 'Adding Looks...' : 'Add Looks'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Generate Look Modal - Two Step Flow */}
+      <Modal
+        isOpen={showGenerateLookModal}
+        onClose={() => {
+          setShowGenerateLookModal(false)
+          setGenerateLookStep('select-avatar')
+          setSelectedAvatarForLook(null)
+          setLookPrompt('')
+          setLookPose('close_up')
+          setLookStyle('Realistic')
+        }}
+        title={generateLookStep === 'select-avatar' ? 'Select Avatar' : 'Generate AI Look'}
+        size={generateLookStep === 'select-avatar' ? 'xl' : 'md'}
+      >
+        {generateLookStep === 'select-avatar' ? (
+          /* Step 1: Select Avatar */
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Choose an avatar to generate a new look for. Only trained avatars can have new looks generated.
+            </p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-h-[60vh] overflow-y-auto pr-2 -mr-2">
+              {avatars
+                .filter(avatar => avatar.status === 'active')
+                .map((avatar) => (
+                  <button
+                    key={avatar.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedAvatarForLook(avatar)
+                      setShowLooksModal(avatar)
+                      setGenerateLookStep('generate')
+                    }}
+                    className="relative rounded-xl border-2 border-slate-200 bg-white p-3 transition-all hover:scale-105 hover:border-brand-300 hover:shadow-md text-left"
+                  >
+                    {avatar.thumbnail_url || avatar.preview_url ? (
+                      <img
+                        src={avatar.thumbnail_url || avatar.preview_url || ''}
+                        alt={avatar.avatar_name}
+                        className="w-full aspect-[3/4] object-cover rounded-lg mb-2 bg-slate-50"
+                      />
+                    ) : (
+                      <div className="w-full aspect-[3/4] bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center mb-2">
+                        <User className="h-12 w-12 text-white opacity-50" />
+                      </div>
+                    )}
+                    <p className="text-xs font-medium text-slate-700 truncate text-center">
+                      {avatar.avatar_name}
+                    </p>
+                  </button>
+                ))}
+            </div>
+
+            {avatars.filter(avatar => avatar.status === 'active').length === 0 && (
+              <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                <User className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+                <p className="text-sm text-slate-600 mb-1">No trained avatars available</p>
+                <p className="text-xs text-slate-500">
+                  Train an avatar first before generating looks
+                </p>
+              </div>
+            )}
 
             <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
               <Button
                 variant="ghost"
                 onClick={() => {
-                  setShowAddLooksModal(false)
-                  setLookImageFiles([])
-                  setLookImagePreviews([])
+                  setShowGenerateLookModal(false)
+                  setGenerateLookStep('select-avatar')
+                  setSelectedAvatarForLook(null)
                 }}
-                disabled={addingLooks}
               >
                 Cancel
               </Button>
-              <Button
-                onClick={handleAddLooks}
-                disabled={addingLooks || lookImageFiles.length === 0}
-                loading={addingLooks}
-              >
-                {addingLooks ? 'Adding Looks...' : 'Add Looks'}
-              </Button>
             </div>
           </div>
-        </Modal>
-
-        {/* Generate Look Modal - Two Step Flow */}
-        <Modal
-          isOpen={showGenerateLookModal}
-          onClose={() => {
-            setShowGenerateLookModal(false)
-            setGenerateLookStep('select-avatar')
-            setSelectedAvatarForLook(null)
-            setLookPrompt('')
-            setLookPose('close_up')
-            setLookStyle('Realistic')
-          }}
-          title={generateLookStep === 'select-avatar' ? 'Select Avatar' : 'Generate AI Look'}
-          size={generateLookStep === 'select-avatar' ? 'xl' : 'md'}
-        >
-          {generateLookStep === 'select-avatar' ? (
-            /* Step 1: Select Avatar */
-            <div className="space-y-4">
-            <p className="text-sm text-slate-600">
-                Choose an avatar to generate a new look for. Only trained avatars can have new looks generated.
-              </p>
-              
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-h-[60vh] overflow-y-auto pr-2 -mr-2">
-                {avatars
-                  .filter(avatar => avatar.status === 'active')
-                  .map((avatar) => (
-                    <button
-                      key={avatar.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedAvatarForLook(avatar)
-                        setShowLooksModal(avatar)
-                        setGenerateLookStep('generate')
-                      }}
-                      className="relative rounded-xl border-2 border-slate-200 bg-white p-3 transition-all hover:scale-105 hover:border-brand-300 hover:shadow-md text-left"
-                    >
-                      {avatar.thumbnail_url || avatar.preview_url ? (
-                        <img
-                          src={avatar.thumbnail_url || avatar.preview_url || ''}
-                          alt={avatar.avatar_name}
-                          className="w-full aspect-[3/4] object-cover rounded-lg mb-2 bg-slate-50"
-                        />
-                      ) : (
-                        <div className="w-full aspect-[3/4] bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center mb-2">
-                          <User className="h-12 w-12 text-white opacity-50" />
-                        </div>
-                      )}
-                      <p className="text-xs font-medium text-slate-700 truncate text-center">
-                        {avatar.avatar_name}
-                      </p>
-                    </button>
-                  ))}
-              </div>
-
-              {avatars.filter(avatar => avatar.status === 'active').length === 0 && (
-                <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                  <User className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-                  <p className="text-sm text-slate-600 mb-1">No trained avatars available</p>
-                  <p className="text-xs text-slate-500">
-                    Train an avatar first before generating looks
-                  </p>
-                </div>
-              )}
-
-              <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setShowGenerateLookModal(false)
-                    setGenerateLookStep('select-avatar')
-                    setSelectedAvatarForLook(null)
-                  }}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          ) : (
-            /* Step 2: Generate Look Form (Avatar is locked) */
-            <div className="space-y-6">
-              {/* Selected Avatar Display - Locked, no option to change */}
-              {selectedAvatarForLook && (
-                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
-                  {selectedAvatarForLook.thumbnail_url || selectedAvatarForLook.preview_url ? (
-                    <img
-                      src={selectedAvatarForLook.thumbnail_url || selectedAvatarForLook.preview_url || ''}
-                      alt={selectedAvatarForLook.avatar_name}
-                      className="w-12 h-12 object-cover rounded-lg"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center">
-                      <User className="h-6 w-6 text-white opacity-50" />
-                    </div>
-                  )}
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-slate-700">{selectedAvatarForLook.avatar_name}</p>
-                    <p className="text-xs text-slate-500">Selected avatar</p>
+        ) : (
+          /* Step 2: Generate Look Form (Avatar is locked) */
+          <div className="space-y-6">
+            {/* Selected Avatar Display - Locked, no option to change */}
+            {selectedAvatarForLook && (
+              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                {selectedAvatarForLook.thumbnail_url || selectedAvatarForLook.preview_url ? (
+                  <img
+                    src={selectedAvatarForLook.thumbnail_url || selectedAvatarForLook.preview_url || ''}
+                    alt={selectedAvatarForLook.avatar_name}
+                    className="w-12 h-12 object-cover rounded-lg"
+                  />
+                ) : (
+                  <div className="w-12 h-12 bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center">
+                    <User className="h-6 w-6 text-white opacity-50" />
                   </div>
-                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                )}
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-slate-700">{selectedAvatarForLook.avatar_name}</p>
+                  <p className="text-xs text-slate-500">Selected avatar</p>
                 </div>
-              )}
+                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+              </div>
+            )}
 
             <Textarea
               label="Look Description *"
@@ -2038,8 +2034,8 @@ export default function Avatars() {
                 variant="ghost"
                 onClick={() => {
                   setShowGenerateLookModal(false)
-                    setGenerateLookStep('select-avatar')
-                    setSelectedAvatarForLook(null)
+                  setGenerateLookStep('select-avatar')
+                  setSelectedAvatarForLook(null)
                   setLookPrompt('')
                   setLookPose('close_up')
                   setLookStyle('Realistic')
@@ -2056,298 +2052,317 @@ export default function Avatars() {
                 {generatingLook ? 'Generating...' : 'Generate Look'}
               </Button>
             </div>
-            </div>
-          )}
-        </Modal>
+          </div>
+        )}
+      </Modal>
 
-        {/* Look Selection Modal - shown after avatar creation or when returning to platform */}
-        <Modal
-          isOpen={!!lookSelectionModal}
-          onClose={() => {
-            // Prevent closing without selecting - user must choose a look
-            if (!selectedLookId) {
-              toast.warning('Please select a look to continue. This selection is required.')
-              return
-            }
-            setLookSelectionModal(null)
-            setSelectedLookId(null)
-          }}
-          title="Choose Your Avatar Look"
-          size="lg"
-          closeOnOverlayClick={false}
-          showCloseButton={false}
-        >
-          {lookSelectionModal && (
-            <div className="space-y-4">
-              <p className="text-sm text-slate-600">
-                Select the look you want to use for this avatar. This choice is permanent and cannot be changed later.
-              </p>
-              <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
-                {lookSelectionModal.looks.map((look: PhotoAvatarLook) => (
-                  <div
-                    key={look.id}
-                    onClick={() => setSelectedLookId(look.id)}
-                    className={`relative flex-shrink-0 w-32 rounded-lg border-2 overflow-hidden transition-all cursor-pointer ${
-                      selectedLookId === look.id
-                        ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-200'
-                        : 'border-slate-200 bg-white hover:border-brand-300'
+      {/* Look Selection Modal - shown after avatar creation or when returning to platform */}
+      <Modal
+        isOpen={!!lookSelectionModal}
+        onClose={() => {
+          // Prevent closing without selecting - user must choose a look
+          if (!selectedLookId) {
+            toast.warning('Please select a look to continue. This selection is required.')
+            return
+          }
+          setLookSelectionModal(null)
+          setSelectedLookId(null)
+        }}
+        title="Choose Your Avatar Look"
+        size="lg"
+        closeOnOverlayClick={false}
+        showCloseButton={false}
+      >
+        {lookSelectionModal && (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Select the look you want to use for this avatar. This choice is permanent and cannot be changed later.
+            </p>
+            <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
+              {lookSelectionModal.looks.map((look: PhotoAvatarLook) => (
+                <div
+                  key={look.id}
+                  onClick={() => setSelectedLookId(look.id)}
+                  className={`relative flex-shrink-0 w-32 rounded-lg border-2 overflow-hidden transition-all cursor-pointer ${selectedLookId === look.id
+                      ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-200'
+                      : 'border-slate-200 bg-white hover:border-brand-300'
                     }`}
-                  >
-                    {look.thumbnail_url || look.image_url ? (
-                      <div className="w-full aspect-[9/16] bg-slate-50 flex items-center justify-center overflow-hidden">
-                        <img
-                          src={look.thumbnail_url || look.image_url || ''}
-                          alt={look.name || 'Look'}
-                          className="w-full h-full object-contain"
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-full aspect-[9/16] bg-slate-100 flex items-center justify-center">
-                        <User className="h-6 w-6 text-slate-400" />
-                      </div>
-                    )}
-                    <div className="p-1.5">
-                      <p className="text-xs font-medium text-slate-900 truncate">
-                        {look.name || 'Unnamed Look'}
-                      </p>
+                >
+                  {look.thumbnail_url || look.image_url ? (
+                    <div className="w-full aspect-[9/16] bg-slate-50 flex items-center justify-center overflow-hidden">
+                      <img
+                        src={look.thumbnail_url || look.image_url || ''}
+                        alt={look.name || 'Look'}
+                        className="w-full h-full object-contain"
+                      />
                     </div>
-                    {selectedLookId === look.id && (
-                      <div className="absolute top-1.5 right-1.5 bg-brand-500 text-white px-1.5 py-0.5 rounded text-xs font-semibold flex items-center gap-1">
-                        <Star className="h-2.5 w-2.5 fill-current" />
-                        Selected
-                      </div>
-                    )}
+                  ) : (
+                    <div className="w-full aspect-[9/16] bg-slate-100 flex items-center justify-center">
+                      <User className="h-6 w-6 text-slate-400" />
+                    </div>
+                  )}
+                  <div className="p-1.5">
+                    <p className="text-xs font-medium text-slate-900 truncate">
+                      {look.name || 'Unnamed Look'}
+                    </p>
                   </div>
-                ))}
-              </div>
-              <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
-                <Button
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    console.log('Confirm Selection button clicked', { selectedLookId, lookSelectionModal })
-                    if (!selectedLookId || !lookSelectionModal) {
-                      toast.warning('Please select a look to continue')
-                      return
-                    }
-                    // Use async IIFE to handle the API call
-                    (async () => {
-                      if (!lookSelectionModal) return
-                      
-                      const avatarToProcess = lookSelectionModal.avatar
-                      const avatarIdToTrain = avatarToProcess.id
-                      
+                  {selectedLookId === look.id && (
+                    <div className="absolute top-1.5 right-1.5 bg-brand-500 text-white px-1.5 py-0.5 rounded text-xs font-semibold flex items-center gap-1">
+                      <Star className="h-2.5 w-2.5 fill-current" />
+                      Selected
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
+              <Button
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  console.log('Confirm Selection button clicked', { selectedLookId, lookSelectionModal })
+                  if (!selectedLookId || !lookSelectionModal) {
+                    toast.warning('Please select a look to continue')
+                    return
+                  }
+                  // Show training modal immediately
+                  if (lookSelectionModal) {
+                    const avatarToProcess = lookSelectionModal.avatar
+                    setTrainingAvatar(avatarToProcess)
+                    setTrainingStatus('pending')
+                    setShowTrainingModal(true)
+                    setLookSelectionModal(null)
+                  }
+
+                  // Use async IIFE to handle the API call
+                  (async () => {
+                    if (!lookSelectionModal) return
+
+                    const avatarToProcess = lookSelectionModal.avatar
+                    const avatarIdToTrain = avatarToProcess.id
+
+                    try {
+                      console.log('Calling API:', `/api/avatars/${avatarIdToTrain}/set-default-look`, { look_id: selectedLookId })
+                      const response = await api.post(`/api/avatars/${avatarIdToTrain}/set-default-look`, {
+                        look_id: selectedLookId,
+                      })
+                      console.log('Set default look response:', response.data)
+                      // toast.success('Look selected! Starting avatar training...')
+
+                      // setLookSelectionModal(null) // Already closed
+                      setSelectedLookId(null)
+                      await loadAvatars()
+
+                      // Auto-trigger training after look selection
                       try {
-                        console.log('Calling API:', `/api/avatars/${avatarIdToTrain}/set-default-look`, { look_id: selectedLookId })
-                        const response = await api.post(`/api/avatars/${avatarIdToTrain}/set-default-look`, {
-                          look_id: selectedLookId,
-                        })
-                        console.log('Set default look response:', response.data)
-                        toast.success('Look selected! Starting avatar training...')
-                        
-                        setLookSelectionModal(null)
-                        setSelectedLookId(null)
+                        // Update status to training
+                        setTrainingStatus('training')
+
+                        const trainResponse = await api.post(`/api/avatars/${avatarIdToTrain}/train`)
+                        console.log('Train avatar response:', trainResponse.data)
+
+                        // Reload avatars to get updated status
                         await loadAvatars()
-                        
-                        // Auto-trigger training after look selection
-                        try {
-                          const trainResponse = await api.post(`/api/avatars/${avatarIdToTrain}/train`)
-                          console.log('Train avatar response:', trainResponse.data)
-                          
-                          // Reload avatars to get updated status
-                          await loadAvatars()
-                          
-                          // Get the updated avatar from the fresh load
-                          const avatarResponse = await api.get('/api/avatars')
-                          const updatedAvatar = avatarResponse.data.avatars.find((a: Avatar) => a.id === avatarIdToTrain)
-                          
-                          if (updatedAvatar) {
-                            // Use status from trainResponse if available, otherwise use updatedAvatar status, default to 'training'
-                            const responseStatus = trainResponse.data?.status
-                            const avatarStatus = updatedAvatar.status
-                            const newStatus = responseStatus === 'ready' ? 'active' : (responseStatus || avatarStatus || 'training')
-                            const avatarToTrain = { ...updatedAvatar, status: newStatus }
-                            
-                            // Update avatar in state
-                            setAvatars(prev =>
-                              prev.map(item =>
-                                item.id === avatarIdToTrain ? avatarToTrain : item
-                              )
+
+                        // Get the updated avatar from the fresh load
+                        const avatarResponse = await api.get('/api/avatars')
+                        const updatedAvatar = avatarResponse.data.avatars.find((a: Avatar) => a.id === avatarIdToTrain)
+
+                        if (updatedAvatar) {
+                          // Use status from trainResponse if available, otherwise use updatedAvatar status, default to 'training'
+                          const responseStatus = trainResponse.data?.status
+                          const avatarStatus = updatedAvatar.status
+                          const newStatus = responseStatus === 'ready' ? 'active' : (responseStatus || avatarStatus || 'training')
+                          const avatarToTrain = { ...updatedAvatar, status: newStatus }
+
+                          // Update avatar in state
+                          setAvatars(prev =>
+                            prev.map(item =>
+                              item.id === avatarIdToTrain ? avatarToTrain : item
                             )
-                            
-                            // Set training modal state
-                            // Convert 'active' to 'ready' for trainingStatus since it only accepts 'training' | 'pending' | 'ready' | 'failed'
+                          )
+
+                          // Set training modal state
+                          // Convert 'active' to 'ready' for trainingStatus since it only accepts 'training' | 'pending' | 'ready' | 'failed'
+                          let trainingStatusValue: 'training' | 'pending' | 'ready' | 'failed' = 'training'
+                          if (newStatus === 'active') {
+                            trainingStatusValue = 'ready'
+                          } else if (['training', 'pending', 'ready', 'failed'].includes(newStatus)) {
+                            trainingStatusValue = newStatus as 'training' | 'pending' | 'ready' | 'failed'
+                          }
+                          console.log('Setting training modal:', { newStatus, trainingStatusValue, avatarToTrain })
+                          setTrainingAvatar(avatarToTrain)
+                          setTrainingStatus(trainingStatusValue)
+                          // setShowTrainingModal(true) // Already open
+
+                          // If already ready, close modal after short delay
+                          if (trainingStatusValue === 'ready') {
+                            setTimeout(() => {
+                              setShowTrainingModal(false)
+                              setTrainingAvatar(null)
+                              setTrainingStatus(null)
+                            }, 2000)
+                          }
+                        } else {
+                          // If avatar not found, still show modal with training status
+                          // Find the avatar from current state as fallback
+                          const currentAvatar = avatars.find(a => a.id === avatarIdToTrain)
+                          if (currentAvatar) {
+                            const responseStatus = trainResponse.data?.status || 'training'
+                            const newStatus = responseStatus === 'ready' ? 'active' : responseStatus
                             let trainingStatusValue: 'training' | 'pending' | 'ready' | 'failed' = 'training'
                             if (newStatus === 'active') {
                               trainingStatusValue = 'ready'
                             } else if (['training', 'pending', 'ready', 'failed'].includes(newStatus)) {
                               trainingStatusValue = newStatus as 'training' | 'pending' | 'ready' | 'failed'
                             }
-                            console.log('Setting training modal:', { newStatus, trainingStatusValue, avatarToTrain })
+                            console.log('Setting training modal (fallback):', { newStatus, trainingStatusValue, currentAvatar })
+                            const avatarToTrain = { ...currentAvatar, status: newStatus }
                             setTrainingAvatar(avatarToTrain)
                             setTrainingStatus(trainingStatusValue)
-                            setShowTrainingModal(true)
-                            
-                            // If already ready, close modal after short delay
-                            if (trainingStatusValue === 'ready') {
-                              setTimeout(() => {
-                                setShowTrainingModal(false)
-                                setTrainingAvatar(null)
-                                setTrainingStatus(null)
-                              }, 2000)
-                            }
+                            // setShowTrainingModal(true) // Already open
                           } else {
-                            // If avatar not found, still show modal with training status
-                            // Find the avatar from current state as fallback
-                            const currentAvatar = avatars.find(a => a.id === avatarIdToTrain)
-                            if (currentAvatar) {
-                              const responseStatus = trainResponse.data?.status || 'training'
-                              const newStatus = responseStatus === 'ready' ? 'active' : responseStatus
-                              let trainingStatusValue: 'training' | 'pending' | 'ready' | 'failed' = 'training'
-                              if (newStatus === 'active') {
-                                trainingStatusValue = 'ready'
-                              } else if (['training', 'pending', 'ready', 'failed'].includes(newStatus)) {
-                                trainingStatusValue = newStatus as 'training' | 'pending' | 'ready' | 'failed'
-                              }
-                              console.log('Setting training modal (fallback):', { newStatus, trainingStatusValue, currentAvatar })
-                              const avatarToTrain = { ...currentAvatar, status: newStatus }
-                              setTrainingAvatar(avatarToTrain)
-                              setTrainingStatus(trainingStatusValue)
-                              setShowTrainingModal(true)
-                            } else {
-                              console.error('Avatar not found for training modal:', avatarIdToTrain)
-                            }
-                          }
-                        } catch (trainError: any) {
-                          console.error('Failed to start training:', trainError)
-                          // If training fails, still show success for look selection
-                          if (trainError.response?.data?.message) {
-                            toast.info(trainError.response.data.message)
-                          } else {
-                            toast.warning('Look selected, but training could not be started automatically. You can train it manually later.')
+                            console.error('Avatar not found for training modal:', avatarIdToTrain)
                           }
                         }
-                      } catch (error: any) {
-                        console.error('Failed to set default look:', error)
-                        console.error('Error details:', {
-                          message: error.message,
-                          response: error.response?.data,
-                          status: error.response?.status,
-                          url: error.config?.url,
-                        })
-                        toast.error(error.response?.data?.error || error.message || 'Failed to set default look')
+                      } catch (trainError: any) {
+                        console.error('Failed to start training:', trainError)
+                        setTrainingStatus('failed')
+                        // If training fails, still show success for look selection
+                        if (trainError.response?.data?.message) {
+                          toast.info(trainError.response.data.message)
+                        } else {
+                          toast.warning('Look selected, but training could not be started automatically. You can train it manually later.')
+                        }
                       }
-                    })()
-                  }}
-                  disabled={!selectedLookId}
-                  type="button"
-                >
-                  Confirm Selection
-                </Button>
-              </div>
+                    } catch (error: any) {
+                      console.error('Failed to set default look:', error)
+                      setTrainingStatus('failed')
+                      console.error('Error details:', {
+                        message: error.message,
+                        response: error.response?.data,
+                        status: error.response?.status,
+                        url: error.config?.url,
+                      })
+                      toast.error(error.response?.data?.error || error.message || 'Failed to set default look')
+                    }
+                  })()
+                }}
+                disabled={!selectedLookId}
+                type="button"
+              >
+                Confirm Selection
+              </Button>
             </div>
-          )}
-        </Modal>
+          </div>
+        )}
+      </Modal>
 
-        {/* Training Status Modal */}
-        <Modal
-          isOpen={showTrainingModal}
-          onClose={() => {
-            // Only allow closing if training is complete
-            if (trainingStatus === 'ready') {
-              setShowTrainingModal(false)
-              setTrainingAvatar(null)
-              setTrainingStatus(null)
-            }
-          }}
-          title="Avatar Training in Progress"
-          size="md"
-          closeOnOverlayClick={trainingStatus === 'ready'}
-          showCloseButton={trainingStatus === 'ready'}
-        >
-          {trainingAvatar && (
-            <div className="space-y-6">
-              <div className="text-center py-4">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-xl overflow-hidden border-2 border-slate-200">
-                  {trainingAvatar.thumbnail_url || trainingAvatar.preview_url ? (
-                    <img
-                      src={trainingAvatar.thumbnail_url || trainingAvatar.preview_url || ''}
-                      alt={trainingAvatar.avatar_name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-300 to-slate-400">
-                      <User className="h-8 w-8 text-white" />
-                    </div>
-                  )}
-                </div>
-                <h3 className="text-lg font-semibold text-slate-900 mb-1">
-                  {trainingAvatar.avatar_name}
-                </h3>
+      {/* Training Status Modal */}
+      <Modal
+        isOpen={showTrainingModal}
+        onClose={() => {
+          // Only allow closing if training is complete
+          if (trainingStatus === 'ready') {
+            setShowTrainingModal(false)
+            setTrainingAvatar(null)
+            setTrainingStatus(null)
+          }
+        }}
+        title="Avatar Training in Progress"
+        size="md"
+        closeOnOverlayClick={trainingStatus === 'ready'}
+        showCloseButton={trainingStatus === 'ready'}
+      >
+        {trainingAvatar && (
+          <div className="space-y-6">
+            <div className="text-center py-4">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-xl overflow-hidden border-2 border-slate-200">
+                {trainingAvatar.thumbnail_url || trainingAvatar.preview_url ? (
+                  <img
+                    src={trainingAvatar.thumbnail_url || trainingAvatar.preview_url || ''}
+                    alt={trainingAvatar.avatar_name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-300 to-slate-400">
+                    <User className="h-8 w-8 text-white" />
+                  </div>
+                )}
               </div>
+              <h3 className="text-lg font-semibold text-slate-900 mb-1">
+                {trainingAvatar.avatar_name}
+              </h3>
+            </div>
 
-              <div className="space-y-4">
-                {trainingStatus === 'training' || trainingStatus === 'pending' ? (
-                  <>
-                    <div className="flex items-center justify-center gap-3">
-                      <Loader2 className="h-6 w-6 text-brand-500 animate-spin" />
+            <div className="space-y-4">
+              {trainingStatus === 'training' || trainingStatus === 'pending' ? (
+                <>
+                  <div className="flex flex-col items-center justify-center gap-4">
+                    {/* Progress Bar */}
+                    <div className="w-full max-w-xs bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                      <div className="h-full bg-brand-500 rounded-full animate-progress-indeterminate"></div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 text-brand-500 animate-spin" />
                       <p className="text-base font-medium text-slate-900">
                         Training your avatar...
                       </p>
                     </div>
-                    <p className="text-sm text-slate-600 text-center">
-                      This process typically takes a few minutes. Your avatar will be ready to use once training completes.
+                  </div>
+                  <p className="text-sm text-slate-600 text-center">
+                    This process typically takes a few minutes. Your avatar will be ready to use once training completes.
+                  </p>
+                  <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                    <p className="text-xs text-slate-500 text-center">
+                      You can close this window - training will continue in the background. You'll be notified when it's ready.
                     </p>
-                    <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-                      <p className="text-xs text-slate-500 text-center">
-                        You can close this window - training will continue in the background. You'll be notified when it's ready.
-                      </p>
-                    </div>
-                  </>
-                ) : trainingStatus === 'ready' ? (
-                  <>
-                    <div className="flex items-center justify-center gap-3">
-                      <CheckCircle2 className="h-6 w-6 text-emerald-500" />
-                      <p className="text-base font-medium text-slate-900">
-                        Training completed!
-                      </p>
-                    </div>
-                    <p className="text-sm text-slate-600 text-center">
-                      Your avatar is now ready to use for video generation.
+                  </div>
+                </>
+              ) : trainingStatus === 'ready' ? (
+                <>
+                  <div className="flex items-center justify-center gap-3">
+                    <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+                    <p className="text-base font-medium text-slate-900">
+                      Training completed!
                     </p>
-                  </>
-                ) : trainingStatus === 'failed' ? (
-                  <>
-                    <div className="flex items-center justify-center gap-3">
-                      <X className="h-6 w-6 text-red-500" />
-                      <p className="text-base font-medium text-slate-900">
-                        Training failed
-                      </p>
-                    </div>
-                    <p className="text-sm text-slate-600 text-center">
-                      There was an error during training. Please try training again manually.
+                  </div>
+                  <p className="text-sm text-slate-600 text-center">
+                    Your avatar is now ready to use for video generation.
+                  </p>
+                </>
+              ) : trainingStatus === 'failed' ? (
+                <>
+                  <div className="flex items-center justify-center gap-3">
+                    <X className="h-6 w-6 text-red-500" />
+                    <p className="text-base font-medium text-slate-900">
+                      Training failed
                     </p>
-                  </>
-                ) : null}
-              </div>
-
-              {trainingStatus === 'ready' && (
-                <div className="flex justify-end pt-4 border-t border-slate-200">
-                  <Button
-                    onClick={() => {
-                      setShowTrainingModal(false)
-                      setTrainingAvatar(null)
-                      setTrainingStatus(null)
-                      loadAvatars()
-                    }}
-                  >
-                    Close
-                  </Button>
-                </div>
-              )}
+                  </div>
+                  <p className="text-sm text-slate-600 text-center">
+                    There was an error during training. Please try training again manually.
+                  </p>
+                </>
+              ) : null}
             </div>
-          )}
-        </Modal>
+
+            {trainingStatus === 'ready' && (
+              <div className="flex justify-end pt-4 border-t border-slate-200">
+                <Button
+                  onClick={() => {
+                    setShowTrainingModal(false)
+                    setTrainingAvatar(null)
+                    setTrainingStatus(null)
+                    loadAvatars()
+                  }}
+                >
+                  Close
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
     </Layout>
   )
 }
