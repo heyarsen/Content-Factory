@@ -585,47 +585,10 @@ export class AvatarService {
         })
         return null
       } else if (trainingStatus.status === 'empty') {
-        console.warn('[Auto Look] Avatar group is empty or not trained yet. Attempting to trigger training...', {
+        console.warn('[Auto Look] Avatar group is empty or not trained yet. Training must be started manually.', {
           groupId,
           status: trainingStatus.status,
         })
-
-        try {
-          // Fetch looks to see if we can train
-          // Wait a few seconds first to avoid unnecessary API calls (economic optimization)
-          // The API often takes a moment to register the new looks
-          await delay(10000)
-
-          let looks: any[] = []
-          // Try just 3 times with longer intervals to minimize calls
-          for (let attempt = 1; attempt <= 3; attempt++) {
-            looks = await fetchAvatarGroupLooks(groupId)
-            if (looks.length > 0) break
-            console.log(`[Auto Look] No looks found yet (attempt ${attempt}/3), waiting...`)
-            await delay(3000)
-          }
-
-          const lookIds = looks
-            .filter((l) => l.status === 'uploaded' || l.status === 'ready' || !l.status)
-            .map((l) => l.id)
-
-          if (lookIds.length > 0) {
-            console.log('[Auto Look] Found looks, triggering training...', { lookIds })
-            await trainAvatarGroup(groupId, lookIds)
-            console.log('[Auto Look] Training triggered successfully.')
-
-            // Update local status
-            await supabase
-              .from('avatars')
-              .update({ status: 'training' })
-              .eq('heygen_avatar_id', groupId)
-          } else {
-            console.warn('[Auto Look] No valid looks found to train after retries.')
-          }
-        } catch (err: any) {
-          console.error('[Auto Look] Failed to trigger training:', err.message)
-        }
-
         return null
       } else {
         // Unknown status - log warning but try anyway

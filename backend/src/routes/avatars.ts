@@ -16,13 +16,7 @@ import {
   assignAvatarSource,
   executeWithAvatarSourceFallback,
 } from '../lib/avatarSourceColumn.js'
-import {
-  saveUntrainedAvatarToTest,
-  loadUntrainedAvatarsFromTest,
-  getUntrainedAvatarFromTest,
-  clearTestAvatars,
-  syncUntrainedAvatarsFromDatabase,
-} from '../lib/testFixtures.js'
+// Test fixtures removed - no longer saving avatars automatically
 const router = Router()
 
 // Helper function to poll for look generation status and add looks when complete
@@ -436,17 +430,8 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
       throw heygenError
     }
 
-    // Save untrained avatar to test fixtures for testing
-    if (avatar && (avatar.status === 'training' || avatar.status === 'pending' || avatar.status === 'generating')) {
-      saveUntrainedAvatarToTest(avatar, {
-        photo_url: primaryPhotoUrl,
-        additional_photo_urls: extraPhotoUrls,
-        avatar_name: avatar_name,
-      })
-    }
-
     return res.status(201).json({
-      message: 'Avatar created successfully. Training has completed and the avatar is ready to use.',
+      message: 'Avatar created successfully. Please start training manually using the "Train Avatar" button.',
       avatar,
       photo_url: primaryPhotoUrl,
       additional_photo_urls: extraPhotoUrls,
@@ -622,13 +607,8 @@ router.post('/generate-ai', async (req: AuthRequest, res: Response) => {
 
     console.log('Avatar generation saved to database:', data?.id)
 
-    // Save untrained avatar to test fixtures for testing
-    if (data) {
-      saveUntrainedAvatarToTest(data, request)
-    }
-
     return res.json({
-      message: 'AI avatar generation started',
+      message: 'AI avatar generation started. Once generation completes, you will need to manually start training.',
       generation_id: result.generation_id,
     })
   } catch (error: any) {
@@ -1211,138 +1191,6 @@ router.post('/upload-look-image', authenticate, async (req: AuthRequest, res: Re
   }
 })
 
-// Test fixtures endpoints for managing untrained avatars
-// GET /avatars/test-fixtures - List all saved untrained avatars
-router.get('/test-fixtures', authenticate, async (req: AuthRequest, res: Response) => {
-  try {
-    const avatars = loadUntrainedAvatarsFromTest()
-    return res.json({
-      count: avatars.length,
-      avatars: avatars.map((item) => ({
-        id: item.avatar.id,
-        avatar_name: item.avatar.avatar_name,
-        heygen_avatar_id: item.avatar.heygen_avatar_id,
-        status: item.avatar.status,
-        source: item.avatar.source,
-        saved_at: item.saved_at,
-      })),
-    })
-  } catch (error: any) {
-    console.error('List test fixtures error:', error)
-    return res.status(500).json({
-      error: error.message || 'Failed to list test fixtures',
-    })
-  }
-})
-
-// POST /avatars/test-fixtures/sync - Sync existing avatars from database to test fixtures
-// Query param: ?all=false to only sync untrained avatars (default: true, syncs ALL avatars)
-router.post('/test-fixtures/sync', authenticate, async (req: AuthRequest, res: Response) => {
-  try {
-    const userId = req.userId!
-    const allAvatars = req.query.all !== 'false' // Default to true, sync ALL avatars
-    
-    console.log(`[Test Fixtures Sync] Starting sync for user ${userId}, allAvatars=${allAvatars}`)
-    
-    const result = await syncUntrainedAvatarsFromDatabase(userId, allAvatars)
-    
-    return res.json({
-      message: `Synced ${result.saved} avatars to test fixtures (${result.total} total found in database)`,
-      saved_count: result.saved,
-      total_count: result.total,
-      by_status: result.byStatus,
-      by_source: result.bySource,
-      avatars_found: result.avatars,
-      all_avatars: allAvatars,
-    })
-  } catch (error: any) {
-    console.error('Sync test fixtures error:', error)
-    return res.status(500).json({
-      error: error.message || 'Failed to sync test fixtures',
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
-    })
-  }
-})
-
-// GET /avatars/test-fixtures/debug - Debug endpoint to see what avatars exist in database
-router.get('/test-fixtures/debug', authenticate, async (req: AuthRequest, res: Response) => {
-  try {
-    const userId = req.userId!
-    const { supabase } = await import('../lib/supabase.js')
-    
-    // Get ALL avatars for this user
-    const { data: avatars, error } = await supabase
-      .from('avatars')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      return res.status(500).json({ error: error.message })
-    }
-
-    const byStatus: Record<string, number> = {}
-    const bySource: Record<string, number> = {}
-    
-    avatars?.forEach(avatar => {
-      const status = avatar.status || 'null'
-      const source = avatar.source || 'null'
-      byStatus[status] = (byStatus[status] || 0) + 1
-      bySource[source] = (bySource[source] || 0) + 1
-    })
-
-    return res.json({
-      total_avatars: avatars?.length || 0,
-      by_status: byStatus,
-      by_source: bySource,
-      avatars: avatars?.map(a => ({
-        id: a.id,
-        avatar_name: a.avatar_name,
-        status: a.status,
-        source: a.source,
-        heygen_avatar_id: a.heygen_avatar_id,
-        created_at: a.created_at,
-        avatar_url: a.avatar_url ? 'has_url' : 'no_url',
-      })) || [],
-    })
-  } catch (error: any) {
-    console.error('Debug avatars error:', error)
-    return res.status(500).json({
-      error: error.message || 'Failed to debug avatars',
-    })
-  }
-})
-
-// GET /avatars/test-fixtures/:id - Get a specific test avatar
-router.get('/test-fixtures/:id', authenticate, async (req: AuthRequest, res: Response) => {
-  try {
-    const { id } = req.params
-    const fixture = getUntrainedAvatarFromTest(id)
-
-    if (!fixture) {
-      return res.status(404).json({ error: 'Test avatar not found' })
-    }
-
-    return res.json(fixture)
-  } catch (error: any) {
-    console.error('Get test fixture error:', error)
-    return res.status(500).json({
-      error: error.message || 'Failed to get test fixture',
-    })
-  }
-})
-
-// DELETE /avatars/test-fixtures - Clear all test avatars
-router.delete('/test-fixtures', authenticate, async (req: AuthRequest, res: Response) => {
-  try {
-    clearTestAvatars()
-    return res.json({ message: 'Test avatars cleared successfully' })
-  } catch (error: any) {
-    console.error('Clear test fixtures error:', error)
-    return res.status(500).json({
-      error: error.message || 'Failed to clear test fixtures',
-    })
-  }
-})
+// Test fixtures endpoints removed - no longer saving avatars automatically
 
 export default router

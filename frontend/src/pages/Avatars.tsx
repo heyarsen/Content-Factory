@@ -1180,6 +1180,54 @@ export default function Avatars() {
           )}
         </div>
 
+        {/* Avatars needing training */}
+        {avatars.filter(a => ['pending', 'empty', 'failed'].includes(a.status) || (a.status === 'active' && !a.avatar_url)).length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+            <h3 className="text-sm font-semibold text-amber-900 mb-3">Avatars Needing Training</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {avatars
+                .filter(a => ['pending', 'empty', 'failed'].includes(a.status) || (a.status === 'active' && !a.avatar_url))
+                .map(avatar => (
+                  <div
+                    key={avatar.id}
+                    className="bg-white rounded-lg p-3 border border-amber-200 flex flex-col items-center gap-2"
+                  >
+                    {avatar.thumbnail_url || avatar.preview_url ? (
+                      <img
+                        src={avatar.thumbnail_url || avatar.preview_url || ''}
+                        alt={avatar.avatar_name}
+                        className="w-16 h-16 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-slate-300 to-slate-400 flex items-center justify-center">
+                        <User className="h-8 w-8 text-white" />
+                      </div>
+                    )}
+                    <p className="text-xs font-medium text-slate-900 text-center truncate w-full">
+                      {avatar.avatar_name}
+                    </p>
+                    <Button
+                      onClick={() => handleStartTraining(avatar)}
+                      size="sm"
+                      variant="secondary"
+                      disabled={avatar.status === 'training'}
+                      className="w-full"
+                    >
+                      {avatar.status === 'training' ? (
+                        <>
+                          <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                          Training...
+                        </>
+                      ) : (
+                        'Train Avatar'
+                      )}
+                    </Button>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
         {/* Section header */}
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-medium text-slate-500">
