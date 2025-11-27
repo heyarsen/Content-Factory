@@ -38,3 +38,6 @@ Thumbs.db
 # Railway
 .railway/
 
+# Test fixtures (remove this line if you want to commit test avatars)
+test/fixtures/
+

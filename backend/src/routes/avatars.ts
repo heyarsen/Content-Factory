@@ -16,6 +16,13 @@ import {
   assignAvatarSource,
   executeWithAvatarSourceFallback,
 } from '../lib/avatarSourceColumn.js'
+import {
+  saveUntrainedAvatarToTest,
+  loadUntrainedAvatarsFromTest,
+  getUntrainedAvatarFromTest,
+  clearTestAvatars,
+  syncUntrainedAvatarsFromDatabase,
+} from '../lib/testFixtures.js'
 const router = Router()
 
 // Helper function to poll for look generation status and add looks when complete
@@ -429,6 +436,15 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
       throw heygenError
     }
 
+    // Save untrained avatar to test fixtures for testing
+    if (avatar && (avatar.status === 'training' || avatar.status === 'pending' || avatar.status === 'generating')) {
+      saveUntrainedAvatarToTest(avatar, {
+        photo_url: primaryPhotoUrl,
+        additional_photo_urls: extraPhotoUrls,
+        avatar_name: avatar_name,
+      })
+    }
+
     return res.status(201).json({
       message: 'Avatar created successfully. Training has completed and the avatar is ready to use.',
       avatar,
@@ -605,6 +621,11 @@ router.post('/generate-ai', async (req: AuthRequest, res: Response) => {
     }
 
     console.log('Avatar generation saved to database:', data?.id)
+
+    // Save untrained avatar to test fixtures for testing
+    if (data) {
+      saveUntrainedAvatarToTest(data, request)
+    }
 
     return res.json({
       message: 'AI avatar generation started',
@@ -1186,6 +1207,79 @@ router.post('/upload-look-image', authenticate, async (req: AuthRequest, res: Re
     console.error('Upload look image error:', error)
     return res.status(500).json({
       error: error.message || 'Failed to upload look image'
+    })
+  }
+})
+
+// Test fixtures endpoints for managing untrained avatars
+// GET /avatars/test-fixtures - List all saved untrained avatars
+router.get('/test-fixtures', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const avatars = loadUntrainedAvatarsFromTest()
+    return res.json({
+      count: avatars.length,
+      avatars: avatars.map((item) => ({
+        id: item.avatar.id,
+        avatar_name: item.avatar.avatar_name,
+        heygen_avatar_id: item.avatar.heygen_avatar_id,
+        status: item.avatar.status,
+        source: item.avatar.source,
+        saved_at: item.saved_at,
+      })),
+    })
+  } catch (error: any) {
+    console.error('List test fixtures error:', error)
+    return res.status(500).json({
+      error: error.message || 'Failed to list test fixtures',
+    })
+  }
+})
+
+// POST /avatars/test-fixtures/sync - Sync existing untrained avatars from database to test fixtures
+router.post('/test-fixtures/sync', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const savedCount = await syncUntrainedAvatarsFromDatabase(userId)
+    return res.json({
+      message: `Synced ${savedCount} untrained avatars to test fixtures`,
+      saved_count: savedCount,
+    })
+  } catch (error: any) {
+    console.error('Sync test fixtures error:', error)
+    return res.status(500).json({
+      error: error.message || 'Failed to sync test fixtures',
+    })
+  }
+})
+
+// GET /avatars/test-fixtures/:id - Get a specific test avatar
+router.get('/test-fixtures/:id', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params
+    const fixture = getUntrainedAvatarFromTest(id)
+
+    if (!fixture) {
+      return res.status(404).json({ error: 'Test avatar not found' })
+    }
+
+    return res.json(fixture)
+  } catch (error: any) {
+    console.error('Get test fixture error:', error)
+    return res.status(500).json({
+      error: error.message || 'Failed to get test fixture',
+    })
+  }
+})
+
+// DELETE /avatars/test-fixtures - Clear all test avatars
+router.delete('/test-fixtures', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    clearTestAvatars()
+    return res.json({ message: 'Test avatars cleared successfully' })
+  } catch (error: any) {
+    console.error('Clear test fixtures error:', error)
+    return res.status(500).json({
+      error: error.message || 'Failed to clear test fixtures',
     })
   }
 })
