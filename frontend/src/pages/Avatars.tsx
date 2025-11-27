@@ -1053,7 +1053,7 @@ export default function Avatars() {
           <div className="flex items-center gap-4 overflow-x-auto pb-2">
             {[1, 2, 3, 4, 5, 6, 7].map(i => (
               <div key={i} className="flex flex-col items-center gap-2 flex-shrink-0">
-                <div className="w-20 h-20 rounded-full bg-slate-200 animate-pulse"></div>
+                <div className="w-20 h-20 rounded-xl bg-slate-200 animate-pulse"></div>
                 <div className="h-3 w-12 bg-slate-200 rounded animate-pulse"></div>
               </div>
             ))}
@@ -1081,7 +1081,7 @@ export default function Avatars() {
             onClick={() => setSelectedAvatarFilter(null)}
             className={`flex flex-col items-center gap-2 flex-shrink-0 group transition-all duration-200`}
           >
-            <div className={`w-20 h-20 rounded-full flex items-center justify-center border-2 transition-all duration-200 ${
+            <div className={`w-20 h-20 rounded-xl flex items-center justify-center border-2 transition-all duration-200 ${
               selectedAvatarFilter === null 
                 ? 'border-cyan-400 bg-white shadow-lg shadow-cyan-100' 
                 : 'border-slate-200 bg-white hover:border-slate-300'
@@ -1092,14 +1092,14 @@ export default function Avatars() {
           </div>
           </button>
           
-          {/* Avatar circles */}
+          {/* Avatar rounded squares */}
           {avatars.slice(0, visibleAvatarCount).map((avatar) => (
             <button
               key={avatar.id}
               onClick={() => setSelectedAvatarFilter(avatar.id === selectedAvatarFilter ? null : avatar.id)}
               className="flex flex-col items-center gap-2 flex-shrink-0 group transition-all duration-200"
             >
-              <div className={`w-20 h-20 rounded-full overflow-hidden border-2 transition-all duration-200 ${
+              <div className={`w-20 h-20 rounded-xl overflow-hidden border-2 transition-all duration-200 ${
                 selectedAvatarFilter === avatar.id 
                   ? 'border-cyan-400 shadow-lg shadow-cyan-100' 
                   : 'border-transparent hover:border-slate-300'
@@ -1124,6 +1124,19 @@ export default function Avatars() {
             </button>
           ))}
           
+          {/* Create Avatar button */}
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex flex-col items-center gap-2 flex-shrink-0 group transition-all duration-200"
+          >
+            <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-cyan-50 to-blue-50 border-2 border-dashed border-cyan-300 hover:border-cyan-400 hover:from-cyan-100 hover:to-blue-100 flex items-center justify-center transition-all duration-200">
+              <Plus className="h-8 w-8 text-cyan-600" />
+            </div>
+            <span className="text-xs font-medium max-w-[72px] truncate text-slate-600">
+              Create Avatar
+            </span>
+          </button>
+          
           {/* "+N more" button */}
           {extraAvatarsCount > 0 && (
             <button
@@ -1137,7 +1150,7 @@ export default function Avatars() {
               }}
               className="flex flex-col items-center gap-2 flex-shrink-0 group"
             >
-              <div className="w-20 h-20 rounded-full bg-slate-800 flex items-center justify-center border-2 border-transparent hover:border-slate-600 transition-all duration-200">
+              <div className="w-20 h-20 rounded-xl bg-slate-800 flex items-center justify-center border-2 border-transparent hover:border-slate-600 transition-all duration-200">
                 <span className="text-white font-semibold">+{extraAvatarsCount}</span>
               </div>
             </button>
@@ -1319,7 +1332,7 @@ export default function Avatars() {
                 const selectedAvatar = avatars.find(a => a.id === selectedAvatarFilter)
                 return selectedAvatar ? (
                   <>
-                    <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border-2 border-slate-200">
+                    <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 border-2 border-slate-200">
                       {selectedAvatar.thumbnail_url || selectedAvatar.avatar_url ? (
                         <img
                           src={selectedAvatar.thumbnail_url || selectedAvatar.avatar_url || ''}
@@ -1366,7 +1379,7 @@ export default function Avatars() {
           ) : (
             // Show default prompt when no avatar is selected
             <div className="bg-white rounded-full shadow-2xl border border-slate-200 px-5 py-3 flex items-center gap-4 max-w-xl">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center flex-shrink-0">
                 <User className="h-5 w-5 text-white" />
                   </div>
               <p className="text-sm text-slate-600 flex-1">
