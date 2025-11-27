@@ -11,6 +11,8 @@ import {
   uploadImageToHeyGen,
   checkTrainingStatus,
   checkGenerationStatus,
+  trainAvatarGroup,
+  fetchAvatarGroupLooks,
 } from '../lib/heygen.js'
 import type {
   HeyGenAvatar,
@@ -109,11 +111,11 @@ export class AvatarService {
             .select()
             .single()
 
-            if (!error && data) {
-              syncedAvatars.push(data)
-            }
-          } else {
-            // Insert new avatar
+          if (!error && data) {
+            syncedAvatars.push(data)
+          }
+        } else {
+          // Insert new avatar
           const newAvatarPayload = {
             user_id: userId,
             heygen_avatar_id: heygenAvatar.avatar_id,
@@ -128,7 +130,7 @@ export class AvatarService {
 
           assignAvatarSource(newAvatarPayload, 'synced')
 
-        const { data, error } = await executeWithAvatarSourceFallback<Avatar>(
+          const { data, error } = await executeWithAvatarSourceFallback<Avatar>(
             newAvatarPayload,
             () =>
               supabase
@@ -367,8 +369,8 @@ export class AvatarService {
     }
 
     // Check if this is a photo avatar (user_photo or ai_generated)
-    const isPhotoAvatar = avatar.source === 'user_photo' || avatar.source === 'ai_generated' || 
-                         (avatar.avatar_url && avatar.avatar_url.includes('supabase.co/storage'))
+    const isPhotoAvatar = avatar.source === 'user_photo' || avatar.source === 'ai_generated' ||
+      (avatar.avatar_url && avatar.avatar_url.includes('supabase.co/storage'))
 
     if (!isPhotoAvatar) {
       // For non-photo avatars, return basic information from the database
@@ -387,7 +389,7 @@ export class AvatarService {
     try {
       // Fetch photo avatar details
       const details = await getPhotoAvatarDetails(avatar.heygen_avatar_id)
-      
+
       // Also fetch training status to get the real status from HeyGen
       let trainingStatus: string = details.status || 'active'
       try {
@@ -402,7 +404,7 @@ export class AvatarService {
           } else if (status.status === 'training' || status.status === 'pending') {
             trainingStatus = 'training'
           }
-          
+
           // Update database if status differs
           if (avatar.status !== trainingStatus) {
             console.log(`[Avatar Details] Updating avatar ${avatarId} status from ${avatar.status} to ${trainingStatus}`)
@@ -416,7 +418,7 @@ export class AvatarService {
         console.warn(`[Avatar Details] Failed to fetch training status:`, statusError.message)
         // Continue with existing status
       }
-      
+
       // Also fetch looks from the avatar group
       let looks: any[] = []
       if (avatar.heygen_avatar_id) {
@@ -461,7 +463,7 @@ export class AvatarService {
           // Continue without looks - not critical
         }
       }
-      
+
       return {
         ...details,
         status: trainingStatus, // Use the real training status
@@ -506,31 +508,31 @@ export class AvatarService {
       const { createAvatarFromPhoto } = await import('../lib/heygen.js')
       const result = await createAvatarFromPhoto(photoUrl, avatarName, additionalPhotoUrls)
 
-        // Save to database
-        // Save photoUrl as avatar_url to identify user-created avatars
-        const newPhotoAvatarPayload = {
-          user_id: userId,
-          heygen_avatar_id: result.avatar_id,
-          avatar_name: avatarName,
-          avatar_url: photoUrl, // Save the photo URL to identify user-created avatars
-          preview_url: photoUrl,
-          thumbnail_url: photoUrl,
-          gender: null,
-          status: result.status === 'training' ? 'training' : 'active',
-          is_default: false,
-        }
+      // Save to database
+      // Save photoUrl as avatar_url to identify user-created avatars
+      const newPhotoAvatarPayload = {
+        user_id: userId,
+        heygen_avatar_id: result.avatar_id,
+        avatar_name: avatarName,
+        avatar_url: photoUrl, // Save the photo URL to identify user-created avatars
+        preview_url: photoUrl,
+        thumbnail_url: photoUrl,
+        gender: null,
+        status: result.status === 'training' ? 'training' : 'active',
+        is_default: false,
+      }
 
-        assignAvatarSource(newPhotoAvatarPayload, 'user_photo')
+      assignAvatarSource(newPhotoAvatarPayload, 'user_photo')
 
-        const { data, error } = await executeWithAvatarSourceFallback<Avatar>(
-          newPhotoAvatarPayload,
-          () =>
-            supabase
-              .from('avatars')
-              .insert(newPhotoAvatarPayload)
-              .select()
-              .single()
-        )
+      const { data, error } = await executeWithAvatarSourceFallback<Avatar>(
+        newPhotoAvatarPayload,
+        () =>
+          supabase
+            .from('avatars')
+            .insert(newPhotoAvatarPayload)
+            .select()
+            .single()
+      )
 
       if (error) throw error
       return data
@@ -556,7 +558,7 @@ export class AvatarService {
     // According to HeyGen support: Only generate looks AFTER training is complete (status: "ready")
     // Step 1: Check training status first
     console.log('[Auto Look] Checking training status before generating look...', { groupId })
-    
+
     let trainingStatus
     try {
       trainingStatus = await checkTrainingStatus(groupId)
@@ -583,11 +585,35 @@ export class AvatarService {
         })
         return null
       } else if (trainingStatus.status === 'empty') {
-        console.warn('[Auto Look] Avatar group is empty or not trained yet. Cannot generate AI look.', {
+        console.warn('[Auto Look] Avatar group is empty or not trained yet. Attempting to trigger training...', {
           groupId,
           status: trainingStatus.status,
-          note: 'Avatar must be trained first before generating looks',
         })
+
+        try {
+          // Fetch looks to see if we can train
+          const looks = await fetchAvatarGroupLooks(groupId)
+          const lookIds = looks
+            .filter((l) => l.status === 'uploaded' || l.status === 'ready' || !l.status)
+            .map((l) => l.id)
+
+          if (lookIds.length > 0) {
+            console.log('[Auto Look] Found looks, triggering training...', { lookIds })
+            await trainAvatarGroup(groupId, lookIds)
+            console.log('[Auto Look] Training triggered successfully.')
+
+            // Update local status
+            await supabase
+              .from('avatars')
+              .update({ status: 'training' })
+              .eq('heygen_avatar_id', groupId)
+          } else {
+            console.warn('[Auto Look] No valid looks found to train.')
+          }
+        } catch (err: any) {
+          console.error('[Auto Look] Failed to trigger training:', err.message)
+        }
+
         return null
       } else {
         // Unknown status - log warning but try anyway
@@ -700,14 +726,14 @@ export class AvatarService {
    * - status 'training' or 'pending' (recently created, not synced)
    * We exclude avatars that were synced from HeyGen (which typically have avatar_url from HeyGen CDN)
    */
-    static async getUserCreatedAvatars(userId: string): Promise<Avatar[]> {
-      const { data, error } = await supabase
-        .from('avatars')
-        .select('*')
-        .eq('user_id', userId)
-        .in('status', ['active', 'training', 'pending', 'generating'])
-        .order('is_default', { ascending: false })
-        .order('avatar_name', { ascending: true })
+  static async getUserCreatedAvatars(userId: string): Promise<Avatar[]> {
+    const { data, error } = await supabase
+      .from('avatars')
+      .select('*')
+      .eq('user_id', userId)
+      .in('status', ['active', 'training', 'pending', 'generating'])
+      .order('is_default', { ascending: false })
+      .order('avatar_name', { ascending: true })
 
     if (error) throw error
 
@@ -716,7 +742,7 @@ export class AvatarService {
       return avatars
     }
     return avatars.filter((avatar) => this.isUserCreatedAvatar(avatar))
-    }
+  }
 
   /**
    * Complete AI avatar generation by creating avatar group from generated images
@@ -735,16 +761,16 @@ export class AvatarService {
 
       const { addLooksToAvatarGroup } = await import('../lib/heygen.js')
       const axios = (await import('axios')).default
-      
+
       // Create avatar group using the first image_key
       const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
-      
+
       // Get API key from environment
       const apiKey = process.env.HEYGEN_KEY
       if (!apiKey) {
         throw new Error('Missing HEYGEN_KEY environment variable')
       }
-      
+
       // Create avatar group with the first image
       const createGroupResponse = await axios.post(
         `${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/create`,
@@ -760,15 +786,15 @@ export class AvatarService {
         }
       )
 
-        const groupId =
-          createGroupResponse.data?.data?.id ||
-          createGroupResponse.data?.data?.group_id ||
-          createGroupResponse.data?.id ||
-          createGroupResponse.data?.group_id
+      const groupId =
+        createGroupResponse.data?.data?.id ||
+        createGroupResponse.data?.data?.group_id ||
+        createGroupResponse.data?.id ||
+        createGroupResponse.data?.group_id
 
-        if (!groupId) {
-          throw new Error('Failed to get group_id from avatar group creation response')
-        }
+      if (!groupId) {
+        throw new Error('Failed to get group_id from avatar group creation response')
+      }
 
       const sanitizedImageUrls = Array.isArray(imageUrls)
         ? imageUrls.filter((url): url is string => typeof url === 'string' && url.trim().length > 0)
