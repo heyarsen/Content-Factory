@@ -3,7 +3,7 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { existsSync } from 'fs'
+import { existsSync, readdirSync } from 'fs'
 import { errorHandler } from './middleware/errorHandler.js'
 import { apiLimiter } from './middleware/rateLimiter.js'
 import authRoutes from './routes/auth.js'
@@ -248,10 +248,19 @@ app.use('/api/avatars', avatarRoutes)
 const frontendDist = path.join(__dirname, '../public')
 const indexHtml = path.join(frontendDist, 'index.html')
 
-console.log('Looking for frontend at:', frontendDist)
-console.log('__dirname is:', __dirname)
-console.log('Frontend exists:', existsSync(frontendDist))
-console.log('Index.html exists:', existsSync(indexHtml))
+console.log('🔍 Frontend Detection:')
+console.log('  __dirname:', __dirname)
+console.log('  Looking for frontend at:', frontendDist)
+console.log('  Frontend directory exists:', existsSync(frontendDist))
+console.log('  Index.html exists:', existsSync(indexHtml))
+if (existsSync(frontendDist)) {
+  try {
+    const files = readdirSync(frontendDist)
+    console.log('  Files in public directory:', files.slice(0, 10).join(', '), files.length > 10 ? `... (${files.length} total)` : `(${files.length} total)`)
+  } catch (error) {
+    console.log('  Error reading public directory:', error)
+  }
+}
 
 if (existsSync(frontendDist) && existsSync(indexHtml)) {
   app.use(express.static(frontendDist))
