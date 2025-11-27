@@ -594,7 +594,7 @@ export class AvatarService {
           // Fetch looks to see if we can train
           // Wait a few seconds first to avoid unnecessary API calls (economic optimization)
           // The API often takes a moment to register the new looks
-          await delay(4000)
+          await delay(10000)
 
           let looks: any[] = []
           // Try just 3 times with longer intervals to minimize calls
