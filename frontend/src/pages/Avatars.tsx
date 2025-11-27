@@ -2120,7 +2120,6 @@ export default function Avatars() {
                 onClick={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
-                  console.log('Confirm Selection button clicked', { selectedLookId, lookSelectionModal })
                   if (!selectedLookId || !lookSelectionModal) {
                     toast.warning('Please select a look to continue')
                     return
@@ -2134,36 +2133,49 @@ export default function Avatars() {
                     const avatarIdToTrain = avatarToProcess.id
 
                     try {
-                      console.log('Calling API:', `/api/avatars/${avatarIdToTrain}/set-default-look`, { look_id: selectedLookId })
-                      const response = await api.post(`/api/avatars/${avatarIdToTrain}/set-default-look`, {
+                      // Set default look first
+                      await api.post(`/api/avatars/${avatarIdToTrain}/set-default-look`, {
                         look_id: selectedLookId,
                       })
-                      console.log('Set default look response:', response.data)
-                      // toast.success('Look selected! Starting avatar training...')
 
-                      // Close the look selection modal
+                      // Close modal and show training modal
                       setLookSelectionModal(null)
                       setSelectedLookId(null)
+
+                      // Show training modal immediately
+                      setTrainingAvatar(avatarToProcess)
+                      setTrainingStatus('pending')
+                      setShowTrainingModal(true)
+
+                      // Start training
+                      setTrainingStatus('training')
+                      const trainResponse = await api.post(`/api/avatars/${avatarIdToTrain}/train`)
+
                       await loadAvatars()
 
-                      // Show success message
-                      toast.success('Look selected! You can now train your avatar from the avatar card.')
+                      // Update training status based on response
+                      const responseStatus = trainResponse.data?.status
+                      if (responseStatus === 'ready' || responseStatus === 'active') {
+                        setTrainingStatus('ready')
+                        setTimeout(() => {
+                          setShowTrainingModal(false)
+                          setTrainingAvatar(null)
+                          setTrainingStatus(null)
+                        }, 2000)
+                      } else if (responseStatus === 'failed') {
+                        setTrainingStatus('failed')
+                      }
                     } catch (error: any) {
-                      console.error('Failed to set default look:', error)
-                      console.error('Error details:', {
-                        message: error.message,
-                        response: error.response?.data,
-                        status: error.response?.status,
-                        url: error.config?.url,
-                      })
-                      toast.error(error.response?.data?.error || error.message || 'Failed to set default look')
+                      console.error('Failed to train avatar:', error)
+                      setTrainingStatus('failed')
+                      toast.error(error.response?.data?.error || error.message || 'Failed to start training')
                     }
                   })()
                 }}
                 disabled={!selectedLookId}
                 type="button"
               >
-                Confirm Selection
+                Confirm & Train
               </Button>
             </div>
           </div>
