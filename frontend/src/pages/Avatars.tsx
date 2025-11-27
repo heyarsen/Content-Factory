@@ -219,7 +219,7 @@ export default function Avatars() {
       setLoading(true)
       // Only show user-created avatars
       const response = await api.get('/api/avatars')
-      const avatarsList = response.data?.avatars || []
+      const avatarsList = (response.data?.avatars || []).filter((avatar: Avatar) => avatar.status !== 'deleted')
       setAvatars(avatarsList)
       setDefaultAvatarId(response.data?.default_avatar_id || null)
 

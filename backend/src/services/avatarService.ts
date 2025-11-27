@@ -397,10 +397,16 @@ export class AvatarService {
         
         // Update database to mark avatar as deleted
         if (avatar.status !== 'deleted') {
-          await supabase
+          const { error: updateError } = await supabase
             .from('avatars')
             .update({ status: 'deleted' })
             .eq('id', avatarId)
+          
+          if (updateError) {
+            console.error(`[Avatar Details] Failed to mark avatar ${avatarId} as deleted:`, updateError)
+          } else {
+            console.log(`[Avatar Details] Successfully marked avatar ${avatarId} (${avatar.avatar_name}) as deleted`)
+          }
         }
         
         // Don't throw - return what we have from database
@@ -736,14 +742,14 @@ export class AvatarService {
       .from('avatars')
       .select('*')
       .eq('user_id', userId)
-      .neq('status', 'deleted') // Exclude deleted avatars
       .order('is_default', { ascending: false })
       .order('created_at', { ascending: false }) // Show newest first
       .order('avatar_name', { ascending: true })
 
     if (error) throw error
 
-    return data || []
+    // Explicitly filter out deleted avatars (using filter instead of .neq for reliability)
+    return (data || []).filter(avatar => avatar.status !== 'deleted')
   }
 
   /**
