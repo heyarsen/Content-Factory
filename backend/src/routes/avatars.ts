@@ -1235,14 +1235,20 @@ router.get('/test-fixtures', authenticate, async (req: AuthRequest, res: Respons
   }
 })
 
-// POST /avatars/test-fixtures/sync - Sync existing untrained avatars from database to test fixtures
+// POST /avatars/test-fixtures/sync - Sync existing avatars from database to test fixtures
+// Query param: ?all=false to only sync untrained avatars (default: true, syncs all user-created avatars)
 router.post('/test-fixtures/sync', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
-    const savedCount = await syncUntrainedAvatarsFromDatabase(userId)
+    const allAvatars = req.query.all !== 'false' // Default to true, sync all user-created avatars
+    const result = await syncUntrainedAvatarsFromDatabase(userId, allAvatars)
+    
     return res.json({
-      message: `Synced ${savedCount} untrained avatars to test fixtures`,
-      saved_count: savedCount,
+      message: `Synced ${result.saved} avatars to test fixtures (${result.total} total found)`,
+      saved_count: result.saved,
+      total_count: result.total,
+      by_status: result.byStatus,
+      all_avatars: allAvatars,
     })
   } catch (error: any) {
     console.error('Sync test fixtures error:', error)

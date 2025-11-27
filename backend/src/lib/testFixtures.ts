@@ -14,18 +14,22 @@ function ensureTestFixturesDir(): void {
 }
 
 /**
- * Save an untrained avatar to test fixtures
- * Untrained avatars are those with status 'generating', 'training', or 'pending'
+ * Save an avatar to test fixtures
+ * @param avatar - Avatar to save
+ * @param requestData - Optional request data used to create the avatar
+ * @param forceSave - If true, save regardless of status (default: false, only saves untrained avatars)
  */
-export function saveUntrainedAvatarToTest(avatar: Avatar, requestData?: any): void {
+export function saveUntrainedAvatarToTest(avatar: Avatar, requestData?: any, forceSave: boolean = false): void {
   try {
     ensureTestFixturesDir()
 
-    // Only save untrained avatars
-    const untrainedStatuses = ['generating', 'training', 'pending']
-    if (!untrainedStatuses.includes(avatar.status)) {
-      console.log(`[Test Fixtures] Skipping avatar ${avatar.id} - status is '${avatar.status}', not untrained`)
-      return
+    // Only save untrained avatars by default, unless forceSave is true
+    if (!forceSave) {
+      const untrainedStatuses = ['generating', 'training', 'pending']
+      if (!untrainedStatuses.includes(avatar.status)) {
+        console.log(`[Test Fixtures] Skipping avatar ${avatar.id} - status is '${avatar.status}', not untrained`)
+        return
+      }
     }
 
     const fileName = `untrained-avatar-${avatar.id}.json`
@@ -133,44 +137,65 @@ export function clearTestAvatars(): void {
 }
 
 /**
- * Sync existing untrained avatars from database to test fixtures
+ * Sync existing avatars from database to test fixtures
+ * @param userId - User ID to sync avatars for
+ * @param allAvatars - If true, sync ALL user-created avatars. If false, only sync untrained ones (default: true)
  */
-export async function syncUntrainedAvatarsFromDatabase(userId: string): Promise<number> {
+export async function syncUntrainedAvatarsFromDatabase(userId: string, allAvatars: boolean = true): Promise<{ saved: number; total: number; byStatus: Record<string, number> }> {
   try {
     const { supabase } = await import('../lib/supabase.js')
-    const untrainedStatuses = ['generating', 'training', 'pending']
-
-    // Get all untrained avatars for this user
-    const { data: avatars, error } = await supabase
+    
+    let query = supabase
       .from('avatars')
       .select('*')
       .eq('user_id', userId)
-      .in('status', untrainedStatuses)
+
+    // If allAvatars is true, get all user-created avatars (not synced from HeyGen)
+    if (allAvatars) {
+      query = query.in('source', ['user_photo', 'ai_generated'])
+    } else {
+      // Only get untrained avatars
+      const untrainedStatuses = ['generating', 'training', 'pending']
+      query = query.in('status', untrainedStatuses)
+    }
+
+    const { data: avatars, error } = await query
 
     if (error) {
-      console.error('[Test Fixtures] Failed to query untrained avatars:', error)
+      console.error('[Test Fixtures] Failed to query avatars:', error)
       throw error
     }
 
     if (!avatars || avatars.length === 0) {
-      console.log('[Test Fixtures] No untrained avatars found in database')
-      return 0
+      console.log(`[Test Fixtures] No avatars found in database (allAvatars=${allAvatars})`)
+      return { saved: 0, total: 0, byStatus: {} }
     }
 
+    const byStatus: Record<string, number> = {}
     let savedCount = 0
+    
     for (const avatar of avatars) {
+      // Track status distribution
+      const status = avatar.status || 'unknown'
+      byStatus[status] = (byStatus[status] || 0) + 1
+
       // Check if already saved
       const existing = getUntrainedAvatarFromTest(avatar.id)
       if (!existing) {
-        saveUntrainedAvatarToTest(avatar as any)
+        // Use forceSave=true if allAvatars is true, so we save regardless of status
+        saveUntrainedAvatarToTest(avatar as any, null, allAvatars)
         savedCount++
       }
     }
 
-    console.log(`[Test Fixtures] Synced ${savedCount} new untrained avatars from database (${avatars.length} total found)`)
-    return savedCount
+    console.log(`[Test Fixtures] Synced ${savedCount} new avatars from database (${avatars.length} total found)`, {
+      byStatus,
+      allAvatars,
+    })
+    
+    return { saved: savedCount, total: avatars.length, byStatus }
   } catch (error: any) {
-    console.error('[Test Fixtures] Failed to sync untrained avatars from database:', error.message)
+    console.error('[Test Fixtures] Failed to sync avatars from database:', error.message)
     throw error
   }
 }
