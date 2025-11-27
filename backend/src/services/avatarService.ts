@@ -162,6 +162,7 @@ export class AvatarService {
       .select('*')
       .eq('user_id', userId)
       .in('status', ['active', 'training'])
+      .neq('status', 'deleted') // Exclude deleted avatars
       .order('is_default', { ascending: false })
       .order('avatar_name', { ascending: true })
 
@@ -390,14 +391,23 @@ export class AvatarService {
       // Fetch photo avatar details
       const details = await getPhotoAvatarDetails(avatar.heygen_avatar_id)
 
-      // If avatar doesn't exist in HeyGen (status is 'unknown'), mark it as invalid
+      // If avatar doesn't exist in HeyGen (status is 'unknown'), mark it as deleted
       if (details.status === 'unknown') {
-        console.warn(`[Avatar Details] Avatar ${avatarId} (${avatar.avatar_name}) not found in HeyGen - may have been deleted`)
+        console.warn(`[Avatar Details] Avatar ${avatarId} (${avatar.avatar_name}) not found in HeyGen - marking as deleted`)
+        
+        // Update database to mark avatar as deleted
+        if (avatar.status !== 'deleted') {
+          await supabase
+            .from('avatars')
+            .update({ status: 'deleted' })
+            .eq('id', avatarId)
+        }
+        
         // Don't throw - return what we have from database
         return {
           id: avatar.heygen_avatar_id,
           group_id: avatar.heygen_avatar_id,
-          status: avatar.status || 'unknown',
+          status: 'deleted',
           image_url: avatar.avatar_url ?? undefined,
           preview_url: avatar.preview_url ?? undefined,
           thumbnail_url: avatar.thumbnail_url ?? undefined,
@@ -721,10 +731,12 @@ export class AvatarService {
   static async getUserCreatedAvatars(userId: string): Promise<Avatar[]> {
     // Get ALL avatars for the user - no status or source filtering
     // This ensures all user-created avatars are shown, including old ones
+    // But exclude deleted/invalid avatars
     const { data, error } = await supabase
       .from('avatars')
       .select('*')
       .eq('user_id', userId)
+      .neq('status', 'deleted') // Exclude deleted avatars
       .order('is_default', { ascending: false })
       .order('created_at', { ascending: false }) // Show newest first
       .order('avatar_name', { ascending: true })

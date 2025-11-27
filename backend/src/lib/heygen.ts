@@ -2026,9 +2026,12 @@ export async function getPhotoAvatarDetails(
     return fetchPhotoAvatarDetails(resolved.photoAvatarId)
   } catch (error: any) {
     // If it's a 404 or "not found", it might be a group_id or deleted avatar
-    if (error.response?.status === 404 || error.message?.includes('not found') || error.message?.includes('No avatars found')) {
+    if (error.response?.status === 404 || 
+        error.message?.includes('not found') || 
+        error.message?.includes('No avatars found') ||
+        (error.response?.data?.error?.message && error.response.data.error.message.includes('not found'))) {
       // Don't log as error - this is expected for group IDs or deleted avatars
-      // Return basic structure with the identifier as ID
+      // Return basic structure with status 'unknown' so it can be marked as deleted
       return {
         id: identifier,
         group_id: identifier,
