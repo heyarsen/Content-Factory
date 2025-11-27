@@ -192,7 +192,8 @@ export function VideoPlanning() {
   const loadAvatars = async () => {
     try {
       setLoadingAvatars(true)
-      const response = await api.get('/api/avatars', { params: { all: 'true' } })
+      // Only fetch user-created avatars (default behavior, no 'all' parameter)
+      const response = await api.get('/api/avatars')
       setAvatars(response.data.avatars || [])
       setDefaultAvatarId(response.data.default_avatar_id || null)
       

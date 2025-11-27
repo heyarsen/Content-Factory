@@ -195,15 +195,11 @@ export function QuickCreate() {
 
   const loadAvatars = async () => {
     try {
-      const response = await api.get('/api/avatars', { params: { all: 'true' } })
+      // Only fetch user-created avatars (default behavior, no 'all' parameter)
+      const response = await api.get('/api/avatars')
       const allAvatars: AvatarRecord[] = (response.data.avatars || []) as AvatarRecord[]
-      // First try to get user-created avatars
-      let avatarsToUse = allAvatars.filter((avatar) => isUserCreatedAvatar(avatar))
-      
-      // If no user-created avatars, fall back to all available avatars
-      if (avatarsToUse.length === 0) {
-        avatarsToUse = allAvatars
-      }
+      // Filter to ensure only user-created avatars (backend should already filter, but double-check)
+      const avatarsToUse = allAvatars.filter((avatar) => isUserCreatedAvatar(avatar))
       
       setAvatars(avatarsToUse)
       const defaultAvatar = avatarsToUse.find((a: any) => a.is_default)

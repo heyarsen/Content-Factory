@@ -78,6 +78,9 @@ export default function Avatars() {
   const [selectedLookId, setSelectedLookId] = useState<string | null>(null)
   const [selectedAvatarFilter, setSelectedAvatarFilter] = useState<string | null>(null) // null = "All"
   const [quickPrompt, setQuickPrompt] = useState('') // Quick prompt input for generating looks
+  const [showTrainingModal, setShowTrainingModal] = useState(false)
+  const [trainingAvatar, setTrainingAvatar] = useState<Avatar | null>(null)
+  const [trainingStatus, setTrainingStatus] = useState<'training' | 'pending' | 'ready' | 'failed' | null>(null)
   
   // Get all looks from all avatars for the grid display
   const [allLooks, setAllLooks] = useState<Array<{ look: PhotoAvatarLook; avatar: Avatar }>>([])
@@ -303,6 +306,23 @@ export default function Avatars() {
           )
         )
 
+        // Update training modal if this avatar is being tracked
+        if (trainingAvatar && trainingAvatar.id === avatar.id) {
+          const newStatus = normalizedStatus as 'training' | 'pending' | 'ready' | 'failed'
+          setTrainingStatus(newStatus)
+          setTrainingAvatar(prev => prev ? { ...prev, status: normalizedStatus } : null)
+          
+          if (normalizedStatus === 'active') {
+            // Training completed, close modal after a short delay
+            toast.success('Avatar training completed! Your avatar is now ready to use.')
+            setTimeout(() => {
+              setShowTrainingModal(false)
+              setTrainingAvatar(null)
+              setTrainingStatus(null)
+            }, 2000)
+          }
+        }
+
         if (!options.silent) {
           if (status === 'ready') {
             toastRef.current.success('Avatar training completed!')
@@ -317,8 +337,9 @@ export default function Avatars() {
         }
       }
     },
-    []
+    [trainingAvatar]
   )
+
 
   useEffect(() => {
     if (trainingStatusIntervalRef.current) {
@@ -2105,16 +2126,69 @@ export default function Avatars() {
                     }
                     // Use async IIFE to handle the API call
                     (async () => {
+                      if (!lookSelectionModal) return
+                      
+                      const avatarToProcess = lookSelectionModal.avatar
+                      const avatarIdToTrain = avatarToProcess.id
+                      
                       try {
-                        console.log('Calling API:', `/api/avatars/${lookSelectionModal.avatar.id}/set-default-look`, { look_id: selectedLookId })
-                        const response = await api.post(`/api/avatars/${lookSelectionModal.avatar.id}/set-default-look`, {
+                        console.log('Calling API:', `/api/avatars/${avatarIdToTrain}/set-default-look`, { look_id: selectedLookId })
+                        const response = await api.post(`/api/avatars/${avatarIdToTrain}/set-default-look`, {
                           look_id: selectedLookId,
                         })
                         console.log('Set default look response:', response.data)
-                        toast.success('Look selected! This is now your permanent avatar look.')
+                        toast.success('Look selected! Starting avatar training...')
+                        
                         setLookSelectionModal(null)
                         setSelectedLookId(null)
                         await loadAvatars()
+                        
+                        // Auto-trigger training after look selection
+                        try {
+                          const trainResponse = await api.post(`/api/avatars/${avatarIdToTrain}/train`)
+                          console.log('Train avatar response:', trainResponse.data)
+                          
+                          // Reload avatars to get updated status
+                          await loadAvatars()
+                          
+                          // Get the updated avatar from the fresh load
+                          const avatarResponse = await api.get('/api/avatars')
+                          const updatedAvatar = avatarResponse.data.avatars.find((a: Avatar) => a.id === avatarIdToTrain)
+                          
+                          if (updatedAvatar) {
+                            const newStatus = trainResponse.data.status === 'ready' ? 'active' : trainResponse.data.status || 'training'
+                            const avatarToTrain = { ...updatedAvatar, status: newStatus }
+                            
+                            // Update avatar in state
+                            setAvatars(prev =>
+                              prev.map(item =>
+                                item.id === avatarIdToTrain ? avatarToTrain : item
+                              )
+                            )
+                            
+                            // Set training modal state
+                            setTrainingAvatar(avatarToTrain)
+                            setTrainingStatus(newStatus as 'training' | 'pending' | 'ready' | 'failed')
+                            setShowTrainingModal(true)
+                            
+                            // If already ready, close modal after short delay
+                            if (newStatus === 'active' || trainResponse.data.status === 'ready') {
+                              setTimeout(() => {
+                                setShowTrainingModal(false)
+                                setTrainingAvatar(null)
+                                setTrainingStatus(null)
+                              }, 2000)
+                            }
+                          }
+                        } catch (trainError: any) {
+                          console.error('Failed to start training:', trainError)
+                          // If training fails, still show success for look selection
+                          if (trainError.response?.data?.message) {
+                            toast.info(trainError.response.data.message)
+                          } else {
+                            toast.warning('Look selected, but training could not be started automatically. You can train it manually later.')
+                          }
+                        }
                       } catch (error: any) {
                         console.error('Failed to set default look:', error)
                         console.error('Error details:', {
@@ -2133,6 +2207,106 @@ export default function Avatars() {
                   Confirm Selection
                 </Button>
               </div>
+            </div>
+          )}
+        </Modal>
+
+        {/* Training Status Modal */}
+        <Modal
+          isOpen={showTrainingModal}
+          onClose={() => {
+            // Only allow closing if training is complete
+            if (trainingStatus === 'active' || trainingStatus === 'ready') {
+              setShowTrainingModal(false)
+              setTrainingAvatar(null)
+              setTrainingStatus(null)
+            }
+          }}
+          title="Avatar Training in Progress"
+          size="md"
+          closeOnOverlayClick={trainingStatus === 'active' || trainingStatus === 'ready'}
+          showCloseButton={trainingStatus === 'active' || trainingStatus === 'ready'}
+        >
+          {trainingAvatar && (
+            <div className="space-y-6">
+              <div className="text-center py-4">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-xl overflow-hidden border-2 border-slate-200">
+                  {trainingAvatar.thumbnail_url || trainingAvatar.preview_url ? (
+                    <img
+                      src={trainingAvatar.thumbnail_url || trainingAvatar.preview_url || ''}
+                      alt={trainingAvatar.avatar_name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-300 to-slate-400">
+                      <User className="h-8 w-8 text-white" />
+                    </div>
+                  )}
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900 mb-1">
+                  {trainingAvatar.avatar_name}
+                </h3>
+              </div>
+
+              <div className="space-y-4">
+                {trainingStatus === 'training' || trainingStatus === 'pending' ? (
+                  <>
+                    <div className="flex items-center justify-center gap-3">
+                      <Loader2 className="h-6 w-6 text-brand-500 animate-spin" />
+                      <p className="text-base font-medium text-slate-900">
+                        Training your avatar...
+                      </p>
+                    </div>
+                    <p className="text-sm text-slate-600 text-center">
+                      This process typically takes a few minutes. Your avatar will be ready to use once training completes.
+                    </p>
+                    <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                      <p className="text-xs text-slate-500 text-center">
+                        You can close this window - training will continue in the background. You'll be notified when it's ready.
+                      </p>
+                    </div>
+                  </>
+                ) : trainingStatus === 'active' || trainingStatus === 'ready' ? (
+                  <>
+                    <div className="flex items-center justify-center gap-3">
+                      <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+                      <p className="text-base font-medium text-slate-900">
+                        Training completed!
+                      </p>
+                    </div>
+                    <p className="text-sm text-slate-600 text-center">
+                      Your avatar is now ready to use for video generation.
+                    </p>
+                  </>
+                ) : trainingStatus === 'failed' ? (
+                  <>
+                    <div className="flex items-center justify-center gap-3">
+                      <X className="h-6 w-6 text-red-500" />
+                      <p className="text-base font-medium text-slate-900">
+                        Training failed
+                      </p>
+                    </div>
+                    <p className="text-sm text-slate-600 text-center">
+                      There was an error during training. Please try training again manually.
+                    </p>
+                  </>
+                ) : null}
+              </div>
+
+              {(trainingStatus === 'active' || trainingStatus === 'ready') && (
+                <div className="flex justify-end pt-4 border-t border-slate-200">
+                  <Button
+                    onClick={() => {
+                      setShowTrainingModal(false)
+                      setTrainingAvatar(null)
+                      setTrainingStatus(null)
+                      loadAvatars()
+                    }}
+                  >
+                    Close
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </Modal>
