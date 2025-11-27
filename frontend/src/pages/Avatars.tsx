@@ -1109,8 +1109,8 @@ export default function Avatars() {
             className={`flex flex-col items-center gap-2 flex-shrink-0 group transition-all duration-200`}
           >
             <div className={`w-20 h-20 rounded-xl flex items-center justify-center border-2 transition-all duration-200 ${selectedAvatarFilter === null
-                ? 'border-cyan-400 bg-white shadow-lg shadow-cyan-100'
-                : 'border-slate-200 bg-white hover:border-slate-300'
+              ? 'border-cyan-400 bg-white shadow-lg shadow-cyan-100'
+              : 'border-slate-200 bg-white hover:border-slate-300'
               }`}>
               <span className={`text-sm font-semibold ${selectedAvatarFilter === null ? 'text-slate-900' : 'text-slate-600'
                 }`}>All</span>
@@ -1125,8 +1125,8 @@ export default function Avatars() {
               className="flex flex-col items-center gap-2 flex-shrink-0 group transition-all duration-200"
             >
               <div className={`w-20 h-20 rounded-xl overflow-hidden border-2 transition-all duration-200 ${selectedAvatarFilter === avatar.id
-                  ? 'border-cyan-400 shadow-lg shadow-cyan-100'
-                  : 'border-transparent hover:border-slate-300'
+                ? 'border-cyan-400 shadow-lg shadow-cyan-100'
+                : 'border-transparent hover:border-slate-300'
                 }`}>
                 {avatar.thumbnail_url || avatar.preview_url ? (
                   <img
@@ -2084,8 +2084,8 @@ export default function Avatars() {
                   key={look.id}
                   onClick={() => setSelectedLookId(look.id)}
                   className={`relative flex-shrink-0 w-32 rounded-lg border-2 overflow-hidden transition-all cursor-pointer ${selectedLookId === look.id
-                      ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-200'
-                      : 'border-slate-200 bg-white hover:border-brand-300'
+                    ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-200'
+                    : 'border-slate-200 bg-white hover:border-brand-300'
                     }`}
                 >
                   {look.thumbnail_url || look.image_url ? (
@@ -2125,14 +2125,6 @@ export default function Avatars() {
                     toast.warning('Please select a look to continue')
                     return
                   }
-                  // Show training modal immediately
-                  if (lookSelectionModal) {
-                    const avatarToProcess = lookSelectionModal.avatar
-                    setTrainingAvatar(avatarToProcess)
-                    setTrainingStatus('pending')
-                    setShowTrainingModal(true)
-                    setLookSelectionModal(null)
-                  }
 
                   // Use async IIFE to handle the API call
                   (async () => {
@@ -2149,95 +2141,15 @@ export default function Avatars() {
                       console.log('Set default look response:', response.data)
                       // toast.success('Look selected! Starting avatar training...')
 
-                      // setLookSelectionModal(null) // Already closed
+                      // Close the look selection modal
+                      setLookSelectionModal(null)
                       setSelectedLookId(null)
                       await loadAvatars()
 
-                      // Auto-trigger training after look selection
-                      try {
-                        // Update status to training
-                        setTrainingStatus('training')
-
-                        const trainResponse = await api.post(`/api/avatars/${avatarIdToTrain}/train`)
-                        console.log('Train avatar response:', trainResponse.data)
-
-                        // Reload avatars to get updated status
-                        await loadAvatars()
-
-                        // Get the updated avatar from the fresh load
-                        const avatarResponse = await api.get('/api/avatars')
-                        const updatedAvatar = avatarResponse.data.avatars.find((a: Avatar) => a.id === avatarIdToTrain)
-
-                        if (updatedAvatar) {
-                          // Use status from trainResponse if available, otherwise use updatedAvatar status, default to 'training'
-                          const responseStatus = trainResponse.data?.status
-                          const avatarStatus = updatedAvatar.status
-                          const newStatus = responseStatus === 'ready' ? 'active' : (responseStatus || avatarStatus || 'training')
-                          const avatarToTrain = { ...updatedAvatar, status: newStatus }
-
-                          // Update avatar in state
-                          setAvatars(prev =>
-                            prev.map(item =>
-                              item.id === avatarIdToTrain ? avatarToTrain : item
-                            )
-                          )
-
-                          // Set training modal state
-                          // Convert 'active' to 'ready' for trainingStatus since it only accepts 'training' | 'pending' | 'ready' | 'failed'
-                          let trainingStatusValue: 'training' | 'pending' | 'ready' | 'failed' = 'training'
-                          if (newStatus === 'active') {
-                            trainingStatusValue = 'ready'
-                          } else if (['training', 'pending', 'ready', 'failed'].includes(newStatus)) {
-                            trainingStatusValue = newStatus as 'training' | 'pending' | 'ready' | 'failed'
-                          }
-                          console.log('Setting training modal:', { newStatus, trainingStatusValue, avatarToTrain })
-                          setTrainingAvatar(avatarToTrain)
-                          setTrainingStatus(trainingStatusValue)
-                          // setShowTrainingModal(true) // Already open
-
-                          // If already ready, close modal after short delay
-                          if (trainingStatusValue === 'ready') {
-                            setTimeout(() => {
-                              setShowTrainingModal(false)
-                              setTrainingAvatar(null)
-                              setTrainingStatus(null)
-                            }, 2000)
-                          }
-                        } else {
-                          // If avatar not found, still show modal with training status
-                          // Find the avatar from current state as fallback
-                          const currentAvatar = avatars.find(a => a.id === avatarIdToTrain)
-                          if (currentAvatar) {
-                            const responseStatus = trainResponse.data?.status || 'training'
-                            const newStatus = responseStatus === 'ready' ? 'active' : responseStatus
-                            let trainingStatusValue: 'training' | 'pending' | 'ready' | 'failed' = 'training'
-                            if (newStatus === 'active') {
-                              trainingStatusValue = 'ready'
-                            } else if (['training', 'pending', 'ready', 'failed'].includes(newStatus)) {
-                              trainingStatusValue = newStatus as 'training' | 'pending' | 'ready' | 'failed'
-                            }
-                            console.log('Setting training modal (fallback):', { newStatus, trainingStatusValue, currentAvatar })
-                            const avatarToTrain = { ...currentAvatar, status: newStatus }
-                            setTrainingAvatar(avatarToTrain)
-                            setTrainingStatus(trainingStatusValue)
-                            // setShowTrainingModal(true) // Already open
-                          } else {
-                            console.error('Avatar not found for training modal:', avatarIdToTrain)
-                          }
-                        }
-                      } catch (trainError: any) {
-                        console.error('Failed to start training:', trainError)
-                        setTrainingStatus('failed')
-                        // If training fails, still show success for look selection
-                        if (trainError.response?.data?.message) {
-                          toast.info(trainError.response.data.message)
-                        } else {
-                          toast.warning('Look selected, but training could not be started automatically. You can train it manually later.')
-                        }
-                      }
+                      // Show success message
+                      toast.success('Look selected! You can now train your avatar from the avatar card.')
                     } catch (error: any) {
                       console.error('Failed to set default look:', error)
-                      setTrainingStatus('failed')
                       console.error('Error details:', {
                         message: error.message,
                         response: error.response?.data,
