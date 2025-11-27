@@ -748,8 +748,8 @@ export class AvatarService {
 
     if (error) throw error
 
-    // Explicitly filter out deleted avatars (using filter instead of .neq for reliability)
-    return (data || []).filter(avatar => avatar.status !== 'deleted')
+    // Explicitly filter out deleted and inactive avatars (using filter instead of .neq for reliability)
+    return (data || []).filter(avatar => avatar.status !== 'deleted' && avatar.status !== 'inactive')
   }
 
   /**
