@@ -22,34 +22,34 @@ const router = Router()
 async function pollLookGenerationStatus(generationId: string, groupId: string, lookName?: string): Promise<void> {
   const maxAttempts = 30 // Poll for up to 5 minutes (30 * 10 seconds)
   const pollInterval = 10000 // 10 seconds
-  
+
   console.log(`[Generate Look] Starting background polling for generation ${generationId}`)
-  
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     await new Promise(resolve => setTimeout(resolve, pollInterval))
-    
+
     try {
       const status = await checkGenerationStatus(generationId)
       console.log(`[Generate Look] Poll attempt ${attempt}/${maxAttempts} - Status:`, status)
-      
+
       if (status.status === 'success') {
         console.log(`[Generate Look] ✅ Generation completed successfully!`, {
           generationId,
           groupId,
           imageCount: status.image_url_list?.length || 0,
         })
-        
+
         // Now add the generated images as looks to the avatar group
         if (status.image_key_list && status.image_key_list.length > 0) {
           try {
             console.log(`[Generate Look] Adding ${status.image_key_list.length} generated images as looks to group ${groupId}`)
-            
+
             const addLooksRequest: AddLooksRequest = {
               group_id: groupId,
               image_keys: status.image_key_list,
               name: lookName || `Generated Look ${new Date().toISOString().split('T')[0]}`,
             }
-            
+
             const addLooksResult = await addLooksToAvatarGroup(addLooksRequest)
             console.log(`[Generate Look] ✅ Successfully added ${addLooksResult.photo_avatar_list?.length || 0} looks to avatar group!`, {
               groupId,
@@ -76,7 +76,7 @@ async function pollLookGenerationStatus(generationId: string, groupId: string, l
       // Continue polling despite errors
     }
   }
-  
+
   console.warn(`[Generate Look] ⚠️ Polling timed out after ${maxAttempts} attempts for generation ${generationId}`)
 }
 
@@ -90,14 +90,14 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const showAll = req.query.all === 'true'
-    
+
     // Default to showing only user-created avatars unless ?all=true is specified
-    const avatars = showAll 
+    const avatars = showAll
       ? await AvatarService.getUserAvatars(userId)
       : await AvatarService.getUserCreatedAvatars(userId)
-    
+
     // Get default avatar (only from user-created avatars)
-    const defaultAvatar = showAll 
+    const defaultAvatar = showAll
       ? await AvatarService.getDefaultAvatar(userId)
       : (await AvatarService.getUserCreatedAvatars(userId)).find(a => a.is_default) || null
 
@@ -130,7 +130,7 @@ router.post('/sync', async (req: AuthRequest, res: Response) => {
       response: error.response?.data,
       status: error.response?.status,
     })
-    
+
     // Provide more helpful error messages
     let errorMessage = error.message || 'Failed to sync avatars'
     if (error.message?.includes('HEYGEN_KEY') || error.message?.includes('Missing')) {
@@ -140,7 +140,7 @@ router.post('/sync', async (req: AuthRequest, res: Response) => {
     } else if (error.response?.status === 404) {
       errorMessage = 'HeyGen avatar endpoint not found. The API endpoint may have changed. Please check HeyGen API documentation.'
     }
-    
+
     return res.status(500).json({ error: errorMessage })
   }
 })
@@ -335,42 +335,42 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
       let buffer: Buffer = Buffer.from(base64Data, 'base64')
 
       const normalizedMime = (mimeType || '').toLowerCase()
-    let extension = 'jpg'
+      let extension = 'jpg'
       if (normalizedMime.includes('png')) extension = 'png'
       else if (normalizedMime.includes('webp')) extension = 'webp'
-    
+
       const safeLabel = label.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'avatar'
       const fileName = `avatars/${userId}/${Date.now()}-${safeLabel}-${Math.random().toString(36).slice(2, 8)}.${extension}`
-    
-    console.log('Processing image upload:', {
-      fileName,
-      mimeType,
-      bufferSize: buffer.length,
-      extension,
-    })
+
+      console.log('Processing image upload:', {
+        fileName,
+        mimeType,
+        bufferSize: buffer.length,
+        extension,
+      })
       const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, buffer, {
         contentType: mimeType || `image/${extension}`,
         upsert: false,
         cacheControl: '3600',
       })
 
-    if (uploadError) {
-      console.error('Supabase storage upload error:', uploadError)
-      if (uploadError.message?.includes('Bucket') || uploadError.message?.includes('not found')) {
+      if (uploadError) {
+        console.error('Supabase storage upload error:', uploadError)
+        if (uploadError.message?.includes('Bucket') || uploadError.message?.includes('not found')) {
           throw new Error(
             `Storage bucket "avatars" not found. Please create it in Supabase Dashboard > Storage with public access. Error: ${uploadError.message}`
           )
+        }
+        throw new Error(`Failed to upload image to storage: ${uploadError.message}`)
       }
-      throw new Error(`Failed to upload image to storage: ${uploadError.message}`)
-    }
 
       const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName)
-    const publicUrl = urlData?.publicUrl
-    if (!publicUrl) {
-      throw new Error('Failed to get public URL for uploaded image')
-    }
-    
-    console.log('Image uploaded successfully, public URL:', publicUrl)
+      const publicUrl = urlData?.publicUrl
+      if (!publicUrl) {
+        throw new Error('Failed to get public URL for uploaded image')
+      }
+
+      console.log('Image uploaded successfully, public URL:', publicUrl)
       return publicUrl
     }
 
@@ -425,7 +425,7 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
         name: heygenError?.name,
         code: heygenError?.code,
       })
-      
+
       throw heygenError
     }
 
@@ -436,13 +436,13 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
       additional_photo_urls: extraPhotoUrls,
       auto_look: autoLookResult
         ? {
-            type: autoLookResult.type,
-            id: autoLookResult.id,
-            note:
-              autoLookResult.type === 'ai_generation'
-                ? 'AI-generated 9:16 look is being created based on your photo. This may take a few minutes.'
-                : 'Photo added as look.',
-          }
+          type: autoLookResult.type,
+          id: autoLookResult.id,
+          note:
+            autoLookResult.type === 'ai_generation'
+              ? 'AI-generated 9:16 look is being created based on your photo. This may take a few minutes.'
+              : 'Photo added as look.',
+        }
         : null,
     })
   } catch (error: any) {
@@ -457,14 +457,14 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
       code: error.code,
       fullError: error,
     })
-    
+
     // Extract detailed error message
     let errorMessage = 'Failed to upload photo and create avatar'
-    
+
     // Try to get the most specific error message
     if (error.response?.data?.error) {
-      errorMessage = typeof error.response.data.error === 'string' 
-        ? error.response.data.error 
+      errorMessage = typeof error.response.data.error === 'string'
+        ? error.response.data.error
         : JSON.stringify(error.response.data.error)
     } else if (error.response?.data?.message) {
       errorMessage = error.response.data.message
@@ -476,7 +476,7 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
       errorMessage =
         'HeyGen could not use this photo (usually because the face is blurry, too dark, or out of frame). Try a brighter front-facing selfie on a plain background.'
     }
-    
+
     // Add more context if available
     if (error.response?.status) {
       if (error.response.status === 404) {
@@ -493,10 +493,10 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
         errorMessage = `Invalid request: ${errorMessage}`
       }
     }
-    
+
     // Include more details in development
     const statusCode = error.response?.status || 500
-    return res.status(statusCode).json({ 
+    return res.status(statusCode).json({
       error: errorMessage,
       details: process.env.NODE_ENV === 'development' ? {
         originalMessage: error.message,
@@ -530,12 +530,12 @@ router.post('/create-from-photo', async (req: AuthRequest, res: Response) => {
       response: error.response?.data,
       status: error.response?.status,
     })
-    
-    const errorMessage = 
-      error.message || 
+
+    const errorMessage =
+      error.message ||
       error.response?.data?.message ||
       'Failed to create avatar from photo'
-    
+
     return res.status(500).json({ error: errorMessage })
   }
 })
@@ -548,7 +548,7 @@ router.post('/generate-ai', async (req: AuthRequest, res: Response) => {
     userId: req.userId,
     bodyKeys: Object.keys(req.body || {}),
   })
-  
+
   try {
     const userId = req.userId!
     const request: GenerateAIAvatarRequest = req.body
@@ -618,9 +618,9 @@ router.post('/generate-ai', async (req: AuthRequest, res: Response) => {
       status: error.response?.status,
       statusText: error.response?.statusText,
     })
-    
+
     let errorMessage = 'Failed to generate AI avatar'
-    
+
     if (error.response?.status === 404) {
       errorMessage = 'HeyGen AI avatar generation endpoint not found (404). The API endpoint may have changed or the feature may not be available in your HeyGen plan.'
     } else if (error.response?.status === 401) {
@@ -628,16 +628,16 @@ router.post('/generate-ai', async (req: AuthRequest, res: Response) => {
     } else if (error.response?.status === 403) {
       errorMessage = 'Access denied. AI avatar generation may not be available in your HeyGen plan.'
     } else if (error.response?.data?.error) {
-      errorMessage = typeof error.response.data.error === 'string' 
-        ? error.response.data.error 
+      errorMessage = typeof error.response.data.error === 'string'
+        ? error.response.data.error
         : JSON.stringify(error.response.data.error)
     } else if (error.response?.data?.message) {
       errorMessage = error.response.data.message
     } else if (error.message) {
       errorMessage = error.message
     }
-    
-    return res.status(error.response?.status || 500).json({ 
+
+    return res.status(error.response?.status || 500).json({
       error: errorMessage,
       details: process.env.NODE_ENV === 'development' ? {
         originalMessage: error.message,
@@ -660,7 +660,7 @@ router.get('/generation-status/:generationId', async (req: AuthRequest, res: Res
   } catch (error: any) {
     console.error('Check generation status error:', error)
     console.error('Check generation status response:', error.response?.data)
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: error.message || 'Failed to check generation status',
       details: error.response?.data
     })
@@ -895,7 +895,7 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
       heygen_avatar_id: avatar.heygen_avatar_id,
       default_look_id: avatar.default_look_id,
     } : 'not found')
-    
+
     // IMPORTANT: Do NOT set photo_avatar_id
     // The group_id alone should be sufficient for HeyGen to generate a look
     // that matches the avatar's identity. Setting photo_avatar_id incorrectly
@@ -908,34 +908,34 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
     // Check training status before generating look (with timeout)
     const { checkTrainingStatus } = await import('../lib/heygen.js')
     console.log('[Generate Look] Checking training status for group:', request.group_id)
-    
+
     try {
       // Add a timeout to prevent hanging
-      const timeoutPromise = new Promise<never>((_, reject) => 
+      const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Training status check timed out after 10s')), 10000)
       )
-      
+
       const trainingStatus = await Promise.race([
         checkTrainingStatus(request.group_id),
         timeoutPromise
       ])
-      
+
       console.log('[Generate Look] Training status result:', trainingStatus)
       if (trainingStatus.status !== 'ready') {
         if (trainingStatus.status === 'empty') {
           console.log('[Generate Look] Training status is empty, returning error')
-          return res.status(400).json({ 
-            error: 'Avatar group is not trained yet. Please wait for training to complete before generating looks.' 
+          return res.status(400).json({
+            error: 'Avatar group is not trained yet. Please wait for training to complete before generating looks.'
           })
         } else if (trainingStatus.status === 'failed') {
           console.log('[Generate Look] Training failed, returning error')
-          return res.status(400).json({ 
-            error: `Avatar training failed: ${trainingStatus.error_msg || 'Unknown error'}. Cannot generate looks.` 
+          return res.status(400).json({
+            error: `Avatar training failed: ${trainingStatus.error_msg || 'Unknown error'}. Cannot generate looks.`
           })
         } else if (trainingStatus.status === 'training' || trainingStatus.status === 'pending') {
           console.log('[Generate Look] Training in progress, returning error')
-          return res.status(400).json({ 
-            error: `Avatar is still training (status: ${trainingStatus.status}). Please wait for training to complete before generating looks.` 
+          return res.status(400).json({
+            error: `Avatar is still training (status: ${trainingStatus.status}). Please wait for training to complete before generating looks.`
           })
         }
       }
@@ -948,11 +948,11 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
     }
 
     console.log('[Generate Look] Calling generateAvatarLook with request:', JSON.stringify(request, null, 2))
-    
+
     try {
-    const result = await generateAvatarLook(request)
+      const result = await generateAvatarLook(request)
       console.log('[Generate Look] Generation result:', result)
-      
+
       // Start polling for generation status in the background
       // When complete, it will automatically add the generated images as looks
       if (result.generation_id) {
@@ -962,10 +962,10 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
         })
       }
 
-    return res.json({
-      message: 'Look generation started',
-      generation_id: result.generation_id,
-    })
+      return res.json({
+        message: 'Look generation started',
+        generation_id: result.generation_id,
+      })
     } catch (genError: any) {
       console.error('[Generate Look] generateAvatarLook failed:', genError.message)
       console.error('[Generate Look] Full generation error:', genError)
@@ -974,11 +974,11 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
     }
   } catch (error: any) {
     console.error('Generate look error:', error)
-    
+
     // Provide more user-friendly error messages
     let errorMessage = error.message || 'Failed to generate look'
     let errorCode: string | undefined
-    
+
     if (error.response?.data?.error) {
       const apiError = error.response.data.error
       if (typeof apiError === 'string') {
@@ -992,10 +992,10 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
         }
       }
     }
-    
-    return res.status(error.response?.status || 500).json({ 
+
+    return res.status(error.response?.status || 500).json({
       error: errorMessage,
-      code: errorCode 
+      code: errorCode
     })
   }
 })
@@ -1007,7 +1007,7 @@ router.post('/:id/train', async (req: AuthRequest, res: Response) => {
     const { id } = req.params
 
     const { supabase } = await import('../lib/supabase.js')
-    
+
     // Get the avatar
     const { data: avatar, error: avatarError } = await supabase
       .from('avatars')
@@ -1034,15 +1034,15 @@ router.post('/:id/train', async (req: AuthRequest, res: Response) => {
         .from('avatars')
         .update({ status: 'active' })
         .eq('id', id)
-      
-      return res.json({ 
+
+      return res.json({
         message: 'Avatar is already trained and ready to use',
         status: 'ready'
       })
     }
 
     if (currentStatus.status === 'training' || currentStatus.status === 'pending') {
-      return res.json({ 
+      return res.json({
         message: `Avatar is currently ${currentStatus.status}. Please wait for training to complete.`,
         status: currentStatus.status
       })
@@ -1052,11 +1052,11 @@ router.post('/:id/train', async (req: AuthRequest, res: Response) => {
     // First, we need to get the looks/photos for this avatar using the avatar_group endpoint
     const { default: axios } = await import('axios')
     const apiKey = process.env.HEYGEN_KEY
-    
+
     if (!apiKey) {
       return res.status(500).json({ error: 'HeyGen API key not configured' })
     }
-    
+
     let looks: any[] = []
     try {
       // Use the avatar_group endpoint which works for these avatars
@@ -1091,19 +1091,29 @@ router.post('/:id/train', async (req: AuthRequest, res: Response) => {
     }
 
     if (looks.length === 0) {
-      return res.status(400).json({ 
-        error: 'No photos found for this avatar. Please add photos before training.' 
+      return res.status(400).json({
+        error: 'No photos found for this avatar. Please add photos before training.'
       })
     }
 
-    // Get look IDs that are ready for training
-    const lookIds = looks
-      .filter((look: any) => look.status === 'uploaded' || look.status === 'ready' || !look.status)
-      .map((look: any) => look.id)
+    // Use the default_look_id if set, otherwise use all looks
+    let lookIds: string[]
+
+    if (avatar.default_look_id) {
+      // User has selected a specific look - use only that one
+      console.log('[Train Avatar] Using selected look:', avatar.default_look_id)
+      lookIds = [avatar.default_look_id]
+    } else {
+      // No specific look selected - use all ready looks
+      console.log('[Train Avatar] No specific look selected, using all ready looks')
+      lookIds = looks
+        .filter((look: any) => look.status === 'uploaded' || look.status === 'ready' || !look.status)
+        .map((look: any) => look.id)
+    }
 
     if (lookIds.length === 0) {
-      return res.status(400).json({ 
-        error: 'No photos are ready for training. Please wait for photo upload to complete.' 
+      return res.status(400).json({
+        error: 'No photos are ready for training. Please wait for photo upload to complete or select a look first.'
       })
     }
 
@@ -1142,14 +1152,14 @@ router.post('/:id/train', async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     console.error('[Train Avatar] Error:', error)
     console.error('[Train Avatar] Response data:', error.response?.data)
-    
+
     let errorMessage = error.message || 'Failed to start training'
     if (error.response?.data?.error) {
-      errorMessage = typeof error.response.data.error === 'string' 
-        ? error.response.data.error 
+      errorMessage = typeof error.response.data.error === 'string'
+        ? error.response.data.error
         : error.response.data.error.message || JSON.stringify(error.response.data.error)
     }
-    
+
     return res.status(error.response?.status || 500).json({ error: errorMessage })
   }
 })
@@ -1165,7 +1175,7 @@ router.post('/upload-look-image', authenticate, async (req: AuthRequest, res: Re
 
     // Import uploadImageToHeyGen function
     const { uploadImageToHeyGen } = await import('../lib/heygen.js')
-    
+
     // Upload to HeyGen and get image_key
     const imageKey = await uploadImageToHeyGen(photo_data)
 
@@ -1174,8 +1184,8 @@ router.post('/upload-look-image', authenticate, async (req: AuthRequest, res: Re
     })
   } catch (error: any) {
     console.error('Upload look image error:', error)
-    return res.status(500).json({ 
-      error: error.message || 'Failed to upload look image' 
+    return res.status(500).json({
+      error: error.message || 'Failed to upload look image'
     })
   }
 })

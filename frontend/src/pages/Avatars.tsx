@@ -2147,8 +2147,9 @@ export default function Avatars() {
                       setTrainingStatus('pending')
                       setShowTrainingModal(true)
 
-                      // Start training
+                      // Start training (wait a moment for HeyGen to process the avatar group)
                       setTrainingStatus('training')
+                      await new Promise(resolve => setTimeout(resolve, 2000))
                       const trainResponse = await api.post(`/api/avatars/${avatarIdToTrain}/train`)
 
                       await loadAvatars()
