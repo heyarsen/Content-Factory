@@ -2040,7 +2040,7 @@ export async function getPhotoAvatarDetails(
     }
     // Only log actual errors (not 404s)
     if (error.response?.status !== 404) {
-      console.error('HeyGen API error (getPhotoAvatarDetails):', error.response?.data || error.message)
+    console.error('HeyGen API error (getPhotoAvatarDetails):', error.response?.data || error.message)
     }
     throw error
   }

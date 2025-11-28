@@ -551,7 +551,7 @@ export class AvatarService {
         preview_url: photoUrl,
         thumbnail_url: photoUrl,
         gender: null,
-        status: result.status === 'training' ? 'training' : 'active',
+        status: 'pending', // Always start as pending - training must be done manually
         is_default: false,
       }
 
@@ -735,21 +735,20 @@ export class AvatarService {
    * We exclude avatars that were synced from HeyGen (which typically have avatar_url from HeyGen CDN)
    */
   static async getUserCreatedAvatars(userId: string): Promise<Avatar[]> {
-    // Get ALL avatars for the user - no status or source filtering
-    // This ensures all user-created avatars are shown, including old ones
-    // But exclude deleted/invalid avatars
+    // Only show trained avatars (status 'active') - untrained avatars must be manually trained
     const { data, error } = await supabase
       .from('avatars')
       .select('*')
       .eq('user_id', userId)
+      .eq('status', 'active') // Only show trained/ready avatars
       .order('is_default', { ascending: false })
       .order('created_at', { ascending: false }) // Show newest first
       .order('avatar_name', { ascending: true })
 
     if (error) throw error
 
-    // Explicitly filter out deleted and inactive avatars (using filter instead of .neq for reliability)
-    return (data || []).filter(avatar => avatar.status !== 'deleted' && avatar.status !== 'inactive')
+    // Explicitly filter out deleted and inactive avatars (safety check)
+    return (data || []).filter(avatar => avatar.status === 'active' && avatar.status !== 'deleted' && avatar.status !== 'inactive')
   }
 
   /**

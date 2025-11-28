@@ -51,6 +51,7 @@ type AiStageVisualState = 'done' | 'current' | 'pending'
 
 export default function Avatars() {
   const [avatars, setAvatars] = useState<Avatar[]>([])
+  const [untrainedAvatars, setUntrainedAvatars] = useState<Avatar[]>([])
   const [, setDefaultAvatarId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -219,8 +220,12 @@ export default function Avatars() {
       setLoading(true)
       // Only show user-created avatars
       const response = await api.get('/api/avatars')
-      const avatarsList = response.data?.avatars || []
+      // Only show trained avatars (status 'active') - untrained avatars must be manually trained
+      const avatarsList = (response.data?.avatars || []).filter(
+        (avatar: Avatar) => avatar.status === 'active' && avatar.status !== 'deleted'
+      )
       setAvatars(avatarsList)
+      setUntrainedAvatars(response.data?.untrained_avatars || [])
       setDefaultAvatarId(response.data?.default_avatar_id || null)
 
       // After loading, check if any avatars need look selection (don't block on errors)
@@ -286,6 +291,37 @@ export default function Avatars() {
     }
   }, [])
 
+
+  const handleStartTraining = useCallback(async (avatar: Avatar) => {
+    try {
+      setTrainingAvatar(avatar)
+      setTrainingStatus('pending')
+      setShowTrainingModal(true)
+
+      const trainResponse = await api.post(`/api/avatars/${avatar.id}/train`)
+      const responseStatus = trainResponse.data?.status
+
+      if (responseStatus === 'ready') {
+        setTrainingStatus('ready')
+        await loadAvatars()
+        setTimeout(() => {
+          setShowTrainingModal(false)
+          setTrainingAvatar(null)
+          setTrainingStatus(null)
+        }, 2000)
+      } else if (responseStatus === 'training' || responseStatus === 'pending') {
+        setTrainingStatus('training')
+      } else if (responseStatus === 'failed') {
+        setTrainingStatus('failed')
+      } else {
+        setTrainingStatus('training')
+      }
+    } catch (error: any) {
+      console.error('Failed to train avatar:', error)
+      setTrainingStatus('failed')
+      toast.error(error.response?.data?.error || error.message || 'Failed to start training')
+    }
+  }, [loadAvatars])
 
   const handleRefreshTrainingStatus = useCallback(
     async (avatar: Avatar, options: { silent?: boolean } = {}) => {
@@ -1179,6 +1215,53 @@ export default function Avatars() {
             </button>
           )}
         </div>
+
+        {/* Avatars needing training */}
+        {untrainedAvatars.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+            <h3 className="text-sm font-semibold text-amber-900 mb-3">Avatars Needing Training</h3>
+            <p className="text-xs text-amber-700 mb-3">These avatars need to be trained before they can be used. Click "Train Avatar" to start training.</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {untrainedAvatars.map(avatar => (
+                <div
+                  key={avatar.id}
+                  className="bg-white rounded-lg p-3 border border-amber-200 flex flex-col items-center gap-2"
+                >
+                  {avatar.thumbnail_url || avatar.preview_url ? (
+                    <img
+                      src={avatar.thumbnail_url || avatar.preview_url || ''}
+                      alt={avatar.avatar_name}
+                      className="w-16 h-16 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-slate-300 to-slate-400 flex items-center justify-center">
+                      <User className="h-8 w-8 text-white" />
+                    </div>
+                  )}
+                  <p className="text-xs font-medium text-slate-900 text-center truncate w-full">
+                    {avatar.avatar_name}
+                  </p>
+                  <Button
+                    onClick={() => handleStartTraining(avatar)}
+                    size="sm"
+                    variant="secondary"
+                    disabled={avatar.status === 'training'}
+                    className="w-full"
+                  >
+                    {avatar.status === 'training' ? (
+                      <>
+                        <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                        Training...
+                      </>
+                    ) : (
+                      'Train Avatar'
+                    )}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Section header */}
         <div className="flex items-center justify-between">

@@ -97,6 +97,16 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       ? await AvatarService.getUserAvatars(userId)
       : await AvatarService.getUserCreatedAvatars(userId)
 
+    // Get untrained avatars separately (for training section)
+    const { supabase } = await import('../lib/supabase.js')
+    const { data: untrainedAvatars } = await supabase
+      .from('avatars')
+      .select('*')
+      .eq('user_id', userId)
+      .in('status', ['pending', 'empty', 'failed', 'training'])
+      .neq('status', 'deleted')
+      .order('created_at', { ascending: false })
+
     // Get default avatar (only from user-created avatars)
     const defaultAvatar = showAll
       ? await AvatarService.getDefaultAvatar(userId)
@@ -104,6 +114,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
     return res.json({
       avatars,
+      untrained_avatars: untrainedAvatars || [],
       default_avatar_id: defaultAvatar?.id || null,
       only_created: !showAll,
     })
