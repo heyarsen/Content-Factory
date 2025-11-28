@@ -296,38 +296,6 @@ export default function Avatars() {
     }
   }, [])
 
-
-  const handleStartTraining = useCallback(async (avatar: Avatar) => {
-    try {
-      setTrainingAvatar(avatar)
-      setTrainingStatus('pending')
-      setShowTrainingModal(true)
-
-      const trainResponse = await api.post(`/api/avatars/${avatar.id}/train`)
-      const responseStatus = trainResponse.data?.status
-
-      if (responseStatus === 'ready') {
-        setTrainingStatus('ready')
-        await loadAvatars()
-        setTimeout(() => {
-          setShowTrainingModal(false)
-          setTrainingAvatar(null)
-          setTrainingStatus(null)
-        }, 2000)
-      } else if (responseStatus === 'training' || responseStatus === 'pending') {
-        setTrainingStatus('training')
-      } else if (responseStatus === 'failed') {
-        setTrainingStatus('failed')
-      } else {
-        setTrainingStatus('training')
-      }
-    } catch (error: any) {
-      console.error('Failed to train avatar:', error)
-      setTrainingStatus('failed')
-      toast.error(error.response?.data?.error || error.message || 'Failed to start training')
-    }
-  }, [loadAvatars])
-
   const handleRefreshTrainingStatus = useCallback(
     async (avatar: Avatar, options: { silent?: boolean } = {}) => {
       if (!avatar) return
