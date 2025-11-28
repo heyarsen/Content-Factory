@@ -222,7 +222,7 @@ export default function Avatars() {
       const response = await api.get('/api/avatars')
       // Only show trained avatars (status 'active') - untrained avatars must be manually trained
       const avatarsList = (response.data?.avatars || []).filter(
-        (avatar: Avatar) => avatar.status === 'active' && avatar.status !== 'deleted'
+        (avatar: Avatar) => avatar.status === 'active'
       )
       setAvatars(avatarsList)
       setUntrainedAvatars(response.data?.untrained_avatars || [])
