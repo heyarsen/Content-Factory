@@ -51,7 +51,6 @@ type AiStageVisualState = 'done' | 'current' | 'pending'
 
 export default function Avatars() {
   const [avatars, setAvatars] = useState<Avatar[]>([])
-  const [untrainedAvatars, setUntrainedAvatars] = useState<Avatar[]>([])
   const [, setDefaultAvatarId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -220,12 +219,18 @@ export default function Avatars() {
       setLoading(true)
       // Only show user-created avatars
       const response = await api.get('/api/avatars')
-      // Only show trained avatars (status 'active') - untrained avatars must be manually trained
+      // Only show trained avatars (status 'active') - untrained avatars are hidden
+      // Also filter out avatars that don't have a heygen_avatar_id (not properly created)
       const avatarsList = (response.data?.avatars || []).filter(
-        (avatar: Avatar) => avatar.status === 'active'
+        (avatar: Avatar) => {
+          // Must have active status
+          if (avatar.status !== 'active') return false
+          // Must have a valid heygen_avatar_id
+          if (!avatar.heygen_avatar_id || avatar.heygen_avatar_id.trim() === '') return false
+          return true
+        }
       )
       setAvatars(avatarsList)
-      setUntrainedAvatars(response.data?.untrained_avatars || [])
       setDefaultAvatarId(response.data?.default_avatar_id || null)
 
       // After loading, check if any avatars need look selection (don't block on errors)
@@ -1164,17 +1169,31 @@ export default function Avatars() {
                 ? 'border-cyan-400 shadow-lg shadow-cyan-100'
                 : 'border-transparent hover:border-slate-300'
                 }`}>
-                {avatar.thumbnail_url || avatar.preview_url ? (
-                  <img
-                    src={avatar.thumbnail_url || avatar.preview_url || ''}
-                    alt={avatar.avatar_name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-300 to-slate-400">
-                    <User className="h-8 w-8 text-white" />
-                  </div>
-                )}
+                {(() => {
+                  const imageUrl = avatar.thumbnail_url || avatar.preview_url || avatar.avatar_url
+                  const hasValidUrl = imageUrl && imageUrl.trim() !== ''
+                  return (
+                    <div className="relative w-full h-full">
+                      {/* Placeholder - always rendered as fallback */}
+                      <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-300 to-slate-400">
+                        <User className="h-8 w-8 text-white" />
+                      </div>
+                      {/* Image - overlays placeholder if valid and loads successfully */}
+                      {hasValidUrl && (
+                        <img
+                          src={imageUrl}
+                          alt={avatar.avatar_name}
+                          className="relative w-full h-full object-cover z-10"
+                          onError={(e) => {
+                            // Hide image on error to show placeholder
+                            const target = e.target as HTMLImageElement
+                            target.style.display = 'none'
+                          }}
+                        />
+                      )}
+                    </div>
+                  )
+                })()}
               </div>
               <span className={`text-xs font-medium max-w-[72px] truncate ${selectedAvatarFilter === avatar.id ? 'text-slate-900' : 'text-slate-600'
                 }`}>
@@ -1215,53 +1234,6 @@ export default function Avatars() {
             </button>
           )}
         </div>
-
-        {/* Avatars needing training */}
-        {untrainedAvatars.length > 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
-            <h3 className="text-sm font-semibold text-amber-900 mb-3">Avatars Needing Training</h3>
-            <p className="text-xs text-amber-700 mb-3">These avatars need to be trained before they can be used. Click "Train Avatar" to start training.</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {untrainedAvatars.map(avatar => (
-                <div
-                  key={avatar.id}
-                  className="bg-white rounded-lg p-3 border border-amber-200 flex flex-col items-center gap-2"
-                >
-                  {avatar.thumbnail_url || avatar.preview_url ? (
-                    <img
-                      src={avatar.thumbnail_url || avatar.preview_url || ''}
-                      alt={avatar.avatar_name}
-                      className="w-16 h-16 rounded-lg object-cover"
-                    />
-                  ) : (
-                    <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-slate-300 to-slate-400 flex items-center justify-center">
-                      <User className="h-8 w-8 text-white" />
-                    </div>
-                  )}
-                  <p className="text-xs font-medium text-slate-900 text-center truncate w-full">
-                    {avatar.avatar_name}
-                  </p>
-                  <Button
-                    onClick={() => handleStartTraining(avatar)}
-                    size="sm"
-                    variant="secondary"
-                    disabled={avatar.status === 'training'}
-                    className="w-full"
-                  >
-                    {avatar.status === 'training' ? (
-                      <>
-                        <Loader2 className="h-3 w-3 mr-2 animate-spin" />
-                        Training...
-                      </>
-                    ) : (
-                      'Train Avatar'
-                    )}
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Section header */}
         <div className="flex items-center justify-between">
@@ -1393,17 +1365,31 @@ export default function Avatars() {
                   key={`${avatar.id}-${look.id}`}
                   className="group relative aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 hover:shadow-xl transition-all duration-300"
                 >
-                  {look.image_url || look.preview_url || look.thumbnail_url ? (
-                    <img
-                      src={look.image_url || look.preview_url || look.thumbnail_url || ''}
-                      alt={look.name || avatar.avatar_name}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-200 to-slate-300">
-                      <User className="h-12 w-12 text-slate-400" />
-                    </div>
-                  )}
+                  {(() => {
+                    const imageUrl = look.image_url || look.preview_url || look.thumbnail_url
+                    const hasValidUrl = imageUrl && imageUrl.trim() !== ''
+                    return (
+                      <div className="relative w-full h-full">
+                        {/* Placeholder - always rendered as fallback */}
+                        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-200 to-slate-300">
+                          <User className="h-12 w-12 text-slate-400" />
+                        </div>
+                        {/* Image - overlays placeholder if valid and loads successfully */}
+                        {hasValidUrl && (
+                          <img
+                            src={imageUrl}
+                            alt={look.name || avatar.avatar_name}
+                            className="relative w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 z-10"
+                            onError={(e) => {
+                              // Hide image on error to show placeholder
+                              const target = e.target as HTMLImageElement
+                              target.style.display = 'none'
+                            }}
+                          />
+                        )}
+                      </div>
+                    )
+                  })()}
 
                   {/* Default look indicator */}
                   {look.is_default && (
@@ -1439,17 +1425,30 @@ export default function Avatars() {
                 return selectedAvatar ? (
                   <>
                     <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 border-2 border-slate-200">
-                      {selectedAvatar.thumbnail_url || selectedAvatar.avatar_url ? (
-                        <img
-                          src={selectedAvatar.thumbnail_url || selectedAvatar.avatar_url || ''}
-                          alt={selectedAvatar.avatar_name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
-                          <User className="h-5 w-5 text-white" />
-                        </div>
-                      )}
+                      {(() => {
+                        const imageUrl = selectedAvatar.thumbnail_url || selectedAvatar.preview_url || selectedAvatar.avatar_url
+                        const hasValidUrl = imageUrl && imageUrl.trim() !== ''
+                        return (
+                          <div className="relative w-full h-full">
+                            {/* Placeholder - always rendered as fallback */}
+                            <div className="absolute inset-0 bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
+                              <User className="h-5 w-5 text-white" />
+                            </div>
+                            {/* Image - overlays placeholder if valid and loads successfully */}
+                            {hasValidUrl && (
+                              <img
+                                src={imageUrl}
+                                alt={selectedAvatar.avatar_name}
+                                className="relative w-full h-full object-cover z-10"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement
+                                  target.style.display = 'none'
+                                }}
+                              />
+                            )}
+                          </div>
+                        )
+                      })()}
                     </div>
                     <input
                       type="text"
@@ -2011,17 +2010,30 @@ export default function Avatars() {
                     }}
                     className="relative rounded-xl border-2 border-slate-200 bg-white p-3 transition-all hover:scale-105 hover:border-brand-300 hover:shadow-md text-left"
                   >
-                    {avatar.thumbnail_url || avatar.preview_url ? (
-                      <img
-                        src={avatar.thumbnail_url || avatar.preview_url || ''}
-                        alt={avatar.avatar_name}
-                        className="w-full aspect-[3/4] object-cover rounded-lg mb-2 bg-slate-50"
-                      />
-                    ) : (
-                      <div className="w-full aspect-[3/4] bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center mb-2">
-                        <User className="h-12 w-12 text-white opacity-50" />
-                      </div>
-                    )}
+                    {(() => {
+                      const imageUrl = avatar.thumbnail_url || avatar.preview_url || avatar.avatar_url
+                      const hasValidUrl = imageUrl && imageUrl.trim() !== ''
+                      return (
+                        <div className="relative w-full aspect-[3/4] mb-2">
+                          {/* Placeholder - always rendered as fallback */}
+                          <div className="absolute inset-0 bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center">
+                            <User className="h-12 w-12 text-white opacity-50" />
+                          </div>
+                          {/* Image - overlays placeholder if valid and loads successfully */}
+                          {hasValidUrl && (
+                            <img
+                              src={imageUrl}
+                              alt={avatar.avatar_name}
+                              className="relative w-full h-full object-cover rounded-lg bg-slate-50 z-10"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement
+                                target.style.display = 'none'
+                              }}
+                            />
+                          )}
+                        </div>
+                      )
+                    })()}
                     <p className="text-xs font-medium text-slate-700 truncate text-center">
                       {avatar.avatar_name}
                     </p>
@@ -2058,17 +2070,30 @@ export default function Avatars() {
             {/* Selected Avatar Display - Locked, no option to change */}
             {selectedAvatarForLook && (
               <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
-                {selectedAvatarForLook.thumbnail_url || selectedAvatarForLook.preview_url ? (
-                  <img
-                    src={selectedAvatarForLook.thumbnail_url || selectedAvatarForLook.preview_url || ''}
-                    alt={selectedAvatarForLook.avatar_name}
-                    className="w-12 h-12 object-cover rounded-lg"
-                  />
-                ) : (
-                  <div className="w-12 h-12 bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center">
-                    <User className="h-6 w-6 text-white opacity-50" />
-                  </div>
-                )}
+                {(() => {
+                  const imageUrl = selectedAvatarForLook.thumbnail_url || selectedAvatarForLook.preview_url || selectedAvatarForLook.avatar_url
+                  const hasValidUrl = imageUrl && imageUrl.trim() !== ''
+                  return (
+                    <div className="relative w-12 h-12">
+                      {/* Placeholder - always rendered as fallback */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center">
+                        <User className="h-6 w-6 text-white opacity-50" />
+                      </div>
+                      {/* Image - overlays placeholder if valid and loads successfully */}
+                      {hasValidUrl && (
+                        <img
+                          src={imageUrl}
+                          alt={selectedAvatarForLook.avatar_name}
+                          className="relative w-full h-full object-cover rounded-lg z-10"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.style.display = 'none'
+                          }}
+                        />
+                      )}
+                    </div>
+                  )
+                })()}
                 <div className="flex-1">
                   <p className="text-sm font-medium text-slate-700">{selectedAvatarForLook.avatar_name}</p>
                   <p className="text-xs text-slate-500">Selected avatar</p>
@@ -2171,19 +2196,32 @@ export default function Avatars() {
                     : 'border-slate-200 bg-white hover:border-brand-300'
                     }`}
                 >
-                  {look.thumbnail_url || look.image_url ? (
-                    <div className="w-full aspect-[9/16] bg-slate-50 flex items-center justify-center overflow-hidden">
-                      <img
-                        src={look.thumbnail_url || look.image_url || ''}
-                        alt={look.name || 'Look'}
-                        className="w-full h-full object-contain"
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-full aspect-[9/16] bg-slate-100 flex items-center justify-center">
-                      <User className="h-6 w-6 text-slate-400" />
-                    </div>
-                  )}
+                  {(() => {
+                    const imageUrl = look.thumbnail_url || look.preview_url || look.image_url
+                    const hasValidUrl = imageUrl && imageUrl.trim() !== ''
+                    return (
+                      <div className="relative w-full aspect-[9/16]">
+                        {/* Placeholder - always rendered as fallback */}
+                        <div className="absolute inset-0 bg-slate-100 flex items-center justify-center">
+                          <User className="h-6 w-6 text-slate-400" />
+                        </div>
+                        {/* Image - overlays placeholder if valid and loads successfully */}
+                        {hasValidUrl && (
+                          <div className="relative w-full h-full bg-slate-50 flex items-center justify-center overflow-hidden z-10">
+                            <img
+                              src={imageUrl}
+                              alt={look.name || 'Look'}
+                              className="w-full h-full object-contain"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement
+                                target.style.display = 'none'
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
                   <div className="p-1.5">
                     <p className="text-xs font-medium text-slate-900 truncate">
                       {look.name || 'Unnamed Look'}
@@ -2285,18 +2323,31 @@ export default function Avatars() {
         {trainingAvatar && (
           <div className="space-y-6">
             <div className="text-center py-4">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-xl overflow-hidden border-2 border-slate-200">
-                {trainingAvatar.thumbnail_url || trainingAvatar.preview_url ? (
-                  <img
-                    src={trainingAvatar.thumbnail_url || trainingAvatar.preview_url || ''}
-                    alt={trainingAvatar.avatar_name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-300 to-slate-400">
-                    <User className="h-8 w-8 text-white" />
-                  </div>
-                )}
+              <div className="w-16 h-16 mx-auto mb-4 rounded-xl overflow-hidden border-2 border-slate-200 relative">
+                {(() => {
+                  const imageUrl = trainingAvatar.thumbnail_url || trainingAvatar.preview_url || trainingAvatar.avatar_url
+                  const hasValidUrl = imageUrl && imageUrl.trim() !== ''
+                  return (
+                    <>
+                      {/* Placeholder - always rendered as fallback */}
+                      <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-300 to-slate-400">
+                        <User className="h-8 w-8 text-white" />
+                      </div>
+                      {/* Image - overlays placeholder if valid and loads successfully */}
+                      {hasValidUrl && (
+                        <img
+                          src={imageUrl}
+                          alt={trainingAvatar.avatar_name}
+                          className="relative w-full h-full object-cover z-10"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.style.display = 'none'
+                          }}
+                        />
+                      )}
+                    </>
+                  )
+                })()}
               </div>
               <h3 className="text-lg font-semibold text-slate-900 mb-1">
                 {trainingAvatar.avatar_name}

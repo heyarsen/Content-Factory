@@ -441,9 +441,18 @@ export class AvatarService {
           // Update database if status differs
           if (avatar.status !== trainingStatus) {
             console.log(`[Avatar Details] Updating avatar ${avatarId} status from ${avatar.status} to ${trainingStatus}`)
+            
+            // If training is complete (status is 'active'), also update image URLs from HeyGen
+            const updatePayload: any = { status: trainingStatus }
+            if (trainingStatus === 'active' && details.image_url) {
+              updatePayload.avatar_url = details.image_url
+              updatePayload.preview_url = details.preview_url || details.image_url
+              updatePayload.thumbnail_url = details.thumbnail_url || details.preview_url || details.image_url
+            }
+            
             await supabase
               .from('avatars')
-              .update({ status: trainingStatus })
+              .update(updatePayload)
               .eq('id', avatarId)
           }
         }

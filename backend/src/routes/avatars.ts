@@ -97,16 +97,6 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       ? await AvatarService.getUserAvatars(userId)
       : await AvatarService.getUserCreatedAvatars(userId)
 
-    // Get untrained avatars separately (for training section)
-    const { supabase } = await import('../lib/supabase.js')
-    const { data: untrainedAvatars } = await supabase
-      .from('avatars')
-      .select('*')
-      .eq('user_id', userId)
-      .in('status', ['pending', 'empty', 'failed', 'training'])
-      .neq('status', 'deleted')
-      .order('created_at', { ascending: false })
-
     // Get default avatar (only from user-created avatars)
     const defaultAvatar = showAll
       ? await AvatarService.getDefaultAvatar(userId)
@@ -114,7 +104,6 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
     return res.json({
       avatars,
-      untrained_avatars: untrainedAvatars || [],
       default_avatar_id: defaultAvatar?.id || null,
       only_created: !showAll,
     })
@@ -717,12 +706,30 @@ router.get('/training-status/:groupId', async (req: AuthRequest, res: Response) 
 
     try {
       const { supabase } = await import('../lib/supabase.js')
+      
+      // If training is complete (status is 'ready'), also fetch and update image URLs
+      const updatePayload: any = {
+        status: normalizedStatus,
+        updated_at: new Date().toISOString(),
+      }
+      
+      if (normalizedStatus === 'active') {
+        try {
+          const { getPhotoAvatarDetails } = await import('../lib/heygen.js')
+          const avatarDetails = await getPhotoAvatarDetails(groupId)
+          if (avatarDetails.image_url) {
+            updatePayload.avatar_url = avatarDetails.image_url
+            updatePayload.preview_url = avatarDetails.preview_url || avatarDetails.image_url
+            updatePayload.thumbnail_url = avatarDetails.thumbnail_url || avatarDetails.preview_url || avatarDetails.image_url
+          }
+        } catch (detailsError: any) {
+          console.warn('[Training Status] Could not fetch avatar details:', detailsError.message)
+        }
+      }
+      
       await supabase
         .from('avatars')
-        .update({
-          status: normalizedStatus,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq('user_id', userId)
         .eq('heygen_avatar_id', groupId)
     } catch (dbError) {
@@ -1041,11 +1048,30 @@ router.post('/:id/train', async (req: AuthRequest, res: Response) => {
     console.log('[Train Avatar] Current training status:', currentStatus)
 
     if (currentStatus.status === 'ready') {
-      // Update avatar status in database
-      await supabase
-        .from('avatars')
-        .update({ status: 'active' })
-        .eq('id', id)
+      // Update avatar status in database and fetch image URLs
+      try {
+        const { getPhotoAvatarDetails } = await import('../lib/heygen.js')
+        const avatarDetails = await getPhotoAvatarDetails(groupId)
+        
+        const updatePayload: any = { status: 'active' }
+        if (avatarDetails.image_url) {
+          updatePayload.avatar_url = avatarDetails.image_url
+          updatePayload.preview_url = avatarDetails.preview_url || avatarDetails.image_url
+          updatePayload.thumbnail_url = avatarDetails.thumbnail_url || avatarDetails.preview_url || avatarDetails.image_url
+        }
+        
+        await supabase
+          .from('avatars')
+          .update(updatePayload)
+          .eq('id', id)
+      } catch (detailsError: any) {
+        // If we can't get details, just update status
+        console.warn('[Train Avatar] Could not fetch avatar details, updating status only:', detailsError.message)
+        await supabase
+          .from('avatars')
+          .update({ status: 'active' })
+          .eq('id', id)
+      }
 
       return res.json({
         message: 'Avatar is already trained and ready to use',
