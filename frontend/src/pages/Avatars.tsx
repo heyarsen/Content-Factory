@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { Layout } from '../components/layout/Layout'
 import { Button } from '../components/ui/Button'
 import { useToast } from '../hooks/useToast'
@@ -15,6 +15,7 @@ import { LookGenerationModal } from '../components/avatars/LookGenerationModal'
 import { LookSelectionModal } from '../components/avatars/LookSelectionModal'
 import { TrainingStatusModal } from '../components/avatars/TrainingStatusModal'
 import { AddLooksModal } from '../components/avatars/AddLooksModal'
+import { ManageLooksModal } from '../components/avatars/ManageLooksModal'
 
 // Import custom hooks
 import { useAvatarData } from '../hooks/useAvatarData'
@@ -51,6 +52,7 @@ type AiGenerationStage = 'idle' | 'creating' | 'photosReady' | 'completing' | 'c
 
 export default function Avatars() {
   const { toast } = useToast()
+  const avatarsLengthRef = useRef(0)
   
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -86,7 +88,7 @@ export default function Avatars() {
   const { refreshTrainingStatus } = useAvatarPolling({
     avatars: avatars as any,
     onStatusUpdate: (_avatar, _status) => {
-      // Status updates handled by polling hook
+      // Status updates handled by polling - will reload when training completes
     },
     onTrainingComplete: (avatar) => {
       if (trainingAvatar && trainingAvatar.id === avatar.id) {
@@ -134,13 +136,6 @@ export default function Avatars() {
         }
     }
   }, [lookSelectionModal])
-
-  // Check for unselected looks after loading
-  const handleAvatarsLoaded = useCallback(() => {
-    if (avatars.length > 0) {
-      checkForUnselectedLooks(avatars)
-    }
-  }, [avatars, checkForUnselectedLooks])
 
   // Handle avatar creation
   const handleCreateAvatar = useCallback(async (data: { avatarName: string; photoFiles: File[] }) => {
@@ -398,12 +393,16 @@ export default function Avatars() {
     }
   }, [lookSelectionModal, toast, loadAvatars, invalidateLooksCache])
 
-  // Trigger check after avatars load
+  // Trigger check after avatars load (debounced to avoid infinite loops)
   useEffect(() => {
-    if (avatars.length > 0) {
-      handleAvatarsLoaded()
+    if (avatars.length > 0 && avatars.length !== avatarsLengthRef.current) {
+      avatarsLengthRef.current = avatars.length
+      const timer = setTimeout(() => {
+        checkForUnselectedLooks(avatars)
+      }, 1000)
+      return () => clearTimeout(timer)
     }
-  }, [avatars, handleAvatarsLoaded])
+  }, [avatars.length, checkForUnselectedLooks])
 
   if (loading) {
     return (
@@ -491,23 +490,31 @@ export default function Avatars() {
             looks={allLooks}
             selectedAvatarFilter={selectedAvatarFilter}
             onCreateClick={() => {
-                if (selectedAvatarFilter) {
-                  const avatar = avatars.find(a => a.id === selectedAvatarFilter)
-                  if (avatar) {
-                    setSelectedAvatarForLook(avatar as any)
-                    setGenerateLookStep('generate')
-                    setShowGenerateLookModal(true)
-                  }
-                } else {
-                  setGenerateLookStep('select-avatar')
-                  setSelectedAvatarForLook(null)
+              if (selectedAvatarFilter) {
+                const avatar = avatars.find(a => a.id === selectedAvatarFilter)
+                if (avatar) {
+                  setSelectedAvatarForLook(avatar as any)
+                  setGenerateLookStep('generate')
                   setShowGenerateLookModal(true)
                 }
-              }}
+              } else {
+                setGenerateLookStep('select-avatar')
+                setSelectedAvatarForLook(null)
+                setShowGenerateLookModal(true)
+              }
+            }}
+            onLookClick={(look, avatar) => {
+              // Open manage looks modal when clicking on a look
+              setShowLooksModal(avatar as any)
+            }}
+            onAvatarClick={(avatar) => {
+              // Filter by this avatar when clicking avatar name
+              setSelectedAvatarFilter(avatar.id === selectedAvatarFilter ? null : avatar.id)
+            }}
             generatingLookIds={generatingLookIds}
             loading={loadingLooks}
             avatars={avatars}
-                          />
+          />
                         )}
                       </div>
 
@@ -548,6 +555,24 @@ export default function Avatars() {
         }}
         onGenerate={handleGenerateLook as any}
         generating={generating}
+      />
+
+      <ManageLooksModal
+        isOpen={!!showLooksModal && !showAddLooksModal && !showGenerateLookModal}
+        onClose={() => {
+          setShowLooksModal(null)
+        }}
+        avatar={showLooksModal}
+        onUploadLooks={() => {
+          setShowAddLooksModal(true)
+        }}
+        onGenerateLook={() => {
+          if (showLooksModal) {
+            setSelectedAvatarForLook(showLooksModal as any)
+            setGenerateLookStep('generate')
+            setShowGenerateLookModal(true)
+          }
+        }}
       />
 
       <AddLooksModal

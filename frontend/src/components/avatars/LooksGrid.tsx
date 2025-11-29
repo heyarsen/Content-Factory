@@ -28,6 +28,8 @@ interface LooksGridProps {
   generatingLookIds: Set<string>
   loading: boolean
   avatars: Avatar[]
+  onLookClick?: (look: PhotoAvatarLook, avatar: Avatar) => void
+  onAvatarClick?: (avatar: Avatar) => void
 }
 
 export function LooksGrid({
@@ -37,6 +39,8 @@ export function LooksGrid({
   generatingLookIds,
   loading,
   avatars,
+  onLookClick,
+  onAvatarClick,
 }: LooksGridProps) {
   // Filter looks based on selected avatar
   const filteredLooks = selectedAvatarFilter
@@ -104,7 +108,8 @@ export function LooksGrid({
       {filteredLooks.map(({ look, avatar }) => (
         <div
           key={`${avatar.id}-${look.id}`}
-          className="group relative aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 hover:shadow-xl transition-all duration-300"
+          onClick={() => onLookClick?.(look, avatar)}
+          className="group relative aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 hover:shadow-xl transition-all duration-300 cursor-pointer"
         >
           {(() => {
             const imageUrl = look.image_url || look.preview_url || look.thumbnail_url

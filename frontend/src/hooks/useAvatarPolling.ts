@@ -18,6 +18,41 @@ interface UseAvatarPollingOptions {
 export function useAvatarPolling({ avatars, onStatusUpdate, onTrainingComplete }: UseAvatarPollingOptions) {
   const pollingCleanupsRef = useRef<Map<string, () => void>>(new Map())
 
+  const handleRefreshTrainingStatus = useCallback(
+    async (avatar: Avatar, options: { silent?: boolean } = {}) => {
+      if (!avatar) return
+      try {
+        const response = await api.get(`/api/avatars/training-status/${avatar.heygen_avatar_id}`)
+        const status = response.data?.status
+        const normalizedStatus = status === 'ready' ? 'active' : status || avatar.status
+
+        onStatusUpdate?.(avatar, normalizedStatus)
+
+        if (status === 'ready' && onTrainingComplete) {
+          onTrainingComplete(avatar)
+        }
+
+        if (!options.silent && shouldShowError(null)) {
+          // Only show non-critical updates
+        }
+      } catch (error: any) {
+        if (!options.silent && shouldShowError(error)) {
+          handleError(error, {
+            showToast: true,
+            logError: true,
+          })
+        } else if (!options.silent) {
+          handleError(error, {
+            showToast: false,
+            logError: true,
+            silent: true,
+          })
+        }
+      }
+    },
+    [onStatusUpdate, onTrainingComplete]
+  )
+
   // Training status polling
   useEffect(() => {
     const avatarsNeedingUpdate = avatars.filter(avatar =>
@@ -67,42 +102,7 @@ export function useAvatarPolling({ avatars, onStatusUpdate, onTrainingComplete }
       cleanup()
       pollingCleanupsRef.current.delete(pollingKey)
     }
-  }, [avatars])
-
-  const handleRefreshTrainingStatus = useCallback(
-    async (avatar: Avatar, options: { silent?: boolean } = {}) => {
-      if (!avatar) return
-      try {
-        const response = await api.get(`/api/avatars/training-status/${avatar.heygen_avatar_id}`)
-        const status = response.data?.status
-        const normalizedStatus = status === 'ready' ? 'active' : status || avatar.status
-
-        onStatusUpdate?.(avatar, normalizedStatus)
-
-        if (status === 'ready' && onTrainingComplete) {
-          onTrainingComplete(avatar)
-        }
-
-        if (!options.silent && shouldShowError(null)) {
-          // Only show non-critical updates
-        }
-      } catch (error: any) {
-        if (!options.silent && shouldShowError(error)) {
-          handleError(error, {
-            showToast: true,
-            logError: true,
-          })
-        } else if (!options.silent) {
-          handleError(error, {
-            showToast: false,
-            logError: true,
-            silent: true,
-          })
-        }
-      }
-    },
-    [onStatusUpdate, onTrainingComplete]
-  )
+  }, [avatars, handleRefreshTrainingStatus]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Cleanup all polling on unmount
   useEffect(() => {
