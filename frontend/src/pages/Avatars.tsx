@@ -5,6 +5,8 @@ import { Input } from '../components/ui/Input'
 import { Modal } from '../components/ui/Modal'
 import { useToast } from '../hooks/useToast'
 import api from '../lib/api'
+import { pollingManager } from '../lib/pollingManager'
+import { handleError, formatSpecificError, shouldShowError } from '../lib/errorHandler'
 import {
   RefreshCw,
   Star,
@@ -141,10 +143,11 @@ export default function Avatars() {
 
   const createPhotoInputRef = useRef<HTMLInputElement>(null)
   const addLooksInputRef = useRef<HTMLInputElement>(null)
-  const statusCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const trainingStatusIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const { toast } = useToast()
   const toastRef = useRef(toast)
+  
+  // Store cleanup functions for polling operations
+  const pollingCleanupsRef = useRef<Map<string, () => void>>(new Map())
 
   // Update ref when toast changes
   useEffect(() => {
@@ -241,8 +244,11 @@ export default function Avatars() {
         })
       }
     } catch (error: any) {
-      console.error('Failed to load avatars:', error)
-      toastRef.current.error(error.response?.data?.error || 'Failed to load avatars')
+      const errorMessage = handleError(error, {
+        showToast: true,
+        logError: true,
+      })
+      toastRef.current.error(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -284,15 +290,12 @@ export default function Avatars() {
     }
   }, [avatars, loadAllLooks])
 
-  // Cleanup status check interval on unmount
+  // Cleanup all polling operations on unmount
   useEffect(() => {
     return () => {
-      if (statusCheckIntervalRef.current) {
-        clearInterval(statusCheckIntervalRef.current)
-      }
-      if (trainingStatusIntervalRef.current) {
-        clearInterval(trainingStatusIntervalRef.current)
-      }
+      // Stop all polling operations managed by this component
+      pollingCleanupsRef.current.forEach(cleanup => cleanup())
+      pollingCleanupsRef.current.clear()
     }
   }, [])
 
@@ -346,9 +349,19 @@ export default function Avatars() {
           }
         }
       } catch (error: any) {
-        console.error('Failed to refresh training status:', error)
-        if (!options.silent) {
-          toastRef.current.error(error.response?.data?.error || 'Failed to refresh training status')
+        if (!options.silent && shouldShowError(error)) {
+          const errorMessage = handleError(error, {
+            showToast: true,
+            logError: true,
+          })
+          toastRef.current.error(errorMessage)
+        } else if (!options.silent) {
+          // Log silently for non-showable errors
+          handleError(error, {
+            showToast: false,
+            logError: true,
+            silent: true,
+          })
         }
       }
     },
@@ -356,12 +369,8 @@ export default function Avatars() {
   )
 
 
+  // Training status polling with proper cleanup
   useEffect(() => {
-    if (trainingStatusIntervalRef.current) {
-      clearInterval(trainingStatusIntervalRef.current)
-      trainingStatusIntervalRef.current = null
-    }
-
     const avatarsNeedingUpdate = avatars.filter(avatar =>
       ['pending', 'training', 'generating'].includes(avatar.status)
     )
@@ -370,17 +379,46 @@ export default function Avatars() {
       return
     }
 
-    trainingStatusIntervalRef.current = setInterval(() => {
-      avatarsNeedingUpdate.forEach(avatar => {
-        handleRefreshTrainingStatus(avatar, { silent: true })
-      })
-    }, 30000)
+    const pollingKey = 'training-status-polling'
+    
+    // Stop existing polling if any
+    const existingCleanup = pollingCleanupsRef.current.get(pollingKey)
+    if (existingCleanup) {
+      existingCleanup()
+    }
+
+    // Start new polling operation
+    const cleanup = pollingManager.startPolling(
+      pollingKey,
+      async () => {
+        await Promise.all(
+          avatarsNeedingUpdate.map(avatar =>
+            handleRefreshTrainingStatus(avatar, { silent: true }).catch(err => {
+              // Silently handle errors during polling
+              if (shouldShowError(err)) {
+                console.error('Training status check error:', err)
+              }
+            })
+          )
+        )
+      },
+      30000, // Poll every 30 seconds
+      {
+        immediate: false,
+        onError: (error) => {
+          // Only log if it's a showable error
+          if (shouldShowError(error)) {
+            console.error('Training status polling error:', error)
+          }
+        },
+      }
+    )
+
+    pollingCleanupsRef.current.set(pollingKey, cleanup)
 
     return () => {
-      if (trainingStatusIntervalRef.current) {
-        clearInterval(trainingStatusIntervalRef.current)
-        trainingStatusIntervalRef.current = null
-      }
+      cleanup()
+      pollingCleanupsRef.current.delete(pollingKey)
     }
   }, [avatars, handleRefreshTrainingStatus])
 
@@ -553,30 +591,12 @@ export default function Avatars() {
         throw new Error('No avatar returned from API')
       }
     } catch (error: any) {
-      console.error('Failed to create avatar:', error)
-      console.error('Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        fullError: error,
+      const errorMessage = formatSpecificError(error)
+      handleError(error, {
+        showToast: true,
+        logError: true,
+        customMessage: errorMessage,
       })
-
-      let errorMessage =
-        error.response?.data?.error ||
-        error.response?.data?.message ||
-        error.message ||
-        'Failed to create avatar. Please check console for details.'
-
-      // If it's a storage bucket error, make it more user-friendly
-      if (errorMessage.includes('bucket') || errorMessage.includes('Bucket')) {
-        errorMessage = 'Storage bucket not configured. Please contact support to set up avatar storage, or create the "avatars" bucket in Supabase Dashboard > Storage with public access.'
-      }
-
-      // Show full error in console for debugging
-      if (error.response?.data) {
-        console.error('Full API error response:', JSON.stringify(error.response.data, null, 2))
-      }
-
       toast.error(errorMessage)
       setCreating(false) // Set here too in case finally doesn't run
     } finally {
@@ -637,30 +657,12 @@ export default function Avatars() {
       // Start polling for status
       startStatusCheck(genId, requestedAiName)
     } catch (error: any) {
-      console.error('Failed to generate AI avatar - Full error:', {
-        message: error.message,
-        response: error.response,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        config: {
-          url: error.config?.url,
-          method: error.config?.method,
-          baseURL: error.config?.baseURL,
-        },
+      const errorMessage = formatSpecificError(error)
+      handleError(error, {
+        showToast: true,
+        logError: true,
+        customMessage: errorMessage,
       })
-
-      let errorMessage = 'Failed to generate AI avatar'
-
-      if (error.response?.status === 404) {
-        errorMessage = error.response?.data?.error ||
-          'AI avatar generation endpoint not found (404). Please check if the feature is available.'
-      } else if (error.response?.data?.error) {
-        errorMessage = error.response.data.error
-      } else if (error.message) {
-        errorMessage = error.message
-      }
-
       toast.error(errorMessage)
       setGeneratingAI(false)
       setAiGenerationStage('idle')
@@ -673,64 +675,92 @@ export default function Avatars() {
     setAiGenerationStage('creating')
     setAiGenerationError(null)
 
-    // Check status every 5 seconds
-    statusCheckIntervalRef.current = setInterval(async () => {
-      try {
-        const response = await api.get(`/api/avatars/generation-status/${genId}`)
-        const status = response.data
+    const pollingKey = `ai-generation-status-${genId}`
 
-        if (status.status === 'success') {
-          setAiGenerationStage('photosReady')
-          // Generation complete - create avatar group
-          if (statusCheckIntervalRef.current) {
-            clearInterval(statusCheckIntervalRef.current)
-            statusCheckIntervalRef.current = null
-          }
+    // Stop existing polling if any
+    const existingCleanup = pollingCleanupsRef.current.get(pollingKey)
+    if (existingCleanup) {
+      existingCleanup()
+    }
 
-          if (status.image_key_list && status.image_key_list.length > 0) {
-            try {
-              setAiGenerationStage('completing')
-              await api.post('/api/avatars/complete-ai-generation', {
-                generation_id: genId,
-                image_keys: status.image_key_list,
-                image_urls: status.image_url_list,
-                avatar_name: avatarNameOverride || aiName,
-              })
+    // Start polling with proper cleanup
+    const cleanup = pollingManager.startPolling(
+      pollingKey,
+      async () => {
+        try {
+          const response = await api.get(`/api/avatars/generation-status/${genId}`)
+          const status = response.data
 
-              setAiGenerationStage('completed')
-              toast.success('AI avatar created successfully!')
-              setShowGenerateAIModal(false)
-              resetAIGenerationForm()
-              await loadAvatars()
-            } catch (err: any) {
-              console.error('Failed to complete AI avatar:', err)
-              setAiGenerationStage('idle')
-              toast.error(err.response?.data?.error || 'Failed to create avatar from generated images')
+          if (status.status === 'success') {
+            setAiGenerationStage('photosReady')
+            // Stop polling - generation complete
+            cleanup()
+
+            if (status.image_key_list && status.image_key_list.length > 0) {
+              try {
+                setAiGenerationStage('completing')
+                await api.post('/api/avatars/complete-ai-generation', {
+                  generation_id: genId,
+                  image_keys: status.image_key_list,
+                  image_urls: status.image_url_list,
+                  avatar_name: avatarNameOverride || aiName,
+                })
+
+                setAiGenerationStage('completed')
+                toast.success('AI avatar created successfully!')
+                setShowGenerateAIModal(false)
+                resetAIGenerationForm()
+                await loadAvatars()
+              } catch (err: any) {
+                const errorMessage = handleError(err, {
+                  showToast: true,
+                  logError: true,
+                })
+                setAiGenerationStage('idle')
+                toast.error(errorMessage)
+              }
+            } else {
+              toast.error('No images were generated')
             }
-          } else {
-            toast.error('No images were generated')
-          }
 
-          setCheckingStatus(false)
-          setGeneratingAI(false)
-        } else if (status.status === 'failed') {
-          if (statusCheckIntervalRef.current) {
-            clearInterval(statusCheckIntervalRef.current)
-            statusCheckIntervalRef.current = null
+            setCheckingStatus(false)
+            setGeneratingAI(false)
+          } else if (status.status === 'failed') {
+            cleanup()
+            const failureMessage = status.msg || 'Avatar generation failed'
+            toast.error(failureMessage)
+            setAiGenerationError(failureMessage)
+            setAiGenerationStage('idle')
+            setCheckingStatus(false)
+            setGeneratingAI(false)
           }
-          const failureMessage = status.msg || 'Avatar generation failed'
-          toast.error(failureMessage)
-          setAiGenerationError(failureMessage)
-          setAiGenerationStage('idle')
+          // If still in_progress, continue polling
+        } catch (error: any) {
+          // Only log/show errors that should be shown
+          if (shouldShowError(error)) {
+            console.error('Failed to check generation status:', error)
+          }
+          // Don't stop polling on temporary errors
+        }
+      },
+      5000, // Poll every 5 seconds
+      {
+        immediate: true, // Check immediately
+        maxAttempts: 120, // Max 10 minutes (120 * 5 seconds)
+        onError: (error) => {
+          if (shouldShowError(error)) {
+            const errorMessage = handleError(error, { showToast: false, logError: true })
+            setAiGenerationError(errorMessage)
+          }
+        },
+        onComplete: () => {
           setCheckingStatus(false)
           setGeneratingAI(false)
-        }
-        // If still in_progress, continue polling
-      } catch (error: any) {
-        console.error('Failed to check generation status:', error)
-        // Don't stop polling on error - might be temporary
+        },
       }
-    }, 5000)
+    )
+
+    pollingCleanupsRef.current.set(pollingKey, cleanup)
   }
 
   const resetAIGenerationForm = () => {
@@ -746,19 +776,23 @@ export default function Avatars() {
   }
 
   const handleCloseGenerateAIModal = () => {
-    if (!generatingAI && !checkingStatus) {
-      if (statusCheckIntervalRef.current) {
-        clearInterval(statusCheckIntervalRef.current)
-        statusCheckIntervalRef.current = null
+    // Stop all AI generation polling
+    const pollingKeys = Array.from(pollingCleanupsRef.current.keys()).filter(key =>
+      key.startsWith('ai-generation-status-')
+    )
+    pollingKeys.forEach(key => {
+      const cleanup = pollingCleanupsRef.current.get(key)
+      if (cleanup) {
+        cleanup()
+        pollingCleanupsRef.current.delete(key)
       }
+    })
+
+    if (!generatingAI && !checkingStatus) {
       setShowGenerateAIModal(false)
       resetAIGenerationForm()
     } else {
       setShowGenerateAIModal(false)
-      if (statusCheckIntervalRef.current) {
-        clearInterval(statusCheckIntervalRef.current)
-        statusCheckIntervalRef.current = null
-      }
       setCheckingStatus(false)
       setGeneratingAI(false)
       setAiGenerationStage('idle')
@@ -814,77 +848,102 @@ export default function Avatars() {
       // Refresh avatars and looks
       await loadAvatars()
     } catch (error: any) {
-      console.error('Failed to add looks:', error)
-      toast.error(error.response?.data?.error || 'Failed to add looks')
+      const errorMessage = formatSpecificError(error)
+      handleError(error, {
+        showToast: true,
+        logError: true,
+        customMessage: errorMessage,
+      })
+      toast.error(errorMessage)
     } finally {
       setAddingLooks(false)
     }
   }
 
-  // Poll for look generation status
-  const pollLookGenerationStatus = async (generationId: string, avatarId: string, attempt = 1, maxAttempts = 60) => {
-    if (attempt > maxAttempts) {
-      console.error('Look generation polling timeout')
-      setGeneratingLookIds(prev => {
-        const next = new Set(prev)
-        next.delete(avatarId)
-        return next
-      })
-      toast.error('Look generation is taking longer than expected. Please check back later or refresh the page.')
-      return
+  // Poll for look generation status using polling manager
+  const pollLookGenerationStatus = (generationId: string, avatarId: string) => {
+    const pollingKey = `look-generation-${generationId}-${avatarId}`
+
+    // Stop existing polling if any (deduplication)
+    const existingCleanup = pollingCleanupsRef.current.get(pollingKey)
+    if (existingCleanup) {
+      existingCleanup()
     }
 
-    try {
-      const response = await api.get(`/api/avatars/generation-status/${generationId}`)
-      const status = response.data?.status
+    // Start recursive polling
+    const cleanup = pollingManager.startRecursivePolling(
+      pollingKey,
+      async () => {
+        const response = await api.get(`/api/avatars/generation-status/${generationId}`)
+        const status = response.data?.status
 
-      if (status === 'success') {
-        // Generation complete, refresh looks
-        setGeneratingLookIds(prev => {
-          const next = new Set(prev)
-          next.delete(avatarId)
-          return next
-        })
-        toast.success('Look generation completed!')
-        // Refresh avatars first, then looks will be refreshed via useEffect
-        await loadAvatars()
-      } else if (status === 'failed') {
-        setGeneratingLookIds(prev => {
-          const next = new Set(prev)
-          next.delete(avatarId)
-          return next
-        })
-        toast.error('Look generation failed')
-      } else if (status === 'in_progress') {
-        // Still generating, poll again after delay
-        setTimeout(() => {
-          pollLookGenerationStatus(generationId, avatarId, attempt + 1, maxAttempts)
-        }, 5000) // Poll every 5 seconds
+        if (status === 'success') {
+          // Generation complete, refresh looks
+          setGeneratingLookIds(prev => {
+            const next = new Set(prev)
+            next.delete(avatarId)
+            return next
+          })
+          toast.success('Look generation completed!')
+          // Refresh avatars first, then looks will be refreshed via useEffect
+          await loadAvatars()
+          return { status: 'complete' } // Signal to stop polling
+        } else if (status === 'failed') {
+          setGeneratingLookIds(prev => {
+            const next = new Set(prev)
+            next.delete(avatarId)
+            return next
+          })
+          const errorMessage = handleError(new Error('Look generation failed'), {
+            showToast: true,
+            logError: true,
+          })
+          toast.error(errorMessage)
+          return { status: 'complete' } // Signal to stop polling
+        }
+        // Continue polling if in_progress
+        return { status: 'in_progress' }
+      },
+      5000, // Poll every 5 seconds
+      {
+        immediate: true, // Check immediately
+        maxAttempts: 60, // Max 5 minutes (60 * 5 seconds)
+        shouldContinue: (result) => {
+          // Continue polling if status is in_progress
+          return result?.status === 'in_progress'
+        },
+        onError: (error) => {
+          // Handle errors gracefully
+          if (shouldShowError(error)) {
+            console.error('Look generation status check error:', error)
+          }
+          // Continue polling on temporary errors
+        },
+        onComplete: () => {
+          // Cleanup on completion
+          setGeneratingLookIds(prev => {
+            const next = new Set(prev)
+            next.delete(avatarId)
+            return next
+          })
+        },
       }
-    } catch (error: any) {
-      console.error('Failed to check generation status:', error)
-      // For 502 errors or network issues, continue polling (these are temporary)
-      // For other errors, also continue but log them
-      if (error.response?.status === 502 || error.code === 'ECONNRESET' || error.message?.includes('Bad Gateway')) {
-        // Temporary server issue, continue polling
-        setTimeout(() => {
-          pollLookGenerationStatus(generationId, avatarId, attempt + 1, maxAttempts)
-        }, 5000)
-      } else if (attempt < maxAttempts) {
-        // Other errors, continue polling but with longer delay
-        setTimeout(() => {
-          pollLookGenerationStatus(generationId, avatarId, attempt + 1, maxAttempts)
-        }, 10000) // Wait 10 seconds on error
-      } else {
-        // Max attempts reached
+    )
+
+    pollingCleanupsRef.current.set(pollingKey, cleanup)
+
+    // Handle timeout case
+    setTimeout(() => {
+      if (pollingManager.isPolling(pollingKey)) {
+        cleanup()
         setGeneratingLookIds(prev => {
           const next = new Set(prev)
           next.delete(avatarId)
           return next
         })
-        toast.error('Unable to check generation status. Please refresh the page to see if looks were generated.')
+        toast.error('Look generation is taking longer than expected. Please check back later or refresh the page.')
       }
-    }
+    }, 300000) // 5 minutes timeout
   }
 
   // Quick generate look from bottom prompt bar
