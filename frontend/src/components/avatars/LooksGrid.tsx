@@ -29,7 +29,6 @@ interface LooksGridProps {
   loading: boolean
   avatars: Avatar[]
   onLookClick?: (look: PhotoAvatarLook, avatar: Avatar) => void
-  onAvatarClick?: (avatar: Avatar) => void
 }
 
 export function LooksGrid({
@@ -40,7 +39,6 @@ export function LooksGrid({
   loading,
   avatars,
   onLookClick,
-  onAvatarClick,
 }: LooksGridProps) {
   // Filter looks based on selected avatar
   const filteredLooks = selectedAvatarFilter

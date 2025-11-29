@@ -1,4 +1,4 @@
-import { Upload, Sparkles, X } from 'lucide-react'
+import { Upload, Sparkles } from 'lucide-react'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { AvatarImage } from './AvatarImage'

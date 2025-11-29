@@ -503,13 +503,9 @@ export default function Avatars() {
                 setShowGenerateLookModal(true)
               }
             }}
-            onLookClick={(look, avatar) => {
+            onLookClick={(_look, avatar) => {
               // Open manage looks modal when clicking on a look
               setShowLooksModal(avatar as any)
-            }}
-            onAvatarClick={(avatar) => {
-              // Filter by this avatar when clicking avatar name
-              setSelectedAvatarFilter(avatar.id === selectedAvatarFilter ? null : avatar.id)
             }}
             generatingLookIds={generatingLookIds}
             loading={loadingLooks}
