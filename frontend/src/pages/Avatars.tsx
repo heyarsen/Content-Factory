@@ -207,12 +207,22 @@ export default function Avatars() {
             return // Only show for first avatar that needs selection
           }
         } catch (error: any) {
-          console.error('Failed to check looks for avatar:', avatar.id, error)
+          // Silently handle errors when checking individual avatars
+          handleError(error, {
+            showToast: false,
+            logError: true,
+            silent: true,
+          })
           // Continue checking other avatars
         }
       }
     } catch (error: any) {
-      console.error('Error in checkForUnselectedLooks:', error)
+      // Silently handle errors in look selection check
+      handleError(error, {
+        showToast: false,
+        logError: true,
+        silent: true,
+      })
       // Don't throw - just log the error
     }
   }, [lookSelectionModal])
@@ -240,7 +250,11 @@ export default function Avatars() {
       if (avatarsList.length > 0 && checkForUnselectedLooks) {
         // Run this asynchronously without blocking
         checkForUnselectedLooks(avatarsList).catch(err => {
-          console.error('Error checking for unselected looks:', err)
+          handleError(err, {
+            showToast: false,
+            logError: true,
+            silent: true,
+          })
         })
       }
     } catch (error: any) {
@@ -275,7 +289,11 @@ export default function Avatars() {
         }
       } catch (error) {
         // Silently skip avatars that fail to load
-        console.error(`Failed to load looks for avatar ${avatar.id}:`, error)
+        handleError(error, {
+          showToast: false,
+          logError: true,
+          silent: true,
+        })
       }
     }
 
@@ -581,7 +599,12 @@ export default function Avatars() {
               setLookSelectionModal({ avatar: response.data.avatar, looks })
             }
           } catch (err) {
-            console.error('Failed to fetch looks for selection:', err)
+            // Silently handle error - not critical for user experience
+            handleError(err, {
+              showToast: false,
+              logError: true,
+              silent: true,
+            })
           }
         }, 3000)
 
@@ -991,7 +1014,6 @@ export default function Avatars() {
       // Clear the prompt
       setQuickPrompt('')
     } catch (error: any) {
-      console.error('Failed to generate look:', error)
       // Remove from generating state on error
       setGeneratingLookIds(prev => {
         const next = new Set(prev)
@@ -999,20 +1021,13 @@ export default function Avatars() {
         return next
       })
 
-      // Handle specific error types
-      const errorData = error.response?.data
-      const errorCode = errorData?.code || errorData?.error?.code
-      const errorMessage = errorData?.error?.message || errorData?.error || errorData?.message || error.message
-
-      if (errorCode === 'insufficient_credit' || errorMessage?.includes('Insufficient credit')) {
-        toast.error('Insufficient credit. Please add credits to your HeyGen account to generate looks.')
-      } else if (errorData?.error) {
-        toast.error(typeof errorData.error === 'string' ? errorData.error : (errorData.error.message || 'Failed to generate look'))
-      } else if (error.message?.includes('timeout')) {
-        toast.error('Request timed out. Please try again.')
-      } else {
-        toast.error(errorMessage || 'Failed to generate look')
-      }
+      const errorMessage = formatSpecificError(error)
+      handleError(error, {
+        showToast: true,
+        logError: true,
+        customMessage: errorMessage,
+      })
+      toast.error(errorMessage)
     } finally {
       setGeneratingLook(false)
     }
@@ -1066,12 +1081,6 @@ export default function Avatars() {
       setLookPose('close_up')
       setLookStyle('Realistic')
     } catch (error: any) {
-      console.error('Failed to generate look:', error)
-      console.error('Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-      })
       // Remove from generating state on error
       if (targetAvatar) {
         setGeneratingLookIds(prev => {
@@ -1081,20 +1090,13 @@ export default function Avatars() {
         })
       }
 
-      // Handle specific error types
-      const errorData = error.response?.data
-      const errorCode = errorData?.code || errorData?.error?.code
-      const errorMessage = errorData?.error?.message || errorData?.error || errorData?.message || error.message
-
-      if (errorCode === 'insufficient_credit' || errorMessage?.includes('Insufficient credit')) {
-        toast.error('Insufficient credit. Please add credits to your HeyGen account to generate looks.')
-      } else if (errorData?.error) {
-        toast.error(typeof errorData.error === 'string' ? errorData.error : (errorData.error.message || 'Failed to generate look'))
-      } else if (error.message?.includes('timeout')) {
-        toast.error('Request timed out. Please try again.')
-      } else {
-        toast.error(errorMessage || 'Failed to generate look')
-      }
+      const errorMessage = formatSpecificError(error)
+      handleError(error, {
+        showToast: true,
+        logError: true,
+        customMessage: errorMessage,
+      })
+      toast.error(errorMessage)
     } finally {
       setGeneratingLook(false)
     }
@@ -1673,7 +1675,12 @@ export default function Avatars() {
                   photoCount: photoFiles.length
                 })
                 handleCreateAvatar(e).catch((err) => {
-                  console.error('Error in handleCreateAvatar:', err)
+                  // Error is already handled in handleCreateAvatar
+                  handleError(err, {
+                    showToast: false,
+                    logError: true,
+                    silent: true,
+                  })
                 })
               }}
               disabled={creating || !avatarName.trim() || photoFiles.length === 0}
@@ -2315,9 +2322,14 @@ export default function Avatars() {
                         setTrainingStatus('failed')
                       }
                     } catch (error: any) {
-                      console.error('Failed to train avatar:', error)
+                      const errorMessage = formatSpecificError(error)
+                      handleError(error, {
+                        showToast: true,
+                        logError: true,
+                        customMessage: errorMessage,
+                      })
                       setTrainingStatus('failed')
-                      toast.error(error.response?.data?.error || error.message || 'Failed to start training')
+                      toast.error(errorMessage)
                     }
                   })()
                 }}
