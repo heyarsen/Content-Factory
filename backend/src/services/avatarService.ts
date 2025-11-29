@@ -461,48 +461,65 @@ export class AvatarService {
         // Continue with existing status
       }
 
-      // Also fetch looks from the avatar group
+      // Also fetch looks from the avatar group (with caching)
       let looks: any[] = []
       if (avatar.heygen_avatar_id) {
-        try {
-          const axios = (await import('axios')).default
-          const apiKey = process.env.HEYGEN_KEY
-          if (apiKey) {
-            const looksResponse = await axios.get(
-              `${process.env.HEYGEN_V2_API_URL || 'https://api.heygen.com/v2'}/avatar_group/${avatar.heygen_avatar_id}/avatars`,
-              {
-                headers: {
-                  'X-Api-Key': apiKey,
-                  'Content-Type': 'application/json',
-                },
-                timeout: 5000, // 5 second timeout
+        // Check cache first
+        const { lookCache } = await import('../lib/lookCache.js')
+        const cachedLooks = lookCache.get(avatarId)
+
+        if (cachedLooks) {
+          looks = cachedLooks.map((look: any) => ({
+            ...look,
+            is_default: (avatar as any)?.default_look_id === look.id,
+          }))
+          console.log(`[Avatar Details] Found ${looks.length} cached looks for avatar ${avatarId}`)
+        } else {
+          // Fetch from API
+          try {
+            const axios = (await import('axios')).default
+            const apiKey = process.env.HEYGEN_KEY
+            if (apiKey) {
+              const looksResponse = await axios.get(
+                `${process.env.HEYGEN_V2_API_URL || 'https://api.heygen.com/v2'}/avatar_group/${avatar.heygen_avatar_id}/avatars`,
+                {
+                  headers: {
+                    'X-Api-Key': apiKey,
+                    'Content-Type': 'application/json',
+                  },
+                  timeout: 5000, // 5 second timeout
+                }
+              )
+
+              const avatarList =
+                looksResponse.data?.data?.avatar_list ||
+                looksResponse.data?.avatar_list ||
+                looksResponse.data?.data ||
+                []
+
+              if (Array.isArray(avatarList)) {
+                looks = avatarList.map((look: any) => ({
+                  id: look.id,
+                  name: look.name,
+                  status: look.status,
+                  image_url: look.image_url,
+                  preview_url: look.image_url,
+                  thumbnail_url: look.image_url,
+                  created_at: look.created_at,
+                  updated_at: look.updated_at,
+                  is_default: (avatar as any)?.default_look_id === look.id,
+                }))
+                console.log(`[Avatar Details] Found ${looks.length} looks for avatar ${avatarId}`)
+
+                // Cache the results (without is_default since it's avatar-specific)
+                const looksToCache = looks.map(({ is_default, ...look }) => look)
+                lookCache.set(avatarId, looksToCache)
               }
-            )
-
-            const avatarList =
-              looksResponse.data?.data?.avatar_list ||
-              looksResponse.data?.avatar_list ||
-              looksResponse.data?.data ||
-              []
-
-            if (Array.isArray(avatarList)) {
-              looks = avatarList.map((look: any) => ({
-                id: look.id,
-                name: look.name,
-                status: look.status,
-                image_url: look.image_url,
-                preview_url: look.image_url,
-                thumbnail_url: look.image_url,
-                created_at: look.created_at,
-                updated_at: look.updated_at,
-                is_default: (avatar as any)?.default_look_id === look.id,
-              }))
-              console.log(`[Avatar Details] Found ${looks.length} looks for avatar ${avatarId}`)
             }
+          } catch (looksError: any) {
+            console.warn(`[Avatar Details] Failed to fetch looks (returning without looks):`, looksError.message)
+            // Continue without looks - not critical
           }
-        } catch (looksError: any) {
-          console.warn(`[Avatar Details] Failed to fetch looks (returning without looks):`, looksError.message)
-          // Continue without looks - not critical
         }
       }
 

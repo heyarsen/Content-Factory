@@ -19,9 +19,23 @@ interface PollingOperation {
 class PollingManager {
   private operations = new Map<PollingKey, PollingOperation>()
   private debounceTimers = new Map<PollingKey, NodeJS.Timeout>()
+  private failureCounts = new Map<PollingKey, number>() // Track consecutive failures for backoff
 
   /**
-   * Start a polling operation with deduplication
+   * Calculate exponential backoff delay
+   */
+  private getBackoffDelay(failureCount: number, baseInterval: number): number {
+    if (failureCount === 0) {
+      return baseInterval
+    }
+    // Exponential backoff: baseInterval * 2^failureCount, max 60s
+    const delay = baseInterval * Math.pow(2, failureCount)
+    const maxDelay = 60000 // 60 seconds max
+    return Math.min(delay, maxDelay)
+  }
+
+  /**
+   * Start a polling operation with deduplication and exponential backoff
    * If a polling operation with the same key already exists, it will be ignored
    */
   startPolling(
@@ -34,6 +48,7 @@ class PollingManager {
       onComplete?: () => void // Called when polling completes
       onError?: (error: unknown) => void // Called on error
       cleanup?: PollingCleanup // Custom cleanup function
+      useExponentialBackoff?: boolean // Enable exponential backoff on errors
     } = {}
   ): () => void {
     const {
@@ -42,6 +57,7 @@ class PollingManager {
       onComplete,
       onError,
       cleanup,
+      useExponentialBackoff = true,
     } = options
 
     // If already polling, return existing cleanup function
@@ -56,6 +72,7 @@ class PollingManager {
     let attemptCount = 0
     let intervalId: NodeJS.Timeout | undefined
     let timeoutId: NodeJS.Timeout | undefined
+    let currentInterval = interval
 
     const wrappedCallback = async () => {
       try {
@@ -64,6 +81,7 @@ class PollingManager {
         // Check max attempts
         if (maxAttempts && attemptCount > maxAttempts) {
           this.stopPolling(key)
+          this.failureCounts.delete(key)
           if (onError) {
             onError(new Error('Polling timeout: maximum attempts reached'))
           }
@@ -72,9 +90,29 @@ class PollingManager {
 
         await callback()
 
+        // Success - reset failure count and interval
+        if (useExponentialBackoff) {
+          this.failureCounts.delete(key)
+          currentInterval = interval
+        }
+
         // If callback returns a truthy value, stop polling
         // This allows callbacks to signal completion
       } catch (error) {
+        // Increment failure count for backoff
+        if (useExponentialBackoff) {
+          const failureCount = (this.failureCounts.get(key) || 0) + 1
+          this.failureCounts.set(key, failureCount)
+          currentInterval = this.getBackoffDelay(failureCount, interval)
+          
+          // Update interval if using dynamic backoff
+          if (intervalId) {
+            clearInterval(intervalId)
+            intervalId = setInterval(wrappedCallback, currentInterval)
+            operation.intervalId = intervalId
+          }
+        }
+
         if (onError) {
           onError(error)
         } else {
@@ -143,13 +181,14 @@ class PollingManager {
     key: PollingKey,
     callback: PollingCallbackWithResult<T>,
     delay: number,
-    options: {
+      options: {
       immediate?: boolean
       maxAttempts?: number
       onComplete?: () => void
       onError?: (error: unknown) => void
       cleanup?: PollingCleanup
       shouldContinue?: (result: T) => boolean // Return false to stop polling
+      useExponentialBackoff?: boolean // Enable exponential backoff on errors
     } = {}
   ): () => void {
     const {
@@ -159,6 +198,7 @@ class PollingManager {
       onError,
       cleanup,
       shouldContinue,
+      useExponentialBackoff = true,
     } = options
 
     // If already polling, return existing cleanup function
@@ -172,6 +212,7 @@ class PollingManager {
     let attemptCount = 0
     let timeoutId: NodeJS.Timeout | undefined
     let isCancelled = false
+    let currentDelay = delay
 
     const poll = async () => {
       if (isCancelled) return
@@ -182,6 +223,7 @@ class PollingManager {
         // Check max attempts
         if (maxAttempts && attemptCount > maxAttempts) {
           this.stopPolling(key)
+          this.failureCounts.delete(key)
           if (onError) {
             onError(new Error('Polling timeout: maximum attempts reached'))
           }
@@ -189,6 +231,12 @@ class PollingManager {
         }
 
         const result = await callback()
+
+        // Success - reset failure count and delay
+        if (useExponentialBackoff) {
+          this.failureCounts.delete(key)
+          currentDelay = delay
+        }
 
         // Check if we should continue polling
         if (shouldContinue && !shouldContinue(result)) {
@@ -201,9 +249,16 @@ class PollingManager {
 
         // Schedule next poll if still active
         if (!isCancelled && this.operations.has(key)) {
-          timeoutId = setTimeout(poll, delay)
+          timeoutId = setTimeout(poll, currentDelay)
         }
       } catch (error) {
+        // Increment failure count for backoff
+        if (useExponentialBackoff) {
+          const failureCount = (this.failureCounts.get(key) || 0) + 1
+          this.failureCounts.set(key, failureCount)
+          currentDelay = this.getBackoffDelay(failureCount, delay)
+        }
+
         if (onError) {
           onError(error)
         } else {
@@ -211,7 +266,7 @@ class PollingManager {
         }
         // Continue polling on error unless cancelled
         if (!isCancelled && this.operations.has(key)) {
-          timeoutId = setTimeout(poll, delay)
+          timeoutId = setTimeout(poll, currentDelay)
         }
       }
     }
@@ -266,6 +321,9 @@ class PollingManager {
       operation.cleanup()
       this.operations.delete(key)
     }
+
+    // Clear failure count
+    this.failureCounts.delete(key)
 
     // Clear debounce timer if exists
     const debounceTimer = this.debounceTimers.get(key)

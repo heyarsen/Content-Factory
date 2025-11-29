@@ -16,69 +16,169 @@ import {
   assignAvatarSource,
   executeWithAvatarSourceFallback,
 } from '../lib/avatarSourceColumn.js'
+import { jobManager } from '../lib/jobManager.js'
+import { createErrorResponse, logError, ErrorCode, ApiError } from '../lib/apiErrorHandler.js'
+import { validateRequired, validateStringLength, validateBase64Image, validateEnum, validateOrThrow } from '../lib/validators.js'
+import { lookCache } from '../lib/lookCache.js'
+
 // Test fixtures removed - no longer saving avatars automatically
 const router = Router()
 
+// Configuration from environment variables
+const POLL_LOOK_GENERATION_TIMEOUT = parseInt(process.env.POLL_LOOK_GENERATION_TIMEOUT || '300', 10) * 1000 // Default 5 minutes
+const POLL_INTERVAL = parseInt(process.env.POLL_LOOK_GENERATION_INTERVAL || '10', 10) * 1000 // Default 10 seconds
+const TRAINING_STATUS_CHECK_TIMEOUT = parseInt(process.env.TRAINING_STATUS_CHECK_TIMEOUT || '15', 10) * 1000 // Default 15 seconds
+const TRAINING_STATUS_CHECK_RETRIES = parseInt(process.env.TRAINING_STATUS_CHECK_RETRIES || '3', 10) // Default 3 retries
+
 // Helper function to poll for look generation status and add looks when complete
-async function pollLookGenerationStatus(generationId: string, groupId: string, lookName?: string): Promise<void> {
-  const maxAttempts = 30 // Poll for up to 5 minutes (30 * 10 seconds)
-  const pollInterval = 10000 // 10 seconds
+async function pollLookGenerationStatus(
+  generationId: string,
+  groupId: string,
+  lookName?: string,
+  userId?: string,
+  avatarId?: string
+): Promise<void> {
+  const maxAttempts = Math.ceil(POLL_LOOK_GENERATION_TIMEOUT / POLL_INTERVAL)
+  const pollInterval = POLL_INTERVAL
 
-  console.log(`[Generate Look] Starting background polling for generation ${generationId}`)
+  // Create job for tracking
+  const jobId = jobManager.createJob('look_generation', generationId, {
+    groupId,
+    userId,
+    avatarId,
+    metadata: { lookName },
+  })
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    await new Promise(resolve => setTimeout(resolve, pollInterval))
+  jobManager.updateJob(jobId, { status: 'in_progress' })
 
-    try {
-      const status = await checkGenerationStatus(generationId)
-      console.log(`[Generate Look] Poll attempt ${attempt}/${maxAttempts} - Status:`, status)
+  const cancellationToken = jobManager.getCancellationToken(jobId)
 
-      if (status.status === 'success') {
-        console.log(`[Generate Look] ✅ Generation completed successfully!`, {
-          generationId,
-          groupId,
-          imageCount: status.image_url_list?.length || 0,
-        })
+  console.log(`[Generate Look] Starting background polling for generation ${generationId} (job: ${jobId})`)
 
-        // Now add the generated images as looks to the avatar group
-        if (status.image_key_list && status.image_key_list.length > 0) {
-          try {
-            console.log(`[Generate Look] Adding ${status.image_key_list.length} generated images as looks to group ${groupId}`)
-
-            const addLooksRequest: AddLooksRequest = {
-              group_id: groupId,
-              image_keys: status.image_key_list,
-              name: lookName || `Generated Look ${new Date().toISOString().split('T')[0]}`,
-            }
-
-            const addLooksResult = await addLooksToAvatarGroup(addLooksRequest)
-            console.log(`[Generate Look] ✅ Successfully added ${addLooksResult.photo_avatar_list?.length || 0} looks to avatar group!`, {
-              groupId,
-              lookIds: addLooksResult.photo_avatar_list?.map(l => l.id),
-            })
-          } catch (addError: any) {
-            console.error(`[Generate Look] ❌ Failed to add generated images as looks:`, addError.response?.data || addError.message)
-          }
-        } else {
-          console.warn(`[Generate Look] ⚠️ Generation succeeded but no image keys returned`)
-        }
-        return
-      } else if (status.status === 'failed') {
-        console.error(`[Generate Look] ❌ Generation failed:`, {
-          generationId,
-          groupId,
-          error: status.msg,
-        })
+  try {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      // Check for cancellation
+      if (cancellationToken?.signal.aborted || jobManager.isCancelled(jobId)) {
+        console.log(`[Generate Look] Job ${jobId} was cancelled`)
+        jobManager.updateJob(jobId, { status: 'cancelled' })
         return
       }
-      // Status is still 'in_progress' or 'pending', continue polling
-    } catch (error: any) {
-      console.warn(`[Generate Look] Poll attempt ${attempt} failed:`, error.message)
-      // Continue polling despite errors
+
+      // Wait for poll interval (but check cancellation during wait)
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => resolve(), pollInterval)
+        
+        // Check cancellation periodically during wait
+        const checkInterval = setInterval(() => {
+          if (cancellationToken?.signal.aborted || jobManager.isCancelled(jobId)) {
+            clearTimeout(timeout)
+            clearInterval(checkInterval)
+            reject(new Error('Job cancelled'))
+          }
+        }, 1000)
+
+        cancellationToken?.signal.addEventListener('abort', () => {
+          clearTimeout(timeout)
+          clearInterval(checkInterval)
+          reject(new Error('Job cancelled'))
+        })
+      }).catch(() => {
+        // Cancellation handled above
+        throw new Error('Job cancelled')
+      })
+
+      try {
+        const status = await checkGenerationStatus(generationId)
+        console.log(`[Generate Look] Poll attempt ${attempt}/${maxAttempts} - Status:`, status)
+
+        if (status.status === 'success') {
+          console.log(`[Generate Look] ✅ Generation completed successfully!`, {
+            generationId,
+            groupId,
+            imageCount: status.image_url_list?.length || 0,
+          })
+
+          // Now add the generated images as looks to the avatar group
+          if (status.image_key_list && status.image_key_list.length > 0) {
+            try {
+              console.log(`[Generate Look] Adding ${status.image_key_list.length} generated images as looks to group ${groupId}`)
+
+              const addLooksRequest: AddLooksRequest = {
+                group_id: groupId,
+                image_keys: status.image_key_list,
+                name: lookName || `Generated Look ${new Date().toISOString().split('T')[0]}`,
+              }
+
+              const addLooksResult = await addLooksToAvatarGroup(addLooksRequest)
+              console.log(`[Generate Look] ✅ Successfully added ${addLooksResult.photo_avatar_list?.length || 0} looks to avatar group!`, {
+                groupId,
+                lookIds: addLooksResult.photo_avatar_list?.map(l => l.id),
+              })
+
+              jobManager.updateJob(jobId, {
+                status: 'completed',
+                metadata: {
+                  ...jobManager.getJob(jobId)?.metadata,
+                  looksAdded: addLooksResult.photo_avatar_list?.length || 0,
+                },
+              })
+            } catch (addError: any) {
+              console.error(`[Generate Look] ❌ Failed to add generated images as looks:`, addError.response?.data || addError.message)
+              jobManager.updateJob(jobId, {
+                status: 'failed',
+                error: addError.message || 'Failed to add looks',
+              })
+            }
+          } else {
+            console.warn(`[Generate Look] ⚠️ Generation succeeded but no image keys returned`)
+            jobManager.updateJob(jobId, {
+              status: 'failed',
+              error: 'No image keys returned',
+            })
+          }
+          return
+        } else if (status.status === 'failed') {
+          console.error(`[Generate Look] ❌ Generation failed:`, {
+            generationId,
+            groupId,
+            error: status.msg,
+          })
+          jobManager.updateJob(jobId, {
+            status: 'failed',
+            error: status.msg || 'Generation failed',
+          })
+          return
+        }
+        // Status is still 'in_progress' or 'pending', continue polling
+      } catch (error: any) {
+        // Check if it's a cancellation
+        if (error.message === 'Job cancelled') {
+          return
+        }
+
+        console.warn(`[Generate Look] Poll attempt ${attempt} failed:`, error.message)
+        // Continue polling despite errors (unless cancelled)
+        if (cancellationToken?.signal.aborted || jobManager.isCancelled(jobId)) {
+          return
+        }
+      }
+    }
+
+    // Timeout reached
+    console.warn(`[Generate Look] ⚠️ Polling timed out after ${maxAttempts} attempts for generation ${generationId}`)
+    jobManager.updateJob(jobId, {
+      status: 'failed',
+      error: `Polling timed out after ${POLL_LOOK_GENERATION_TIMEOUT / 1000} seconds`,
+    })
+  } catch (error: any) {
+    if (error.message !== 'Job cancelled') {
+      console.error(`[Generate Look] Polling error:`, error)
+      jobManager.updateJob(jobId, {
+        status: 'failed',
+        error: error.message || 'Unknown error',
+      })
     }
   }
-
-  console.warn(`[Generate Look] ⚠️ Polling timed out after ${maxAttempts} attempts for generation ${generationId}`)
 }
 
 // All routes require authentication
@@ -291,8 +391,36 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
       additionalPhotosCount: Array.isArray(additional_photos) ? additional_photos.length : 0,
     })
 
-    if (!avatar_name || typeof avatar_name !== 'string') {
-      return res.status(400).json({ error: 'avatar_name is required' })
+    // Validate required fields
+    const requiredValidation = validateRequired(req.body, ['avatar_name'])
+    validateOrThrow(requiredValidation, ErrorCode.MISSING_REQUIRED_FIELD)
+
+    // Validate avatar_name length
+    const nameValidation = validateStringLength(avatar_name, 1, 200, 'avatar_name')
+    validateOrThrow(nameValidation, ErrorCode.VALIDATION_ERROR)
+
+    // Validate that either photo_data or photo_url is provided
+    if (!photo_data && !photo_url) {
+      throw new ApiError('photo_data (base64) or photo_url is required', ErrorCode.MISSING_REQUIRED_FIELD, 400)
+    }
+
+    // Validate base64 image if provided
+    if (photo_data) {
+      const imageValidation = validateBase64Image(photo_data, 10) // 10MB max
+      validateOrThrow(imageValidation, ErrorCode.INVALID_IMAGE)
+    }
+
+    // Validate additional photos if provided
+    if (Array.isArray(additional_photos)) {
+      if (additional_photos.length > 4) {
+        throw new ApiError('Maximum 4 additional photos allowed (5 total including primary)', ErrorCode.VALIDATION_ERROR, 400)
+      }
+      for (let i = 0; i < additional_photos.length; i++) {
+        const photoValidation = validateBase64Image(additional_photos[i], 10)
+        if (!photoValidation.valid) {
+          throw new ApiError(`Additional photo ${i + 1}: ${photoValidation.errors.join(', ')}`, ErrorCode.INVALID_IMAGE, 400)
+        }
+      }
     }
 
     const primaryInput: string | null =
@@ -303,7 +431,7 @@ router.post('/upload-photo', authenticate, async (req: AuthRequest, res: Respons
           : null
 
     if (!primaryInput) {
-      return res.status(400).json({ error: 'photo_data (base64) or photo_url is required' })
+      throw new ApiError('photo_data (base64) or photo_url is required', ErrorCode.MISSING_REQUIRED_FIELD, 400)
     }
 
     const { supabase } = await import('../lib/supabase.js')
@@ -743,6 +871,125 @@ router.get('/training-status/:groupId', async (req: AuthRequest, res: Response) 
   }
 })
 
+// Batch fetch looks for multiple avatars
+router.get('/looks/batch', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { avatarIds } = req.query
+
+    if (!avatarIds || typeof avatarIds !== 'string') {
+      return res.status(400).json({ error: 'avatarIds query parameter is required (comma-separated)' })
+    }
+
+    const avatarIdList = avatarIds.split(',').map(id => id.trim()).filter(Boolean)
+
+    if (avatarIdList.length === 0) {
+      return res.status(400).json({ error: 'At least one avatar ID is required' })
+    }
+
+    if (avatarIdList.length > 20) {
+      return res.status(400).json({ error: 'Maximum 20 avatar IDs allowed per request' })
+    }
+
+    // Get avatars from database to verify ownership and get heygen_avatar_id
+    const { supabase } = await import('../lib/supabase.js')
+    const { data: avatars, error: avatarsError } = await supabase
+      .from('avatars')
+      .select('id, heygen_avatar_id')
+      .eq('user_id', userId)
+      .in('id', avatarIdList)
+
+    if (avatarsError) {
+      throw avatarsError
+    }
+
+    if (!avatars || avatars.length === 0) {
+      return res.status(404).json({ error: 'No avatars found' })
+    }
+
+    // Fetch looks for all avatars in parallel
+    const axios = (await import('axios')).default
+    const apiKey = process.env.HEYGEN_KEY
+    const HEYGEN_V2_API_URL = process.env.HEYGEN_V2_API_URL || 'https://api.heygen.com/v2'
+
+    if (!apiKey) {
+      return res.status(500).json({ error: 'HeyGen API key not configured' })
+    }
+
+    const looksPromises = avatars.map(async (avatar) => {
+      // Check cache first
+      const cachedLooks = lookCache.get(avatar.id)
+      if (cachedLooks) {
+        return { avatarId: avatar.id, looks: cachedLooks }
+      }
+
+      // Fetch from API
+      try {
+        const looksResponse = await axios.get(
+          `${HEYGEN_V2_API_URL}/avatar_group/${avatar.heygen_avatar_id}/avatars`,
+          {
+            headers: {
+              'X-Api-Key': apiKey,
+              'Content-Type': 'application/json',
+            },
+            timeout: 5000,
+          }
+        )
+
+        const avatarList =
+          looksResponse.data?.data?.avatar_list ||
+          looksResponse.data?.avatar_list ||
+          looksResponse.data?.data ||
+          []
+
+        const looks = Array.isArray(avatarList)
+          ? avatarList.map((look: any) => ({
+              id: look.id,
+              name: look.name,
+              status: look.status,
+              image_url: look.image_url,
+              preview_url: look.image_url,
+              thumbnail_url: look.image_url,
+              created_at: look.created_at,
+              updated_at: look.updated_at,
+            }))
+          : []
+
+        // Cache the results
+        lookCache.set(avatar.id, looks)
+
+        return { avatarId: avatar.id, looks }
+      } catch (error: any) {
+        console.warn(`[Batch Looks] Failed to fetch looks for avatar ${avatar.id}:`, error.message)
+        return { avatarId: avatar.id, looks: [], error: error.message }
+      }
+    })
+
+    const results = await Promise.all(looksPromises)
+
+    // Format response
+    const looksByAvatar: Record<string, any[]> = {}
+    for (const result of results) {
+      looksByAvatar[result.avatarId] = result.looks
+    }
+
+    return res.json({ looks: looksByAvatar })
+  } catch (error: any) {
+    logError(error, {
+      userId: req.userId!,
+      operation: 'batch_fetch_looks',
+    })
+
+    const { statusCode, response } = createErrorResponse(
+      error,
+      'Failed to fetch looks',
+      ErrorCode.INTERNAL_SERVER_ERROR
+    )
+
+    return res.status(statusCode).json(response)
+  }
+})
+
 // Photo avatar details
 router.get('/:avatarId/details', async (req: AuthRequest, res: Response) => {
   try {
@@ -895,9 +1142,23 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
     const userId = req.userId!
     const request: GenerateLookRequest = req.body
 
-    if (!request.group_id || !request.prompt || !request.orientation || !request.pose || !request.style) {
-      return res.status(400).json({ error: 'All fields are required for look generation' })
-    }
+    // Validate required fields
+    const requiredValidation = validateRequired(request, ['group_id', 'prompt', 'orientation', 'pose', 'style'])
+    validateOrThrow(requiredValidation, ErrorCode.MISSING_REQUIRED_FIELD)
+
+    // Validate prompt length
+    const promptValidation = validateStringLength(request.prompt, 1, 500, 'prompt')
+    validateOrThrow(promptValidation, ErrorCode.VALIDATION_ERROR)
+
+    // Validate enum values
+    const orientationValidation = validateEnum(request.orientation, ['vertical', 'horizontal', 'square'], 'orientation')
+    validateOrThrow(orientationValidation, ErrorCode.VALIDATION_ERROR)
+
+    const poseValidation = validateEnum(request.pose, ['half_body', 'full_body', 'close_up'], 'pose')
+    validateOrThrow(poseValidation, ErrorCode.VALIDATION_ERROR)
+
+    const styleValidation = validateEnum(request.style, ['Realistic', 'Cartoon', 'Anime'], 'style')
+    validateOrThrow(styleValidation, ErrorCode.VALIDATION_ERROR)
 
     // Get the avatar to find the default look
     const { supabase } = await import('../lib/supabase.js')
@@ -924,47 +1185,78 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
     // a style reference, not for identifying which avatar to use.
     console.log('[Generate Look] Using group_id only (no photo_avatar_id) to ensure correct avatar identity')
 
-    // Check training status before generating look (with timeout)
+    // Check training status before generating look (with timeout and retries)
     const { checkTrainingStatus } = await import('../lib/heygen.js')
     console.log('[Generate Look] Checking training status for group:', request.group_id)
 
-    try {
-      // Add a timeout to prevent hanging
+    // Helper function to check training status with timeout
+    const checkTrainingStatusWithTimeout = async (): Promise<any> => {
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Training status check timed out after 10s')), 10000)
+        setTimeout(() => reject(new Error(`Training status check timed out after ${TRAINING_STATUS_CHECK_TIMEOUT / 1000}s`)), TRAINING_STATUS_CHECK_TIMEOUT)
       )
 
-      const trainingStatus = await Promise.race([
+      return Promise.race([
         checkTrainingStatus(request.group_id),
         timeoutPromise
       ])
+    }
 
-      console.log('[Generate Look] Training status result:', trainingStatus)
-      if (trainingStatus.status !== 'ready') {
-        if (trainingStatus.status === 'empty') {
-          console.log('[Generate Look] Training status is empty, returning error')
-          return res.status(400).json({
-            error: 'Avatar group is not trained yet. Please wait for training to complete before generating looks.'
-          })
-        } else if (trainingStatus.status === 'failed') {
-          console.log('[Generate Look] Training failed, returning error')
-          return res.status(400).json({
-            error: `Avatar training failed: ${trainingStatus.error_msg || 'Unknown error'}. Cannot generate looks.`
-          })
-        } else if (trainingStatus.status === 'training' || trainingStatus.status === 'pending') {
-          console.log('[Generate Look] Training in progress, returning error')
-          return res.status(400).json({
-            error: `Avatar is still training (status: ${trainingStatus.status}). Please wait for training to complete before generating looks.`
-          })
+    // Retry logic with exponential backoff
+    let lastError: any = null
+    let trainingStatus: any = null
+
+    for (let attempt = 1; attempt <= TRAINING_STATUS_CHECK_RETRIES; attempt++) {
+      try {
+        trainingStatus = await checkTrainingStatusWithTimeout()
+        lastError = null
+        break // Success, exit retry loop
+      } catch (error: any) {
+        lastError = error
+        console.warn(`[Generate Look] Training status check attempt ${attempt}/${TRAINING_STATUS_CHECK_RETRIES} failed:`, error.message)
+
+        // If this is the last attempt, we'll handle the error below
+        if (attempt < TRAINING_STATUS_CHECK_RETRIES) {
+          // Exponential backoff: 1s, 2s, 4s
+          const backoffDelay = Math.min(1000 * Math.pow(2, attempt - 1), 5000)
+          console.log(`[Generate Look] Retrying in ${backoffDelay}ms...`)
+          await new Promise(resolve => setTimeout(resolve, backoffDelay))
         }
       }
-      console.log('[Generate Look] Training status is ready, proceeding with look generation')
-    } catch (statusError: any) {
-      // If we can't check status, log warning but continue (might work if training is complete)
-      console.warn('[Generate Look] Failed to check training status:', statusError.message)
-      console.warn('[Generate Look] Full error:', statusError)
-      console.warn('[Generate Look] Will attempt to generate look anyway')
     }
+
+    // If all retries failed, fail fast (this is critical for look generation)
+    if (lastError) {
+      console.error('[Generate Look] All training status check attempts failed:', lastError.message)
+      return res.status(500).json({
+        error: `Failed to verify training status: ${lastError.message}. Please try again later.`,
+        code: 'TRAINING_STATUS_CHECK_FAILED'
+      })
+    }
+
+    // Process training status result
+    if (trainingStatus && trainingStatus.status !== 'ready') {
+      if (trainingStatus.status === 'empty') {
+        console.log('[Generate Look] Training status is empty, returning error')
+        return res.status(400).json({
+          error: 'Avatar group is not trained yet. Please wait for training to complete before generating looks.',
+          code: 'TRAINING_NOT_COMPLETE'
+        })
+      } else if (trainingStatus.status === 'failed') {
+        console.log('[Generate Look] Training failed, returning error')
+        return res.status(400).json({
+          error: `Avatar training failed: ${trainingStatus.error_msg || 'Unknown error'}. Cannot generate looks.`,
+          code: 'TRAINING_FAILED'
+        })
+      } else if (trainingStatus.status === 'training' || trainingStatus.status === 'pending') {
+        console.log('[Generate Look] Training in progress, returning error')
+        return res.status(400).json({
+          error: `Avatar is still training (status: ${trainingStatus.status}). Please wait for training to complete before generating looks.`,
+          code: 'TRAINING_IN_PROGRESS'
+        })
+      }
+    }
+
+    console.log('[Generate Look] Training status is ready, proceeding with look generation')
 
     console.log('[Generate Look] Calling generateAvatarLook with request:', JSON.stringify(request, null, 2))
 
@@ -976,8 +1268,17 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
       // When complete, it will automatically add the generated images as looks
       if (result.generation_id) {
         const lookName = request.prompt || `Look ${new Date().toISOString().split('T')[0]}`
-        pollLookGenerationStatus(result.generation_id, request.group_id, lookName).catch(err => {
+        const avatarId = avatar?.id
+        pollLookGenerationStatus(result.generation_id, request.group_id, lookName, userId, avatarId).catch(err => {
           console.error('[Generate Look] Background polling failed:', err.message)
+        })
+
+        // Get job ID for response
+        const job = jobManager.getJobByGenerationId(result.generation_id, 'look_generation')
+        return res.json({
+          message: 'Look generation started',
+          generation_id: result.generation_id,
+          job_id: job?.id,
         })
       }
 
@@ -992,30 +1293,19 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
       throw genError
     }
   } catch (error: any) {
-    console.error('Generate look error:', error)
-
-    // Provide more user-friendly error messages
-    let errorMessage = error.message || 'Failed to generate look'
-    let errorCode: string | undefined
-
-    if (error.response?.data?.error) {
-      const apiError = error.response.data.error
-      if (typeof apiError === 'string') {
-        errorMessage = apiError
-      } else if (apiError.message) {
-        errorMessage = apiError.message
-        errorCode = apiError.code
-        // Special handling for "Model not found" error
-        if (apiError.message === 'Model not found' || apiError.code === 'invalid_parameter') {
-          errorMessage = 'Avatar is not trained yet. Please wait for training to complete before generating looks.'
-        }
-      }
-    }
-
-    return res.status(error.response?.status || 500).json({
-      error: errorMessage,
-      code: errorCode
+    logError(error, {
+      userId,
+      operation: 'generate_look',
+      groupId: request.group_id,
     })
+
+    const { statusCode, response } = createErrorResponse(
+      error,
+      'Failed to generate look',
+      ErrorCode.LOOK_GENERATION_FAILED
+    )
+
+    return res.status(statusCode).json(response)
   }
 })
 
@@ -1229,5 +1519,74 @@ router.post('/upload-look-image', authenticate, async (req: AuthRequest, res: Re
 })
 
 // Test fixtures endpoints removed - no longer saving avatars automatically
+
+// Get job status
+router.get('/jobs/:jobId', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { jobId } = req.params
+
+    const job = jobManager.getJob(jobId)
+
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' })
+    }
+
+    // Verify job belongs to user
+    if (job.userId && job.userId !== userId) {
+      return res.status(403).json({ error: 'Access denied' })
+    }
+
+    return res.json(job)
+  } catch (error: any) {
+    console.error('Get job status error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to get job status' })
+  }
+})
+
+// Get all jobs for current user
+router.get('/jobs', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { type } = req.query
+
+    const jobs = jobManager.getUserJobs(userId, type as any)
+
+    return res.json({ jobs })
+  } catch (error: any) {
+    console.error('Get jobs error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to get jobs' })
+  }
+})
+
+// Cancel a job
+router.post('/jobs/:jobId/cancel', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { jobId } = req.params
+
+    const job = jobManager.getJob(jobId)
+
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' })
+    }
+
+    // Verify job belongs to user
+    if (job.userId && job.userId !== userId) {
+      return res.status(403).json({ error: 'Access denied' })
+    }
+
+    const cancelled = jobManager.cancelJob(jobId)
+
+    if (!cancelled) {
+      return res.status(400).json({ error: 'Job cannot be cancelled (already completed, failed, or cancelled)' })
+    }
+
+    return res.json({ message: 'Job cancelled successfully', job: jobManager.getJob(jobId) })
+  } catch (error: any) {
+    console.error('Cancel job error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to cancel job' })
+  }
+})
 
 export default router
