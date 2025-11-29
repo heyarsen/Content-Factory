@@ -4,6 +4,7 @@
 
 type PollingKey = string
 type PollingCallback = () => Promise<void> | void
+type PollingCallbackWithResult<T = any> = () => Promise<T> | T
 type PollingCleanup = () => void
 
 interface PollingOperation {
@@ -138,9 +139,9 @@ class PollingManager {
   /**
    * Start a recursive polling operation (uses setTimeout instead of setInterval)
    */
-  startRecursivePolling(
+  startRecursivePolling<T = any>(
     key: PollingKey,
-    callback: PollingCallback,
+    callback: PollingCallbackWithResult<T>,
     delay: number,
     options: {
       immediate?: boolean
@@ -148,7 +149,7 @@ class PollingManager {
       onComplete?: () => void
       onError?: (error: unknown) => void
       cleanup?: PollingCleanup
-      shouldContinue?: (result: any) => boolean // Return false to stop polling
+      shouldContinue?: (result: T) => boolean // Return false to stop polling
     } = {}
   ): () => void {
     const {
@@ -297,7 +298,13 @@ class PollingManager {
     callback: PollingCallback,
     interval: number,
     debounceMs: number = 1000,
-    options: Parameters<PollingManager['startPolling']>[2] = {}
+    options: {
+      immediate?: boolean
+      maxAttempts?: number
+      onComplete?: () => void
+      onError?: (error: unknown) => void
+      cleanup?: PollingCleanup
+    } = {}
   ): () => void {
     // Clear existing debounce timer
     const existingTimer = this.debounceTimers.get(key)

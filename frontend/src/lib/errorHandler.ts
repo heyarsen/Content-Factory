@@ -7,6 +7,7 @@ export interface ApiError {
   status?: number
   code?: string
   response?: {
+    status?: number
     data?: {
       error?: string | { message?: string; code?: string }
       message?: string
@@ -132,7 +133,6 @@ export function handleError(
   options: ErrorHandlingOptions = {}
 ): string {
   const {
-    showToast = true,
     logError = true,
     customMessage,
     silent = false,
@@ -159,7 +159,12 @@ export function handleError(
 export function formatSpecificError(error: unknown): string {
   const apiError = error as ApiError
   const errorData = apiError.response?.data
-  const errorCode = errorData?.error?.code || (errorData?.error as any)?.code
+  const errorObj = errorData?.error
+  const errorCode = typeof errorObj === 'object' && errorObj?.code 
+    ? errorObj.code 
+    : typeof errorObj === 'string' 
+      ? undefined 
+      : (errorObj as any)?.code
 
   // HeyGen specific errors
   if (errorCode === 'insufficient_credit' || 

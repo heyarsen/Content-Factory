@@ -894,7 +894,7 @@ export default function Avatars() {
     }
 
     // Start recursive polling
-    const cleanup = pollingManager.startRecursivePolling(
+    const cleanup = pollingManager.startRecursivePolling<{ status: string }>(
       pollingKey,
       async () => {
         const response = await api.get(`/api/avatars/generation-status/${generationId}`)
