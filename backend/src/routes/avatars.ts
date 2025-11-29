@@ -1294,9 +1294,9 @@ router.post('/generate-look', async (req: AuthRequest, res: Response) => {
     }
   } catch (error: any) {
     logError(error, {
-      userId,
+      userId: req.userId!,
       operation: 'generate_look',
-      groupId: request.group_id,
+      groupId: req.body?.group_id,
     })
 
     const { statusCode, response } = createErrorResponse(
