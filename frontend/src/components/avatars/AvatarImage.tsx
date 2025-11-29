@@ -50,7 +50,7 @@ export function AvatarImage({
             imageLoaded ? 'opacity-100' : 'opacity-0'
           } transition-opacity duration-200`}
           onLoad={() => setImageLoaded(true)}
-          onError={(e) => {
+          onError={() => {
             setImageError(true)
             setImageLoaded(false)
             onError?.()
