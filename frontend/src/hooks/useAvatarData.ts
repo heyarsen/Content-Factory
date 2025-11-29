@@ -10,6 +10,10 @@ interface Avatar {
   preview_url: string | null
   thumbnail_url: string | null
   status: string
+  gender?: string | null
+  is_default?: boolean
+  created_at?: string
+  source?: 'synced' | 'user_photo' | 'ai_generated' | null
 }
 
 interface PhotoAvatarLook {
