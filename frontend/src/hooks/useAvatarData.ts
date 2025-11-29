@@ -64,11 +64,18 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
   }, [])
 
   const loadAllLooks = useCallback(async (avatarsList: Avatar[]) => {
+    if (avatarsList.length === 0) {
+      setAllLooks([])
+      setLoadingLooks(false)
+      return
+    }
+
     setLoadingLooks(true)
     const looks: Array<{ look: PhotoAvatarLook; avatar: Avatar }> = []
 
     // Check cache first
     const uncachedAvatars = avatarsList.filter(avatar => !looksCacheRef.current.has(avatar.id))
+    console.log('[useAvatarData] Loading looks for', uncachedAvatars.length, 'uncached avatars out of', avatarsList.length, 'total')
 
     // Load looks for uncached avatars
     for (const avatar of uncachedAvatars) {
@@ -76,33 +83,41 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
         const response = await api.get(`/api/avatars/${avatar.id}/details`)
         const details = response.data
         if (details?.looks && Array.isArray(details.looks)) {
+          console.log(`[useAvatarData] Loaded ${details.looks.length} looks for avatar ${avatar.avatar_name} (${avatar.id})`)
           looksCacheRef.current.set(avatar.id, details.looks)
           for (const look of details.looks) {
             looks.push({ look, avatar })
           }
+        } else {
+          console.warn(`[useAvatarData] No looks found for avatar ${avatar.avatar_name} (${avatar.id})`)
+          // Cache empty array to prevent repeated requests
+          looksCacheRef.current.set(avatar.id, [])
         }
       } catch (error) {
+        console.error(`[useAvatarData] Failed to load looks for avatar ${avatar.avatar_name} (${avatar.id}):`, error)
         handleError(error, {
           showToast: false,
           logError: true,
           silent: true,
         })
+        // Cache empty array to prevent repeated failed requests
+        looksCacheRef.current.set(avatar.id, [])
       }
     }
 
     // Add cached looks
     for (const avatar of avatarsList) {
       const cachedLooks = looksCacheRef.current.get(avatar.id)
-      if (cachedLooks) {
+      if (cachedLooks && cachedLooks.length > 0) {
         for (const look of cachedLooks) {
           looks.push({ look, avatar })
         }
       }
     }
 
+    console.log('[useAvatarData] Total looks loaded:', looks.length, 'for', avatarsList.length, 'avatars')
     setAllLooks(looks)
     setLoadingLooks(false)
-    console.log('[useAvatarData] Loaded looks:', looks.length, 'for', avatarsList.length, 'avatars')
   }, [])
 
   const loadLooksForAvatar = useCallback(async (avatarId: string) => {

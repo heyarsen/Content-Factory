@@ -110,7 +110,7 @@ export function LooksGrid({
   if (loading) {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-        {[1, 2, 3].map(i => (
+        {[1, 2, 3, 4, 5, 6].map(i => (
           <div key={i} className="aspect-[3/4] rounded-2xl bg-slate-200 animate-pulse"></div>
         ))}
       </div>
@@ -134,20 +134,22 @@ export function LooksGrid({
       )
     }
     
+    // Show empty state with helpful message
+    const selectedAvatar = selectedAvatarFilter ? avatars.find(a => a.id === selectedAvatarFilter) : null
     return (
       <div className="col-span-full flex flex-col items-center justify-center py-16">
         <div className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-100 to-indigo-100 flex items-center justify-center mb-4">
           <Sparkles className="h-12 w-12 text-purple-400" />
         </div>
         <p className="text-lg font-medium text-slate-700 mb-2">
-          {selectedAvatarFilter 
-            ? `No looks yet for this avatar`
-            : 'No looks yet'}
+          {selectedAvatarFilter && selectedAvatar
+            ? `No looks yet for "${selectedAvatar.avatar_name}"`
+            : 'No looks found'}
         </p>
-        <p className="text-sm text-slate-500 mb-6">
+        <p className="text-sm text-slate-500 mb-6 text-center max-w-md">
           {selectedAvatarFilter
-            ? 'Generate or upload a look to get started'
-            : 'Select an avatar or create a new one to generate looks'}
+            ? 'This avatar doesn\'t have any looks yet. Generate or upload a look to get started.'
+            : 'None of your avatars have looks yet. Select an avatar or create a new one to generate looks.'}
         </p>
         <Button onClick={onCreateClick} size="lg">
           <Sparkles className="h-5 w-5 mr-2" />
