@@ -1,0 +1,1060 @@
+import { Request } from 'express'
+import { AvatarService } from '../services/avatarService.js'
+import {
+  generateAIAvatar,
+  checkGenerationStatus,
+  addLooksToAvatarGroup,
+  checkTrainingStatus,
+  generateAvatarLook,
+  uploadImageToHeyGen,
+  type GenerateAIAvatarRequest,
+  type AddLooksRequest,
+  type GenerateLookRequest,
+} from '../lib/heygen.js'
+import { assignAvatarSource, executeWithAvatarSourceFallback } from '../lib/avatarSourceColumn.js'
+import { jobManager } from '../lib/jobManager.js'
+import { validateRequired, validateStringLength, validateBase64Image, validateEnum, validateOrThrow } from '../lib/validators.js'
+import { lookCache } from '../lib/lookCache.js'
+import { createErrorResponse, ErrorCode, ApiError } from '../lib/apiErrorHandler.js'
+import type { Avatar } from '../services/avatarService.js'
+
+// Configuration
+const POLL_LOOK_GENERATION_TIMEOUT = parseInt(process.env.POLL_LOOK_GENERATION_TIMEOUT || '300', 10) * 1000
+const POLL_INTERVAL = parseInt(process.env.POLL_LOOK_GENERATION_INTERVAL || '10', 10) * 1000
+const TRAINING_STATUS_CHECK_TIMEOUT = parseInt(process.env.TRAINING_STATUS_CHECK_TIMEOUT || '15', 10) * 1000
+const TRAINING_STATUS_CHECK_RETRIES = parseInt(process.env.TRAINING_STATUS_CHECK_RETRIES || '3', 10)
+
+/**
+ * Background polling for look generation status
+ */
+async function pollLookGenerationStatus(
+  generationId: string,
+  groupId: string,
+  lookName?: string,
+  userId?: string,
+  avatarId?: string
+): Promise<void> {
+  const maxAttempts = Math.ceil(POLL_LOOK_GENERATION_TIMEOUT / POLL_INTERVAL)
+  const pollInterval = POLL_INTERVAL
+
+  const jobId = jobManager.createJob('look_generation', generationId, {
+    groupId,
+    userId,
+    avatarId,
+    metadata: { lookName },
+  })
+
+  jobManager.updateJob(jobId, { status: 'in_progress' })
+  const cancellationToken = jobManager.getCancellationToken(jobId)
+
+  console.log(`[Generate Look] Starting background polling for generation ${generationId} (job: ${jobId})`)
+
+  try {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      if (cancellationToken?.signal.aborted || jobManager.isCancelled(jobId)) {
+        console.log(`[Generate Look] Job ${jobId} was cancelled`)
+        jobManager.updateJob(jobId, { status: 'cancelled' })
+        return
+      }
+
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => resolve(), pollInterval)
+        const checkInterval = setInterval(() => {
+          if (cancellationToken?.signal.aborted || jobManager.isCancelled(jobId)) {
+            clearTimeout(timeout)
+            clearInterval(checkInterval)
+            reject(new Error('Job cancelled'))
+          }
+        }, 1000)
+
+        cancellationToken?.signal.addEventListener('abort', () => {
+          clearTimeout(timeout)
+          clearInterval(checkInterval)
+          reject(new Error('Job cancelled'))
+        })
+      }).catch(() => {
+        throw new Error('Job cancelled')
+      })
+
+      try {
+        const status = await checkGenerationStatus(generationId)
+        console.log(`[Generate Look] Poll attempt ${attempt}/${maxAttempts} - Status:`, status)
+
+        if (status.status === 'success') {
+          console.log(`[Generate Look] ✅ Generation completed successfully!`, {
+            generationId,
+            groupId,
+            imageCount: status.image_url_list?.length || 0,
+          })
+
+          if (status.image_key_list && status.image_key_list.length > 0) {
+            try {
+              console.log(`[Generate Look] Adding ${status.image_key_list.length} generated images as looks to group ${groupId}`)
+
+              const addLooksRequest: AddLooksRequest = {
+                group_id: groupId,
+                image_keys: status.image_key_list,
+                name: lookName || `Generated Look ${new Date().toISOString().split('T')[0]}`,
+              }
+
+              const addLooksResult = await addLooksToAvatarGroup(addLooksRequest)
+              console.log(`[Generate Look] ✅ Successfully added ${addLooksResult.photo_avatar_list?.length || 0} looks to avatar group!`, {
+                groupId,
+                lookIds: addLooksResult.photo_avatar_list?.map(l => l.id),
+              })
+
+              jobManager.updateJob(jobId, {
+                status: 'completed',
+                metadata: {
+                  ...jobManager.getJob(jobId)?.metadata,
+                  looksAdded: addLooksResult.photo_avatar_list?.length || 0,
+                },
+              })
+            } catch (addError: any) {
+              console.error(`[Generate Look] ❌ Failed to add generated images as looks:`, addError.response?.data || addError.message)
+              jobManager.updateJob(jobId, {
+                status: 'failed',
+                error: addError.message || 'Failed to add looks',
+              })
+            }
+          } else {
+            console.warn(`[Generate Look] ⚠️ Generation succeeded but no image keys returned`)
+            jobManager.updateJob(jobId, {
+              status: 'failed',
+              error: 'No image keys returned',
+            })
+          }
+          return
+        } else if (status.status === 'failed') {
+          console.error(`[Generate Look] ❌ Generation failed:`, {
+            generationId,
+            groupId,
+            error: status.msg,
+          })
+          jobManager.updateJob(jobId, {
+            status: 'failed',
+            error: status.msg || 'Generation failed',
+          })
+          return
+        }
+      } catch (error: any) {
+        if (error.message === 'Job cancelled') {
+          return
+        }
+        console.warn(`[Generate Look] Poll attempt ${attempt} failed:`, error.message)
+        if (cancellationToken?.signal.aborted || jobManager.isCancelled(jobId)) {
+          return
+        }
+      }
+    }
+
+    console.warn(`[Generate Look] ⚠️ Polling timed out after ${maxAttempts} attempts for generation ${generationId}`)
+    jobManager.updateJob(jobId, {
+      status: 'failed',
+      error: `Polling timed out after ${POLL_LOOK_GENERATION_TIMEOUT / 1000} seconds`,
+    })
+  } catch (error: any) {
+    if (error.message !== 'Job cancelled') {
+      console.error(`[Generate Look] Polling error:`, error)
+      jobManager.updateJob(jobId, {
+        status: 'failed',
+        error: error.message || 'Unknown error',
+      })
+    }
+  }
+}
+
+export class AvatarController {
+  /**
+   * List all avatars for a user
+   */
+  static async listAvatars(userId: string, options: { includeSynced?: boolean } = {}) {
+    const showAll = options.includeSynced ?? false
+
+    const avatars = showAll
+      ? await AvatarService.getUserAvatars(userId)
+      : await AvatarService.getUserCreatedAvatars(userId)
+
+    const defaultAvatar = showAll
+      ? await AvatarService.getDefaultAvatar(userId)
+      : (await AvatarService.getUserCreatedAvatars(userId)).find(a => a.is_default) || null
+
+    return {
+      avatars,
+      default_avatar_id: defaultAvatar?.id || null,
+      only_created: !showAll,
+    }
+  }
+
+  /**
+   * Get a specific avatar
+   */
+  static async getAvatar(userId: string, avatarId: string) {
+    const avatar = await AvatarService.getAvatarById(avatarId, userId)
+    if (!avatar) {
+      throw new ApiError('Avatar not found', ErrorCode.NOT_FOUND, 404)
+    }
+    return { avatar }
+  }
+
+  /**
+   * Create avatar from photo upload
+   */
+  static async createFromPhoto(req: Request, userId: string) {
+    const { photo_data, photo_url, avatar_name, additional_photos } = req.body
+
+    // Validate required fields
+    const requiredValidation = validateRequired(req.body, ['avatar_name'])
+    validateOrThrow(requiredValidation, ErrorCode.MISSING_REQUIRED_FIELD)
+
+    const nameValidation = validateStringLength(avatar_name, 1, 200, 'avatar_name')
+    validateOrThrow(nameValidation, ErrorCode.VALIDATION_ERROR)
+
+    if (!photo_data && !photo_url) {
+      throw new ApiError('photo_data (base64) or photo_url is required', ErrorCode.MISSING_REQUIRED_FIELD, 400)
+    }
+
+    if (photo_data) {
+      const imageValidation = validateBase64Image(photo_data, 10)
+      validateOrThrow(imageValidation, ErrorCode.INVALID_IMAGE)
+    }
+
+    if (Array.isArray(additional_photos)) {
+      if (additional_photos.length > 4) {
+        throw new ApiError('Maximum 4 additional photos allowed (5 total including primary)', ErrorCode.VALIDATION_ERROR, 400)
+      }
+      for (let i = 0; i < additional_photos.length; i++) {
+        const photoValidation = validateBase64Image(additional_photos[i], 10)
+        if (!photoValidation.valid) {
+          throw new ApiError(`Additional photo ${i + 1}: ${photoValidation.errors.join(', ')}`, ErrorCode.INVALID_IMAGE, 400)
+        }
+      }
+    }
+
+    const primaryInput: string | null =
+      typeof photo_data === 'string' && photo_data.length > 0
+        ? photo_data
+        : typeof photo_url === 'string' && photo_url.length > 0
+          ? photo_url
+          : null
+
+    if (!primaryInput) {
+      throw new ApiError('photo_data (base64) or photo_url is required', ErrorCode.MISSING_REQUIRED_FIELD, 400)
+    }
+
+    const { supabase } = await import('../lib/supabase.js')
+
+    // Ensure bucket exists
+    const { data: buckets, error: bucketError } = await supabase.storage.listBuckets()
+    if (bucketError) {
+      console.error('Error checking buckets:', bucketError)
+    } else {
+      const bucketExists = buckets?.some((b) => b.name === 'avatars')
+      if (buckets && !bucketExists) {
+        throw new ApiError(
+          'Storage bucket "avatars" does not exist. Please create it in Supabase Dashboard > Storage with public access.',
+          ErrorCode.INTERNAL_SERVER_ERROR,
+          500
+        )
+      }
+    }
+
+    // Upload photo(s) to storage
+    const uploadBase64Photo = async (dataUrl: string, label: string): Promise<string> => {
+      const base64Regex = /^data:([^;]+);base64,(.+)$/
+      const match = dataUrl.match(base64Regex)
+      if (!match) {
+        throw new ApiError('photo_data must be a base64-encoded data URL', ErrorCode.INVALID_IMAGE, 400)
+      }
+      let mimeType = match[1]
+      const base64Data = match[2]
+      let buffer: Buffer = Buffer.from(base64Data, 'base64')
+
+      const normalizedMime = (mimeType || '').toLowerCase()
+      let extension = 'jpg'
+      if (normalizedMime.includes('png')) extension = 'png'
+      else if (normalizedMime.includes('webp')) extension = 'webp'
+
+      const safeLabel = label.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'avatar'
+      const fileName = `avatars/${userId}/${Date.now()}-${safeLabel}-${Math.random().toString(36).slice(2, 8)}.${extension}`
+
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, buffer, {
+        contentType: mimeType || `image/${extension}`,
+        upsert: false,
+        cacheControl: '3600',
+      })
+
+      if (uploadError) {
+        if (uploadError.message?.includes('Bucket') || uploadError.message?.includes('not found')) {
+          throw new ApiError(
+            `Storage bucket "avatars" not found. Please create it in Supabase Dashboard > Storage with public access. Error: ${uploadError.message}`,
+            ErrorCode.INTERNAL_SERVER_ERROR,
+            500
+          )
+        }
+        throw new ApiError(`Failed to upload image to storage: ${uploadError.message}`, ErrorCode.INTERNAL_SERVER_ERROR, 500)
+      }
+
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName)
+      const publicUrl = urlData?.publicUrl
+      if (!publicUrl) {
+        throw new ApiError('Failed to get public URL for uploaded image', ErrorCode.INTERNAL_SERVER_ERROR, 500)
+      }
+
+      return publicUrl
+    }
+
+    const processPhotoInput = async (input: string, label: string): Promise<string> => {
+      if (typeof input !== 'string' || input.trim().length === 0) {
+        throw new ApiError('Invalid photo input', ErrorCode.INVALID_IMAGE, 400)
+      }
+      if (/^https?:\/\//i.test(input.trim())) {
+        return input.trim()
+      }
+      return uploadBase64Photo(input, label)
+    }
+
+    const primaryPhotoUrl = await processPhotoInput(primaryInput, avatar_name)
+
+    const extraPhotoUrls: string[] = []
+    if (Array.isArray(additional_photos)) {
+      for (const [index, extra] of additional_photos.entries()) {
+        if (typeof extra !== 'string' || extra.trim().length === 0) continue
+        try {
+          const extraUrl = await processPhotoInput(extra, `${avatar_name}_extra_${index + 1}`)
+          extraPhotoUrls.push(extraUrl)
+        } catch (extraErr: any) {
+          console.warn(`Failed to process additional photo #${index + 1}:`, extraErr?.message || extraErr)
+        }
+      }
+    }
+
+    let avatar
+    let autoLookResult: { type: 'ai_generation' | 'photo_look'; id: string } | null = null
+    try {
+      avatar = await AvatarService.createAvatarFromPhoto(userId, primaryPhotoUrl, avatar_name, extraPhotoUrls)
+      autoLookResult = await AvatarService.autoGenerateVerticalLook(
+        avatar.heygen_avatar_id,
+        primaryPhotoUrl,
+        avatar_name
+      )
+    } catch (heygenError: any) {
+      console.error('HeyGen avatar creation failed:', {
+        message: heygenError?.message,
+        stack: heygenError?.stack,
+        response: heygenError?.response?.data,
+        status: heygenError?.response?.status,
+      })
+      throw heygenError
+    }
+
+    return {
+      message: 'Avatar created successfully. Please start training manually using the "Train Avatar" button.',
+      avatar,
+      photo_url: primaryPhotoUrl,
+      additional_photo_urls: extraPhotoUrls,
+      auto_look: autoLookResult
+        ? {
+          type: autoLookResult.type,
+          id: autoLookResult.id,
+          note:
+            autoLookResult.type === 'ai_generation'
+              ? 'AI-generated 9:16 look is being created based on your photo. This may take a few minutes.'
+              : 'Photo added as look.',
+        }
+        : null,
+    }
+  }
+
+  /**
+   * Update avatar metadata
+   */
+  static async updateAvatar(userId: string, avatarId: string, updates: { avatar_name?: string; gender?: string }) {
+    const { supabase } = await import('../lib/supabase.js')
+    
+    // Verify ownership
+    const { data: avatar, error: avatarError } = await supabase
+      .from('avatars')
+      .select('id, user_id')
+      .eq('id', avatarId)
+      .eq('user_id', userId)
+      .single()
+
+    if (avatarError || !avatar) {
+      throw new ApiError('Avatar not found', ErrorCode.NOT_FOUND, 404)
+    }
+
+    const updateData: any = {}
+    if (updates.avatar_name !== undefined) updateData.avatar_name = updates.avatar_name
+    if (updates.gender !== undefined) updateData.gender = updates.gender
+
+    const { data: updatedAvatar, error: updateError } = await supabase
+      .from('avatars')
+      .update(updateData)
+      .eq('id', avatarId)
+      .eq('user_id', userId)
+      .select()
+      .single()
+
+    if (updateError) {
+      throw new ApiError(updateError.message || 'Failed to update avatar', ErrorCode.INTERNAL_SERVER_ERROR, 500)
+    }
+
+    return {
+      message: 'Avatar updated successfully',
+      avatar: updatedAvatar,
+    }
+  }
+
+  /**
+   * Delete an avatar
+   */
+  static async deleteAvatar(userId: string, avatarId: string, options: { removeRemote?: boolean } = {}) {
+    await AvatarService.deleteAvatar(avatarId, userId, options)
+  }
+
+  /**
+   * Set avatar as default
+   */
+  static async setDefault(userId: string, avatarId: string) {
+    const avatar = await AvatarService.setDefaultAvatar(avatarId, userId)
+    return {
+      message: 'Default avatar updated',
+      avatar,
+    }
+  }
+
+  /**
+   * Sync avatars from HeyGen
+   */
+  static async syncFromHeyGen(userId: string) {
+    const avatars = await AvatarService.syncAvatarsFromHeyGen(userId)
+    return {
+      message: 'Avatars synced successfully',
+      avatars,
+      count: avatars.length,
+    }
+  }
+
+  /**
+   * Generate AI avatar
+   */
+  static async generateAI(userId: string, request: GenerateAIAvatarRequest) {
+    if (!request.name || !request.age || !request.gender || !request.ethnicity || !request.orientation || !request.pose || !request.style || !request.appearance) {
+      throw new ApiError('All fields are required for AI avatar generation', ErrorCode.MISSING_REQUIRED_FIELD, 400)
+    }
+
+    const result = await generateAIAvatar(request)
+
+    const { supabase } = await import('../lib/supabase.js')
+    const avatarPayload = {
+      user_id: userId,
+      heygen_avatar_id: result.generation_id,
+      avatar_name: request.name,
+      avatar_url: null,
+      preview_url: null,
+      thumbnail_url: null,
+      gender: request.gender,
+      status: 'generating',
+      is_default: false,
+    }
+
+    assignAvatarSource(avatarPayload, 'ai_generated')
+
+    const { data, error } = await executeWithAvatarSourceFallback<Avatar>(
+      avatarPayload,
+      () =>
+        supabase
+          .from('avatars')
+          .insert(avatarPayload)
+          .select()
+          .single()
+    )
+
+    if (error) {
+      throw new ApiError(`Failed to save avatar generation: ${error.message}`, ErrorCode.INTERNAL_SERVER_ERROR, 500)
+    }
+
+    return {
+      message: 'AI avatar generation started. Once generation completes, you will need to manually start training.',
+      generation_id: result.generation_id,
+    }
+  }
+
+  /**
+   * Get generation status
+   */
+  static async getGenerationStatus(generationId: string) {
+    const status = await checkGenerationStatus(generationId)
+    return status
+  }
+
+  /**
+   * Complete AI generation
+   */
+  static async completeAIGeneration(userId: string, body: { generation_id: string; image_keys: string[]; avatar_name: string; image_urls?: string[] }) {
+    const { generation_id, image_keys, avatar_name, image_urls } = body
+
+    if (!generation_id || !image_keys || !Array.isArray(image_keys) || image_keys.length === 0 || !avatar_name) {
+      throw new ApiError('generation_id, image_keys array, and avatar_name are required', ErrorCode.MISSING_REQUIRED_FIELD, 400)
+    }
+
+    const avatar = await AvatarService.completeAIAvatarGeneration(
+      userId,
+      generation_id,
+      image_keys,
+      avatar_name,
+      image_urls
+    )
+
+    return {
+      message: 'AI avatar created successfully',
+      avatar,
+    }
+  }
+
+  /**
+   * Get avatar details including looks
+   */
+  static async getDetails(userId: string, avatarId: string) {
+    const details = await AvatarService.fetchPhotoAvatarDetails(avatarId, userId)
+    return details
+  }
+
+  /**
+   * Set default look
+   */
+  static async setDefaultLook(userId: string, avatarId: string, lookId: string) {
+    if (!lookId) {
+      throw new ApiError('look_id is required', ErrorCode.MISSING_REQUIRED_FIELD, 400)
+    }
+
+    const { supabase } = await import('../lib/supabase.js')
+    const { data: avatar, error: avatarError } = await supabase
+      .from('avatars')
+      .select('id, user_id')
+      .eq('id', avatarId)
+      .eq('user_id', userId)
+      .single()
+
+    if (avatarError || !avatar) {
+      throw new ApiError('Avatar not found', ErrorCode.NOT_FOUND, 404)
+    }
+
+    const { error: updateError } = await supabase
+      .from('avatars')
+      .update({ default_look_id: lookId })
+      .eq('id', avatarId)
+      .eq('user_id', userId)
+
+    if (updateError) {
+      throw new ApiError(updateError.message || 'Failed to set default look', ErrorCode.INTERNAL_SERVER_ERROR, 500)
+    }
+
+    return {
+      message: 'Default look updated successfully',
+      default_look_id: lookId,
+    }
+  }
+
+  /**
+   * Delete a look
+   */
+  static async deleteLook(userId: string, avatarId: string, lookId: string) {
+    const { supabase } = await import('../lib/supabase.js')
+    const { data: avatar, error: avatarError } = await supabase
+      .from('avatars')
+      .select('id, user_id, default_look_id')
+      .eq('id', avatarId)
+      .eq('user_id', userId)
+      .single()
+
+    if (avatarError || !avatar) {
+      throw new ApiError('Avatar not found', ErrorCode.NOT_FOUND, 404)
+    }
+
+    if (avatar.default_look_id === lookId) {
+      throw new ApiError('Cannot delete the selected look. Please select a different look first.', ErrorCode.VALIDATION_ERROR, 400)
+    }
+
+    const { deletePhotoAvatar } = await import('../lib/heygen.js')
+    await deletePhotoAvatar(lookId)
+  }
+
+  /**
+   * Train an avatar
+   */
+  static async trainAvatar(userId: string, avatarId: string) {
+    const { supabase } = await import('../lib/supabase.js')
+
+    const { data: avatar, error: avatarError } = await supabase
+      .from('avatars')
+      .select('*')
+      .eq('id', avatarId)
+      .eq('user_id', userId)
+      .single()
+
+    if (avatarError || !avatar) {
+      throw new ApiError('Avatar not found', ErrorCode.NOT_FOUND, 404)
+    }
+
+    const groupId = avatar.heygen_avatar_id
+    const { checkTrainingStatus } = await import('../lib/heygen.js')
+    const currentStatus = await checkTrainingStatus(groupId)
+
+    if (currentStatus.status === 'ready') {
+      try {
+        const { getPhotoAvatarDetails } = await import('../lib/heygen.js')
+        const avatarDetails = await getPhotoAvatarDetails(groupId)
+        
+        const updatePayload: any = { status: 'active' }
+        if (avatarDetails.image_url) {
+          updatePayload.avatar_url = avatarDetails.image_url
+          updatePayload.preview_url = avatarDetails.preview_url || avatarDetails.image_url
+          updatePayload.thumbnail_url = avatarDetails.thumbnail_url || avatarDetails.preview_url || avatarDetails.image_url
+        }
+        
+        await supabase
+          .from('avatars')
+          .update(updatePayload)
+          .eq('id', avatarId)
+
+        return {
+          message: 'Avatar is already trained and ready to use',
+          status: 'ready'
+        }
+      } catch (detailsError: any) {
+        await supabase
+          .from('avatars')
+          .update({ status: 'active' })
+          .eq('id', avatarId)
+        return {
+          message: 'Avatar is already trained and ready to use',
+          status: 'ready'
+        }
+      }
+    }
+
+    if (currentStatus.status === 'training' || currentStatus.status === 'pending') {
+      return {
+        message: `Avatar is currently ${currentStatus.status}. Please wait for training to complete.`,
+        status: currentStatus.status
+      }
+    }
+
+    // Get looks for training
+    const axios = (await import('axios')).default
+    const apiKey = process.env.HEYGEN_KEY
+
+    if (!apiKey) {
+      throw new ApiError('HeyGen API key not configured', ErrorCode.INTERNAL_SERVER_ERROR, 500)
+    }
+
+    let looks: any[] = []
+    try {
+      const looksResponse = await axios.get(
+        `${process.env.HEYGEN_V2_API_URL || 'https://api.heygen.com/v2'}/avatar_group/${groupId}/avatars`,
+        {
+          headers: {
+            'X-Api-Key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          timeout: 10000,
+        }
+      )
+
+      const avatarList =
+        looksResponse.data?.data?.avatar_list ||
+        looksResponse.data?.avatar_list ||
+        looksResponse.data?.data ||
+        []
+
+      if (Array.isArray(avatarList)) {
+        looks = avatarList.map((look: any) => ({
+          id: look.id,
+          name: look.name,
+          status: look.status,
+        }))
+      }
+    } catch (detailsError: any) {
+      console.warn('[Train Avatar] Could not get avatar looks:', detailsError.message)
+    }
+
+    if (looks.length === 0) {
+      throw new ApiError('No photos found for this avatar. Please add photos before training.', ErrorCode.VALIDATION_ERROR, 400)
+    }
+
+    let lookIds: string[]
+    if (avatar.default_look_id) {
+      lookIds = [avatar.default_look_id]
+    } else {
+      lookIds = looks
+        .filter((look: any) => look.status === 'uploaded' || look.status === 'ready' || !look.status)
+        .map((look: any) => look.id)
+    }
+
+    if (lookIds.length === 0) {
+      throw new ApiError('No photos are ready for training. Please wait for photo upload to complete or select a look first.', ErrorCode.VALIDATION_ERROR, 400)
+    }
+
+    const HEYGEN_V2_API_URL = process.env.HEYGEN_V2_API_URL || 'https://api.heygen.com/v2'
+
+    const trainResponse = await axios.post(
+      `${HEYGEN_V2_API_URL}/photo_avatar/train`,
+      {
+        group_id: groupId,
+        photo_avatar_ids: lookIds,
+      },
+      {
+        headers: {
+          'X-Api-Key': apiKey,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
+
+    await supabase
+      .from('avatars')
+      .update({ status: 'training' })
+      .eq('id', avatarId)
+
+    return {
+      message: 'Training started successfully. This may take a few minutes.',
+      status: 'training',
+      data: trainResponse.data?.data || trainResponse.data,
+    }
+  }
+
+  /**
+   * Get training status
+   */
+  static async getTrainingStatus(userId: string, groupId: string) {
+    const status = await checkTrainingStatus(groupId)
+    const normalizedStatus = status.status === 'ready' ? 'active' : status.status
+
+    try {
+      const { supabase } = await import('../lib/supabase.js')
+      
+      const updatePayload: any = {
+        status: normalizedStatus,
+        updated_at: new Date().toISOString(),
+      }
+      
+      if (normalizedStatus === 'active') {
+        try {
+          const { getPhotoAvatarDetails } = await import('../lib/heygen.js')
+          const avatarDetails = await getPhotoAvatarDetails(groupId)
+          if (avatarDetails.image_url) {
+            updatePayload.avatar_url = avatarDetails.image_url
+            updatePayload.preview_url = avatarDetails.preview_url || avatarDetails.image_url
+            updatePayload.thumbnail_url = avatarDetails.thumbnail_url || avatarDetails.preview_url || avatarDetails.image_url
+          }
+        } catch (detailsError: any) {
+          console.warn('[Training Status] Could not fetch avatar details:', detailsError.message)
+        }
+      }
+      
+      await supabase
+        .from('avatars')
+        .update(updatePayload)
+        .eq('user_id', userId)
+        .eq('heygen_avatar_id', groupId)
+    } catch (dbError) {
+      console.warn('Failed to persist training status locally:', dbError)
+    }
+
+    return status
+  }
+
+  /**
+   * Batch fetch looks
+   */
+  static async batchFetchLooks(userId: string, avatarIdsParam: string) {
+    if (!avatarIdsParam || typeof avatarIdsParam !== 'string') {
+      throw new ApiError('avatarIds query parameter is required (comma-separated)', ErrorCode.MISSING_REQUIRED_FIELD, 400)
+    }
+
+    const avatarIdList = avatarIdsParam.split(',').map(id => id.trim()).filter(Boolean)
+
+    if (avatarIdList.length === 0) {
+      throw new ApiError('At least one avatar ID is required', ErrorCode.MISSING_REQUIRED_FIELD, 400)
+    }
+
+    if (avatarIdList.length > 20) {
+      throw new ApiError('Maximum 20 avatar IDs allowed per request', ErrorCode.VALIDATION_ERROR, 400)
+    }
+
+    const { supabase } = await import('../lib/supabase.js')
+    const { data: avatars, error: avatarsError } = await supabase
+      .from('avatars')
+      .select('id, heygen_avatar_id')
+      .eq('user_id', userId)
+      .in('id', avatarIdList)
+
+    if (avatarsError) {
+      throw new ApiError(avatarsError.message || 'Failed to fetch avatars', ErrorCode.INTERNAL_SERVER_ERROR, 500)
+    }
+
+    if (!avatars || avatars.length === 0) {
+      throw new ApiError('No avatars found', ErrorCode.NOT_FOUND, 404)
+    }
+
+    const axios = (await import('axios')).default
+    const apiKey = process.env.HEYGEN_KEY
+    const HEYGEN_V2_API_URL = process.env.HEYGEN_V2_API_URL || 'https://api.heygen.com/v2'
+
+    if (!apiKey) {
+      throw new ApiError('HeyGen API key not configured', ErrorCode.INTERNAL_SERVER_ERROR, 500)
+    }
+
+    const looksPromises = avatars.map(async (avatar) => {
+      const cachedLooks = lookCache.get(avatar.id)
+      if (cachedLooks) {
+        return { avatarId: avatar.id, looks: cachedLooks }
+      }
+
+      try {
+        const looksResponse = await axios.get(
+          `${HEYGEN_V2_API_URL}/avatar_group/${avatar.heygen_avatar_id}/avatars`,
+          {
+            headers: {
+              'X-Api-Key': apiKey,
+              'Content-Type': 'application/json',
+            },
+            timeout: 5000,
+          }
+        )
+
+        const avatarList =
+          looksResponse.data?.data?.avatar_list ||
+          looksResponse.data?.avatar_list ||
+          looksResponse.data?.data ||
+          []
+
+        const looks = Array.isArray(avatarList)
+          ? avatarList.map((look: any) => ({
+              id: look.id,
+              name: look.name,
+              status: look.status,
+              image_url: look.image_url,
+              preview_url: look.image_url,
+              thumbnail_url: look.image_url,
+              created_at: look.created_at,
+              updated_at: look.updated_at,
+            }))
+          : []
+
+        lookCache.set(avatar.id, looks)
+
+        return { avatarId: avatar.id, looks }
+      } catch (error: any) {
+        console.warn(`[Batch Looks] Failed to fetch looks for avatar ${avatar.id}:`, error.message)
+        return { avatarId: avatar.id, looks: [], error: error.message }
+      }
+    })
+
+    const results = await Promise.all(looksPromises)
+
+    const looksByAvatar: Record<string, any[]> = {}
+    for (const result of results) {
+      looksByAvatar[result.avatarId] = result.looks
+    }
+
+    return { looks: looksByAvatar }
+  }
+
+  /**
+   * Add looks to avatar group
+   */
+  static async addLooks(userId: string, request: AddLooksRequest) {
+    if (!request.group_id || !request.image_keys || !Array.isArray(request.image_keys) || request.image_keys.length === 0) {
+      throw new ApiError('group_id and image_keys array are required', ErrorCode.MISSING_REQUIRED_FIELD, 400)
+    }
+
+    const result = await addLooksToAvatarGroup(request)
+    await AvatarService.syncAvatarsFromHeyGen(userId)
+
+    return {
+      message: 'Looks added successfully',
+      photo_avatar_list: result.photo_avatar_list,
+    }
+  }
+
+  /**
+   * Generate a look
+   */
+  static async generateLook(userId: string, request: GenerateLookRequest) {
+    const requiredValidation = validateRequired(request, ['group_id', 'prompt', 'orientation', 'pose', 'style'])
+    validateOrThrow(requiredValidation, ErrorCode.MISSING_REQUIRED_FIELD)
+
+    const promptValidation = validateStringLength(request.prompt, 1, 500, 'prompt')
+    validateOrThrow(promptValidation, ErrorCode.VALIDATION_ERROR)
+
+    const orientationValidation = validateEnum(request.orientation, ['vertical', 'horizontal', 'square'], 'orientation')
+    validateOrThrow(orientationValidation, ErrorCode.VALIDATION_ERROR)
+
+    const poseValidation = validateEnum(request.pose, ['half_body', 'full_body', 'close_up'], 'pose')
+    validateOrThrow(poseValidation, ErrorCode.VALIDATION_ERROR)
+
+    const styleValidation = validateEnum(request.style, ['Realistic', 'Cartoon', 'Anime'], 'style')
+    validateOrThrow(styleValidation, ErrorCode.VALIDATION_ERROR)
+
+    const { supabase } = await import('../lib/supabase.js')
+    const { data: avatar } = await supabase
+      .from('avatars')
+      .select('id, default_look_id, heygen_avatar_id')
+      .eq('heygen_avatar_id', request.group_id)
+      .eq('user_id', userId)
+      .single()
+
+    // Check training status
+    const checkTrainingStatusWithTimeout = async (): Promise<any> => {
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`Training status check timed out after ${TRAINING_STATUS_CHECK_TIMEOUT / 1000}s`)), TRAINING_STATUS_CHECK_TIMEOUT)
+      )
+
+      return Promise.race([
+        checkTrainingStatus(request.group_id),
+        timeoutPromise
+      ])
+    }
+
+    let lastError: any = null
+    let trainingStatus: any = null
+
+    for (let attempt = 1; attempt <= TRAINING_STATUS_CHECK_RETRIES; attempt++) {
+      try {
+        trainingStatus = await checkTrainingStatusWithTimeout()
+        lastError = null
+        break
+      } catch (error: any) {
+        lastError = error
+        if (attempt < TRAINING_STATUS_CHECK_RETRIES) {
+          const backoffDelay = Math.min(1000 * Math.pow(2, attempt - 1), 5000)
+          await new Promise(resolve => setTimeout(resolve, backoffDelay))
+        }
+      }
+    }
+
+    if (lastError) {
+      throw new ApiError(
+        `Failed to verify training status: ${lastError.message}. Please try again later.`,
+        ErrorCode.INTERNAL_SERVER_ERROR,
+        500
+      )
+    }
+
+    if (trainingStatus && trainingStatus.status !== 'ready') {
+      if (trainingStatus.status === 'empty') {
+        throw new ApiError(
+          'Avatar group is not trained yet. Please wait for training to complete before generating looks.',
+          ErrorCode.VALIDATION_ERROR,
+          400
+        )
+      } else if (trainingStatus.status === 'failed') {
+        throw new ApiError(
+          `Avatar training failed: ${trainingStatus.error_msg || 'Unknown error'}. Cannot generate looks.`,
+          ErrorCode.VALIDATION_ERROR,
+          400
+        )
+      } else if (trainingStatus.status === 'training' || trainingStatus.status === 'pending') {
+        throw new ApiError(
+          `Avatar is still training (status: ${trainingStatus.status}). Please wait for training to complete before generating looks.`,
+          ErrorCode.VALIDATION_ERROR,
+          400
+        )
+      }
+    }
+
+    const result = await generateAvatarLook(request)
+
+    if (result.generation_id) {
+      const lookName = request.prompt || `Look ${new Date().toISOString().split('T')[0]}`
+      const avatarId = avatar?.id
+      pollLookGenerationStatus(result.generation_id, request.group_id, lookName, userId, avatarId).catch(err => {
+        console.error('[Generate Look] Background polling failed:', err.message)
+      })
+
+      const job = jobManager.getJobByGenerationId(result.generation_id, 'look_generation')
+      return {
+        message: 'Look generation started',
+        generation_id: result.generation_id,
+        job_id: job?.id,
+      }
+    }
+
+    return {
+      message: 'Look generation started',
+      generation_id: result.generation_id,
+    }
+  }
+
+  /**
+   * Upload look image
+   */
+  static async uploadLookImage(body: { photo_data: string }) {
+    const { photo_data } = body
+
+    if (!photo_data) {
+      throw new ApiError('photo_data is required', ErrorCode.MISSING_REQUIRED_FIELD, 400)
+    }
+
+    const imageKey = await uploadImageToHeyGen(photo_data)
+
+    return {
+      image_key: imageKey,
+    }
+  }
+
+  /**
+   * Get jobs
+   */
+  static async getJobs(userId: string, type?: string) {
+    const jobs = jobManager.getUserJobs(userId, type as any)
+    return { jobs }
+  }
+
+  /**
+   * Get a specific job
+   */
+  static async getJob(userId: string, jobId: string) {
+    const job = jobManager.getJob(jobId)
+
+    if (!job) {
+      throw new ApiError('Job not found', ErrorCode.NOT_FOUND, 404)
+    }
+
+    if (job.userId && job.userId !== userId) {
+      throw new ApiError('Access denied', ErrorCode.FORBIDDEN, 403)
+    }
+
+    return job
+  }
+
+  /**
+   * Cancel a job
+   */
+  static async cancelJob(userId: string, jobId: string) {
+    const job = jobManager.getJob(jobId)
+
+    if (!job) {
+      throw new ApiError('Job not found', ErrorCode.NOT_FOUND, 404)
+    }
+
+    if (job.userId && job.userId !== userId) {
+      throw new ApiError('Access denied', ErrorCode.FORBIDDEN, 403)
+    }
+
+    const cancelled = jobManager.cancelJob(jobId)
+
+    if (!cancelled) {
+      throw new ApiError('Job cannot be cancelled (already completed, failed, or cancelled)', ErrorCode.VALIDATION_ERROR, 400)
+    }
+
+    return {
+      message: 'Job cancelled successfully',
+      job: jobManager.getJob(jobId),
+    }
+  }
+}
+

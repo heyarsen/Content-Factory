@@ -4,9 +4,9 @@ import { Button } from '../components/ui/Button'
 import { useToast } from '../hooks/useToast'
 import api from '../lib/api'
 import { handleError, formatSpecificError } from '../lib/errorHandler'
-import { Upload, Sparkles, User, Plus } from 'lucide-react'
+import { Upload, Sparkles, User, Plus, Grid3x3, List } from 'lucide-react'
 
-// Import extracted components
+// Import reimagined components
 import { AvatarSelector } from '../components/avatars/AvatarSelector'
 import { LooksGrid } from '../components/avatars/LooksGrid'
 import { AvatarCreateModal } from '../components/avatars/AvatarCreateModal'
@@ -49,10 +49,14 @@ interface PhotoAvatarLook {
 }
 
 type AiGenerationStage = 'idle' | 'creating' | 'photosReady' | 'completing' | 'completed'
+type ViewMode = 'grid' | 'list'
 
 export default function Avatars() {
   const { toast } = useToast()
   const avatarsLengthRef = useRef(0)
+  
+  // View state
+  const [viewMode, setViewMode] = useState<ViewMode>('grid')
   
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -85,29 +89,10 @@ export default function Avatars() {
     selectedAvatarId: selectedAvatarFilter,
   })
 
-  // Debug logging
-  useEffect(() => {
-    if (avatars.length > 0) {
-      console.log('[Avatars] Loaded avatars:', avatars.length, avatars.map(a => ({ 
-        id: a.id, 
-        name: a.avatar_name, 
-        hasImage: !!(a.thumbnail_url || a.preview_url || a.avatar_url) 
-      })))
-    }
-    if (allLooks.length > 0) {
-      console.log('[Avatars] Loaded looks:', allLooks.length, allLooks.map(({ look, avatar }) => ({
-        lookId: look.id,
-        lookName: look.name,
-        avatarName: avatar.avatar_name,
-        hasImage: !!(look.image_url || look.preview_url || look.thumbnail_url)
-      })))
-    }
-  }, [avatars.length, allLooks.length])
-
   const { refreshTrainingStatus } = useAvatarPolling({
     avatars: avatars as any,
     onStatusUpdate: (_avatar, _status) => {
-      // Status updates handled by polling - will reload when training completes
+      // Status updates handled by polling
     },
     onTrainingComplete: (avatar) => {
       if (trainingAvatar && trainingAvatar.id === avatar.id) {
@@ -142,17 +127,17 @@ export default function Avatars() {
       if (avatar.status !== 'active' || !avatar.heygen_avatar_id) continue
 
       try {
-          const detailsResponse = await api.get(`/api/avatars/${avatar.id}/details`)
-          const looks = detailsResponse.data?.looks || []
-          const defaultLookId = detailsResponse.data?.default_look_id
+        const detailsResponse = await api.get(`/api/avatars/${avatar.id}/details`)
+        const looks = detailsResponse.data?.looks || []
+        const defaultLookId = detailsResponse.data?.default_look_id
 
-          if (looks.length > 0 && !defaultLookId) {
-            setLookSelectionModal({ avatar, looks })
+        if (looks.length > 0 && !defaultLookId) {
+          setLookSelectionModal({ avatar, looks })
           return
-          }
+        }
       } catch (error) {
         // Silently continue
-        }
+      }
     }
   }, [lookSelectionModal])
 
@@ -184,17 +169,17 @@ export default function Avatars() {
         const additionalPhotos = await Promise.all(
           data.photoFiles.slice(1).map(file =>
             new Promise<string>((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          resolve(reader.result)
-        } else {
-          reject(new Error('Failed to read file'))
-        }
-      }
-      reader.onerror = () => reject(new Error('Failed to read file'))
-      reader.readAsDataURL(file)
-    })
+              const reader = new FileReader()
+              reader.onloadend = () => {
+                if (typeof reader.result === 'string') {
+                  resolve(reader.result)
+                } else {
+                  reject(new Error('Failed to read file'))
+                }
+              }
+              reader.onerror = () => reject(new Error('Failed to read file'))
+              reader.readAsDataURL(file)
+            })
           )
         )
         formData.append('additional_photos', JSON.stringify(additionalPhotos))
@@ -205,7 +190,7 @@ export default function Avatars() {
       })
 
       toast.success('Avatar created successfully!')
-        setShowCreateModal(false)
+      setShowCreateModal(false)
       await loadAvatars()
       invalidateLooksCache()
 
@@ -260,7 +245,7 @@ export default function Avatars() {
         throw new Error('No generation ID returned')
       }
 
-          setAiGenerationStage('photosReady')
+      setAiGenerationStage('photosReady')
       
       // Poll for completion
       const checkStatus = async () => {
@@ -272,15 +257,15 @@ export default function Avatars() {
             setAiGenerationStage('completing')
             await loadAvatars()
             invalidateLooksCache()
-              setAiGenerationStage('completed')
-              setShowGenerateAIModal(false)
+            setAiGenerationStage('completed')
+            setShowGenerateAIModal(false)
             toast.success('AI avatar generated successfully!')
           } else if (status === 'failed') {
             throw new Error('AI generation failed')
           } else {
             setTimeout(checkStatus, 5000)
           }
-      } catch (error: any) {
+        } catch (error: any) {
           setAiGenerationError(error.message || 'Failed to check generation status')
           handleError(error, { showToast: false, logError: true })
         }
@@ -336,12 +321,11 @@ export default function Avatars() {
           reader.onerror = () => reject(new Error('Failed to read file'))
           reader.readAsDataURL(file)
         })
-        // Upload to storage and get key
         const uploadResponse = await api.post('/api/avatars/upload-look-image', {
           image_data: `data:${file.type};base64,${base64}`,
         })
         if (uploadResponse.data?.image_key) {
-        imageKeys.push(uploadResponse.data.image_key)
+          imageKeys.push(uploadResponse.data.image_key)
         }
       }
 
@@ -412,7 +396,7 @@ export default function Avatars() {
     }
   }, [lookSelectionModal, toast, loadAvatars, invalidateLooksCache])
 
-  // Trigger check after avatars load (debounced to avoid infinite loops)
+  // Trigger check after avatars load
   useEffect(() => {
     if (avatars.length > 0 && avatars.length !== avatarsLengthRef.current) {
       avatarsLengthRef.current = avatars.length
@@ -447,24 +431,21 @@ export default function Avatars() {
     )
   }
 
+  const selectedAvatar = selectedAvatarFilter ? avatars.find(a => a.id === selectedAvatarFilter) : null
+
   return (
     <Layout>
       <div className="space-y-6">
-        {/* Avatar Selector */}
-        <AvatarSelector
-          avatars={avatars}
-          selectedAvatarId={selectedAvatarFilter}
-          onSelect={setSelectedAvatarFilter}
-          onCreateClick={() => setShowCreateModal(true)}
-        />
-
-        {/* Section header */}
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium text-slate-500">
-            {selectedAvatarFilter
-              ? `${avatars.find(a => a.id === selectedAvatarFilter)?.avatar_name}'s looks`
-              : 'All avatar looks'}
-          </h2>
+        {/* Header Section */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Avatars</h1>
+            <p className="text-sm text-slate-500 mt-1">
+              {selectedAvatarFilter
+                ? `Managing looks for "${selectedAvatar?.avatar_name || 'Unknown'}"`
+                : 'Manage your avatars and their looks'}
+            </p>
+          </div>
           <div className="flex items-center gap-2">
             <Button
               onClick={() => setShowGenerateAIModal(true)}
@@ -478,6 +459,49 @@ export default function Avatars() {
               <Plus className="h-4 w-4 mr-2" />
               Upload Photo
             </Button>
+          </div>
+        </div>
+
+        {/* Avatar Selector */}
+        <AvatarSelector
+          avatars={avatars}
+          selectedAvatarId={selectedAvatarFilter}
+          onSelect={setSelectedAvatarFilter}
+          onCreateClick={() => setShowCreateModal(true)}
+        />
+
+        {/* Section header with view controls */}
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium text-slate-500">
+            {selectedAvatarFilter
+              ? `${selectedAvatar?.avatar_name}'s looks`
+              : 'All avatar looks'}
+          </h2>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-1.5 rounded transition-colors ${
+                  viewMode === 'grid'
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+                aria-label="Grid view"
+              >
+                <Grid3x3 className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-1.5 rounded transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+                aria-label="List view"
+              >
+                <List className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -508,6 +532,7 @@ export default function Avatars() {
           <LooksGrid
             looks={allLooks}
             selectedAvatarFilter={selectedAvatarFilter}
+            viewMode={viewMode}
             onCreateClick={() => {
               if (selectedAvatarFilter) {
                 const avatar = avatars.find(a => a.id === selectedAvatarFilter)
@@ -523,15 +548,14 @@ export default function Avatars() {
               }
             }}
             onLookClick={(_look, avatar) => {
-              // Open manage looks modal when clicking on a look
               setShowLooksModal(avatar as any)
             }}
             generatingLookIds={generatingLookIds}
             loading={loadingLooks}
             avatars={avatars}
           />
-                        )}
-                      </div>
+        )}
+      </div>
 
       {/* Modals */}
       <AvatarCreateModal
