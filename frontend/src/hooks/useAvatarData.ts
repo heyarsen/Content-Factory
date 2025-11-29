@@ -102,6 +102,7 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
 
     setAllLooks(looks)
     setLoadingLooks(false)
+    console.log('[useAvatarData] Loaded looks:', looks.length, 'for', avatarsList.length, 'avatars')
   }, [])
 
   const loadLooksForAvatar = useCallback(async (avatarId: string) => {

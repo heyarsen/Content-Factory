@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { User, Star, Sparkles, Plus } from 'lucide-react'
 import { Button } from '../ui/Button'
 
@@ -31,6 +32,67 @@ interface LooksGridProps {
   onLookClick?: (look: PhotoAvatarLook, avatar: Avatar) => void
 }
 
+function LookCard({
+  look,
+  avatar,
+  imageUrl,
+  onClick,
+}: {
+  look: PhotoAvatarLook
+  avatar: Avatar
+  imageUrl: string | null
+  onClick: () => void
+}) {
+  const [imageError, setImageError] = useState(false)
+  const [imageLoaded, setImageLoaded] = useState(false)
+
+  return (
+    <div
+      onClick={onClick}
+      className="group relative aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 hover:shadow-xl transition-all duration-300 cursor-pointer"
+    >
+      <div className="relative w-full h-full">
+        {/* Placeholder - shown when no URL or image failed to load */}
+        {(!imageUrl || imageError) && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-200 to-slate-300">
+            <User className="h-12 w-12 text-slate-400" />
+          </div>
+        )}
+        {/* Image - overlays placeholder if valid and loads successfully */}
+        {imageUrl && !imageError && (
+          <img
+            src={imageUrl}
+            alt={look.name || avatar.avatar_name}
+            className={`relative w-full h-full object-cover transition-all duration-300 group-hover:scale-105 z-10 ${
+              imageLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+            onLoad={() => setImageLoaded(true)}
+            onError={() => {
+              setImageError(true)
+              setImageLoaded(false)
+            }}
+          />
+        )}
+      </div>
+
+      {/* Default look indicator */}
+      {look.is_default && (
+        <div className="absolute top-3 right-3 z-20">
+          <div className="w-8 h-8 rounded-full bg-cyan-500 flex items-center justify-center shadow-lg">
+            <Star className="h-4 w-4 text-white fill-current" />
+          </div>
+        </div>
+      )}
+
+      {/* Look name and avatar name at bottom */}
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-3 pt-8 z-20">
+        <p className="text-white text-sm font-medium truncate">{look.name || 'Look'}</p>
+        <p className="text-white/70 text-xs truncate mt-0.5">{avatar.avatar_name}</p>
+      </div>
+    </div>
+  )
+}
+
 export function LooksGrid({
   looks,
   selectedAvatarFilter,
@@ -55,13 +117,41 @@ export function LooksGrid({
     )
   }
 
-  if (filteredLooks.length === 0 && avatars.length > 0) {
+  if (filteredLooks.length === 0) {
+    if (avatars.length === 0) {
+      return (
+        <div className="col-span-full flex flex-col items-center justify-center py-16">
+          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center mb-4">
+            <User className="h-12 w-12 text-slate-400" />
+          </div>
+          <p className="text-lg font-medium text-slate-700 mb-2">No avatars yet</p>
+          <p className="text-sm text-slate-500 mb-6">Create your first avatar to get started</p>
+          <Button onClick={onCreateClick} size="lg">
+            <Plus className="h-5 w-5 mr-2" />
+            Create Avatar
+          </Button>
+        </div>
+      )
+    }
+    
     return (
-      <div className="col-span-full flex flex-col items-center justify-center py-12">
-        <p className="text-sm text-slate-500 mb-4">No looks yet for this avatar</p>
-        <Button onClick={onCreateClick} size="sm">
-          <Sparkles className="h-4 w-4 mr-2" />
-          Generate Look
+      <div className="col-span-full flex flex-col items-center justify-center py-16">
+        <div className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-100 to-indigo-100 flex items-center justify-center mb-4">
+          <Sparkles className="h-12 w-12 text-purple-400" />
+        </div>
+        <p className="text-lg font-medium text-slate-700 mb-2">
+          {selectedAvatarFilter 
+            ? `No looks yet for this avatar`
+            : 'No looks yet'}
+        </p>
+        <p className="text-sm text-slate-500 mb-6">
+          {selectedAvatarFilter
+            ? 'Generate or upload a look to get started'
+            : 'Select an avatar or create a new one to generate looks'}
+        </p>
+        <Button onClick={onCreateClick} size="lg">
+          <Sparkles className="h-5 w-5 mr-2" />
+          {selectedAvatarFilter ? 'Generate Look' : 'Create Avatar'}
         </Button>
       </div>
     )
@@ -103,54 +193,20 @@ export function LooksGrid({
         })}
 
       {/* Look cards */}
-      {filteredLooks.map(({ look, avatar }) => (
-        <div
-          key={`${avatar.id}-${look.id}`}
-          onClick={() => onLookClick?.(look, avatar)}
-          className="group relative aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 hover:shadow-xl transition-all duration-300 cursor-pointer"
-        >
-          {(() => {
-            const imageUrl = look.image_url || look.preview_url || look.thumbnail_url
-            const hasValidUrl = imageUrl && imageUrl.trim() !== ''
-            return (
-              <div className="relative w-full h-full">
-                {/* Placeholder - always rendered as fallback */}
-                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-200 to-slate-300">
-                  <User className="h-12 w-12 text-slate-400" />
-                </div>
-                {/* Image - overlays placeholder if valid and loads successfully */}
-                {hasValidUrl && (
-                  <img
-                    src={imageUrl}
-                    alt={look.name || avatar.avatar_name}
-                    className="relative w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 z-10"
-                    onError={(e) => {
-                      // Hide image on error to show placeholder
-                      const target = e.target as HTMLImageElement
-                      target.style.display = 'none'
-                    }}
-                  />
-                )}
-              </div>
-            )
-          })()}
-
-          {/* Default look indicator */}
-          {look.is_default && (
-            <div className="absolute top-3 right-3">
-              <div className="w-8 h-8 rounded-full bg-cyan-500 flex items-center justify-center shadow-lg">
-                <Star className="h-4 w-4 text-white fill-current" />
-              </div>
-            </div>
-          )}
-
-          {/* Look name and avatar name at bottom */}
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-3 pt-8">
-            <p className="text-white text-sm font-medium truncate">{look.name || 'Look'}</p>
-            <p className="text-white/70 text-xs truncate mt-0.5">{avatar.avatar_name}</p>
-          </div>
-        </div>
-      ))}
+      {filteredLooks.map(({ look, avatar }) => {
+        const imageUrl = look.image_url || look.preview_url || look.thumbnail_url
+        const hasValidUrl = imageUrl && imageUrl.trim() !== ''
+        
+        return (
+          <LookCard
+            key={`${avatar.id}-${look.id}`}
+            look={look}
+            avatar={avatar}
+            imageUrl={hasValidUrl ? imageUrl : null}
+            onClick={() => onLookClick?.(look, avatar)}
+          />
+        )
+      })}
     </div>
   )
 }

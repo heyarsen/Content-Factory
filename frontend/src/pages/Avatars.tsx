@@ -85,6 +85,25 @@ export default function Avatars() {
     selectedAvatarId: selectedAvatarFilter,
   })
 
+  // Debug logging
+  useEffect(() => {
+    if (avatars.length > 0) {
+      console.log('[Avatars] Loaded avatars:', avatars.length, avatars.map(a => ({ 
+        id: a.id, 
+        name: a.avatar_name, 
+        hasImage: !!(a.thumbnail_url || a.preview_url || a.avatar_url) 
+      })))
+    }
+    if (allLooks.length > 0) {
+      console.log('[Avatars] Loaded looks:', allLooks.length, allLooks.map(({ look, avatar }) => ({
+        lookId: look.id,
+        lookName: look.name,
+        avatarName: avatar.avatar_name,
+        hasImage: !!(look.image_url || look.preview_url || look.thumbnail_url)
+      })))
+    }
+  }, [avatars.length, allLooks.length])
+
   const { refreshTrainingStatus } = useAvatarPolling({
     avatars: avatars as any,
     onStatusUpdate: (_avatar, _status) => {

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { User } from 'lucide-react'
 
 interface AvatarImageProps {
@@ -26,27 +27,32 @@ export function AvatarImage({
   className = '',
   onError,
 }: AvatarImageProps) {
+  const [imageError, setImageError] = useState(false)
+  const [imageLoaded, setImageLoaded] = useState(false)
+  
   const imageUrl = avatar.thumbnail_url || avatar.preview_url || avatar.avatar_url
-  const hasValidUrl = imageUrl && imageUrl.trim() !== ''
+  const hasValidUrl = imageUrl && imageUrl.trim() !== '' && !imageError
 
   return (
     <div className={`relative ${sizeClasses[size]} ${className}`}>
-      {/* Placeholder - always rendered as fallback */}
-      {showPlaceholder && (
+      {/* Placeholder - shown when no URL or image failed to load */}
+      {(!hasValidUrl || imageError) && showPlaceholder && (
         <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-300 to-slate-400 rounded-lg">
           <User className={`${size === 'sm' ? 'h-4 w-4' : size === 'md' ? 'h-6 w-6' : 'h-8 w-8'} text-white`} />
         </div>
       )}
       {/* Image - overlays placeholder if valid and loads successfully */}
-      {hasValidUrl && (
+      {hasValidUrl && !imageError && (
         <img
           src={imageUrl}
           alt={avatar.avatar_name}
-          className="relative w-full h-full object-cover rounded-lg z-10"
+          className={`relative w-full h-full object-cover rounded-lg z-10 ${
+            imageLoaded ? 'opacity-100' : 'opacity-0'
+          } transition-opacity duration-200`}
+          onLoad={() => setImageLoaded(true)}
           onError={(e) => {
-            // Hide image on error to show placeholder
-            const target = e.target as HTMLImageElement
-            target.style.display = 'none'
+            setImageError(true)
+            setImageLoaded(false)
             onError?.()
           }}
         />
