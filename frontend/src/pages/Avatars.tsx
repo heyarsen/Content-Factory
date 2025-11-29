@@ -84,8 +84,8 @@ export default function Avatars() {
   })
 
   const { refreshTrainingStatus } = useAvatarPolling({
-    avatars,
-    onStatusUpdate: (avatar, status) => {
+    avatars: avatars as any,
+    onStatusUpdate: (_avatar, _status) => {
       // Status updates handled by polling hook
     },
     onTrainingComplete: (avatar) => {
@@ -494,7 +494,7 @@ export default function Avatars() {
                 if (selectedAvatarFilter) {
                   const avatar = avatars.find(a => a.id === selectedAvatarFilter)
                   if (avatar) {
-                    setSelectedAvatarForLook(avatar)
+                    setSelectedAvatarForLook(avatar as any)
                     setGenerateLookStep('generate')
                     setShowGenerateLookModal(true)
                   }
@@ -543,10 +543,10 @@ export default function Avatars() {
         avatars={avatars}
         step={generateLookStep}
         onSelectAvatar={(avatar) => {
-                      setSelectedAvatarForLook(avatar)
-                      setGenerateLookStep('generate')
-                    }}
-        onGenerate={handleGenerateLook}
+          setSelectedAvatarForLook(avatar as any)
+          setGenerateLookStep('generate')
+        }}
+        onGenerate={handleGenerateLook as any}
         generating={generating}
       />
 

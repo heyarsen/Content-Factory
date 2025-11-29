@@ -29,7 +29,6 @@ interface LookSelectionModalProps {
 export function LookSelectionModal({
   isOpen,
   onClose,
-  avatar,
   looks,
   onConfirm,
   allowSkip = false,

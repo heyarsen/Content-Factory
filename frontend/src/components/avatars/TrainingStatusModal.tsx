@@ -1,4 +1,4 @@
-import { User, Loader2, CheckCircle2, X } from 'lucide-react'
+import { Loader2, CheckCircle2, X } from 'lucide-react'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { AvatarImage } from './AvatarImage'
@@ -25,7 +25,7 @@ export function TrainingStatusModal({
   onClose,
   avatar,
   status,
-  onRefresh,
+      onRefresh,
 }: TrainingStatusModalProps) {
   const canClose = status === 'ready' || status === 'failed'
 

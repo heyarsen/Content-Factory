@@ -1,6 +1,5 @@
 import { User, Star, Sparkles, Plus } from 'lucide-react'
 import { Button } from '../ui/Button'
-import { AvatarImage } from './AvatarImage'
 
 interface Avatar {
   id: string

@@ -3,7 +3,7 @@ import { X } from 'lucide-react'
 
 interface ModalProps {
   isOpen: boolean
-  onClose: () => void
+  onClose?: () => void
   title: string
   children: ReactNode
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full'
@@ -12,6 +12,7 @@ interface ModalProps {
 }
 
 export function Modal({ isOpen, onClose, title, children, size = 'md', closeOnOverlayClick = true, showCloseButton = true }: ModalProps) {
+  const handleClose = onClose || (() => {})
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden'
@@ -36,7 +37,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', closeOnOv
   return (
     <div
       className="fixed inset-0 z-[9999]"
-      onClick={closeOnOverlayClick ? onClose : undefined}
+      onClick={closeOnOverlayClick ? handleClose : undefined}
       style={{ 
         position: 'fixed', 
         top: 0, 
@@ -64,8 +65,8 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', closeOnOv
         <div className={`flex items-center border-b border-slate-200 px-6 sm:px-8 py-4 bg-white flex-shrink-0 ${showCloseButton ? 'justify-between' : 'justify-center'}`}>
           <h3 className="text-lg font-semibold text-slate-900 truncate pr-2">{title}</h3>
           {showCloseButton && (
-            <button 
-              onClick={onClose} 
+      <button
+        onClick={handleClose}
               className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-200 flex-shrink-0"
               aria-label="Close modal"
             >

@@ -134,10 +134,10 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
     if (lazyLoadLooks) {
       // Only load looks when avatar is selected
       if (selectedAvatarId) {
-        loadLooksForAvatar(selectedAvatarId).then(looks => {
+        loadLooksForAvatar(selectedAvatarId).then((looks: PhotoAvatarLook[]) => {
           const avatar = avatars.find(a => a.id === selectedAvatarId)
           if (avatar) {
-            setAllLooks(looks.map(look => ({ look, avatar })))
+            setAllLooks(looks.map((look: PhotoAvatarLook) => ({ look, avatar })))
           }
         })
       } else {
