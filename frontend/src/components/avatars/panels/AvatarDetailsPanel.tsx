@@ -1,4 +1,4 @@
-import { Sparkles, Image } from 'lucide-react'
+import { Sparkles, Image, Play } from 'lucide-react'
 import { AvatarImage } from '../AvatarImage'
 import { Button } from '../../ui/Button'
 import { Avatar } from '../../../types/avatar'
@@ -8,6 +8,8 @@ interface AvatarDetailsPanelProps {
   lookCount?: number
   onGenerateLook?: () => void
   onManageLooks?: () => void
+  onTrainAvatar?: () => void
+  training?: boolean
 }
 
 export function AvatarDetailsPanel({
@@ -15,6 +17,8 @@ export function AvatarDetailsPanel({
   lookCount = 0,
   onGenerateLook,
   onManageLooks,
+  onTrainAvatar,
+  training = false,
 }: AvatarDetailsPanelProps) {
   return (
     <div className="space-y-6">
@@ -45,7 +49,18 @@ export function AvatarDetailsPanel({
 
       {/* Quick Actions */}
       <div className="space-y-2">
-        {onGenerateLook && (
+        {avatar.status === 'pending' && onTrainAvatar && (
+          <Button
+            onClick={onTrainAvatar}
+            loading={training}
+            disabled={training}
+            className="w-full"
+          >
+            <Play className="h-4 w-4 mr-2" />
+            {training ? 'Starting Training...' : 'Start Training'}
+          </Button>
+        )}
+        {avatar.status === 'active' && onGenerateLook && (
           <Button
             onClick={onGenerateLook}
             variant="secondary"
@@ -55,7 +70,7 @@ export function AvatarDetailsPanel({
             Generate Look
           </Button>
         )}
-        {onManageLooks && (
+        {onManageLooks && avatar.status === 'active' && (
           <Button
             onClick={onManageLooks}
             variant="secondary"
