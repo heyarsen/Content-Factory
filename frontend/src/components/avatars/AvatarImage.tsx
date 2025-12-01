@@ -38,16 +38,16 @@ export function AvatarImage({
   const containerClasses = hasDimensions
     ? `relative ${className}`
     : `relative ${sizeClasses[size]} ${className}`
-    
+
   return (
     <div className={containerClasses}>
       {/* Placeholder - shown when no URL or image failed to load */}
       {(!hasValidUrl || imageError) && showPlaceholder && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-300 to-slate-400 rounded-lg">
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-300 to-slate-400 rounded-lg z-0">
           <User className={`${size === 'sm' ? 'h-4 w-4' : size === 'md' ? 'h-6 w-6' : 'h-8 w-8'} text-white`} />
         </div>
       )}
-      {/* Image - overlays placeholder if valid and loads successfully */}
+      {/* Image - shown when valid URL exists */}
       {hasValidUrl && !imageError && (
         <img
           src={imageUrl}
