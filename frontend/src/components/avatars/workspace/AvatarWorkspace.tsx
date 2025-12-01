@@ -27,6 +27,8 @@ interface AvatarWorkspaceProps {
   onQuickGenerate?: (prompt: string) => void
   onGenerateAIClick?: () => void
   onAvatarClick?: (avatar: Avatar) => void
+  onTrainAvatar?: (avatar: Avatar) => void
+  trainingAvatarId?: string | null
   generating?: boolean
   generatingLookIds?: Set<string>
 }
@@ -45,6 +47,8 @@ export function AvatarWorkspace({
   onQuickGenerate,
   onGenerateAIClick,
   onAvatarClick,
+  onTrainAvatar,
+  trainingAvatarId,
   generating,
   generatingLookIds = new Set(),
 }: AvatarWorkspaceProps) {
@@ -82,6 +86,8 @@ export function AvatarWorkspace({
             avatar={detailAvatar}
             lookCount={lookCount}
             onGenerateLook={() => panel.openGenerateLook(detailAvatar)}
+            onTrainAvatar={onTrainAvatar ? () => onTrainAvatar(detailAvatar) : undefined}
+            training={trainingAvatarId === detailAvatar.id}
           />
         )
       case 'look-details':

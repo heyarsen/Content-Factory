@@ -53,23 +53,35 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
           console.log(`[useAvatarData] Filtered out avatar ${avatar.avatar_name}: status=${avatar.status}`)
           return false
         }
-        // Exclude synced avatars
+        
+        // Explicitly exclude synced avatars
         if (avatar.source === 'synced') {
           console.log(`[useAvatarData] Filtered out avatar ${avatar.avatar_name}: synced avatar`)
           return false
         }
-        // Show all user-created avatars regardless of status (active, training, pending, generating)
-        // User-created avatars have source: 'user_photo' or 'ai_generated'
-        // OR they have Supabase storage URLs (user uploaded to our storage)
-        // OR they're in a training/generating/pending state (definitely user-created)
-        const isUserCreated = 
-          avatar.source === 'user_photo' || 
-          avatar.source === 'ai_generated' ||
-          (avatar.avatar_url && avatar.avatar_url.includes('supabase.co/storage')) ||
-          ['training', 'pending', 'generating'].includes(avatar.status)
         
-        if (!isUserCreated) {
-          console.log(`[useAvatarData] Filtered out avatar ${avatar.avatar_name}: not user-created (source: ${avatar.source}, status: ${avatar.status})`)
+        // Show all avatars that are NOT synced (include null/undefined source as user-created)
+        // If source is null/undefined, assume it's user-created (not synced)
+        // Only exclude if explicitly marked as 'synced'
+        
+        // Also show if explicitly user-created:
+        const isExplicitlyUserCreated = 
+          avatar.source === 'user_photo' || 
+          avatar.source === 'ai_generated'
+        
+        // Or has Supabase storage URL (definitely user-uploaded)
+        const hasSupabaseUrl = avatar.avatar_url && avatar.avatar_url.includes('supabase.co/storage')
+        
+        // Or is in a user-created state (generating, pending, training)
+        const isInUserCreatedState = ['training', 'pending', 'generating'].includes(avatar.status)
+        
+        // If source is null/undefined and not synced, show it (likely user-created)
+        const isLikelyUserCreated = !avatar.source || avatar.source === null
+        
+        const shouldShow = isExplicitlyUserCreated || hasSupabaseUrl || isInUserCreatedState || isLikelyUserCreated
+        
+        if (!shouldShow) {
+          console.log(`[useAvatarData] Filtered out avatar ${avatar.avatar_name}: not user-created (source: ${avatar.source}, status: ${avatar.status}, url: ${avatar.avatar_url?.substring(0, 50)})`)
           return false
         }
         
@@ -80,6 +92,7 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
           return false
         }
         
+        console.log(`[useAvatarData] Showing avatar ${avatar.avatar_name} (source: ${avatar.source}, status: ${avatar.status})`)
         return true
       })
       

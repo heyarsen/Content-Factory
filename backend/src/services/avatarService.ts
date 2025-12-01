@@ -801,16 +801,17 @@ export class AvatarService {
     if (error) throw error
 
     // Explicitly filter to only show user-created avatars (not synced)
+    // Be more lenient - if source is null/undefined, assume it's user-created (not synced)
     return (data || []).filter(avatar => {
       // Exclude deleted/inactive
       if (avatar.status === 'deleted' || avatar.status === 'inactive') {
         return false
       }
-      // Exclude synced avatars
+      // Explicitly exclude synced avatars
       if (avatar.source === 'synced') {
         return false
       }
-      // Include user-created avatars (user_photo, ai_generated, or has Supabase storage URL)
+      // Include explicitly user-created avatars
       if (avatar.source === 'user_photo' || avatar.source === 'ai_generated') {
         return true
       }
@@ -818,11 +819,16 @@ export class AvatarService {
       if (avatar.avatar_url && avatar.avatar_url.includes('supabase.co/storage')) {
         return true
       }
-      // Include avatars in training/generating states (definitely user-created)
+      // Include avatars in training/generating/pending states (definitely user-created)
       if (['training', 'pending', 'generating'].includes(avatar.status)) {
         return true
       }
-      // Exclude everything else (likely synced or unknown)
+      // If source is null/undefined, show it (likely user-created, not synced)
+      // This catches newly created avatars that might not have source set yet
+      if (!avatar.source || avatar.source === null) {
+        return true
+      }
+      // Exclude everything else (unknown source that's not null)
       return false
     })
   }

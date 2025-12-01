@@ -240,6 +240,28 @@ function AvatarsContent() {
     panel.openLookDetails(look, avatar)
   }, [panel])
 
+  // Handle train avatar
+  const [trainingAvatarId, setTrainingAvatarId] = useState<string | null>(null)
+  const handleTrainAvatar = useCallback(async (avatar: Avatar) => {
+    try {
+      setTrainingAvatarId(avatar.id)
+      await api.post(`/api/avatars/${avatar.id}/train`)
+      toast.success('Avatar training started! This may take a few minutes.')
+      await loadAvatars()
+      invalidateLooksCache()
+    } catch (error: any) {
+      const errorMessage = formatSpecificError(error)
+      handleError(error, {
+        showToast: true,
+        logError: true,
+        customMessage: errorMessage,
+      })
+      toast.error(errorMessage)
+    } finally {
+      setTrainingAvatarId(null)
+    }
+  }, [toast, loadAvatars, invalidateLooksCache])
+
   if (loading) {
     return (
       <Layout>
@@ -285,6 +307,8 @@ function AvatarsContent() {
             panel.openAvatarDetails(avatar)
             setSelectedAvatarId(avatar.id)
           }}
+          onTrainAvatar={handleTrainAvatar}
+          trainingAvatarId={trainingAvatarId}
           generating={generating}
           generatingLookIds={generatingLookIds}
         />
