@@ -773,8 +773,27 @@ export class AvatarService {
 
     if (error) throw error
 
-    // Explicitly filter out deleted and inactive avatars (safety check)
-    return (data || []).filter(avatar => avatar.status === 'active' && avatar.status !== 'deleted' && avatar.status !== 'inactive')
+    // Explicitly filter to only show user-created avatars (not synced)
+    return (data || []).filter(avatar => {
+      // Exclude deleted/inactive
+      if (avatar.status !== 'active' || avatar.status === 'deleted' || avatar.status === 'inactive') {
+        return false
+      }
+      // Exclude synced avatars
+      if (avatar.source === 'synced') {
+        return false
+      }
+      // Include user-created avatars (user_photo, ai_generated, or has Supabase storage URL)
+      if (avatar.source === 'user_photo' || avatar.source === 'ai_generated') {
+        return true
+      }
+      // Include avatars with Supabase storage URLs (user uploaded)
+      if (avatar.avatar_url && avatar.avatar_url.includes('supabase.co/storage')) {
+        return true
+      }
+      // Exclude everything else (likely synced or unknown)
+      return false
+    })
   }
 
   /**

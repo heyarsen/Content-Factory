@@ -57,6 +57,18 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
           console.log(`[useAvatarData] Filtered out avatar ${avatar.avatar_name}: missing heygen_avatar_id`)
           return false
         }
+        // Only show user-created avatars (exclude synced from HeyGen)
+        // User-created avatars have source: 'user_photo' or 'ai_generated'
+        // OR they have Supabase storage URLs (user uploaded to our storage)
+        const isUserCreated = 
+          avatar.source === 'user_photo' || 
+          avatar.source === 'ai_generated' ||
+          (avatar.avatar_url && avatar.avatar_url.includes('supabase.co/storage'))
+        
+        if (!isUserCreated) {
+          console.log(`[useAvatarData] Filtered out avatar ${avatar.avatar_name}: not user-created (source: ${avatar.source})`)
+          return false
+        }
         return true
       })
       
