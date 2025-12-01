@@ -1,4 +1,5 @@
 import { Request } from 'express'
+import axios from 'axios'
 import { AvatarService } from '../services/avatarService.js'
 import {
   generateAIAvatar,
@@ -758,6 +759,10 @@ export class AvatarController {
     const lookIds = readyLookIds
 
     const HEYGEN_V2_API_URL = process.env.HEYGEN_V2_API_URL || 'https://api.heygen.com/v2'
+    const apiKey = process.env.HEYGEN_KEY
+    if (!apiKey) {
+      throw new ApiError('HeyGen API key not configured', ErrorCode.INTERNAL_SERVER_ERROR, 500)
+    }
 
     let trainResponse: any
     try {
