@@ -9,13 +9,6 @@ interface MainContentAreaProps {
   allLooks: Array<{ look: PhotoAvatarLook; avatar: Avatar }>
   loadingLooks: boolean
   selectedAvatarId: string | null
-}
-
-interface MainContentAreaProps {
-  avatars: Avatar[]
-  allLooks: Array<{ look: PhotoAvatarLook; avatar: Avatar }>
-  loadingLooks: boolean
-  selectedAvatarId: string | null
   onLookClick?: (look: PhotoAvatarLook, avatar: Avatar) => void
   onCreateClick?: () => void
   generatingLookIds?: Set<string>
@@ -99,7 +92,6 @@ export function MainContentArea({
           avatars={avatars}
           selectedAvatarId={selectedAvatarId}
           viewMode={viewMode}
-          onViewModeChange={setViewMode}
           onCreateClick={onCreateClick || (() => {})}
           onLookClick={onLookClick}
           generatingLookIds={generatingLookIds}
