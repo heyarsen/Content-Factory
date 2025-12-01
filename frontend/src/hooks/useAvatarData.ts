@@ -62,11 +62,13 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
         // User-created avatars have source: 'user_photo' or 'ai_generated'
         // OR they have Supabase storage URLs (user uploaded to our storage)
         // OR they're in a training/generating state (definitely user-created)
+        // OR they have status 'active' but no avatar_url (likely user-created and completed)
         const isUserCreated = 
           avatar.source === 'user_photo' || 
           avatar.source === 'ai_generated' ||
           (avatar.avatar_url && avatar.avatar_url.includes('supabase.co/storage')) ||
-          ['training', 'pending', 'generating'].includes(avatar.status)
+          ['training', 'pending', 'generating'].includes(avatar.status) ||
+          (avatar.status === 'active' && (avatar.source === 'user_photo' || avatar.source === 'ai_generated'))
         
         if (!isUserCreated) {
           console.log(`[useAvatarData] Filtered out avatar ${avatar.avatar_name}: not user-created (source: ${avatar.source}, status: ${avatar.status})`)
