@@ -304,8 +304,9 @@ router.post('/upload-look-image', async (req: AuthRequest, res: Response) => {
  */
 router.get('/generation-status/:generationId', async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.userId!
     const { generationId } = req.params
-    const result = await AvatarController.getGenerationStatus(generationId)
+    const result = await AvatarController.getGenerationStatus(generationId, userId)
     return res.json(result)
   } catch (error: any) {
     logError(error, { userId: req.userId!, generationId: req.params.generationId, operation: 'get_generation_status' })

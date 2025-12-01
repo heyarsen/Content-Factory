@@ -128,27 +128,70 @@ function AvatarsContent() {
 
       setAiGenerationStage('photosReady')
       
-      // Poll for completion
+      // Poll for completion with timeout and better error handling
+      let attempts = 0
+      const maxAttempts = 120 // 10 minutes (120 * 5 seconds = 600 seconds)
+      
       const checkStatus = async () => {
+        attempts++
+        
         try {
           const statusResponse = await api.get(`/api/avatars/generation-status/${generationId}`)
           const status = statusResponse.data?.status
 
           if (status === 'success') {
             setAiGenerationStage('completing')
+            setCheckingStatus(false)
+            
+            // Wait a bit for backend to complete the avatar creation
+            await new Promise(resolve => setTimeout(resolve, 2000))
+            
             await loadAvatars()
             invalidateLooksCache()
+            
             setAiGenerationStage('completed')
             setShowGenerateAIModal(false)
             toast.success('AI avatar generated successfully!')
+            return
           } else if (status === 'failed') {
-            throw new Error('AI generation failed')
-          } else {
+            setCheckingStatus(false)
+            const errorMsg = statusResponse.data?.msg || 'AI generation failed'
+            setAiGenerationError(errorMsg)
+            handleError(new Error(errorMsg), {
+              showToast: true,
+              logError: true,
+            })
+            return
+          }
+          
+          // Continue polling if still in progress and under max attempts
+          if (attempts < maxAttempts) {
             setTimeout(checkStatus, 5000)
+          } else {
+            setCheckingStatus(false)
+            setAiGenerationError('Generation is taking longer than expected. The avatar will appear once ready. Please refresh the page to check status.')
+            toast.info('Generation is taking longer than expected. Please check back later or refresh the page.')
           }
         } catch (error: any) {
-          setAiGenerationError(error.message || 'Failed to check generation status')
-          handleError(error, { showToast: false, logError: true })
+          // On error, continue polling unless it's a permanent failure
+          console.error('[AI Generation] Status check error:', error)
+          
+          // If it's a 404 or we've tried many times, stop polling
+          if (error.response?.status === 404 || attempts >= 10) {
+            setCheckingStatus(false)
+            setAiGenerationError(error.message || 'Failed to check generation status. The avatar may still be processing.')
+            handleError(error, { showToast: true, logError: true })
+            return
+          }
+          
+          // Temporary error - continue polling (but don't poll forever)
+          if (attempts < maxAttempts) {
+            setTimeout(checkStatus, 5000)
+          } else {
+            setCheckingStatus(false)
+            setAiGenerationError('Failed to check generation status after multiple attempts. Please refresh the page.')
+            handleError(error, { showToast: true, logError: true })
+          }
         }
       }
 

@@ -484,8 +484,40 @@ export class AvatarController {
   /**
    * Get generation status
    */
-  static async getGenerationStatus(generationId: string) {
+  static async getGenerationStatus(generationId: string, userId?: string) {
     const status = await checkGenerationStatus(generationId)
+    
+    // If generation is successful and we have a user ID, try to auto-complete
+    if (status.status === 'success' && userId && status.image_key_list && status.image_key_list.length > 0) {
+      const { supabase } = await import('../lib/supabase.js')
+      
+      // Find the avatar record that matches this generation_id
+      const { data: avatar } = await supabase
+        .from('avatars')
+        .select('id, avatar_name, status, user_id')
+        .eq('user_id', userId)
+        .eq('heygen_avatar_id', generationId)
+        .eq('status', 'generating')
+        .single()
+      
+      // Auto-complete the generation if avatar is still in 'generating' status
+      if (avatar && avatar.status === 'generating') {
+        try {
+          console.log(`[Generation Status] Auto-completing AI avatar generation for ${avatar.avatar_name}`)
+          await this.completeAIGeneration(userId, {
+            generation_id: generationId,
+            image_keys: status.image_key_list,
+            avatar_name: avatar.avatar_name,
+            image_urls: status.image_url_list,
+          })
+          console.log(`[Generation Status] Successfully auto-completed generation for ${avatar.avatar_name}`)
+        } catch (error: any) {
+          console.error(`[Generation Status] Failed to auto-complete generation:`, error.message)
+          // Don't throw - just log the error and return the status
+        }
+      }
+    }
+    
     return status
   }
 

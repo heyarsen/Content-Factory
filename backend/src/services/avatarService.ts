@@ -905,7 +905,7 @@ export class AvatarService {
         .select('*')
         .eq('user_id', userId)
         .eq('heygen_avatar_id', generationId)
-        .single()
+        .maybeSingle()
 
       const existingAvatar = existingAvatarQuery.data as Avatar | null
 
@@ -927,7 +927,7 @@ export class AvatarService {
           avatar_url: resolvedImageUrl,
           preview_url: resolvedImageUrl,
           thumbnail_url: resolvedImageUrl,
-          status: 'active',
+          status: 'pending', // Set to pending - training must be started manually
           updated_at: new Date().toISOString(),
         }
 
@@ -955,7 +955,7 @@ export class AvatarService {
           preview_url: primaryImageUrl,
           thumbnail_url: primaryImageUrl,
           gender: null,
-          status: 'active',
+          status: 'pending', // Set to pending - training must be started manually
           is_default: false,
         }
 
