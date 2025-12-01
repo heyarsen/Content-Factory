@@ -28,6 +28,7 @@ function AvatarsContent() {
     loadingLooks,
     loadAvatars,
     invalidateLooksCache,
+    addAvatar,
     generateLook,
     generating,
     generatingLookIds,
@@ -76,12 +77,18 @@ function AvatarsContent() {
         formData.append('additional_photos', JSON.stringify(additionalPhotos))
       }
 
-      await api.post('/api/avatars/upload-photo', formData, {
+      const response = await api.post('/api/avatars/upload-photo', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
 
+      // Add the avatar immediately to state so it shows up right away
+      if (response.data?.avatar) {
+        addAvatar(response.data.avatar)
+      }
+
       toast.success('Avatar created successfully!')
       panel.closePanel()
+      // Also refresh the list to ensure we have the latest data
       await loadAvatars()
       invalidateLooksCache()
     } catch (error: any) {

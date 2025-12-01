@@ -215,6 +215,18 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
     }
   }, [])
 
+  const addAvatar = useCallback((avatar: Avatar) => {
+    setAvatars((prevAvatars: Avatar[]) => {
+      // Check if avatar already exists
+      if (prevAvatars.find(a => a.id === avatar.id)) {
+        // Update existing avatar
+        return prevAvatars.map(a => a.id === avatar.id ? avatar : a)
+      }
+      // Add new avatar
+      return [...prevAvatars, avatar]
+    })
+  }, [])
+
   return {
     avatars,
     loading,
@@ -223,6 +235,7 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
     loadAvatars,
     loadLooksForAvatar,
     invalidateLooksCache,
+    addAvatar,
   }
 }
 
