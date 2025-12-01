@@ -81,30 +81,13 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
           acc[a.status] = (acc[a.status] || 0) + 1
           return acc
         }, {}),
+        avatars: avatarsList.map(a => ({ id: a.id, name: a.avatar_name, status: a.status, source: a.source }))
       })
       
-      // Merge with existing avatars to preserve pending/training/generating avatars
-      // that might not be in the new response (e.g., due to timing issues)
-      setAvatars((prevAvatars: Avatar[]) => {
-        // On first load (no previous avatars), just use what comes from API
-        if (prevAvatars.length === 0) {
-          return avatarsList
-        }
-        
-        // Start with the new avatars from API (this is the source of truth)
-        const avatarsMap = new Map<string, Avatar>(avatarsList.map((avatar: Avatar) => [avatar.id, avatar]))
-        
-        // Only add back pending/training/generating avatars from previous state
-        // that aren't in the new response (they might still be processing and not yet in DB query)
-        // This preserves avatars that were just created but might not appear in the API response yet
-        prevAvatars.forEach((avatar: Avatar) => {
-          if (['pending', 'training', 'generating'].includes(avatar.status) && !avatarsMap.has(avatar.id)) {
-            avatarsMap.set(avatar.id, avatar)
-          }
-        })
-        
-        return Array.from(avatarsMap.values()) as Avatar[]
-      })
+      // Simply set avatars from API response - this is the source of truth
+      // We'll add merge logic back later if needed for pending avatars
+      setAvatars(avatarsList)
+      console.log('[Avatar Load] Set avatars in state:', avatarsList.length)
     } catch (error: any) {
       // On error, preserve existing avatars (especially pending ones)
       // Only show error if it's not a timeout (timeouts are expected for long operations)
