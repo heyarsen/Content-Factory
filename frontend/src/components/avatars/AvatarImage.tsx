@@ -33,13 +33,14 @@ export function AvatarImage({
   const imageUrl = avatar.thumbnail_url || avatar.preview_url || avatar.avatar_url
   const hasValidUrl = imageUrl && imageUrl.trim() !== '' && !imageError
 
-  // If className includes w-full or h-full, use those instead of size classes
-  const containerClasses = className.includes('w-full') || className.includes('h-full')
-    ? className
-    : `${sizeClasses[size]} ${className}`
+  // Determine container classes - if className includes dimensions, use those
+  const hasDimensions = className.includes('w-') || className.includes('h-') || className.includes('w-full') || className.includes('h-full')
+  const containerClasses = hasDimensions
+    ? `relative ${className}`
+    : `relative ${sizeClasses[size]} ${className}`
     
   return (
-    <div className={`relative ${containerClasses}`}>
+    <div className={containerClasses}>
       {/* Placeholder - shown when no URL or image failed to load */}
       {(!hasValidUrl || imageError) && showPlaceholder && (
         <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-300 to-slate-400 rounded-lg">
