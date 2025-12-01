@@ -44,17 +44,23 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
     try {
       setLoading(true)
       const response = await api.get('/api/avatars')
-      const avatarsList = (response.data?.avatars || []).filter(
-        (avatar: Avatar) => {
-          // Exclude deleted/inactive avatars
-          if (avatar.status === 'inactive' || avatar.status === 'deleted') return false
-          // Only show active avatars
-          if (avatar.status !== 'active') return false
-          // Only show avatars with valid heygen_avatar_id
-          if (!avatar.heygen_avatar_id || avatar.heygen_avatar_id.trim() === '') return false
-          return true
+      const allAvatars = response.data?.avatars || []
+      console.log('[useAvatarData] Received avatars from API:', allAvatars.length)
+      
+      const avatarsList = allAvatars.filter((avatar: Avatar) => {
+        // STRICT filtering - only show active avatars with valid IDs
+        if (avatar.status !== 'active') {
+          console.log(`[useAvatarData] Filtered out avatar ${avatar.avatar_name}: status=${avatar.status}`)
+          return false
         }
-      )
+        if (!avatar.heygen_avatar_id || avatar.heygen_avatar_id.trim() === '') {
+          console.log(`[useAvatarData] Filtered out avatar ${avatar.avatar_name}: missing heygen_avatar_id`)
+          return false
+        }
+        return true
+      })
+      
+      console.log('[useAvatarData] Filtered avatars:', avatarsList.length)
       setAvatars(avatarsList)
     } catch (error: any) {
       const errorMessage = handleError(error, {

@@ -28,42 +28,35 @@ export function AvatarImage({
   onError,
 }: AvatarImageProps) {
   const [imageError, setImageError] = useState(false)
-  const [imageLoaded, setImageLoaded] = useState(false)
   
   const imageUrl = avatar.thumbnail_url || avatar.preview_url || avatar.avatar_url
-  const hasValidUrl = imageUrl && imageUrl.trim() !== '' && !imageError
+  const hasValidUrl = imageUrl && imageUrl.trim() !== ''
 
-  // Determine container classes - if className includes dimensions, use those
-  const hasDimensions = className.includes('w-') || className.includes('h-') || className.includes('w-full') || className.includes('h-full')
-  const containerClasses = hasDimensions
-    ? `relative ${className}`
-    : `relative ${sizeClasses[size]} ${className}`
+  // Use provided className dimensions if available, otherwise use size classes
+  const containerSize = className.includes('w-full') && className.includes('h-full')
+    ? className
+    : className.includes('w-') || className.includes('h-')
+    ? className
+    : sizeClasses[size]
+
+  if (!hasValidUrl || imageError) {
+    if (!showPlaceholder) return null
+    return (
+      <div className={`${containerSize} flex items-center justify-center bg-gradient-to-br from-slate-300 to-slate-400 rounded-lg ${className.includes('rounded') ? '' : 'rounded-lg'}`}>
+        <User className={`${size === 'sm' ? 'h-4 w-4' : size === 'md' ? 'h-6 w-6' : 'h-8 w-8'} text-white`} />
+      </div>
+    )
+  }
 
   return (
-    <div className={containerClasses}>
-      {/* Placeholder - shown when no URL or image failed to load */}
-      {(!hasValidUrl || imageError) && showPlaceholder && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-300 to-slate-400 rounded-lg z-0">
-          <User className={`${size === 'sm' ? 'h-4 w-4' : size === 'md' ? 'h-6 w-6' : 'h-8 w-8'} text-white`} />
-        </div>
-      )}
-      {/* Image - shown when valid URL exists */}
-      {hasValidUrl && !imageError && (
-        <img
-          src={imageUrl}
-          alt={avatar.avatar_name}
-          className={`absolute inset-0 w-full h-full object-cover rounded-lg z-10 ${
-            imageLoaded ? 'opacity-100' : 'opacity-0'
-          } transition-opacity duration-200`}
-          onLoad={() => setImageLoaded(true)}
-          onError={() => {
-            setImageError(true)
-            setImageLoaded(false)
-            onError?.()
-          }}
-        />
-      )}
-    </div>
+    <img
+      src={imageUrl}
+      alt={avatar.avatar_name}
+      className={`${containerSize} object-cover ${className.includes('rounded') ? className : 'rounded-lg'} ${className}`}
+      onError={() => {
+        setImageError(true)
+        onError?.()
+      }}
+    />
   )
 }
-
