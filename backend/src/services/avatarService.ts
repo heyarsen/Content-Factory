@@ -391,35 +391,60 @@ export class AvatarService {
       // Fetch photo avatar details
       const details = await getPhotoAvatarDetails(avatar.heygen_avatar_id)
 
-      // If avatar doesn't exist in HeyGen (status is 'unknown'), mark it as deleted
+      // If avatar doesn't exist in HeyGen (status is 'unknown'), handle based on avatar type
       if (details.status === 'unknown') {
-        console.warn(`[Avatar Details] Avatar ${avatarId} (${avatar.avatar_name}) not found in HeyGen - marking as deleted`)
+        const isUserCreated = this.isUserCreatedAvatar(avatar)
         
-        // Update database to mark avatar as deleted
-        if (avatar.status !== 'deleted') {
-          const { error: updateError } = await supabase
-            .from('avatars')
-            .update({ status: 'deleted' })
-            .eq('id', avatarId)
+        // Only mark synced avatars as deleted if they're not found in HeyGen
+        // User-created avatars might not be immediately available or might be in training
+        if (!isUserCreated && avatar.source === 'synced') {
+          console.warn(`[Avatar Details] Synced avatar ${avatarId} (${avatar.avatar_name}) not found in HeyGen - marking as deleted`)
           
-          if (updateError) {
-            console.error(`[Avatar Details] Failed to mark avatar ${avatarId} as deleted:`, updateError)
-          } else {
-            console.log(`[Avatar Details] Successfully marked avatar ${avatarId} (${avatar.avatar_name}) as deleted`)
+          // Update database to mark avatar as deleted
+          if (avatar.status !== 'deleted') {
+            const { error: updateError } = await supabase
+              .from('avatars')
+              .update({ status: 'deleted' })
+              .eq('id', avatarId)
+            
+            if (updateError) {
+              console.error(`[Avatar Details] Failed to mark avatar ${avatarId} as deleted:`, updateError)
+            } else {
+              console.log(`[Avatar Details] Successfully marked avatar ${avatarId} (${avatar.avatar_name}) as deleted`)
+            }
+          }
+          
+          // Don't throw - return what we have from database
+          return {
+            id: avatar.heygen_avatar_id,
+            group_id: avatar.heygen_avatar_id,
+            status: 'deleted',
+            image_url: avatar.avatar_url ?? undefined,
+            preview_url: avatar.preview_url ?? undefined,
+            thumbnail_url: avatar.thumbnail_url ?? undefined,
+            created_at: avatar.created_at ? new Date(avatar.created_at).getTime() / 1000 : undefined,
+            updated_at: avatar.updated_at ? new Date(avatar.updated_at).getTime() / 1000 : null,
+            looks: [],
           }
         }
         
-        // Don't throw - return what we have from database
-        return {
-          id: avatar.heygen_avatar_id,
-          group_id: avatar.heygen_avatar_id,
-          status: 'deleted',
-          image_url: avatar.avatar_url ?? undefined,
-          preview_url: avatar.preview_url ?? undefined,
-          thumbnail_url: avatar.thumbnail_url ?? undefined,
-          created_at: avatar.created_at ? new Date(avatar.created_at).getTime() / 1000 : undefined,
-          updated_at: avatar.updated_at ? new Date(avatar.updated_at).getTime() / 1000 : null,
-          looks: [],
+        // For user-created avatars that aren't found, keep their current status
+        // They might be in training/pending/generating and not yet available in HeyGen
+        if (isUserCreated) {
+          console.log(`[Avatar Details] User-created avatar ${avatarId} (${avatar.avatar_name}) not yet available in HeyGen (status: ${avatar.status}) - keeping current status`)
+          
+          // Return current avatar details from database instead of marking as deleted
+          return {
+            id: avatar.heygen_avatar_id,
+            group_id: avatar.heygen_avatar_id,
+            status: avatar.status || 'pending',
+            image_url: avatar.avatar_url ?? undefined,
+            preview_url: avatar.preview_url ?? undefined,
+            thumbnail_url: avatar.thumbnail_url ?? undefined,
+            created_at: avatar.created_at ? new Date(avatar.created_at).getTime() / 1000 : undefined,
+            updated_at: avatar.updated_at ? new Date(avatar.updated_at).getTime() / 1000 : null,
+            looks: [],
+          }
         }
       }
 
