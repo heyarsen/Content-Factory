@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { User, Sparkles, Plus, Settings2, Image } from 'lucide-react'
+import { User, Plus, Settings2, Image } from 'lucide-react'
 import { Avatar } from '../../../types/avatar'
 import { AvatarImage } from '../AvatarImage'
 import { Button } from '../../ui/Button'

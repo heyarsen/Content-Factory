@@ -4,7 +4,6 @@ import { AvatarsGallery } from '../gallery/AvatarsGallery'
 import { QuickPromptBar } from '../actions/QuickPromptBar'
 import { Grid3x3, List } from 'lucide-react'
 import { useAvatarWorkspace } from '../../../contexts/AvatarWorkspaceContext'
-import { useContextPanel } from '../../../hooks/avatars/useContextPanel'
 
 interface MainContentAreaProps {
   avatars: Avatar[]
@@ -34,7 +33,6 @@ export function MainContentArea({
   onAvatarClick,
 }: MainContentAreaProps) {
   const { viewMode, setViewMode } = useAvatarWorkspace()
-  const panel = useContextPanel()
   
   const filteredLooks = selectedAvatarId
     ? allLooks.filter(item => item.avatar.id === selectedAvatarId)
