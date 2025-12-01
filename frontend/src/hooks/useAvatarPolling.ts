@@ -137,9 +137,10 @@ export function useAvatarPolling({ avatars, onStatusUpdate, onTrainingComplete }
       30000, // Poll every 30 seconds
       {
         immediate: true, // Start polling immediately
-        onError: (error) => {
+        onError: (error: unknown) => {
           // Don't log timeout errors as they're expected
-          if (shouldShowError(error) && !error.message?.includes('timeout') && !(error as any).code?.includes('ECONNABORTED')) {
+          const err = error as { message?: string; code?: string }
+          if (shouldShowError(error) && !err.message?.includes('timeout') && !err.code?.includes('ECONNABORTED')) {
             console.error('Training status polling error:', error)
           }
         },

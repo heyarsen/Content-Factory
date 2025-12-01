@@ -65,19 +65,19 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
       
       // Merge with existing avatars to preserve pending/training/generating avatars
       // that might not be in the new response (e.g., due to timing issues)
-      setAvatars(prevAvatars => {
+      setAvatars((prevAvatars: Avatar[]) => {
         // Create a map of new avatars by ID (prioritize new data)
-        const avatarsMap = new Map(avatarsList.map(avatar => [avatar.id, avatar]))
+        const avatarsMap = new Map<string, Avatar>(avatarsList.map((avatar: Avatar) => [avatar.id, avatar]))
         
         // Add back any pending/training/generating avatars from previous state
         // that aren't in the new response (they might still be processing)
-        prevAvatars.forEach(avatar => {
+        prevAvatars.forEach((avatar: Avatar) => {
           if (['pending', 'training', 'generating'].includes(avatar.status) && !avatarsMap.has(avatar.id)) {
             avatarsMap.set(avatar.id, avatar)
           }
         })
         
-        return Array.from(avatarsMap.values())
+        return Array.from(avatarsMap.values()) as Avatar[]
       })
     } catch (error: any) {
       // On error, preserve existing avatars (especially pending ones)
