@@ -144,8 +144,11 @@ function AvatarsContent() {
             setCheckingStatus(false)
             
             // Wait a bit for backend to complete the avatar creation
-            await new Promise(resolve => setTimeout(resolve, 2000))
+            await new Promise(resolve => setTimeout(resolve, 3000))
             
+            // Force reload avatars multiple times to ensure it shows up
+            await loadAvatars()
+            await new Promise(resolve => setTimeout(resolve, 1000))
             await loadAvatars()
             invalidateLooksCache()
             
