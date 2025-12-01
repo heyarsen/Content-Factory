@@ -157,13 +157,13 @@ export async function fetchAvatarGroupLooks(groupId: string): Promise<PhotoAvata
   return avatarList.filter((look: any) => look && typeof look === 'object')
 }
 
-interface WaitForLooksReadyOptions {
+export interface WaitForLooksReadyOptions {
   minReadyLooks?: number
   maxWaitTime?: number
   pollInterval?: number
 }
 
-async function waitForLooksReady(
+export async function waitForLooksReady(
   groupId: string,
   lookIds: string[],
   options: WaitForLooksReadyOptions = {}
