@@ -43,7 +43,9 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
   const loadAvatars = useCallback(async () => {
     try {
       setLoading(true)
-      const response = await api.get('/api/avatars')
+      const response = await api.get('/api/avatars', {
+        timeout: 300000, // 5 minutes timeout for avatar loading
+      })
       const allAvatars = response.data?.avatars || []
       
       const avatarsList = allAvatars.filter((avatar: Avatar) => {
@@ -61,13 +63,39 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
         return true
       })
       
-      setAvatars(avatarsList)
-    } catch (error: any) {
-      const errorMessage = handleError(error, {
-        showToast: true,
-        logError: true,
+      // Merge with existing avatars to preserve pending/training/generating avatars
+      // that might not be in the new response (e.g., due to timing issues)
+      setAvatars(prevAvatars => {
+        // Create a map of new avatars by ID (prioritize new data)
+        const avatarsMap = new Map(avatarsList.map(avatar => [avatar.id, avatar]))
+        
+        // Add back any pending/training/generating avatars from previous state
+        // that aren't in the new response (they might still be processing)
+        prevAvatars.forEach(avatar => {
+          if (['pending', 'training', 'generating'].includes(avatar.status) && !avatarsMap.has(avatar.id)) {
+            avatarsMap.set(avatar.id, avatar)
+          }
+        })
+        
+        return Array.from(avatarsMap.values())
       })
-      console.error('Failed to load avatars:', errorMessage)
+    } catch (error: any) {
+      // On error, preserve existing avatars (especially pending ones)
+      // Only show error if it's not a timeout (timeouts are expected for long operations)
+      const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout')
+      
+      if (!isTimeout) {
+        const errorMessage = handleError(error, {
+          showToast: true,
+          logError: true,
+        })
+        console.error('Failed to load avatars:', errorMessage)
+      } else {
+        // For timeouts, silently preserve existing avatars
+        console.warn('Avatar loading timeout - preserving existing avatars')
+      }
+      
+      // Don't clear avatars on error - keep existing ones
     } finally {
       setLoading(false)
     }

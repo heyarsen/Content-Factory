@@ -17,25 +17,42 @@ interface UseAvatarPollingOptions {
 
 export function useAvatarPolling({ avatars, onStatusUpdate, onTrainingComplete }: UseAvatarPollingOptions) {
   const pollingCleanupsRef = useRef<Map<string, () => void>>(new Map())
+  // Store avatars that need polling in a ref to persist across renders
+  const avatarsToPollRef = useRef<Map<string, Avatar>>(new Map())
 
   const handleRefreshTrainingStatus = useCallback(
     async (avatar: Avatar, options: { silent?: boolean } = {}) => {
       if (!avatar) return
       try {
-        const response = await api.get(`/api/avatars/training-status/${avatar.heygen_avatar_id}`)
+        const response = await api.get(`/api/avatars/training-status/${avatar.heygen_avatar_id}`, {
+          timeout: 300000, // 5 minutes timeout for status checks
+        })
         const status = response.data?.status
         const normalizedStatus = status === 'ready' ? 'active' : status || avatar.status
 
+        // Update the stored avatar status
+        if (avatarsToPollRef.current.has(avatar.id)) {
+          const storedAvatar = avatarsToPollRef.current.get(avatar.id)!
+          storedAvatar.status = normalizedStatus
+          avatarsToPollRef.current.set(avatar.id, storedAvatar)
+        }
+
         onStatusUpdate?.(avatar, normalizedStatus)
 
-        if (status === 'ready' && onTrainingComplete) {
-          onTrainingComplete(avatar)
+        // Remove from polling if status changed to active/ready
+        if (normalizedStatus === 'active' || normalizedStatus === 'ready') {
+          avatarsToPollRef.current.delete(avatar.id)
+          if (onTrainingComplete) {
+            onTrainingComplete(avatar)
+          }
         }
 
         if (!options.silent && shouldShowError(null)) {
           // Only show non-critical updates
         }
       } catch (error: any) {
+        // Don't remove from polling on error - keep trying
+        // Only log if it's a significant error
         if (!options.silent && shouldShowError(error)) {
           handleError(error, {
             showToast: true,
@@ -53,9 +70,35 @@ export function useAvatarPolling({ avatars, onStatusUpdate, onTrainingComplete }
     [onStatusUpdate, onTrainingComplete]
   )
 
-  // Training status polling
+  // Update the ref with current avatars that need polling
   useEffect(() => {
     const avatarsNeedingUpdate = avatars.filter(avatar =>
+      ['pending', 'training', 'generating'].includes(avatar.status)
+    )
+
+    // Add new avatars to the polling ref
+    avatarsNeedingUpdate.forEach(avatar => {
+      avatarsToPollRef.current.set(avatar.id, avatar)
+    })
+
+    // Remove avatars that are no longer in pending/training/generating status
+    // but keep them if they're still in the avatars list (in case of temporary load failures)
+    for (const [id, storedAvatar] of avatarsToPollRef.current.entries()) {
+      const currentAvatar = avatars.find(a => a.id === id)
+      if (currentAvatar && !['pending', 'training', 'generating'].includes(currentAvatar.status)) {
+        // Status changed - remove from polling
+        avatarsToPollRef.current.delete(id)
+      } else if (!currentAvatar && !['pending', 'training', 'generating'].includes(storedAvatar.status)) {
+        // Avatar not in current list and status changed - remove from polling
+        avatarsToPollRef.current.delete(id)
+      }
+    }
+  }, [avatars])
+
+  // Training status polling
+  useEffect(() => {
+    // Use the ref to get avatars that need polling (persists across renders)
+    const avatarsNeedingUpdate = Array.from(avatarsToPollRef.current.values()).filter(avatar =>
       ['pending', 'training', 'generating'].includes(avatar.status)
     )
 
@@ -75,10 +118,16 @@ export function useAvatarPolling({ avatars, onStatusUpdate, onTrainingComplete }
     const cleanup = pollingManager.startPolling(
       pollingKey,
       async () => {
+        // Get current avatars from ref (may include avatars not in current avatars array)
+        const currentAvatarsToPoll = Array.from(avatarsToPollRef.current.values()).filter(avatar =>
+          ['pending', 'training', 'generating'].includes(avatar.status)
+        )
+
         await Promise.all(
-          avatarsNeedingUpdate.map(avatar =>
+          currentAvatarsToPoll.map(avatar =>
             handleRefreshTrainingStatus(avatar, { silent: true }).catch(err => {
-              if (shouldShowError(err)) {
+              // Don't log timeout errors as they're expected for long-running operations
+              if (shouldShowError(err) && !err.message?.includes('timeout') && !err.code?.includes('ECONNABORTED')) {
                 console.error('Training status check error:', err)
               }
             })
@@ -87,9 +136,10 @@ export function useAvatarPolling({ avatars, onStatusUpdate, onTrainingComplete }
       },
       30000, // Poll every 30 seconds
       {
-        immediate: false,
+        immediate: true, // Start polling immediately
         onError: (error) => {
-          if (shouldShowError(error)) {
+          // Don't log timeout errors as they're expected
+          if (shouldShowError(error) && !error.message?.includes('timeout') && !(error as any).code?.includes('ECONNABORTED')) {
             console.error('Training status polling error:', error)
           }
         },

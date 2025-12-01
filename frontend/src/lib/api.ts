@@ -8,7 +8,7 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
   withCredentials: true,
-  timeout: 120000, // 2 minutes timeout for avatar creation (can take time)
+  timeout: 300000, // 5 minutes timeout for avatar creation and status checks (can take time)
 })
 
 // Add auth token to requests
