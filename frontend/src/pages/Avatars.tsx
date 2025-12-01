@@ -143,6 +143,27 @@ function AvatarsContent() {
             setAiGenerationStage('completing')
             setCheckingStatus(false)
             
+            // Complete the AI generation by creating the avatar group
+            const imageKeys = statusResponse.data?.image_key_list || []
+            const imageUrls = statusResponse.data?.image_url_list || []
+            
+            if (imageKeys.length === 0) {
+              throw new Error('No image keys returned from generation')
+            }
+            
+            try {
+              await api.post('/api/avatars/complete-ai-generation', {
+                generation_id: generationId,
+                image_keys: imageKeys,
+                avatar_name: data.name,
+                image_urls: imageUrls,
+              })
+            } catch (completeError: any) {
+              // If completion fails, it might already be completed (idempotent)
+              // Check if avatar exists before throwing error
+              console.warn('Completion endpoint error (might already be completed):', completeError)
+            }
+            
             // Wait a bit for backend to complete the avatar creation
             await new Promise(resolve => setTimeout(resolve, 3000))
             
