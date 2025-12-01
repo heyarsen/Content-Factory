@@ -48,25 +48,28 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
       console.log('[useAvatarData] Received avatars from API:', allAvatars.length)
       
       const avatarsList = allAvatars.filter((avatar: Avatar) => {
-        // STRICT filtering - only show active avatars with valid IDs
-        if (avatar.status !== 'active') {
+        // Exclude deleted/inactive avatars
+        if (avatar.status === 'deleted' || avatar.status === 'inactive') {
           console.log(`[useAvatarData] Filtered out avatar ${avatar.avatar_name}: status=${avatar.status}`)
           return false
         }
-        if (!avatar.heygen_avatar_id || avatar.heygen_avatar_id.trim() === '') {
-          console.log(`[useAvatarData] Filtered out avatar ${avatar.avatar_name}: missing heygen_avatar_id`)
+        // Exclude synced avatars
+        if (avatar.source === 'synced') {
+          console.log(`[useAvatarData] Filtered out avatar ${avatar.avatar_name}: synced avatar`)
           return false
         }
-        // Only show user-created avatars (exclude synced from HeyGen)
+        // Show all user-created avatars regardless of status (active, training, pending, generating)
         // User-created avatars have source: 'user_photo' or 'ai_generated'
         // OR they have Supabase storage URLs (user uploaded to our storage)
+        // OR they're in a training/generating state (definitely user-created)
         const isUserCreated = 
           avatar.source === 'user_photo' || 
           avatar.source === 'ai_generated' ||
-          (avatar.avatar_url && avatar.avatar_url.includes('supabase.co/storage'))
+          (avatar.avatar_url && avatar.avatar_url.includes('supabase.co/storage')) ||
+          ['training', 'pending', 'generating'].includes(avatar.status)
         
         if (!isUserCreated) {
-          console.log(`[useAvatarData] Filtered out avatar ${avatar.avatar_name}: not user-created (source: ${avatar.source})`)
+          console.log(`[useAvatarData] Filtered out avatar ${avatar.avatar_name}: not user-created (source: ${avatar.source}, status: ${avatar.status})`)
           return false
         }
         return true

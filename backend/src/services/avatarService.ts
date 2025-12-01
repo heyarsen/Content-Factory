@@ -761,12 +761,14 @@ export class AvatarService {
    * We exclude avatars that were synced from HeyGen (which typically have avatar_url from HeyGen CDN)
    */
   static async getUserCreatedAvatars(userId: string): Promise<Avatar[]> {
-    // Only show trained avatars (status 'active') - untrained avatars must be manually trained
+    // Show all user-created avatars including those in training/pending/generating
     const { data, error } = await supabase
       .from('avatars')
       .select('*')
       .eq('user_id', userId)
-      .eq('status', 'active') // Only show trained/ready avatars
+      .in('status', ['active', 'training', 'pending', 'generating']) // Include all valid statuses
+      .neq('status', 'deleted')
+      .neq('status', 'inactive')
       .order('is_default', { ascending: false })
       .order('created_at', { ascending: false }) // Show newest first
       .order('avatar_name', { ascending: true })
@@ -776,7 +778,7 @@ export class AvatarService {
     // Explicitly filter to only show user-created avatars (not synced)
     return (data || []).filter(avatar => {
       // Exclude deleted/inactive
-      if (avatar.status !== 'active' || avatar.status === 'deleted' || avatar.status === 'inactive') {
+      if (avatar.status === 'deleted' || avatar.status === 'inactive') {
         return false
       }
       // Exclude synced avatars
@@ -789,6 +791,10 @@ export class AvatarService {
       }
       // Include avatars with Supabase storage URLs (user uploaded)
       if (avatar.avatar_url && avatar.avatar_url.includes('supabase.co/storage')) {
+        return true
+      }
+      // Include avatars in training/generating states (definitely user-created)
+      if (['training', 'pending', 'generating'].includes(avatar.status)) {
         return true
       }
       // Exclude everything else (likely synced or unknown)
