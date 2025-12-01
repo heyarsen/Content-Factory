@@ -600,9 +600,18 @@ export class AvatarController {
 
     const groupId = avatar.heygen_avatar_id
     const { checkTrainingStatus } = await import('../lib/heygen.js')
-    const currentStatus = await checkTrainingStatus(groupId)
+    
+    // Check training status, but handle case where avatar might not be available in HeyGen yet
+    let currentStatus: { status: string } | null = null
+    try {
+      currentStatus = await checkTrainingStatus(groupId)
+    } catch (statusError: any) {
+      console.warn(`[Train Avatar] Could not check training status for group ${groupId}:`, statusError.message)
+      // If avatar isn't available in HeyGen yet, continue with photo readiness check
+      // This can happen right after avatar creation
+    }
 
-    if (currentStatus.status === 'ready') {
+    if (currentStatus?.status === 'ready') {
       try {
         const { getPhotoAvatarDetails } = await import('../lib/heygen.js')
         const avatarDetails = await getPhotoAvatarDetails(groupId)
@@ -635,84 +644,146 @@ export class AvatarController {
       }
     }
 
-    if (currentStatus.status === 'training' || currentStatus.status === 'pending') {
+    if (currentStatus?.status === 'training' || currentStatus?.status === 'pending') {
+      // Update database status to match HeyGen status if it differs
+      if (avatar.status !== currentStatus.status) {
+        await supabase
+          .from('avatars')
+          .update({ status: currentStatus.status === 'training' ? 'training' : 'pending' })
+          .eq('id', avatarId)
+      }
       return {
         message: `Avatar is currently ${currentStatus.status}. Please wait for training to complete.`,
         status: currentStatus.status
       }
     }
 
-    // Get looks for training
-    const axios = (await import('axios')).default
-    const apiKey = process.env.HEYGEN_KEY
-
-    if (!apiKey) {
-      throw new ApiError('HeyGen API key not configured', ErrorCode.INTERNAL_SERVER_ERROR, 500)
+    // Get looks for training - use proper function to fetch looks
+    const { fetchAvatarGroupLooks, waitForLooksReady } = await import('../lib/heygen.js')
+    
+    let allLooks: any[] = []
+    try {
+      // Fetch all looks from the avatar group
+      allLooks = await fetchAvatarGroupLooks(groupId)
+      console.log(`[Train Avatar] Found ${allLooks.length} look(s) in group ${groupId}`)
+    } catch (detailsError: any) {
+      console.warn('[Train Avatar] Could not get avatar looks:', detailsError.message)
+      // If avatar group doesn't exist yet or looks aren't available, provide helpful error
+      // Don't update avatar status - keep it as pending so user can retry
+      const errorMessage = detailsError.response?.status === 404 
+        ? 'Avatar is still being created. Please wait a moment and try again.'
+        : 'Failed to fetch avatar looks. The avatar may still be processing. Please try again in a moment.'
+      throw new ApiError(errorMessage, ErrorCode.VALIDATION_ERROR, 400)
     }
 
-    let looks: any[] = []
+    if (allLooks.length === 0) {
+      // Don't update avatar status on error - keep it as pending so user can retry
+      throw new ApiError(
+        'No photos found for this avatar yet. The photos may still be uploading. Please wait a moment and try again.',
+        ErrorCode.VALIDATION_ERROR,
+        400
+      )
+    }
+
+    // Extract look IDs from all looks
+    const allLookIds = allLooks
+      .filter((look: any) => look?.id)
+      .map((look: any) => look.id)
+
+    if (allLookIds.length === 0) {
+      throw new ApiError('No valid look IDs found. Please add photos before training.', ErrorCode.VALIDATION_ERROR, 400)
+    }
+
+    // Wait for looks to be ready (if not using default_look_id)
+    let readyLookIds: string[] = []
+    if (avatar.default_look_id) {
+      // If default_look_id is set, use it directly but verify it exists
+      if (allLookIds.includes(avatar.default_look_id)) {
+        readyLookIds = [avatar.default_look_id]
+        console.log(`[Train Avatar] Using default_look_id: ${avatar.default_look_id}`)
+      } else {
+        console.warn(`[Train Avatar] Default look ID ${avatar.default_look_id} not found in group. Falling back to all looks.`)
+        readyLookIds = allLookIds
+      }
+    } else {
+      // Wait for at least one look to be ready
+      try {
+        console.log(`[Train Avatar] Waiting for looks to be ready for group ${groupId}...`)
+        const waitResult = await waitForLooksReady(groupId, allLookIds, {
+          minReadyLooks: 1,
+          maxWaitTime: 120000, // Wait up to 120 seconds (2 minutes) for photos to upload
+          pollInterval: 5000, // Poll every 5 seconds
+        })
+        readyLookIds = waitResult.readyLooks
+          .filter((look: any) => look?.id)
+          .map((look: any) => look.id)
+        console.log(`[Train Avatar] Found ${readyLookIds.length} ready look(s) for training`)
+      } catch (waitError: any) {
+        console.warn('[Train Avatar] Looks may not be ready yet:', waitError.message)
+        // Fallback: try to use all looks if they exist
+        // Filter looks that are not failed or pending upload
+        readyLookIds = allLooks
+          .filter((look: any) => {
+            if (!look?.id) return false
+            const status = look.status?.toLowerCase()
+            // Exclude failed looks
+            if (status === 'failed') return false
+            // Exclude looks that are clearly pending upload
+            if (look.upscale_availability?.reason?.includes('upload')) return false
+            return true
+          })
+          .map((look: any) => look.id)
+        
+        if (readyLookIds.length === 0) {
+          // Don't update avatar status on error - keep it as pending so user can retry
+          throw new ApiError(
+            'No photos are ready for training yet. The photos may still be uploading. Please wait a minute and try again.',
+            ErrorCode.VALIDATION_ERROR,
+            400
+          )
+        }
+        console.log(`[Train Avatar] Using ${readyLookIds.length} look(s) for training (fallback mode)`)
+      }
+    }
+
+    if (readyLookIds.length === 0) {
+      // Don't update avatar status on error - keep it as pending so user can retry
+      throw new ApiError(
+        'No photos are ready for training yet. Please wait for photo upload to complete and try again in a moment.',
+        ErrorCode.VALIDATION_ERROR,
+        400
+      )
+    }
+
+    const lookIds = readyLookIds
+
+    const HEYGEN_V2_API_URL = process.env.HEYGEN_V2_API_URL || 'https://api.heygen.com/v2'
+
+    let trainResponse: any
     try {
-      const looksResponse = await axios.get(
-        `${process.env.HEYGEN_V2_API_URL || 'https://api.heygen.com/v2'}/avatar_group/${groupId}/avatars`,
+      trainResponse = await axios.post(
+        `${HEYGEN_V2_API_URL}/photo_avatar/train`,
+        {
+          group_id: groupId,
+          photo_avatar_ids: lookIds,
+        },
         {
           headers: {
             'X-Api-Key': apiKey,
             'Content-Type': 'application/json',
           },
-          timeout: 10000,
         }
       )
-
-      const avatarList =
-        looksResponse.data?.data?.avatar_list ||
-        looksResponse.data?.avatar_list ||
-        looksResponse.data?.data ||
-        []
-
-      if (Array.isArray(avatarList)) {
-        looks = avatarList.map((look: any) => ({
-          id: look.id,
-          name: look.name,
-          status: look.status,
-        }))
-      }
-    } catch (detailsError: any) {
-      console.warn('[Train Avatar] Could not get avatar looks:', detailsError.message)
+    } catch (trainError: any) {
+      console.error('[Train Avatar] Failed to start training:', trainError.response?.data || trainError.message)
+      // Don't update avatar status on error - keep it as pending so user can retry
+      const errorMessage = trainError.response?.data?.error?.message 
+        || trainError.response?.data?.message
+        || 'Failed to start training. Please try again in a moment.'
+      throw new ApiError(errorMessage, ErrorCode.INTERNAL_SERVER_ERROR, 500)
     }
 
-    if (looks.length === 0) {
-      throw new ApiError('No photos found for this avatar. Please add photos before training.', ErrorCode.VALIDATION_ERROR, 400)
-    }
-
-    let lookIds: string[]
-    if (avatar.default_look_id) {
-      lookIds = [avatar.default_look_id]
-    } else {
-      lookIds = looks
-        .filter((look: any) => look.status === 'uploaded' || look.status === 'ready' || !look.status)
-        .map((look: any) => look.id)
-    }
-
-    if (lookIds.length === 0) {
-      throw new ApiError('No photos are ready for training. Please wait for photo upload to complete or select a look first.', ErrorCode.VALIDATION_ERROR, 400)
-    }
-
-    const HEYGEN_V2_API_URL = process.env.HEYGEN_V2_API_URL || 'https://api.heygen.com/v2'
-
-    const trainResponse = await axios.post(
-      `${HEYGEN_V2_API_URL}/photo_avatar/train`,
-      {
-        group_id: groupId,
-        photo_avatar_ids: lookIds,
-      },
-      {
-        headers: {
-          'X-Api-Key': apiKey,
-          'Content-Type': 'application/json',
-        },
-      }
-    )
-
+    // Only update status to training if the API call succeeded
     await supabase
       .from('avatars')
       .update({ status: 'training' })
