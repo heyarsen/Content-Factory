@@ -46,8 +46,13 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
       const response = await api.get('/api/avatars')
       const avatarsList = (response.data?.avatars || []).filter(
         (avatar: Avatar) => {
+          // Only show active avatars
           if (avatar.status !== 'active') return false
+          // Only show avatars with valid heygen_avatar_id
           if (!avatar.heygen_avatar_id || avatar.heygen_avatar_id.trim() === '') return false
+          // Only show avatars that exist (have at least one image URL)
+          const hasImage = avatar.thumbnail_url || avatar.preview_url || avatar.avatar_url
+          if (!hasImage) return false
           return true
         }
       )

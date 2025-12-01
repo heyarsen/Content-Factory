@@ -33,8 +33,13 @@ export function AvatarImage({
   const imageUrl = avatar.thumbnail_url || avatar.preview_url || avatar.avatar_url
   const hasValidUrl = imageUrl && imageUrl.trim() !== '' && !imageError
 
+  // If className includes w-full or h-full, use those instead of size classes
+  const containerClasses = className.includes('w-full') || className.includes('h-full')
+    ? className
+    : `${sizeClasses[size]} ${className}`
+    
   return (
-    <div className={`relative ${sizeClasses[size]} ${className}`}>
+    <div className={`relative ${containerClasses}`}>
       {/* Placeholder - shown when no URL or image failed to load */}
       {(!hasValidUrl || imageError) && showPlaceholder && (
         <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-300 to-slate-400 rounded-lg">
@@ -46,7 +51,7 @@ export function AvatarImage({
         <img
           src={imageUrl}
           alt={avatar.avatar_name}
-          className={`relative w-full h-full object-cover rounded-lg z-10 ${
+          className={`absolute inset-0 w-full h-full object-cover rounded-lg z-10 ${
             imageLoaded ? 'opacity-100' : 'opacity-0'
           } transition-opacity duration-200`}
           onLoad={() => setImageLoaded(true)}

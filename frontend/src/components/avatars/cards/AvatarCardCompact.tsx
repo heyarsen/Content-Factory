@@ -51,10 +51,10 @@ export function AvatarCardCompact({
       <div className="flex items-center gap-3">
         {/* Avatar Image */}
         <div className="relative flex-shrink-0">
-          <div className={`w-16 h-16 rounded-lg overflow-hidden ${
+          <div className={`w-16 h-16 rounded-lg overflow-hidden bg-slate-100 ${
             isSelected ? 'ring-2 ring-cyan-500' : ''
           }`}>
-            <AvatarImage avatar={avatar} size="lg" />
+            <AvatarImage avatar={avatar} size="lg" className="w-full h-full rounded-lg" />
           </div>
           {getStatusBadge()}
         </div>
