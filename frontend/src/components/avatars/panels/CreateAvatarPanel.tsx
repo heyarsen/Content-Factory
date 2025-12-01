@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Upload, Sparkles } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { Upload, Sparkles, X, Plus } from 'lucide-react'
 import { Button } from '../../ui/Button'
 import { Input } from '../../ui/Input'
 import { useToast } from '../../../hooks/useToast'
@@ -9,14 +9,36 @@ interface CreateAvatarPanelProps {
   onGenerateAI: () => void
 }
 
+const MAX_PHOTOS = 5
+
 export function CreateAvatarPanel({ onCreate, onGenerateAI }: CreateAvatarPanelProps) {
   const [avatarName, setAvatarName] = useState('')
   const [photoFiles, setPhotoFiles] = useState<File[]>([])
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
   const [creating, setCreating] = useState(false)
+  const createPhotoInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const fileToDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result as string)
+        } else {
+          reject(new Error('Failed to read file'))
+        }
+      }
+      reader.onerror = () => reject(new Error('Failed to read file'))
+      reader.readAsDataURL(file)
+    })
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
+    if (!files.length) {
+      return
+    }
+
     const validFiles = files.filter(file => {
       if (!file.type.startsWith('image/')) {
         toast.error(`${file.name} is not an image file`)
@@ -27,26 +49,71 @@ export function CreateAvatarPanel({ onCreate, onGenerateAI }: CreateAvatarPanelP
         return false
       }
       return true
-    }).slice(0, 5 - photoFiles.length)
-    
-    setPhotoFiles(prev => [...prev, ...validFiles])
+    })
+
+    if (!validFiles.length) {
+      return
+    }
+
+    const availableSlots = Math.max(0, MAX_PHOTOS - photoFiles.length)
+    if (availableSlots === 0) {
+      toast.error(`You can upload up to ${MAX_PHOTOS} photos`)
+      return
+    }
+
+    const filesToAdd = validFiles.slice(0, availableSlots)
+    if (filesToAdd.length < validFiles.length) {
+      toast.info(`Only the first ${filesToAdd.length} photo(s) were added (max ${MAX_PHOTOS})`)
+    }
+
+    try {
+      const previews = await Promise.all(filesToAdd.map(fileToDataUrl))
+      setPhotoFiles(prev => [...prev, ...filesToAdd])
+      setPhotoPreviews(prev => [...prev, ...previews])
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to process selected photos')
+    } finally {
+      // Reset the input value to allow re-uploading the same file
+      if (createPhotoInputRef.current) {
+        createPhotoInputRef.current.value = ''
+      }
+    }
+  }
+
+  const handleRemovePhoto = (index: number) => {
+    setPhotoFiles(prev => prev.filter((_, i) => i !== index))
+    setPhotoPreviews(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const handleSetPrimaryPhoto = (index: number) => {
+    if (index === 0) return
+    setPhotoFiles(prev => {
+      const next = [...prev]
+      const [selected] = next.splice(index, 1)
+      return [selected, ...next]
+    })
+    setPhotoPreviews(prev => {
+      const next = [...prev]
+      const [selected] = next.splice(index, 1)
+      return [selected, ...next]
+    })
   }
 
   const handleCreate = async () => {
     if (!avatarName.trim()) {
-      toast.error('Please enter an avatar name')
+      toast.error('Please enter an avatar name.')
       return
     }
     if (photoFiles.length === 0) {
-      toast.error('Please select at least one photo')
+      toast.error('Please upload at least one photo.')
       return
     }
-
     setCreating(true)
     try {
-      await onCreate({ avatarName: avatarName.trim(), photoFiles })
+      await onCreate({ avatarName, photoFiles })
       setAvatarName('')
       setPhotoFiles([])
+      setPhotoPreviews([])
     } finally {
       setCreating(false)
     }
@@ -77,41 +144,64 @@ export function CreateAvatarPanel({ onCreate, onGenerateAI }: CreateAvatarPanelP
       {/* Photo Upload */}
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-2">
-          Photos (1-5 photos)
+          Uploaded Photos ({photoFiles.length}/{MAX_PHOTOS})
         </label>
-        <div className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center">
-          <Upload className="h-8 w-8 text-slate-400 mx-auto mb-2" />
-          <p className="text-sm text-slate-600 mb-2">
-            {photoFiles.length === 0 
-              ? 'Click to upload photos'
-              : `${photoFiles.length} photo(s) selected`
-            }
-          </p>
-          <input
-            type="file"
-            multiple
-            accept="image/*"
-            onChange={handleFileSelect}
-            disabled={creating || photoFiles.length >= 5}
-            className="hidden"
-            id="photo-upload"
-          />
-          <label
-            htmlFor="photo-upload"
-            className="inline-block px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer text-sm font-medium transition-colors"
-          >
-            Select Photos
-          </label>
-        </div>
-        {photoFiles.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {photoFiles.map((file, index) => (
-              <div key={index} className="text-xs text-slate-600 bg-slate-100 px-2 py-1 rounded">
-                {file.name}
+        {photoFiles.length === 0 ? (
+          <div className="flex items-center justify-center h-32 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 text-sm">
+            <button
+              onClick={() => createPhotoInputRef.current?.click()}
+              className="flex flex-col items-center gap-2 hover:text-slate-600 transition-colors"
+            >
+              <Upload className="h-8 w-8" />
+              <span>Click to upload photos</span>
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-3">
+            {photoPreviews.map((preview, index) => (
+              <div
+                key={index}
+                className={`relative aspect-square rounded-lg overflow-hidden group cursor-pointer ${
+                  index === 0 ? 'border-2 border-cyan-500' : 'border border-slate-200'
+                }`}
+                onClick={() => handleSetPrimaryPhoto(index)}
+              >
+                <img src={preview} alt={`Avatar photo ${index + 1}`} className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleRemovePhoto(index)
+                    }}
+                    className="p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                {index === 0 && (
+                  <span className="absolute top-1 left-1 bg-cyan-500 text-white text-xs px-2 py-0.5 rounded-full">Primary</span>
+                )}
               </div>
             ))}
+            {photoFiles.length < MAX_PHOTOS && (
+              <button
+                onClick={() => createPhotoInputRef.current?.click()}
+                className="aspect-square border-2 border-dashed border-slate-200 rounded-lg flex items-center justify-center text-slate-400 hover:border-slate-300 hover:text-slate-500 transition-colors"
+              >
+                <Plus className="h-6 w-6" />
+              </button>
+            )}
           </div>
         )}
+        <input
+          type="file"
+          ref={createPhotoInputRef}
+          className="hidden"
+          accept="image/*"
+          multiple
+          onChange={handleFileSelect}
+          disabled={creating}
+        />
       </div>
 
       {/* Actions */}

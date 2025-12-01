@@ -64,6 +64,20 @@ export function AvatarsGallery({
   if (viewMode === 'list') {
     return (
       <div className="space-y-3">
+        {/* Create new button */}
+        <button
+          onClick={onCreateClick}
+          className="w-full p-4 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 border-2 border-dashed border-slate-200 hover:border-slate-300 hover:from-slate-100 hover:to-slate-150 flex items-center gap-4 transition-all duration-200 group"
+        >
+          <div className="w-12 h-12 rounded-lg bg-slate-900 flex items-center justify-center group-hover:scale-110 transition-transform duration-200 flex-shrink-0">
+            <Plus className="h-6 w-6 text-white" />
+          </div>
+          <div className="flex-1 text-left">
+            <p className="text-sm font-semibold text-slate-900">Create new avatar</p>
+            <p className="text-xs text-slate-500">Upload photos or generate with AI</p>
+          </div>
+        </button>
+
         {avatars.map((avatar) => (
           <button
             key={avatar.id}
@@ -90,6 +104,17 @@ export function AvatarsGallery({
   // Grid view
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+      {/* Create new avatar card */}
+      <button
+        onClick={onCreateClick}
+        className="aspect-[3/4] rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 border-2 border-dashed border-slate-200 hover:border-slate-300 hover:from-slate-100 hover:to-slate-150 flex flex-col items-center justify-center gap-3 transition-all duration-200 group"
+      >
+        <div className="w-12 h-12 rounded-full bg-slate-900 flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+          <Plus className="h-6 w-6 text-white" />
+        </div>
+        <span className="text-sm font-medium text-slate-700">Create new</span>
+      </button>
+
       {avatars.map((avatar) => (
         <div
           key={avatar.id}
