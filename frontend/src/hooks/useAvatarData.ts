@@ -61,7 +61,7 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
         // Show all user-created avatars regardless of status (active, training, pending, generating)
         // User-created avatars have source: 'user_photo' or 'ai_generated'
         // OR they have Supabase storage URLs (user uploaded to our storage)
-        // OR they're in a training/generating state (definitely user-created)
+        // OR they're in a training/generating/pending state (definitely user-created)
         const isUserCreated = 
           avatar.source === 'user_photo' || 
           avatar.source === 'ai_generated' ||
@@ -72,6 +72,14 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
           console.log(`[useAvatarData] Filtered out avatar ${avatar.avatar_name}: not user-created (source: ${avatar.source}, status: ${avatar.status})`)
           return false
         }
+        
+        // Avatars in generating/pending status might not have heygen_avatar_id yet, that's OK
+        // Only require it for active avatars
+        if (avatar.status === 'active' && (!avatar.heygen_avatar_id || avatar.heygen_avatar_id.trim() === '')) {
+          console.log(`[useAvatarData] Filtered out avatar ${avatar.avatar_name}: active but missing heygen_avatar_id`)
+          return false
+        }
+        
         return true
       })
       

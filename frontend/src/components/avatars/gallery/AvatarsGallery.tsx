@@ -94,6 +94,11 @@ export function AvatarsGallery({
               <p className="text-xs text-slate-500 mt-1">
                 {avatar.source === 'ai_generated' ? 'AI Generated' : avatar.source === 'user_photo' ? 'Photo Upload' : 'Synced'}
               </p>
+              {avatar.status !== 'active' && avatar.status !== 'ready' && (
+                <p className="text-xs text-amber-600 mt-1 capitalize">
+                  Status: {avatar.status}
+                </p>
+              )}
             </div>
           </button>
         ))}
@@ -162,6 +167,11 @@ export function AvatarsGallery({
             <p className="text-xs text-slate-500">
               {avatar.source === 'ai_generated' ? 'AI Generated' : avatar.source === 'user_photo' ? 'Photo Upload' : 'Synced'}
             </p>
+            {avatar.status !== 'active' && avatar.status !== 'ready' && (
+              <p className="text-xs text-amber-600 mt-1 capitalize">
+                {avatar.status}
+              </p>
+            )}
           </div>
         </div>
       ))}

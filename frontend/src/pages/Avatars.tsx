@@ -281,6 +281,8 @@ function AvatarsContent() {
           onQuickGenerate={handleQuickGenerate}
           onGenerateAIClick={() => setShowGenerateAIModal(true)}
           onAvatarClick={(avatar) => {
+            // Clicking avatar in gallery opens details panel instead of just selecting
+            panel.openAvatarDetails(avatar)
             setSelectedAvatarId(avatar.id)
           }}
           generating={generating}
