@@ -26,6 +26,7 @@ interface AvatarWorkspaceProps {
   onLookClick?: (look: PhotoAvatarLook, avatar: Avatar) => void
   onQuickGenerate?: (prompt: string) => void
   onGenerateAIClick?: () => void
+  onAvatarClick?: (avatar: Avatar) => void
   generating?: boolean
   generatingLookIds?: Set<string>
 }
@@ -43,6 +44,7 @@ export function AvatarWorkspace({
   onLookClick,
   onQuickGenerate,
   onGenerateAIClick,
+  onAvatarClick,
   generating,
   generatingLookIds = new Set(),
 }: AvatarWorkspaceProps) {
@@ -107,14 +109,16 @@ export function AvatarWorkspace({
         onCreateAvatarClick={onCreateAvatarClick}
       />
 
-      {/* Main Content Area - Looks Display */}
+      {/* Main Content Area - Avatars or Looks Display */}
       <MainContentArea
         avatars={avatars}
         allLooks={allLooks}
         loadingLooks={loadingLooks}
         selectedAvatarId={selectedAvatarId}
+        onSelectAvatar={onSelectAvatar}
         onLookClick={onLookClick}
-        onCreateClick={() => panel.openGenerateLook()}
+        onAvatarClick={onAvatarClick}
+        onCreateClick={() => panel.openCreateAvatar()}
         generatingLookIds={generatingLookIds}
         onQuickGenerate={onQuickGenerate}
         generating={generating}

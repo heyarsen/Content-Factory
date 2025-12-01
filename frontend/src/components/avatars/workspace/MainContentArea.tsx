@@ -1,19 +1,23 @@
 import { Avatar, PhotoAvatarLook } from '../../../types/avatar'
 import { LooksGallery } from '../gallery/LooksGallery'
+import { AvatarsGallery } from '../gallery/AvatarsGallery'
 import { QuickPromptBar } from '../actions/QuickPromptBar'
 import { Grid3x3, List } from 'lucide-react'
 import { useAvatarWorkspace } from '../../../contexts/AvatarWorkspaceContext'
+import { useContextPanel } from '../../../hooks/avatars/useContextPanel'
 
 interface MainContentAreaProps {
   avatars: Avatar[]
   allLooks: Array<{ look: PhotoAvatarLook; avatar: Avatar }>
   loadingLooks: boolean
   selectedAvatarId: string | null
+  onSelectAvatar?: (avatarId: string | null) => void
   onLookClick?: (look: PhotoAvatarLook, avatar: Avatar) => void
   onCreateClick?: () => void
   generatingLookIds?: Set<string>
   onQuickGenerate?: (prompt: string) => void
   generating?: boolean
+  onAvatarClick?: (avatar: Avatar) => void
 }
 
 export function MainContentArea({
@@ -21,18 +25,25 @@ export function MainContentArea({
   allLooks,
   loadingLooks,
   selectedAvatarId,
+  onSelectAvatar,
   onLookClick,
   onCreateClick,
   generatingLookIds = new Set(),
   onQuickGenerate,
   generating,
+  onAvatarClick,
 }: MainContentAreaProps) {
   const { viewMode, setViewMode } = useAvatarWorkspace()
+  const panel = useContextPanel()
+  
   const filteredLooks = selectedAvatarId
     ? allLooks.filter(item => item.avatar.id === selectedAvatarId)
-    : allLooks
+    : []
 
   const selectedAvatar = selectedAvatarId ? avatars.find(a => a.id === selectedAvatarId) : null
+
+  // Show avatars when no avatar is selected, show looks when avatar is selected
+  const showAvatars = !selectedAvatarId
 
   return (
     <div className="flex-1 min-w-0 flex flex-col">
@@ -45,7 +56,7 @@ export function MainContentArea({
           <p className="text-sm text-slate-500 mt-1">
             {selectedAvatar
               ? `Managing looks for "${selectedAvatar.avatar_name}"`
-              : 'View and manage all avatar looks'}
+              : 'Select an avatar to manage its looks'}
           </p>
         </div>
 
@@ -85,18 +96,35 @@ export function MainContentArea({
         />
       )}
 
-      {/* Looks Gallery */}
+      {/* Content */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <LooksGallery
-          looks={filteredLooks}
-          avatars={avatars}
-          selectedAvatarId={selectedAvatarId}
-          viewMode={viewMode}
-          onCreateClick={onCreateClick || (() => {})}
-          onLookClick={onLookClick}
-          generatingLookIds={generatingLookIds}
-          loading={loadingLooks}
-        />
+        {showAvatars ? (
+          // Show avatars when no avatar is selected
+          <AvatarsGallery
+            avatars={avatars}
+            loading={false}
+            viewMode={viewMode}
+            onAvatarClick={onAvatarClick || ((avatar) => {
+              onSelectAvatar?.(avatar.id)
+            })}
+            onCreateClick={onCreateClick || (() => {})}
+            onGenerateLook={(avatar) => {
+              onSelectAvatar?.(avatar.id)
+            }}
+          />
+        ) : (
+          // Show looks when avatar is selected
+          <LooksGallery
+            looks={filteredLooks}
+            avatars={avatars}
+            selectedAvatarId={selectedAvatarId}
+            viewMode={viewMode}
+            onCreateClick={onCreateClick || (() => {})}
+            onLookClick={onLookClick}
+            generatingLookIds={generatingLookIds}
+            loading={loadingLooks}
+          />
+        )}
       </div>
     </div>
   )

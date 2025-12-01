@@ -237,6 +237,9 @@ function AvatarsContent() {
           onLookClick={handleLookClick}
           onQuickGenerate={handleQuickGenerate}
           onGenerateAIClick={() => setShowGenerateAIModal(true)}
+          onAvatarClick={(avatar) => {
+            setSelectedAvatarId(avatar.id)
+          }}
           generating={generating}
           generatingLookIds={generatingLookIds}
         />
