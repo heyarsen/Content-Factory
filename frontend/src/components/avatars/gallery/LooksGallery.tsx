@@ -12,7 +12,6 @@ interface LooksGalleryProps {
   onLookClick?: (look: PhotoAvatarLook, avatar: Avatar) => void
   generatingLookIds: Set<string>
   loading: boolean
-  onViewModeChange?: (mode: 'grid' | 'list') => void
 }
 
 export function LooksGallery({
@@ -24,7 +23,6 @@ export function LooksGallery({
   onLookClick,
   generatingLookIds,
   loading,
-  onViewModeChange,
 }: LooksGalleryProps) {
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set())
 
