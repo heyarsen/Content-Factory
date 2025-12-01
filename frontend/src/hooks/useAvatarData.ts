@@ -81,7 +81,7 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
           acc[a.status] = (acc[a.status] || 0) + 1
           return acc
         }, {}),
-        avatars: avatarsList.map(a => ({ id: a.id, name: a.avatar_name, status: a.status, source: a.source }))
+        avatars: avatarsList.map((a: Avatar) => ({ id: a.id, name: a.avatar_name, status: a.status, source: a.source }))
       })
       
       // Simply set avatars from API response - this is the source of truth
