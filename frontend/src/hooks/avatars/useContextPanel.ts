@@ -1,6 +1,5 @@
 import { useCallback } from 'react'
 import { useAvatarWorkspace } from '../../contexts/AvatarWorkspaceContext'
-import { PanelType } from '../../types/avatar'
 
 export function useContextPanel() {
   const { panelType, panelData, openPanel, closePanel } = useAvatarWorkspace()

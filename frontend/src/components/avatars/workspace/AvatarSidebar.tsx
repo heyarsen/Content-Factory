@@ -26,10 +26,6 @@ export function AvatarSidebar({
     )
   }, [avatars, searchQuery])
   
-  const getLookCount = (avatarId: string) => {
-    // This will be calculated in parent component
-    return 0
-  }
 
   if (loading) {
     return (
@@ -93,7 +89,6 @@ export function AvatarSidebar({
               avatar={avatar}
               isSelected={selectedAvatarId === avatar.id}
               onClick={() => onSelectAvatar(avatar.id === selectedAvatarId ? null : avatar.id)}
-              lookCount={getLookCount(avatar.id)}
             />
           ))
         )}

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Star, Grid3x3, List, Sparkles, Plus, Image as ImageIcon } from 'lucide-react'
+import { Star, Sparkles, Plus, Image as ImageIcon } from 'lucide-react'
 import { Avatar, PhotoAvatarLook } from '../../../types/avatar'
 import { Button } from '../../ui/Button'
 
@@ -8,11 +8,11 @@ interface LooksGalleryProps {
   avatars: Avatar[]
   selectedAvatarId: string | null
   viewMode: 'grid' | 'list'
-  onViewModeChange: (mode: 'grid' | 'list') => void
   onCreateClick: () => void
   onLookClick?: (look: PhotoAvatarLook, avatar: Avatar) => void
   generatingLookIds: Set<string>
   loading: boolean
+  onViewModeChange?: (mode: 'grid' | 'list') => void
 }
 
 export function LooksGallery({
@@ -20,11 +20,11 @@ export function LooksGallery({
   avatars,
   selectedAvatarId,
   viewMode,
-  onViewModeChange,
   onCreateClick,
   onLookClick,
   generatingLookIds,
   loading,
+  onViewModeChange,
 }: LooksGalleryProps) {
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set())
 

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
-import { Avatar, PhotoAvatarLook, PanelType } from '../types/avatar'
+import { PanelType } from '../types/avatar'
 
 interface AvatarWorkspaceContextValue {
   // Selection state

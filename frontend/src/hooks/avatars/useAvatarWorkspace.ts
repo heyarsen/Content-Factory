@@ -3,7 +3,6 @@ import { useAvatarData } from '../useAvatarData'
 import { useAvatarPolling } from '../useAvatarPolling'
 import { useLookGeneration } from '../useLookGeneration'
 import { useToast } from '../useToast'
-import { useAvatarWorkspace as useWorkspaceContext } from '../../contexts/AvatarWorkspaceContext'
 
 export function useAvatarWorkspaceState(selectedAvatarId: string | null) {
   const { toast } = useToast()
@@ -26,7 +25,7 @@ export function useAvatarWorkspaceState(selectedAvatarId: string | null) {
     onStatusUpdate: () => {
       loadAvatars()
     },
-    onTrainingComplete: (avatar) => {
+    onTrainingComplete: (_avatar) => {
       toast.success('Avatar training completed!')
       loadAvatars()
       invalidateLooksCache()

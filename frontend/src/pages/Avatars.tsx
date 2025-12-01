@@ -23,7 +23,6 @@ function AvatarsContent() {
 
   const {
     avatars,
-    looks,
     allLooks,
     loading,
     loadingLooks,
@@ -238,6 +237,7 @@ function AvatarsContent() {
           onLookClick={handleLookClick}
           onQuickGenerate={handleQuickGenerate}
           generating={generating}
+          generatingLookIds={generatingLookIds}
         />
       </div>
 

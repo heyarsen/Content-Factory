@@ -26,6 +26,7 @@ interface AvatarWorkspaceProps {
   onLookClick?: (look: PhotoAvatarLook, avatar: Avatar) => void
   onQuickGenerate?: (prompt: string) => void
   generating?: boolean
+  generatingLookIds?: Set<string>
 }
 
 export function AvatarWorkspace({
@@ -39,7 +40,9 @@ export function AvatarWorkspace({
   onCreateAvatar,
   onGenerateLook,
   onLookClick,
+  onQuickGenerate,
   generating,
+  generatingLookIds = new Set(),
 }: AvatarWorkspaceProps) {
   const panel = useContextPanel()
   

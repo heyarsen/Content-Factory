@@ -1,4 +1,4 @@
-import { Sparkles, Upload, Trash2, Star, MoreVertical } from 'lucide-react'
+import { Sparkles, Upload, Trash2, Star } from 'lucide-react'
 import { Button } from '../../ui/Button'
 
 interface QuickActionBarProps {
