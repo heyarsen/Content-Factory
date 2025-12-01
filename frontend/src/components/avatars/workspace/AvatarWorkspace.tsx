@@ -25,6 +25,7 @@ interface AvatarWorkspaceProps {
   }) => Promise<void>
   onLookClick?: (look: PhotoAvatarLook, avatar: Avatar) => void
   onQuickGenerate?: (prompt: string) => void
+  onGenerateAIClick?: () => void
   generating?: boolean
   generatingLookIds?: Set<string>
 }
@@ -41,6 +42,7 @@ export function AvatarWorkspace({
   onGenerateLook,
   onLookClick,
   onQuickGenerate,
+  onGenerateAIClick,
   generating,
   generatingLookIds = new Set(),
 }: AvatarWorkspaceProps) {
@@ -55,8 +57,8 @@ export function AvatarWorkspace({
           <CreateAvatarPanel
             onCreate={onCreateAvatar}
             onGenerateAI={() => {
-              // Will open AI generation panel
               panel.closePanel()
+              onGenerateAIClick?.()
             }}
           />
         )
