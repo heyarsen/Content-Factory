@@ -171,6 +171,8 @@ export function VideoPlanning() {
   const [lookModalOpen, setLookModalOpen] = useState(false)
   const [avatarLooks, setAvatarLooks] = useState<any[]>([])
   const [loadingLooks, setLoadingLooks] = useState(false)
+  // Store looks by avatar ID so we can display selected looks
+  const [looksByAvatar, setLooksByAvatar] = useState<Map<string, any[]>>(new Map())
   const [deleteModal, setDeleteModal] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [editPlanModal, setEditPlanModal] = useState<VideoPlan | null>(null)
@@ -198,7 +200,8 @@ export function VideoPlanning() {
       setLoadingAvatars(true)
       // Only fetch user-created avatars (default behavior, no 'all' parameter)
       const response = await api.get('/api/avatars')
-      setAvatars(response.data.avatars || [])
+      const loadedAvatars = response.data.avatars || []
+      setAvatars(loadedAvatars)
       setDefaultAvatarId(response.data.default_avatar_id || null)
       
       // Set default avatar for all video slots that don't have an avatar selected
@@ -213,6 +216,25 @@ export function VideoPlanning() {
           return newAvatars
         })
       }
+      
+      // Pre-load looks for avatars that are already selected (after state is updated)
+      setTimeout(() => {
+        const selectedAvatarIds = [...new Set(videoAvatars.filter(id => id))]
+        for (const avatarId of selectedAvatarIds) {
+          const avatar = loadedAvatars.find((a: any) => a.id === avatarId)
+          if (avatar && avatar.heygen_avatar_id) {
+            // Check if looks are already loaded
+            setLooksByAvatar(prev => {
+              if (prev.has(avatar.heygen_avatar_id!)) {
+                return prev // Already loaded
+              }
+              // Load in background
+              loadAvatarLooks(avatarId).catch(() => {})
+              return prev
+            })
+          }
+        }
+      }, 100)
     } catch (error) {
       console.error('Failed to load avatars:', error)
     } finally {
@@ -226,6 +248,15 @@ export function VideoPlanning() {
       const response = await api.get(`/api/avatars/${avatarId}/details`)
       const looks = response.data?.looks || []
       setAvatarLooks(looks)
+      // Also store looks by avatar ID for display purposes
+      const avatar = avatars.find(a => a.id === avatarId)
+      if (avatar && avatar.heygen_avatar_id) {
+        setLooksByAvatar(prev => {
+          const newMap = new Map(prev)
+          newMap.set(avatar.heygen_avatar_id!, looks)
+          return newMap
+        })
+      }
       return looks // Return looks so we can check them immediately
     } catch (error: any) {
       console.error('Failed to load avatar looks:', error)
@@ -233,6 +264,17 @@ export function VideoPlanning() {
       return []
     } finally {
       setLoadingLooks(false)
+    }
+  }
+  
+  // Load looks for an avatar if not already loaded
+  const ensureLooksLoaded = async (avatarId: string) => {
+    const avatar = avatars.find(a => a.id === avatarId)
+    if (!avatar || !avatar.heygen_avatar_id) return
+    
+    // Check if looks are already loaded
+    if (!looksByAvatar.has(avatar.heygen_avatar_id)) {
+      await loadAvatarLooks(avatarId)
     }
   }
 
@@ -2024,10 +2066,35 @@ export function VideoPlanning() {
                         </div>
                       ) : (() => {
                         const selectedAvatarId = videoAvatars[index]
+                        const selectedLookId = videoLooks[index]
                         const selectedAvatar = avatars.find(a => a.id === selectedAvatarId)
+                        // Get looks for this avatar from the stored map
+                        const avatarLooksForDisplay = selectedAvatar?.heygen_avatar_id 
+                          ? looksByAvatar.get(selectedAvatar.heygen_avatar_id) || []
+                          : []
+                        const selectedLook = selectedLookId && avatarLooksForDisplay.find((l: any) => l.id === selectedLookId)
+                        
+                        // Load looks if we have a selected avatar but looks aren't loaded yet
+                        if (selectedAvatar && selectedAvatar.heygen_avatar_id && !looksByAvatar.has(selectedAvatar.heygen_avatar_id)) {
+                          ensureLooksLoaded(selectedAvatar.id).catch(() => {}) // Load in background
+                        }
+                        
                         return selectedAvatar ? (
                           <div className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg bg-white">
-                            {selectedAvatar.thumbnail_url || selectedAvatar.preview_url ? (
+                            {/* Show look image if look is selected, otherwise show avatar image */}
+                            {selectedLook ? (
+                              selectedLook.image_url || selectedLook.preview_url || selectedLook.thumbnail_url ? (
+                                <img
+                                  src={selectedLook.image_url || selectedLook.preview_url || selectedLook.thumbnail_url || ''}
+                                  alt={selectedLook.name || selectedAvatar.avatar_name}
+                                  className="w-16 h-16 object-cover rounded bg-slate-50 flex-shrink-0"
+                                />
+                              ) : (
+                                <div className="w-16 h-16 bg-gradient-to-br from-purple-400 to-indigo-600 rounded flex items-center justify-center flex-shrink-0">
+                                  <User className="h-8 w-8 text-white opacity-50" />
+                                </div>
+                              )
+                            ) : selectedAvatar.thumbnail_url || selectedAvatar.preview_url ? (
                               <img
                                 src={selectedAvatar.thumbnail_url || selectedAvatar.preview_url || ''}
                                 alt={selectedAvatar.avatar_name}
@@ -2040,18 +2107,22 @@ export function VideoPlanning() {
                             )}
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-slate-700 truncate">
-                                {selectedAvatar.avatar_name}
+                                {selectedLook ? (selectedLook.name || selectedAvatar.avatar_name) : selectedAvatar.avatar_name}
                               </p>
-                              {selectedAvatar.is_default && (
-                                <p className="text-xs text-slate-500 mt-0.5">Default Avatar</p>
-                              )}
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                {selectedLook ? 'Look' : (selectedAvatar.is_default ? 'Default Avatar' : 'Avatar')}
+                              </p>
                             </div>
                             <Button
                               type="button"
                               variant="secondary"
                               size="sm"
-                              onClick={() => {
+                              onClick={async () => {
                                 setAvatarModalIndex(index)
+                                // Load looks for this avatar if not already loaded
+                                if (selectedAvatar.id && (!avatarLooks.length || avatarLooks[0]?.group_id !== selectedAvatar.heygen_avatar_id)) {
+                                  await loadAvatarLooks(selectedAvatar.id)
+                                }
                                 setAvatarModalOpen(true)
                               }}
                             >
@@ -3081,29 +3152,33 @@ export function VideoPlanning() {
                       key={look.id}
                       type="button"
                       onClick={() => handleSelectLook(look.id)}
-                      className={`relative rounded-xl border-2 p-3 transition-all hover:scale-105 ${
+                      className={`relative aspect-[3/4] rounded-2xl overflow-hidden border-2 transition-all hover:scale-105 ${
                         isSelected
-                          ? 'border-brand-500 bg-brand-50 shadow-lg ring-2 ring-brand-200'
-                          : 'border-slate-200 bg-white hover:border-brand-300 hover:shadow-md'
+                          ? 'border-brand-500 ring-2 ring-brand-200 shadow-lg'
+                          : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
                       }`}
                     >
                       {imageUrl ? (
                         <img
                           src={imageUrl}
                           alt={look.name || 'Look'}
-                          className="w-full h-36 object-cover rounded-lg mb-2 bg-slate-50"
+                          className="w-full h-full object-cover"
                         />
                       ) : (
-                        <div className="w-full h-36 bg-gradient-to-br from-purple-400 to-indigo-600 rounded-lg flex items-center justify-center mb-2">
+                        <div className="w-full h-full bg-gradient-to-br from-purple-400 to-indigo-600 flex items-center justify-center">
                           <Users className="h-12 w-12 text-white opacity-50" />
                         </div>
                       )}
-                      <p className="text-xs font-medium text-slate-700 truncate text-center">
-                        {look.name || 'Look'}
-                      </p>
                       {isSelected && (
-                        <div className="absolute top-2 right-2 bg-brand-500 text-white rounded-full p-1.5 shadow-lg ring-2 ring-white">
+                        <div className="absolute top-2 right-2 bg-brand-500 text-white rounded-full p-1.5 shadow-lg ring-2 ring-white z-10">
                           <CheckCircle2 className="h-4 w-4" />
+                        </div>
+                      )}
+                      {look.name && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                          <p className="text-xs font-medium text-white truncate text-center">
+                            {look.name}
+                          </p>
                         </div>
                       )}
                     </button>
