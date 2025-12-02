@@ -402,6 +402,14 @@ async function runTemplateGeneration(
   planItemId?: string | null
 ): Promise<void> {
   try {
+    console.log('[Template Generation] Starting template video generation:', {
+      videoId: video.id,
+      templateId: preference.templateId,
+      scriptKey: preference.scriptKey,
+      scriptLength: scriptText?.length || 0,
+      topic: video.topic,
+    })
+    
     const variables: Record<string, any> = {
       ...preference.variables,
     }
@@ -420,12 +428,26 @@ async function runTemplateGeneration(
       overrides: preference.overrides,
     }
 
+    console.log('[Template Generation] Calling HeyGen template API with payload:', {
+      templateId: payload.template_id,
+      variables: Object.keys(payload.variables),
+      hasOverrides: !!payload.overrides && Object.keys(payload.overrides).length > 0,
+    })
+
     const response = await generateVideoFromTemplate(payload)
+    
+    console.log('[Template Generation] Template video generation successful:', {
+      videoId: video.id,
+      heygenVideoId: response.video_id,
+      status: response.status,
+    })
+    
     await applyManualGenerationSuccess(video.id, response)
     await updatePlanItemStatus(planItemId, response.status)
   } catch (error: any) {
-    console.error('Template generation error:', {
+    console.error('[Template Generation] Template generation error:', {
       error: error.message || error,
+      errorResponse: error.response?.data,
       templateId: preference.templateId,
       videoId: video.id,
     })
@@ -470,10 +492,8 @@ export class VideoService {
       avatarRecordId = resolved.avatarRecordId
       isPhotoAvatar = resolved.isPhotoAvatar
     }
-    // Skip templates when using talking photos (looks) - they only animate the face, not full body
-    // Templates work better with regular avatars that support full body movement
-    const shouldUseTemplate = !isPhotoAvatar
-    const templatePreference = shouldUseTemplate ? await fetchUserTemplatePreference(userId) : null
+    // Always use the hardcoded template for everyone
+    const templatePreference = await fetchUserTemplatePreference(userId)
     
     // Idempotency 1: If tied to a plan item, and it already has a video_id, reuse that video
     if (input.plan_item_id) {
@@ -548,17 +568,26 @@ export class VideoService {
         dimension
       )
 
+    // Always use template - it's hardcoded for everyone
     if (templatePreference) {
+      console.log('[Video Generation] Using template:', {
+        templateId: templatePreference.templateId,
+        videoId: video.id,
+        scriptKey: templatePreference.scriptKey,
+        hasScript: !!scriptText,
+      })
       void runTemplateGeneration(video, templatePreference, scriptText, input.plan_item_id || null).catch(
         (error) => {
-          console.warn('Template video generation failed; falling back to avatar-based generation:', {
+          console.error('Template video generation failed; falling back to avatar-based generation:', {
             error: error.message || error,
             videoId: video.id,
+            templateId: templatePreference.templateId,
           })
           void scheduleManualGeneration()
         }
       )
     } else {
+      console.error('[Video Generation] ERROR: Template preference is null! This should never happen.')
       void scheduleManualGeneration()
     }
     return video
