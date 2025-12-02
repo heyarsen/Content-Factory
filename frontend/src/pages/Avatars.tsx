@@ -258,9 +258,10 @@ function AvatarsContent() {
       const newAvatar: Avatar | undefined = completeResponse.data?.avatar
 
       if (newAvatar) {
-        // Add to state immediately
+        // Add to state immediately so it shows up right away
         addAvatar(newAvatar)
-
+        
+        // Start training automatically (user requested this)
         try {
           await api.post(`/api/avatars/${newAvatar.id}/train`)
           toast.success('Avatar created and training started! This may take a few minutes.')
@@ -269,8 +270,23 @@ function AvatarsContent() {
           toast.error('Avatar created, but failed to start training automatically. Please start training manually.')
         }
 
+        // Refresh immediately and again after a delay to ensure it shows up
         await loadAvatars()
         invalidateLooksCache()
+        
+        // Also refresh after a short delay to catch any backend processing
+        setTimeout(async () => {
+          await loadAvatars()
+        }, 2000)
+      } else {
+        // If no avatar in response, refresh to see if it appears
+        await loadAvatars()
+        invalidateLooksCache()
+        
+        // Try again after delay
+        setTimeout(async () => {
+          await loadAvatars()
+        }, 2000)
       }
 
       setAiGenerationStage('completed')

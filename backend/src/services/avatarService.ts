@@ -690,12 +690,26 @@ export class AvatarService {
         style: AUTO_LOOK_STYLE,
       })
 
+      // Fetch looks to use the first/default look as base for generation
+      // This ensures generated looks match the original person's appearance
+      let photoAvatarId: string | undefined = undefined
+      try {
+        const looks = await fetchAvatarGroupLooks(groupId)
+        if (looks && looks.length > 0) {
+          photoAvatarId = looks[0].id
+          console.log(`[Auto Look] Using look ${photoAvatarId} as base for generation to ensure consistency`)
+        }
+      } catch (looksError: any) {
+        console.warn(`[Auto Look] Failed to fetch looks for base reference:`, looksError.message)
+      }
+
       const response = await generateAvatarLook({
         group_id: groupId,
         prompt,
         orientation: 'vertical', // Force 9:16 format
         pose: AUTO_LOOK_POSE,
         style: AUTO_LOOK_STYLE,
+        photo_avatar_id: photoAvatarId, // Use first look as base to preserve identity
       })
 
       console.log('[Auto Look] ✅ AI look generation started (9:16 format)', {

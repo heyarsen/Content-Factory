@@ -945,6 +945,8 @@ export class AvatarController {
 
   /**
    * Add looks to avatar group
+   * NOTE: We do NOT automatically retrain after adding looks - retraining is expensive
+   * and must be done manually by the user via the "Train Avatar" button if they want to.
    */
   static async addLooks(userId: string, request: AddLooksRequest) {
     if (!request.group_id || !request.image_keys || !Array.isArray(request.image_keys) || request.image_keys.length === 0) {
@@ -954,6 +956,9 @@ export class AvatarController {
     const result = await addLooksToAvatarGroup(request)
     await AvatarService.syncAvatarsFromHeyGen(userId)
 
+    // IMPORTANT: We do NOT call trainAvatarGroup here - retraining is expensive
+    // and must be done manually by the user if they want to include new looks in training
+
     return {
       message: 'Looks added successfully',
       photo_avatar_list: result.photo_avatar_list,
@@ -962,6 +967,8 @@ export class AvatarController {
 
   /**
    * Generate a look
+   * NOTE: We do NOT automatically retrain after generating looks - retraining is expensive
+   * and must be done manually by the user via the "Train Avatar" button if they want to.
    */
   static async generateLook(userId: string, request: GenerateLookRequest) {
     const requiredValidation = validateRequired(request, ['group_id', 'prompt', 'orientation', 'pose', 'style'])
@@ -1046,7 +1053,34 @@ export class AvatarController {
       }
     }
 
-    const result = await generateAvatarLook(request)
+    // Fetch looks from the avatar group to use the selected photo as base for generation
+    // This ensures generated looks match the original person's appearance
+    const { fetchAvatarGroupLooks } = await import('../lib/heygen.js')
+    let photoAvatarId: string | undefined = undefined
+    
+    try {
+      const looks = await fetchAvatarGroupLooks(request.group_id)
+      if (looks && looks.length > 0) {
+        // Use the default look if available, otherwise use the first look
+        const defaultLook = avatar?.default_look_id 
+          ? looks.find(look => look.id === avatar.default_look_id)
+          : null
+        const selectedLook = defaultLook || looks[0]
+        photoAvatarId = selectedLook.id
+        console.log(`[Generate Look] Using look ${photoAvatarId} as base for generation to ensure consistency`)
+      }
+    } catch (looksError: any) {
+      console.warn(`[Generate Look] Failed to fetch looks for base reference:`, looksError.message)
+      // Continue without photo_avatar_id - HeyGen will still generate, but may not match as well
+    }
+
+    // Include photo_avatar_id in the request to ensure generated looks match the selected avatar photo
+    const generateRequest = {
+      ...request,
+      photo_avatar_id: photoAvatarId,
+    }
+
+    const result = await generateAvatarLook(generateRequest)
 
     if (result.generation_id) {
       const lookName = request.prompt || `Look ${new Date().toISOString().split('T')[0]}`
