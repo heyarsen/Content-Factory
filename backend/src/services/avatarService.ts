@@ -389,18 +389,21 @@ export class AvatarService {
 
     try {
       // Fetch photo avatar details
-      const details = await getPhotoAvatarDetails(avatar.heygen_avatar_id)
-
-      // If avatar doesn't exist in HeyGen (status is 'unknown'), handle based on avatar type
-      if (details.status === 'unknown') {
+      // Note: avatar.heygen_avatar_id is a group_id, not an individual photo_avatar_id
+      // getPhotoAvatarDetails will try to resolve it, but may fail if it's truly a group_id
+      let details: PhotoAvatarDetails
+      try {
+        details = await getPhotoAvatarDetails(avatar.heygen_avatar_id)
+      } catch (detailsError: any) {
+        // If getPhotoAvatarDetails fails (e.g., because it's a group_id), 
+        // we'll still fetch looks from the group directly below
+        console.log(`[Avatar Details] getPhotoAvatarDetails failed for ${avatar.heygen_avatar_id}, will fetch looks from group directly:`, detailsError.message)
         const isUserCreated = this.isUserCreatedAvatar(avatar)
         
-        // Only mark synced avatars as deleted if they're not found in HeyGen
-        // User-created avatars might not be immediately available or might be in training
         if (!isUserCreated && avatar.source === 'synced') {
+          // Synced avatars that aren't found should be marked as deleted
           console.warn(`[Avatar Details] Synced avatar ${avatarId} (${avatar.avatar_name}) not found in HeyGen - marking as deleted`)
           
-          // Update database to mark avatar as deleted
           if (avatar.status !== 'deleted') {
             const { error: updateError } = await supabase
               .from('avatars')
@@ -414,7 +417,6 @@ export class AvatarService {
             }
           }
           
-          // Don't throw - return what we have from database
           return {
             id: avatar.heygen_avatar_id,
             group_id: avatar.heygen_avatar_id,
@@ -428,16 +430,44 @@ export class AvatarService {
           }
         }
         
-        // For user-created avatars that aren't found, keep their current status
-        // They might be in training/pending/generating and not yet available in HeyGen
-        if (isUserCreated) {
-          console.log(`[Avatar Details] User-created avatar ${avatarId} (${avatar.avatar_name}) not yet available in HeyGen (status: ${avatar.status}) - keeping current status`)
+        // For user-created avatars, create a basic details object and continue to fetch looks
+        details = {
+          id: avatar.heygen_avatar_id,
+          group_id: avatar.heygen_avatar_id,
+          status: avatar.status || 'pending',
+          image_url: avatar.avatar_url ?? undefined,
+          preview_url: avatar.preview_url ?? undefined,
+          thumbnail_url: avatar.thumbnail_url ?? undefined,
+          created_at: avatar.created_at ? new Date(avatar.created_at).getTime() / 1000 : undefined,
+          updated_at: avatar.updated_at ? new Date(avatar.updated_at).getTime() / 1000 : null,
+        }
+      }
+
+      // If avatar doesn't exist in HeyGen (status is 'unknown'), handle based on avatar type
+      if (details.status === 'unknown') {
+        const isUserCreated = this.isUserCreatedAvatar(avatar)
+        
+        // Only mark synced avatars as deleted if they're not found in HeyGen
+        if (!isUserCreated && avatar.source === 'synced') {
+          console.warn(`[Avatar Details] Synced avatar ${avatarId} (${avatar.avatar_name}) not found in HeyGen - marking as deleted`)
           
-          // Return current avatar details from database instead of marking as deleted
+          if (avatar.status !== 'deleted') {
+            const { error: updateError } = await supabase
+              .from('avatars')
+              .update({ status: 'deleted' })
+              .eq('id', avatarId)
+            
+            if (updateError) {
+              console.error(`[Avatar Details] Failed to mark avatar ${avatarId} as deleted:`, updateError)
+            } else {
+              console.log(`[Avatar Details] Successfully marked avatar ${avatarId} (${avatar.avatar_name}) as deleted`)
+            }
+          }
+          
           return {
             id: avatar.heygen_avatar_id,
             group_id: avatar.heygen_avatar_id,
-            status: avatar.status || 'pending',
+            status: 'deleted',
             image_url: avatar.avatar_url ?? undefined,
             preview_url: avatar.preview_url ?? undefined,
             thumbnail_url: avatar.thumbnail_url ?? undefined,
@@ -445,6 +475,13 @@ export class AvatarService {
             updated_at: avatar.updated_at ? new Date(avatar.updated_at).getTime() / 1000 : null,
             looks: [],
           }
+        }
+        
+        // For user-created avatars with 'unknown' status, update details but continue to fetch looks
+        console.log(`[Avatar Details] User-created avatar ${avatarId} (${avatar.avatar_name}) has unknown status, will still fetch looks from group`)
+        details = {
+          ...details,
+          status: avatar.status || 'pending',
         }
       }
 
@@ -487,6 +524,8 @@ export class AvatarService {
       }
 
       // Also fetch looks from the avatar group (with caching)
+      // IMPORTANT: avatar.heygen_avatar_id is a group_id, not an individual photo_avatar_id
+      // So we fetch looks directly from the group, not from photo_avatar/details
       let looks: any[] = []
       if (avatar.heygen_avatar_id) {
         // Check cache first
@@ -500,49 +539,37 @@ export class AvatarService {
           }))
           console.log(`[Avatar Details] Found ${looks.length} cached looks for avatar ${avatarId}`)
         } else {
-          // Fetch from API
+          // Fetch looks directly from the avatar group using fetchAvatarGroupLooks
           try {
-            const axios = (await import('axios')).default
-            const apiKey = process.env.HEYGEN_KEY
-            if (apiKey) {
-              const looksResponse = await axios.get(
-                `${process.env.HEYGEN_V2_API_URL || 'https://api.heygen.com/v2'}/avatar_group/${avatar.heygen_avatar_id}/avatars`,
-                {
-                  headers: {
-                    'X-Api-Key': apiKey,
-                    'Content-Type': 'application/json',
-                  },
-                  timeout: 5000, // 5 second timeout
-                }
-              )
+            const { fetchAvatarGroupLooks } = await import('../lib/heygen.js')
+            const groupLooks = await fetchAvatarGroupLooks(avatar.heygen_avatar_id)
+            
+            if (Array.isArray(groupLooks) && groupLooks.length > 0) {
+              looks = groupLooks.map((look: any) => ({
+                id: look.id,
+                name: look.name,
+                status: look.status,
+                image_url: look.image_url,
+                preview_url: look.image_url,
+                thumbnail_url: look.image_url,
+                created_at: look.created_at,
+                updated_at: look.updated_at,
+                is_default: (avatar as any)?.default_look_id === look.id,
+              }))
+              console.log(`[Avatar Details] Found ${looks.length} looks for avatar ${avatarId} from group ${avatar.heygen_avatar_id}`)
 
-              const avatarList =
-                looksResponse.data?.data?.avatar_list ||
-                looksResponse.data?.avatar_list ||
-                looksResponse.data?.data ||
-                []
-
-              if (Array.isArray(avatarList)) {
-                looks = avatarList.map((look: any) => ({
-                  id: look.id,
-                  name: look.name,
-                  status: look.status,
-                  image_url: look.image_url,
-                  preview_url: look.image_url,
-                  thumbnail_url: look.image_url,
-                  created_at: look.created_at,
-                  updated_at: look.updated_at,
-                  is_default: (avatar as any)?.default_look_id === look.id,
-                }))
-                console.log(`[Avatar Details] Found ${looks.length} looks for avatar ${avatarId}`)
-
-                // Cache the results (without is_default since it's avatar-specific)
-                const looksToCache = looks.map(({ is_default, ...look }) => look)
-                lookCache.set(avatarId, looksToCache)
-              }
+              // Cache the results (without is_default since it's avatar-specific)
+              const looksToCache = looks.map(({ is_default, ...look }) => look)
+              lookCache.set(avatarId, looksToCache)
+            } else {
+              console.log(`[Avatar Details] No looks found for avatar ${avatarId} in group ${avatar.heygen_avatar_id}`)
+              // Cache empty array to prevent repeated requests
+              lookCache.set(avatarId, [])
             }
           } catch (looksError: any) {
-            console.warn(`[Avatar Details] Failed to fetch looks (returning without looks):`, looksError.message)
+            console.warn(`[Avatar Details] Failed to fetch looks for avatar ${avatarId} (group ${avatar.heygen_avatar_id}):`, looksError.message)
+            // Cache empty array to prevent repeated failed requests
+            lookCache.set(avatarId, [])
             // Continue without looks - not critical
           }
         }
