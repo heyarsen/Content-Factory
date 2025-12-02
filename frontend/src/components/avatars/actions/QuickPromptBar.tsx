@@ -36,24 +36,23 @@ export function QuickPromptBar({ onGenerate, generating = false, avatarName }: Q
           disabled={generating}
           className="w-full pl-12 pr-24 py-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
         />
-        <Button
+        <button
           type="submit"
           disabled={!prompt.trim() || generating}
-          size="sm"
-          className="absolute right-2 top-1/2 -translate-y-1/2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white border-0 shadow-md hover:shadow-lg transition-all flex items-center"
+          className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white text-sm font-medium rounded-lg shadow-md hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {generating ? (
             <>
-              <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-              Generating...
+              <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              <span>Generating...</span>
             </>
           ) : (
             <>
-              <Sparkles className="h-4 w-4 mr-2" />
-              Generate
+              <Sparkles className="h-4 w-4" />
+              <span>Generate</span>
             </>
           )}
-        </Button>
+        </button>
       </div>
       <p className="mt-2 text-xs text-slate-500">
         Quick generate with AI. Describe the look you want to create.

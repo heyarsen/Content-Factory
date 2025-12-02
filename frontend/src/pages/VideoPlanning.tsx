@@ -226,9 +226,11 @@ export function VideoPlanning() {
       const response = await api.get(`/api/avatars/${avatarId}/details`)
       const looks = response.data?.looks || []
       setAvatarLooks(looks)
+      return looks // Return looks so we can check them immediately
     } catch (error: any) {
       console.error('Failed to load avatar looks:', error)
       setAvatarLooks([])
+      return []
     } finally {
       setLoadingLooks(false)
     }
@@ -2988,10 +2990,10 @@ export function VideoPlanning() {
                         setVideoAvatars(newAvatars)
                         
                         // Load looks for this avatar
-                        await loadAvatarLooks(avatar.id)
+                        const looks = await loadAvatarLooks(avatar.id)
                         
                         // If avatar has looks, show look selection modal, otherwise just close avatar modal
-                        if (avatarLooks.length > 0) {
+                        if (looks && looks.length > 0) {
                           setAvatarModalOpen(false)
                           setLookModalOpen(true)
                         } else {
