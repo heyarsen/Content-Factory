@@ -399,7 +399,9 @@ async function runTemplateGeneration(
   video: Video,
   preference: TemplatePreference,
   scriptText: string,
-  planItemId?: string | null
+  planItemId?: string | null,
+  avatarId?: string,
+  isPhotoAvatar?: boolean
 ): Promise<void> {
   try {
     console.log('[Template Generation] Starting template video generation:', {
@@ -420,12 +422,60 @@ async function runTemplateGeneration(
       variables[scriptKey] = scriptValue
     }
 
+    // Add avatar information as variables for template use
+    if (avatarId) {
+      if (isPhotoAvatar) {
+        variables['talking_photo_id'] = avatarId
+        variables['avatar_id'] = avatarId // Also provide as avatar_id for compatibility
+      } else {
+        variables['avatar_id'] = avatarId
+      }
+    }
+
+    // Build overrides to set avatar in template nodes if needed
+    let overrides = { ...preference.overrides }
+    
+    // If no overrides provided, create default override to set avatar in template
+    if (!overrides || Object.keys(overrides).length === 0) {
+      // Try to set avatar via nodes_override if avatar is available
+      if (avatarId) {
+        overrides = {
+          nodes_override: [
+            {
+              character: isPhotoAvatar
+                ? {
+                    type: 'talking_photo',
+                    talking_photo_id: avatarId,
+                  }
+                : {
+                    type: 'avatar',
+                    avatar_id: avatarId,
+                  },
+            },
+          ],
+        }
+      }
+    } else if (avatarId && overrides.nodes_override) {
+      // If overrides exist, ensure avatar is set in the first node
+      if (Array.isArray(overrides.nodes_override) && overrides.nodes_override.length > 0) {
+        overrides.nodes_override[0].character = isPhotoAvatar
+          ? {
+              type: 'talking_photo',
+              talking_photo_id: avatarId,
+            }
+          : {
+              type: 'avatar',
+              avatar_id: avatarId,
+            }
+      }
+    }
+
     const payload = {
       template_id: preference.templateId,
       variables,
       title: video.topic,
       caption: true,
-      overrides: preference.overrides,
+      overrides: Object.keys(overrides).length > 0 ? overrides : undefined,
     }
 
     console.log('[Template Generation] Calling HeyGen template API with payload:', {
@@ -575,8 +625,10 @@ export class VideoService {
         videoId: video.id,
         scriptKey: templatePreference.scriptKey,
         hasScript: !!scriptText,
+        avatarId: avatarId,
+        isPhotoAvatar: isPhotoAvatar,
       })
-      void runTemplateGeneration(video, templatePreference, scriptText, input.plan_item_id || null).catch(
+      void runTemplateGeneration(video, templatePreference, scriptText, input.plan_item_id || null, avatarId, isPhotoAvatar).catch(
         (error) => {
           console.error('Template video generation failed; falling back to avatar-based generation:', {
             error: error.message || error,
