@@ -5,7 +5,12 @@ WORKDIR /app
 
 # Copy frontend files
 COPY frontend/package*.json ./frontend/
-RUN cd frontend && npm ci
+RUN npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    cd frontend && npm ci || \
+    (echo "First attempt failed, retrying..." && sleep 5 && npm ci) || \
+    (echo "Second attempt failed, retrying..." && sleep 10 && npm ci)
 
 COPY frontend/ ./frontend/
 
@@ -40,7 +45,12 @@ WORKDIR /app
 
 # Copy backend files
 COPY backend/package*.json ./backend/
-RUN cd backend && npm ci
+RUN npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    cd backend && npm ci || \
+    (echo "First attempt failed, retrying..." && sleep 5 && npm ci) || \
+    (echo "Second attempt failed, retrying..." && sleep 10 && npm ci)
 
 COPY backend/ ./backend/
 
@@ -75,8 +85,13 @@ RUN ls -la /app/public/ || echo "Public directory listing"
 RUN test -f /app/dist/server.js || (echo "ERROR: server.js not found" && exit 1)
 RUN test -f /app/public/index.html || (echo "ERROR: index.html not found" && exit 1)
 
-# Install only production dependencies
-RUN npm ci --only=production
+# Install only production dependencies with retry logic
+RUN npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm ci --only=production || \
+    (echo "First attempt failed, retrying..." && sleep 5 && npm ci --only=production) || \
+    (echo "Second attempt failed, retrying..." && sleep 10 && npm ci --only=production)
 
 # Expose port (Railway will set PORT env var)
 EXPOSE 3001
