@@ -104,6 +104,12 @@ async function pollLookGenerationStatus(
                 lookIds: addLooksResult.photo_avatar_list?.map(l => l.id),
               })
 
+              // Invalidate look cache so new looks show up immediately
+              if (avatarId) {
+                lookCache.invalidate(avatarId)
+                console.log(`[Generate Look] Invalidated look cache for avatar ${avatarId}`)
+              }
+
               jobManager.updateJob(jobId, {
                 status: 'completed',
                 metadata: {
@@ -955,6 +961,21 @@ export class AvatarController {
 
     const result = await addLooksToAvatarGroup(request)
     await AvatarService.syncAvatarsFromHeyGen(userId)
+
+    // Invalidate look cache for all avatars with this group_id so new looks show up immediately
+    const { supabase } = await import('../lib/supabase.js')
+    const { data: avatars } = await supabase
+      .from('avatars')
+      .select('id')
+      .eq('heygen_avatar_id', request.group_id)
+      .eq('user_id', userId)
+
+    if (avatars && avatars.length > 0) {
+      avatars.forEach(avatar => {
+        lookCache.invalidate(avatar.id)
+      })
+      console.log(`[Add Looks] Invalidated look cache for ${avatars.length} avatar(s)`)
+    }
 
     // IMPORTANT: We do NOT call trainAvatarGroup here - retraining is expensive
     // and must be done manually by the user if they want to include new looks in training

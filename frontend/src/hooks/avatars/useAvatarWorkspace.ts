@@ -8,7 +8,7 @@ export function useAvatarWorkspaceState(selectedAvatarId: string | null) {
   const { toast } = useToast()
 
   // Load avatar data with lazy loading
-  const { avatars, loading, allLooks, loadingLooks, loadAvatars, invalidateLooksCache, addAvatar } = useAvatarData({
+  const { avatars, loading, allLooks, loadingLooks, loadAvatars, invalidateLooksCache, addAvatar, loadLooksForAvatar } = useAvatarData({
     lazyLoadLooks: true,
     selectedAvatarId,
   })
@@ -44,8 +44,35 @@ export function useAvatarWorkspaceState(selectedAvatarId: string | null) {
   // Look generation
   const { generating, generatingLookIds, generateLook } = useLookGeneration({
     onSuccess: () => {
+      // Invalidate cache first so fresh data is fetched
+      if (selectedAvatarId) {
+        invalidateLooksCache(selectedAvatarId)
+        // Reload looks for the selected avatar immediately
+        loadLooksForAvatar(selectedAvatarId).then((looks) => {
+          // Update allLooks state with the new looks
+          const avatar = avatars.find(a => a.id === selectedAvatarId)
+          if (avatar && looks) {
+            // This will be handled by the useEffect, but we trigger it here too
+            // The useEffect depends on avatars, so we need to ensure it runs
+          }
+        })
+      } else {
+        invalidateLooksCache()
+      }
+      
+      // Reload avatars to trigger useEffect which will reload looks
       loadAvatars()
-      invalidateLooksCache()
+      
+      // Also reload after a short delay to ensure backend has fully processed the new looks
+      setTimeout(() => {
+        if (selectedAvatarId) {
+          invalidateLooksCache(selectedAvatarId)
+          loadLooksForAvatar(selectedAvatarId)
+        } else {
+          invalidateLooksCache()
+        }
+        loadAvatars()
+      }, 3000)
     },
     onError: (error) => {
       toast.error(error)
