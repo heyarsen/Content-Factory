@@ -120,7 +120,8 @@ export class PlanService {
     customTimes?: string[], // Custom posting times from user
     customTopics?: string[], // Custom topics for each time slot
     customCategories?: Array<string | null>, // Custom categories for each slot
-    avatarIds?: string[] // Avatar IDs for each time slot
+    avatarIds?: string[], // Avatar IDs for each time slot
+    lookIds?: Array<string | null> // Look IDs (talking_photo_id) for each time slot
   ): Promise<VideoPlanItem[]> {
     console.log(`[Plan Service] ===== generatePlanItems called =====`)
     console.log(`[Plan Service] Parameters:`, {
@@ -300,6 +301,15 @@ export class PlanService {
           }
         }
         
+        // Extract lookId (talking_photo_id), ensuring it's a valid non-empty string or null
+        let lookId: string | null = null
+        if (lookIds && lookIds[i]) {
+          const rawLookId = lookIds[i]
+          if (typeof rawLookId === 'string' && rawLookId.trim().length > 0) {
+            lookId = rawLookId.trim()
+          }
+        }
+        
         // Determine initial status and topic
         let status: string = 'pending'
         let topic: string | null = null
@@ -332,6 +342,11 @@ export class PlanService {
             insertData.avatar_id = avatarId.trim()
           }
           
+          // Include talking_photo_id (look ID) if provided
+          if (lookId && typeof lookId === 'string' && lookId.trim().length > 0) {
+            insertData.talking_photo_id = lookId.trim()
+          }
+          
           console.log(`[Plan Service] Inserting item:`, {
             plan_id: planId,
             scheduled_date: currentDateStr,
@@ -341,6 +356,7 @@ export class PlanService {
             status,
             platforms: plan.default_platforms,
             avatar_id: avatarId || 'null (not included)',
+            talking_photo_id: lookId || 'null (not included)',
           })
           
           let { data: item, error } = await supabase

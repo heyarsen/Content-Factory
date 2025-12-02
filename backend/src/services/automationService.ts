@@ -288,13 +288,16 @@ export class AutomationService {
                     continue // Another process already claimed this item
                   }
                   
-                  // Get avatar_id from plan item (optional - will fall back to default avatar if not provided)
+                  // Get avatar_id and talking_photo_id from plan item (optional - will fall back to default avatar if not provided)
                   const avatarId = (updatedItem as any).avatar_id
+                  const talkingPhotoId = (updatedItem as any).talking_photo_id
                   
                   console.log(`[Video Generation] ✓ Claimed item ${item.id} for immediate video generation`, {
                     topic: updatedItem.topic,
                     hasAvatarId: !!avatarId,
-                    avatarId: avatarId || 'will use default avatar'
+                    hasTalkingPhotoId: !!talkingPhotoId,
+                    avatarId: avatarId || 'will use default avatar',
+                    talkingPhotoId: talkingPhotoId || 'none'
                   })
                   
                   // VideoService.requestManualVideo will automatically use default avatar if avatar_id is not provided
@@ -304,6 +307,7 @@ export class AutomationService {
                     style: 'professional',
                     duration: 30,
                     avatar_id: avatarId, // Can be undefined - will fall back to default
+                    talking_photo_id: talkingPhotoId, // Look ID if provided
                     plan_item_id: item.id,
                   })
                   
@@ -416,14 +420,17 @@ export class AutomationService {
           throw new Error('Missing topic or script for video generation')
         }
 
-        // Get avatar_id from plan item (optional - will fall back to default avatar if not provided)
+        // Get avatar_id and talking_photo_id from plan item (optional - will fall back to default avatar if not provided)
         const avatarId = (item as any).avatar_id
+        const talkingPhotoId = (item as any).talking_photo_id
         
         console.log(`[Video Generation] Creating video for item ${item.id}`, {
           topic: item.topic,
           scriptLength: item.script?.length || 0,
           hasAvatarId: !!avatarId,
-          avatarId: avatarId || 'will use default avatar'
+          hasTalkingPhotoId: !!talkingPhotoId,
+          avatarId: avatarId || 'will use default avatar',
+          talkingPhotoId: talkingPhotoId || 'none'
         })
         
         // VideoService.requestManualVideo will automatically use default avatar if avatar_id is not provided
@@ -435,6 +442,7 @@ export class AutomationService {
           style: 'professional',
           duration: 30,
           avatar_id: avatarId, // Can be undefined - will fall back to default avatar
+          talking_photo_id: talkingPhotoId, // Look ID if provided
           plan_item_id: item.id,
         })
 
@@ -856,10 +864,14 @@ export class AutomationService {
               throw new Error('Missing topic or script for video generation')
             }
 
-            // Get avatar_id from plan item
+            // Get avatar_id and talking_photo_id from plan item
             const avatarId = (item as any).avatar_id
+            const talkingPhotoId = (item as any).talking_photo_id
 
-            console.log(`[Video Generation] Creating video for today's item ${item.id} with topic: ${item.topic}`)
+            console.log(`[Video Generation] Creating video for today's item ${item.id} with topic: ${item.topic}`, {
+              hasAvatarId: !!avatarId,
+              hasTalkingPhotoId: !!talkingPhotoId
+            })
             
             // Create video record - this happens synchronously
             const video = await VideoService.requestManualVideo(plan.user_id, {
@@ -868,6 +880,7 @@ export class AutomationService {
           style: 'professional',
           duration: 30,
           avatar_id: avatarId, // Can be undefined - will fall back to default avatar
+          talking_photo_id: talkingPhotoId, // Look ID if provided
           plan_item_id: item.id,
         })
 
@@ -2098,6 +2111,7 @@ export class AutomationService {
 
     const plan = item.plan as any
     const avatarId = (item as any).avatar_id
+    const talkingPhotoId = (item as any).talking_photo_id
     
     const video = await VideoService.requestManualVideo(plan.user_id, {
       topic: item.topic!,
@@ -2105,6 +2119,7 @@ export class AutomationService {
       style: 'professional',
       duration: 30,
       avatar_id: avatarId, // Can be undefined - will fall back to default avatar
+      talking_photo_id: talkingPhotoId, // Look ID if provided
       plan_item_id: item.id,
     })
 

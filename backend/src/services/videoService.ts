@@ -481,7 +481,10 @@ export class VideoService {
       avatarRecordId = resolved.avatarRecordId
       isPhotoAvatar = resolved.isPhotoAvatar
     }
-    const templatePreference = await fetchUserTemplatePreference(userId)
+    // Skip templates when using talking photos (looks) - they only animate the face, not full body
+    // Templates work better with regular avatars that support full body movement
+    const shouldUseTemplate = !isPhotoAvatar
+    const templatePreference = shouldUseTemplate ? await fetchUserTemplatePreference(userId) : null
     
     // Idempotency 1: If tied to a plan item, and it already has a video_id, reuse that video
     if (input.plan_item_id) {

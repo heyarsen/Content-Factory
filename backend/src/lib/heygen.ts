@@ -2191,30 +2191,44 @@ export async function getVideoStatus(
         progress: data.progress || data.progress_percentage || undefined,
       }
     } catch (v2Error: any) {
-      // Fallback to v1 API
-      console.log(
-        'v2 API failed, trying v1:',
-        v2Error.response?.status ?? v2Error?.message ?? 'unknown error'
+      // Fallback to v1 API - but v1 API is deprecated, so log warning
+      const v2Status = v2Error.response?.status
+      const v2Message = v2Error?.message ?? 'unknown error'
+      
+      console.warn(
+        `v2 API failed (status: ${v2Status}), trying v1:`,
+        v2Message
       )
-      const response = await axios.get(
-        `${HEYGEN_API_URL}/video_status.get`,
-        {
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-          },
-          params: {
-            video_id: videoId,
-          },
+      
+      // Only try v1 if v2 error is not 404 (which means endpoint doesn't exist)
+      if (v2Status === 404) {
+        throw new Error(`HeyGen v2 API endpoint not found. Please check your API configuration. Original error: ${v2Message}`)
+      }
+      
+      try {
+        const response = await axios.get(
+          `${HEYGEN_API_URL}/video_status.get`,
+          {
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+            },
+            params: {
+              video_id: videoId,
+            },
+          }
+        )
+
+        const data = response.data.data || response.data
+
+        return {
+          video_id: videoId,
+          status: data.status,
+          video_url: data.video_url || data.videoUrl || data.url,
+          error: data.error || data.error_message,
         }
-      )
-
-      const data = response.data.data || response.data
-
-      return {
-        video_id: videoId,
-        status: data.status,
-        video_url: data.video_url || data.videoUrl || data.url,
-        error: data.error || data.error_message,
+      } catch (v1Error: any) {
+        // If v1 also fails, throw the original v2 error
+        throw new Error(`HeyGen API error: v2 failed (${v2Status}), v1 also failed (${v1Error.response?.status || v1Error.message}). Please check your API configuration.`)
       }
     }
   } catch (error: any) {

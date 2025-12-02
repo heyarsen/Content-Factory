@@ -29,6 +29,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       video_topics, // Custom topics for each video slot
       video_categories, // Custom categories for each video slot
       video_avatars, // Avatar IDs for each video slot
+      video_looks, // Look IDs (talking_photo_id) for each video slot
     } = req.body
 
     if (!name || !videos_per_day || !start_date) {
@@ -79,7 +80,8 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
         video_times, // Pass custom times
         video_topics, // Pass custom topics
         video_categories, // Pass custom categories
-        video_avatars // Pass avatar IDs for each time slot
+        video_avatars, // Pass avatar IDs for each time slot
+        video_looks // Pass look IDs (talking_photo_id) for each time slot
       )
       console.log(`[Plans API] Generated ${items.length} items for plan ${plan.id}`)
       if (items.length === 0) {
