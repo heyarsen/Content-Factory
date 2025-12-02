@@ -384,25 +384,14 @@ type TemplatePreference = {
 }
 
 async function fetchUserTemplatePreference(userId: string): Promise<TemplatePreference | null> {
-  const { data, error } = await supabase
-    .from('user_preferences')
-    .select('heygen_vertical_template_id, heygen_vertical_template_script_key, heygen_vertical_template_variables, heygen_vertical_template_overrides')
-    .eq('user_id', userId)
-    .single()
-
-  if (error || !data) {
-    return null
-  }
-
-  if (!data.heygen_vertical_template_id) {
-    return null
-  }
-
+  // Always use the default template for everyone
+  const DEFAULT_TEMPLATE_ID = 'baf2ab03a4354aebac815fd42c10895b'
+  
   return {
-    templateId: data.heygen_vertical_template_id,
-    scriptKey: data.heygen_vertical_template_script_key || 'script',
-    variables: data.heygen_vertical_template_variables || {},
-    overrides: data.heygen_vertical_template_overrides || {},
+    templateId: DEFAULT_TEMPLATE_ID,
+    scriptKey: 'script', // Default script variable key
+    variables: {},
+    overrides: {},
   }
 }
 
