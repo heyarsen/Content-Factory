@@ -244,9 +244,12 @@ export function VideoPlanning() {
 
   const loadAvatarLooks = async (avatarId: string) => {
     setLoadingLooks(true)
+    setAvatarLooks([]) // Clear previous looks immediately
     try {
       const response = await api.get(`/api/avatars/${avatarId}/details`)
       const looks = response.data?.looks || []
+      console.log(`[VideoPlanning] Loaded ${looks.length} looks for avatar ${avatarId}:`, looks)
+      // Set looks state before returning
       setAvatarLooks(looks)
       // Also store looks by avatar ID for display purposes
       const avatar = avatars.find(a => a.id === avatarId)
@@ -257,6 +260,8 @@ export function VideoPlanning() {
           return newMap
         })
       }
+      // Ensure state is updated before returning
+      await new Promise(resolve => setTimeout(resolve, 50))
       return looks // Return looks so we can check them immediately
     } catch (error: any) {
       console.error('Failed to load avatar looks:', error)
@@ -284,6 +289,19 @@ export function VideoPlanning() {
     setVideoLooks(newLooks)
     setLookModalOpen(false)
   }
+
+  // Reload looks when look modal opens to ensure fresh data
+  useEffect(() => {
+    if (lookModalOpen && avatarModalIndex >= 0 && videoAvatars[avatarModalIndex]) {
+      const selectedAvatarId = videoAvatars[avatarModalIndex]
+      if (selectedAvatarId) {
+        console.log(`[VideoPlanning] Look modal opened, reloading looks for avatar ${selectedAvatarId}`)
+        loadAvatarLooks(selectedAvatarId).catch(error => {
+          console.error('[VideoPlanning] Failed to reload looks when modal opened:', error)
+        })
+      }
+    }
+  }, [lookModalOpen, avatarModalIndex]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Update videoTimes, videoTopics, and videoAvatars when videosPerDay changes
   useEffect(() => {
@@ -3065,8 +3083,12 @@ export function VideoPlanning() {
                         
                         // If avatar has looks, show look selection modal, otherwise just close avatar modal
                         if (looks && looks.length > 0) {
+                          // Close avatar modal first
                           setAvatarModalOpen(false)
-                          setLookModalOpen(true)
+                          // Wait a bit for state to settle, then open look modal
+                          setTimeout(() => {
+                            setLookModalOpen(true)
+                          }, 100)
                         } else {
                           // Clear look selection if no looks available
                           const newLooks = [...videoLooks]
@@ -3131,12 +3153,13 @@ export function VideoPlanning() {
             <p className="text-sm text-slate-500">
               Choose a look for video {avatarModalIndex + 1}. You can also use the default avatar by closing this modal.
             </p>
-            {loadingLooks ? (
-              <div className="text-center py-12">
-                <div className="inline-block h-8 w-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
-                <p className="mt-4 text-sm text-slate-500">Loading looks...</p>
-              </div>
-            ) : avatarLooks.length === 0 ? (
+            {loadingLooks || avatarLooks.length === 0 ? (
+              loadingLooks ? (
+                <div className="text-center py-12">
+                  <div className="inline-block h-8 w-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="mt-4 text-sm text-slate-500">Loading looks...</p>
+                </div>
+              ) : (
               <div className="text-center py-12 text-slate-500">
                 <Users className="h-12 w-12 mx-auto mb-3 text-slate-300" />
                 <p>No looks available for this avatar</p>
