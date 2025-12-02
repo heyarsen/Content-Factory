@@ -171,6 +171,7 @@ export function VideoPlanning() {
   const [lookModalOpen, setLookModalOpen] = useState(false)
   const [avatarLooks, setAvatarLooks] = useState<any[]>([])
   const [loadingLooks, setLoadingLooks] = useState(false)
+  const loadingLooksRef = useRef(false) // Prevent multiple simultaneous API calls
   // Store looks by avatar ID so we can display selected looks
   const [looksByAvatar, setLooksByAvatar] = useState<Map<string, any[]>>(new Map())
   const [deleteModal, setDeleteModal] = useState<string | null>(null)
@@ -243,6 +244,13 @@ export function VideoPlanning() {
   }
 
   const loadAvatarLooks = async (avatarId: string) => {
+    // Prevent multiple simultaneous calls
+    if (loadingLooksRef.current) {
+      console.log(`[VideoPlanning] Already loading looks for avatar ${avatarId}, skipping duplicate call`)
+      return avatarLooks.length > 0 ? avatarLooks : []
+    }
+    
+    loadingLooksRef.current = true
     console.log(`[VideoPlanning] loadAvatarLooks called for avatar ${avatarId}`)
     setLoadingLooks(true)
     setAvatarLooks([]) // Clear previous looks immediately
@@ -271,6 +279,7 @@ export function VideoPlanning() {
       return []
     } finally {
       setLoadingLooks(false)
+      loadingLooksRef.current = false
     }
   }
   
@@ -296,7 +305,7 @@ export function VideoPlanning() {
   useEffect(() => {
     if (lookModalOpen && avatarModalIndex >= 0 && videoAvatars[avatarModalIndex]) {
       const selectedAvatarId = videoAvatars[avatarModalIndex]
-      if (selectedAvatarId) {
+      if (selectedAvatarId && !loadingLooksRef.current) {
         console.log(`[VideoPlanning] Look modal opened, reloading looks for avatar ${selectedAvatarId}`)
         loadAvatarLooks(selectedAvatarId).catch(error => {
           console.error('[VideoPlanning] Failed to reload looks when modal opened:', error)
@@ -3158,90 +3167,73 @@ export function VideoPlanning() {
               <p className="text-sm text-slate-500">
                 Choose a look for video {avatarModalIndex + 1}. You can also use the default avatar by closing this modal.
               </p>
-              {(() => {
-                console.log('[VideoPlanning] Rendering look modal content:', {
-                  loadingLooks,
-                  avatarLooksLength: avatarLooks.length,
-                  avatarModalIndex,
-                  selectedAvatarId: videoAvatars[avatarModalIndex]
-                })
-                
-                if (loadingLooks) {
-                  return (
-                    <div className="text-center py-12">
-                      <div className="inline-block h-8 w-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
-                      <p className="mt-4 text-sm text-slate-500">Loading looks...</p>
-                    </div>
-                  )
-                }
-                
-                if (!avatarLooks || avatarLooks.length === 0) {
-                  return (
-                    <div className="text-center py-12 text-slate-500">
-                      <Users className="h-12 w-12 mx-auto mb-3 text-slate-300" />
-                      <p>No looks available for this avatar</p>
-                      <p className="text-xs mt-2">The default avatar will be used</p>
-                      <Button
-                        variant="ghost"
-                        onClick={() => {
-                          const newLooks = [...videoLooks]
-                          newLooks[avatarModalIndex] = null
-                          setVideoLooks(newLooks)
-                          setLookModalOpen(false)
-                        }}
-                        className="mt-4"
+              {loadingLooks ? (
+                <div className="text-center py-12">
+                  <div className="inline-block h-8 w-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="mt-4 text-sm text-slate-500">Loading looks...</p>
+                </div>
+              ) : !avatarLooks || avatarLooks.length === 0 ? (
+                <div className="text-center py-12 text-slate-500">
+                  <Users className="h-12 w-12 mx-auto mb-3 text-slate-300" />
+                  <p>No looks available for this avatar</p>
+                  <p className="text-xs mt-2">The default avatar will be used</p>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      const newLooks = [...videoLooks]
+                      newLooks[avatarModalIndex] = null
+                      setVideoLooks(newLooks)
+                      setLookModalOpen(false)
+                    }}
+                    className="mt-4"
+                  >
+                    Use Default Avatar
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 max-h-[65vh] overflow-y-auto pr-2 -mr-2">
+                  {avatarLooks.map((look: any) => {
+                    const isSelected = videoLooks[avatarModalIndex] === look.id
+                    const imageUrl = look.image_url || look.preview_url || look.thumbnail_url
+                    return (
+                      <button
+                        key={look.id}
+                        type="button"
+                        onClick={() => handleSelectLook(look.id)}
+                        className={`relative aspect-[3/4] rounded-2xl overflow-hidden border-2 transition-all hover:scale-105 ${
+                          isSelected
+                            ? 'border-brand-500 ring-2 ring-brand-200 shadow-lg'
+                            : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
+                        }`}
                       >
-                        Use Default Avatar
-                      </Button>
-                    </div>
-                  )
-                }
-                
-                return (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 max-h-[65vh] overflow-y-auto pr-2 -mr-2">
-                    {avatarLooks.map((look: any) => {
-                      const isSelected = videoLooks[avatarModalIndex] === look.id
-                      const imageUrl = look.image_url || look.preview_url || look.thumbnail_url
-                      return (
-                        <button
-                          key={look.id}
-                          type="button"
-                          onClick={() => handleSelectLook(look.id)}
-                          className={`relative aspect-[3/4] rounded-2xl overflow-hidden border-2 transition-all hover:scale-105 ${
-                            isSelected
-                              ? 'border-brand-500 ring-2 ring-brand-200 shadow-lg'
-                              : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
-                          }`}
-                        >
-                          {imageUrl ? (
-                            <img
-                              src={imageUrl}
-                              alt={look.name || 'Look'}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-purple-400 to-indigo-600 flex items-center justify-center">
-                              <Users className="h-12 w-12 text-white opacity-50" />
-                            </div>
-                          )}
-                          {isSelected && (
-                            <div className="absolute top-2 right-2 bg-brand-500 text-white rounded-full p-1.5 shadow-lg ring-2 ring-white z-10">
-                              <CheckCircle2 className="h-4 w-4" />
-                            </div>
-                          )}
-                          {look.name && (
-                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                              <p className="text-xs font-medium text-white truncate text-center">
-                                {look.name}
-                              </p>
-                            </div>
-                          )}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )
-              })()}
+                        {imageUrl ? (
+                          <img
+                            src={imageUrl}
+                            alt={look.name || 'Look'}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-purple-400 to-indigo-600 flex items-center justify-center">
+                            <Users className="h-12 w-12 text-white opacity-50" />
+                          </div>
+                        )}
+                        {isSelected && (
+                          <div className="absolute top-2 right-2 bg-brand-500 text-white rounded-full p-1.5 shadow-lg ring-2 ring-white z-10">
+                            <CheckCircle2 className="h-4 w-4" />
+                          </div>
+                        )}
+                        {look.name && (
+                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                            <p className="text-xs font-medium text-white truncate text-center">
+                              {look.name}
+                            </p>
+                          </div>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             <div className="flex items-center justify-between pt-4 border-t border-slate-200">
               <p className="text-xs text-slate-400">
                 {avatarLooks.length} look{avatarLooks.length !== 1 ? 's' : ''} available
