@@ -40,7 +40,7 @@ export function QuickPromptBar({ onGenerate, generating = false, avatarName }: Q
           type="submit"
           disabled={!prompt.trim() || generating}
           size="sm"
-          className="absolute right-2 top-1/2 -translate-y-1/2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white border-0 shadow-md hover:shadow-lg transition-all"
+          className="absolute right-2 top-1/2 -translate-y-1/2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white border-0 shadow-md hover:shadow-lg transition-all flex items-center"
         >
           {generating ? (
             <>
