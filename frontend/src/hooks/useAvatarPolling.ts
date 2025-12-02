@@ -30,6 +30,10 @@ export function useAvatarPolling({ avatars, onStatusUpdate, onTrainingComplete }
         const status = response.data?.status
         const normalizedStatus = status === 'ready' ? 'active' : status || avatar.status
 
+        // Only update if status actually changed
+        const previousStatus = avatar.status
+        const statusChanged = normalizedStatus !== previousStatus
+
         // Update the stored avatar status
         if (avatarsToPollRef.current.has(avatar.id)) {
           const storedAvatar = avatarsToPollRef.current.get(avatar.id)!
@@ -37,12 +41,15 @@ export function useAvatarPolling({ avatars, onStatusUpdate, onTrainingComplete }
           avatarsToPollRef.current.set(avatar.id, storedAvatar)
         }
 
-        onStatusUpdate?.(avatar, normalizedStatus)
+        // Only call onStatusUpdate if status actually changed
+        if (statusChanged) {
+          onStatusUpdate?.(avatar, normalizedStatus)
+        }
 
         // Remove from polling if status changed to active/ready
         if (normalizedStatus === 'active' || normalizedStatus === 'ready') {
           avatarsToPollRef.current.delete(avatar.id)
-          if (onTrainingComplete) {
+          if (onTrainingComplete && statusChanged) {
             onTrainingComplete(avatar)
           }
         }

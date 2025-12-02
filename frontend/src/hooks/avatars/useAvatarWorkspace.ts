@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useCallback, useRef } from 'react'
 import { useAvatarData } from '../useAvatarData'
 import { useAvatarPolling } from '../useAvatarPolling'
 import { useLookGeneration } from '../useLookGeneration'
@@ -19,17 +19,26 @@ export function useAvatarWorkspaceState(selectedAvatarId: string | null) {
     return allLooks.filter(item => item.avatar.id === selectedAvatarId)
   }, [allLooks, selectedAvatarId])
 
+  // Debounce loadAvatars to prevent too frequent updates
+  const lastLoadTimeRef = useRef<number>(0)
+  const debouncedLoadAvatars = useCallback(() => {
+    const now = Date.now()
+    // Only reload if at least 2 seconds have passed since last load
+    if (now - lastLoadTimeRef.current > 2000) {
+      lastLoadTimeRef.current = now
+      loadAvatars()
+    }
+  }, [loadAvatars])
+
   // Polling for training status
   const { refreshTrainingStatus } = useAvatarPolling({
     avatars: avatars as any,
-    onStatusUpdate: () => {
-      loadAvatars()
-    },
-    onTrainingComplete: (_avatar) => {
+    onStatusUpdate: debouncedLoadAvatars,
+    onTrainingComplete: useCallback((_avatar) => {
       toast.success('Avatar training completed!')
       loadAvatars()
       invalidateLooksCache()
-    },
+    }, [toast, loadAvatars, invalidateLooksCache]),
   })
 
   // Look generation
