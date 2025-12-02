@@ -25,10 +25,10 @@ interface AIGenerationModalProps {
   stage: AiGenerationStage
   error: string | null
   photos?: Array<{ url: string; key: string }>
-  selectedIndex: number | null
-  onSelectPhoto: (index: number) => void
-  onConfirmPhoto: () => Promise<void>
-  confirmingPhoto: boolean
+  selectedIndex?: number | null
+  onSelectPhoto?: (index: number) => void
+  onConfirmPhoto?: () => Promise<void>
+  confirmingPhoto?: boolean
 }
 
 const AI_ETHNICITY_OPTIONS = [
@@ -75,10 +75,10 @@ export function AIGenerationModal({
   stage,
   error,
   photos = [],
-  selectedIndex,
+  selectedIndex = null,
   onSelectPhoto,
   onConfirmPhoto,
-  confirmingPhoto,
+  confirmingPhoto = false,
 }: AIGenerationModalProps) {
   const [aiName, setAiName] = useState('')
   const [aiAge, setAiAge] = useState<AIAgeOption>('Unspecified')
@@ -177,7 +177,7 @@ export function AIGenerationModal({
                   <button
                     key={photo.key || index}
                     type="button"
-                    onClick={() => onSelectPhoto(index)}
+                    onClick={() => onSelectPhoto?.(index)}
                     className={`relative aspect-[3/4] rounded-2xl overflow-hidden border-2 transition-all ${
                       isSelected
                         ? 'border-brand-500 ring-2 ring-brand-200 shadow-lg'
@@ -201,8 +201,8 @@ export function AIGenerationModal({
                 Cancel
               </Button>
               <Button
-                onClick={onConfirmPhoto}
-                disabled={confirmingPhoto || selectedIndex === null}
+                onClick={() => onConfirmPhoto?.()}
+                disabled={confirmingPhoto || selectedIndex === null || !onConfirmPhoto}
                 loading={confirmingPhoto}
                 type="button"
               >
