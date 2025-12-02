@@ -24,6 +24,11 @@ interface AIGenerationModalProps {
   checkingStatus: boolean
   stage: AiGenerationStage
   error: string | null
+  photos?: Array<{ url: string; key: string }>
+  selectedIndex: number | null
+  onSelectPhoto: (index: number) => void
+  onConfirmPhoto: () => Promise<void>
+  confirmingPhoto: boolean
 }
 
 const AI_ETHNICITY_OPTIONS = [
@@ -69,6 +74,11 @@ export function AIGenerationModal({
   checkingStatus,
   stage,
   error,
+  photos = [],
+  selectedIndex,
+  onSelectPhoto,
+  onConfirmPhoto,
+  confirmingPhoto,
 }: AIGenerationModalProps) {
   const [aiName, setAiName] = useState('')
   const [aiAge, setAiAge] = useState<AIAgeOption>('Unspecified')
@@ -109,6 +119,8 @@ export function AIGenerationModal({
     }
   }
 
+  const isPhotoSelectionStage = !checkingStatus && stage === 'photosReady' && photos.length > 0
+
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Generate AI Avatar" size="md">
       <div className="space-y-6">
@@ -147,6 +159,57 @@ export function AIGenerationModal({
               })}
             </div>
           </div>
+        ) : isPhotoSelectionStage ? (
+          <>
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-slate-900">
+                Choose your avatar photo
+              </p>
+              <p className="text-xs text-slate-600">
+                We generated several options. Pick the one you like best — we&apos;ll create and train your avatar from that photo.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {photos.slice(0, 4).map((photo, index) => {
+                const isSelected = selectedIndex === index
+                return (
+                  <button
+                    key={photo.key || index}
+                    type="button"
+                    onClick={() => onSelectPhoto(index)}
+                    className={`relative aspect-[3/4] rounded-2xl overflow-hidden border-2 transition-all ${
+                      isSelected
+                        ? 'border-brand-500 ring-2 ring-brand-200 shadow-lg'
+                        : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
+                    }`}
+                  >
+                    <img
+                      src={photo.url}
+                      alt={`AI avatar option ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </button>
+                )
+              })}
+            </div>
+
+            {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+
+            <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
+              <Button variant="ghost" onClick={handleClose} type="button" disabled={confirmingPhoto}>
+                Cancel
+              </Button>
+              <Button
+                onClick={onConfirmPhoto}
+                disabled={confirmingPhoto || selectedIndex === null}
+                loading={confirmingPhoto}
+                type="button"
+              >
+                {confirmingPhoto ? 'Creating avatar...' : 'Use this photo'}
+              </Button>
+            </div>
+          </>
         ) : (
           <>
             <div className="rounded-lg bg-gradient-to-r from-brand-50 to-purple-50 border border-brand-200 p-4 mb-2">

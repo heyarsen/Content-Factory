@@ -20,6 +20,11 @@ function AvatarsContent() {
   const [checkingStatus, setCheckingStatus] = useState(false)
   const [aiGenerationStage, setAiGenerationStage] = useState<'idle' | 'creating' | 'photosReady' | 'completing' | 'completed'>('idle')
   const [aiGenerationError, setAiGenerationError] = useState<string | null>(null)
+  const [aiGenerationPhotos, setAiGenerationPhotos] = useState<Array<{ url: string; key: string }>>([])
+  const [aiSelectedPhotoIndex, setAiSelectedPhotoIndex] = useState<number | null>(null)
+  const [aiGenerationId, setAiGenerationId] = useState<string | null>(null)
+  const [aiConfirmingPhoto, setAiConfirmingPhoto] = useState(false)
+  const [aiRequestName, setAiRequestName] = useState<string | null>(null)
 
   const {
     avatars,
@@ -115,6 +120,10 @@ function AvatarsContent() {
     setCheckingStatus(true)
     setAiGenerationStage('creating')
     setAiGenerationError(null)
+    setAiGenerationPhotos([])
+    setAiSelectedPhotoIndex(null)
+    setAiGenerationId(null)
+    setAiRequestName(data.name)
 
     try {
       const response = await api.post('/api/avatars/generate-ai', {
@@ -133,7 +142,7 @@ function AvatarsContent() {
         throw new Error('No generation ID returned')
       }
 
-      setAiGenerationStage('photosReady')
+      setAiGenerationId(generationId)
       
       // Poll for completion with timeout and better error handling
       let attempts = 0
@@ -145,23 +154,27 @@ function AvatarsContent() {
         try {
           const statusResponse = await api.get(`/api/avatars/generation-status/${generationId}`)
           const status = statusResponse.data?.status
+          const imageUrls: string[] = statusResponse.data?.image_url_list || []
+          const imageKeys: string[] = statusResponse.data?.image_key_list || []
 
           if (status === 'success') {
-            setAiGenerationStage('completing')
             setCheckingStatus(false)
-            
-            // Wait a bit for backend to complete the avatar creation
-            await new Promise(resolve => setTimeout(resolve, 3000))
-            
-            // Force reload avatars multiple times to ensure it shows up
-            await loadAvatars()
-            await new Promise(resolve => setTimeout(resolve, 1000))
-            await loadAvatars()
-            invalidateLooksCache()
-            
-            setAiGenerationStage('completed')
-            setShowGenerateAIModal(false)
-            toast.success('AI avatar generated successfully!')
+            const photos = imageUrls
+              .slice(0, 4)
+              .map((url, index) => ({
+                url,
+                key: imageKeys[index] || '',
+              }))
+              .filter(photo => photo.url && photo.key)
+
+            if (!photos.length) {
+              throw new Error('Generation succeeded but no photos were returned')
+            }
+
+            setAiGenerationPhotos(photos)
+            setAiSelectedPhotoIndex(0)
+            setAiGenerationStage('photosReady')
+            toast.success('AI photos generated. Please choose one to create your avatar.')
             return
           } else if (status === 'failed') {
             setCheckingStatus(false)
@@ -218,6 +231,76 @@ function AvatarsContent() {
       setCheckingStatus(false)
     }
   }, [toast, loadAvatars, invalidateLooksCache])
+
+  const handleConfirmAIPhoto = useCallback(async () => {
+    try {
+      if (
+        aiGenerationId === null ||
+        aiSelectedPhotoIndex === null ||
+        !aiGenerationPhotos[aiSelectedPhotoIndex]
+      ) {
+        setAiGenerationError('Please select a photo first.')
+        return
+      }
+
+      const selected = aiGenerationPhotos[aiSelectedPhotoIndex]
+      const avatarName = aiRequestName || 'AI Avatar'
+
+      setAiConfirmingPhoto(true)
+
+      const completeResponse = await api.post('/api/avatars/complete-ai-generation', {
+        generation_id: aiGenerationId,
+        image_keys: [selected.key],
+        avatar_name: avatarName,
+        image_urls: [selected.url],
+      })
+
+      const newAvatar: Avatar | undefined = completeResponse.data?.avatar
+
+      if (newAvatar) {
+        // Add to state immediately
+        addAvatar(newAvatar)
+
+        try {
+          await api.post(`/api/avatars/${newAvatar.id}/train`)
+          toast.success('Avatar created and training started! This may take a few minutes.')
+        } catch (trainError: any) {
+          console.error('Failed to start training automatically:', trainError)
+          toast.error('Avatar created, but failed to start training automatically. Please start training manually.')
+        }
+
+        await loadAvatars()
+        invalidateLooksCache()
+      }
+
+      setAiGenerationStage('completed')
+      setShowGenerateAIModal(false)
+      setAiGenerationPhotos([])
+      setAiSelectedPhotoIndex(null)
+      setAiGenerationId(null)
+      setAiRequestName(null)
+    } catch (error: any) {
+      const errorMessage = formatSpecificError(error)
+      setAiGenerationError(errorMessage)
+      handleError(error, {
+        showToast: true,
+        logError: true,
+        customMessage: errorMessage,
+      })
+      toast.error(errorMessage)
+    } finally {
+      setAiConfirmingPhoto(false)
+    }
+  }, [
+    aiGenerationId,
+    aiSelectedPhotoIndex,
+    aiGenerationPhotos,
+    aiRequestName,
+    addAvatar,
+    loadAvatars,
+    invalidateLooksCache,
+    toast,
+  ])
 
   // Handle look generation
   const handleGenerateLook = useCallback(async (data: {
@@ -331,11 +414,19 @@ function AvatarsContent() {
           setShowGenerateAIModal(false)
           setAiGenerationStage('idle')
           setAiGenerationError(null)
+          setAiGenerationPhotos([])
+          setAiSelectedPhotoIndex(null)
+          setAiGenerationId(null)
         }}
         onGenerate={handleGenerateAI}
         checkingStatus={checkingStatus}
         stage={aiGenerationStage}
         error={aiGenerationError}
+        photos={aiGenerationPhotos}
+        selectedIndex={aiSelectedPhotoIndex}
+        onSelectPhoto={setAiSelectedPhotoIndex}
+        onConfirmPhoto={handleConfirmAIPhoto}
+        confirmingPhoto={aiConfirmingPhoto}
       />
     </Layout>
   )

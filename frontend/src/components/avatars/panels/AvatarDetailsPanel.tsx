@@ -42,6 +42,7 @@ export function AvatarDetailsPanel({
           <p className="text-sm text-amber-800">
             {avatar.status === 'training' && 'This avatar is currently being trained.'}
             {avatar.status === 'pending' && 'This avatar is pending training.'}
+          {avatar.status === 'empty' && 'This avatar has been created but is not trained yet. Start training to make it usable.'}
             {avatar.status === 'failed' && 'Training failed. Please try again.'}
           </p>
         </div>
@@ -49,7 +50,7 @@ export function AvatarDetailsPanel({
 
       {/* Quick Actions */}
       <div className="space-y-2">
-        {avatar.status === 'pending' && onTrainAvatar && (
+        {(avatar.status === 'pending' || avatar.status === 'empty' || avatar.status === 'failed') && onTrainAvatar && (
           <Button
             onClick={onTrainAvatar}
             loading={training}
