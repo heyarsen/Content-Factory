@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Sparkles } from 'lucide-react'
-import { Button } from '../../ui/Button'
 
 interface QuickPromptBarProps {
   onGenerate: (prompt: string) => void
