@@ -169,7 +169,6 @@ export function VideoPlanning() {
   const [avatarModalOpen, setAvatarModalOpen] = useState(false)
   const [avatarModalIndex, setAvatarModalIndex] = useState<number>(0) // Track which video slot is selecting avatar
   const [lookModalOpen, setLookModalOpen] = useState(false)
-  const [selectedAvatarForLook, setSelectedAvatarForLook] = useState<string | null>(null)
   const [avatarLooks, setAvatarLooks] = useState<any[]>([])
   const [loadingLooks, setLoadingLooks] = useState(false)
   const [deleteModal, setDeleteModal] = useState<string | null>(null)
@@ -2990,7 +2989,6 @@ export function VideoPlanning() {
                         
                         // Load looks for this avatar
                         await loadAvatarLooks(avatar.id)
-                        setSelectedAvatarForLook(avatar.id)
                         
                         // If avatar has looks, show look selection modal, otherwise just close avatar modal
                         if (avatarLooks.length > 0) {
