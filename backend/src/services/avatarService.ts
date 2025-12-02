@@ -786,12 +786,14 @@ export class AvatarService {
    * We exclude avatars that were synced from HeyGen (which typically have avatar_url from HeyGen CDN)
    */
   static async getUserCreatedAvatars(userId: string): Promise<Avatar[]> {
-    // Show all user-created avatars including those in training/pending/generating
+    // Show all user-created avatars for this user.
+    // IMPORTANT: Do NOT over-filter by status here, because older avatars might use
+    // statuses like "ready" or other legacy values. We only exclude deleted/inactive,
+    // and we filter out explicitly synced avatars using the `source` column.
     const { data, error } = await supabase
       .from('avatars')
       .select('*')
       .eq('user_id', userId)
-      .in('status', ['active', 'training', 'pending', 'generating']) // Include all valid statuses
       .neq('status', 'deleted')
       .neq('status', 'inactive')
       .order('is_default', { ascending: false })
