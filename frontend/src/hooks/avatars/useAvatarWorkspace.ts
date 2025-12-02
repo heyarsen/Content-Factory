@@ -34,7 +34,7 @@ export function useAvatarWorkspaceState(selectedAvatarId: string | null) {
   const { refreshTrainingStatus } = useAvatarPolling({
     avatars: avatars as any,
     onStatusUpdate: debouncedLoadAvatars,
-    onTrainingComplete: useCallback((_avatar) => {
+    onTrainingComplete: useCallback((_avatar: { id: string; heygen_avatar_id: string; status: string }) => {
       toast.success('Avatar training completed!')
       loadAvatars()
       invalidateLooksCache()
