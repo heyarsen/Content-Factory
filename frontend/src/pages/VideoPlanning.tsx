@@ -3153,13 +3153,12 @@ export function VideoPlanning() {
             <p className="text-sm text-slate-500">
               Choose a look for video {avatarModalIndex + 1}. You can also use the default avatar by closing this modal.
             </p>
-            {loadingLooks || avatarLooks.length === 0 ? (
-              loadingLooks ? (
-                <div className="text-center py-12">
-                  <div className="inline-block h-8 w-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
-                  <p className="mt-4 text-sm text-slate-500">Loading looks...</p>
-                </div>
-              ) : (
+            {loadingLooks ? (
+              <div className="text-center py-12">
+                <div className="inline-block h-8 w-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+                <p className="mt-4 text-sm text-slate-500">Loading looks...</p>
+              </div>
+            ) : avatarLooks.length === 0 ? (
               <div className="text-center py-12 text-slate-500">
                 <Users className="h-12 w-12 mx-auto mb-3 text-slate-300" />
                 <p>No looks available for this avatar</p>
