@@ -124,7 +124,17 @@ export function AvatarWorkspace({
         onSelectAvatar={onSelectAvatar}
         onLookClick={onLookClick}
         onAvatarClick={onAvatarClick}
-        onCreateClick={() => panel.openCreateAvatar()}
+        onCreateClick={() => {
+          // If avatar is selected, open look generation, otherwise open avatar creation
+          if (selectedAvatarId) {
+            const avatar = avatars.find(a => a.id === selectedAvatarId)
+            if (avatar) {
+              panel.openGenerateLook(avatar)
+            }
+          } else {
+            panel.openCreateAvatar()
+          }
+        }}
         generatingLookIds={generatingLookIds}
         onQuickGenerate={onQuickGenerate}
         generating={generating}

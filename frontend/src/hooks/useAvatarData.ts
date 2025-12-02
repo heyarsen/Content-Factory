@@ -158,7 +158,12 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
       }
     }
 
-    setAllLooks(looks)
+    // Deduplicate looks by look.id to prevent duplicates
+    const uniqueLooks = looks.filter((item, index, self) => 
+      index === self.findIndex((t) => t.look.id === item.look.id && t.avatar.id === item.avatar.id)
+    )
+    
+    setAllLooks(uniqueLooks)
     setLoadingLooks(false)
   }, [])
 
@@ -199,7 +204,14 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
         loadLooksForAvatar(selectedAvatarId).then((looks: PhotoAvatarLook[]) => {
           const avatar = avatars.find(a => a.id === selectedAvatarId)
           if (avatar) {
-            setAllLooks(looks.map((look: PhotoAvatarLook) => ({ look, avatar })))
+            const newLooks = looks.map((look: PhotoAvatarLook) => ({ look, avatar }))
+            // Deduplicate by look.id
+            setAllLooks(prevLooks => {
+              const combined = [...prevLooks, ...newLooks]
+              return combined.filter((item, index, self) => 
+                index === self.findIndex((t) => t.look.id === item.look.id && t.avatar.id === item.avatar.id)
+              )
+            })
           }
         })
       } else {
