@@ -447,11 +447,25 @@ async function runTemplateGeneration(
         })
         
         // Try multiple possible paths for nodes
+        // HeyGen template structure can vary, so check multiple locations
         templateNodes = 
           templateDetails?.nodes || 
           templateDetails?.data?.nodes || 
           templateDetails?.data?.template?.nodes ||
+          templateDetails?.template?.nodes ||
+          templateDetails?.structure?.nodes ||
           (Array.isArray(templateDetails) ? templateDetails : [])
+        
+        // If still no nodes, check if there's a scenes or timeline structure
+        if (templateNodes.length === 0) {
+          const scenes = templateDetails?.scenes || templateDetails?.data?.scenes || templateDetails?.data?.template?.scenes
+          const timeline = templateDetails?.timeline || templateDetails?.data?.timeline || templateDetails?.data?.template?.timeline
+          if (scenes && Array.isArray(scenes)) {
+            templateNodes = scenes
+          } else if (timeline && Array.isArray(timeline)) {
+            templateNodes = timeline
+          }
+        }
         
         console.log('[Template Generation] Fetched template details:', {
           templateId: preference.templateId,
@@ -488,10 +502,10 @@ async function runTemplateGeneration(
       
       // Override strategy: Since template details may not expose nodes correctly,
       // we'll override multiple nodes to ensure the character is set
-      // Try overriding nodes 0, 1, and 2 (most templates have the character in one of these)
+      // If we have template nodes, use them; otherwise override nodes 0-5 to catch the character
       const nodesToOverride: Array<{ index: number; id?: string; hasCharacter?: boolean }> = templateNodes.length > 0 
         ? templateNodes.map((n: any, i: number) => ({ index: i, id: n.id || n.node_id, hasCharacter: !!n.character }))
-        : [{ index: 0 }, { index: 1 }, { index: 2 }] // Fallback: override first 3 nodes
+        : Array.from({ length: 6 }, (_, i) => ({ index: i })) // Fallback: override nodes 0-5 to ensure we catch the character
       
       // Override all identified nodes (or first 3 as fallback)
       for (const nodeInfo of nodesToOverride) {
