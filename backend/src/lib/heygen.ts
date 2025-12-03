@@ -961,29 +961,42 @@ export async function detectAvatarCapabilities(
  * Hyper-Realistic avatars support the full range of gestures.
  */
 export function buildGestureArray(script: string, duration: number): GestureDefinition[] {
-  // Default gesture sequence for natural movement
-  const defaultGestures: Array<{ time: number; type: string }> = [
-    { time: 0.5, type: 'open_hand' },   // Early welcoming gesture
-    { time: 2.0, type: 'point_right' },  // Mid-early pointing
-    { time: 4.0, type: 'emphasis' },     // Emphasis for key points
-  ]
+  // Enhanced gesture sequence for maximum movement and hand gestures
+  // More frequent gestures create more natural, engaging movement
+  const gestures: Array<{ time: number; type: string }> = []
   
-  // Filter gestures that occur within video duration
-  const gestures = defaultGestures.filter(g => g.time < duration)
+  // Calculate gesture interval based on duration (aim for gesture every 2-3 seconds)
+  const gestureInterval = Math.max(2.0, duration / Math.max(3, Math.floor(duration / 2.5)))
   
-  // If video is longer, add more gestures at intervals
-  if (duration > 6) {
-    gestures.push({ time: 6.0, type: 'wave' })
-  }
-  if (duration > 8) {
-    gestures.push({ time: 8.0, type: 'emphasis' })
-  }
-  if (duration > 10) {
-    gestures.push({ time: 10.0, type: 'open_hand' })
+  // Generate gestures throughout the video for continuous movement
+  const gestureTypes = ['open_hand', 'point_right', 'emphasis', 'wave', 'point_left', 'thumbs_up']
+  let currentTime = 0.5 // Start early
+  
+  while (currentTime < duration - 0.5) {
+    // Rotate through gesture types for variety
+    const gestureType = gestureTypes[gestures.length % gestureTypes.length]
+    gestures.push({ time: currentTime, type: gestureType })
+    
+    // Move to next gesture time
+    currentTime += gestureInterval
+    
+    // Add some variation to timing (±0.3 seconds) for more natural feel
+    currentTime += (Math.random() * 0.6 - 0.3)
   }
   
-  // Ensure gestures don't exceed duration
-  return gestures.filter(g => g.time < duration)
+  // Ensure we have at least a few gestures even for short videos
+  if (gestures.length < 2 && duration >= 1) {
+    gestures.push({ time: Math.min(0.5, duration * 0.1), type: 'open_hand' })
+    if (duration >= 2) {
+      gestures.push({ time: Math.min(duration * 0.5, duration - 0.5), type: 'emphasis' })
+    }
+  }
+  
+  // Sort by time and ensure gestures don't exceed duration
+  return gestures
+    .filter(g => g.time < duration && g.time >= 0)
+    .sort((a, b) => a.time - b.time)
+    .slice(0, 10) // Limit to 10 gestures max to avoid overwhelming the API
 }
 
 export async function generateVideo(

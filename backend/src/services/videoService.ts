@@ -447,12 +447,20 @@ async function runTemplateGeneration(
           ? buildGestureArray(scriptText || video.topic || '', video.duration)
           : undefined
         
+        // Create enhanced motion config for maximum movement
+        // Use more explicit prompts for full body motion, hand gestures, and head movement
+        const enhancedMotionPrompt = avatarCapabilities.supportsFullBodyMovement
+          ? 'Full body motion with expressive hand gestures, natural head movements, and engaging body language. Include waving, pointing, and emphasis gestures throughout the video.'
+          : avatarCapabilities.supportsCustomMotionPrompt
+          ? 'Expressive head movements with natural hand gestures, friendly facial expressions, and engaging body language. Include waving, pointing, and emphasis gestures.'
+          : 'Natural head movement with friendly expressions, engaging gestures, and expressive body language'
+        
         motionConfig = {
           gestures,
-          customMotionPrompt: avatarCapabilities.supportsCustomMotionPrompt
-            ? 'Natural head movement with friendly expressions and engaging gestures'
+          customMotionPrompt: avatarCapabilities.supportsCustomMotionPrompt || avatarCapabilities.supportsFullBodyMovement
+            ? enhancedMotionPrompt
             : undefined,
-          enhanceCustomMotionPrompt: avatarCapabilities.supportsCustomMotionPrompt,
+          enhanceCustomMotionPrompt: avatarCapabilities.supportsCustomMotionPrompt || avatarCapabilities.supportsFullBodyMovement,
           enableHeadMovement: avatarCapabilities.supportsHeadMovement,
           enableEnhancedExpressions: avatarCapabilities.supportsEnhancedExpressions,
         }
@@ -580,39 +588,45 @@ async function runTemplateGeneration(
               console.log(`[Template Generation] Preserving fields from template node[${nodeIndex}]:`, preservedFields)
             }
             
-            // Add motion features to character nodes if supported AND template doesn't already have them
-            const motionFields = [
-              'motion_engine', 
-              'generation_mode', 
-              'motion_config', 
-              'motion_settings', 
-              'full_body_motion',
-              'enable_full_body_motion',
-              'motion_mode'
-            ]
-            const hasTemplateMotion = motionFields.some(field => existingNode[field] !== undefined) ||
-              (oldCharacter && typeof oldCharacter === 'object' && 
-               ['motion_engine', 'generation_mode', 'full_body_motion'].some(field => oldCharacter[field] !== undefined))
-            
-            if (!hasTemplateMotion && motionConfig && avatarCapabilities) {
-              // Add gestures if avatar supports gesture control
+            // ALWAYS add motion features to ensure maximum movement, even if template has some motion settings
+            // This ensures we get full body motion, hand gestures, and head movement
+            if (motionConfig && avatarCapabilities) {
+              // Add gestures if avatar supports gesture control (always add for maximum motion)
               if (motionConfig.gestures && motionConfig.gestures.length > 0 && avatarCapabilities.supportsGestureControl) {
                 nodeOverride.gestures = motionConfig.gestures
+                console.log(`[Template Generation] Added gestures to node[${nodeIndex}]:`, motionConfig.gestures.length, 'gestures')
               }
               
-              // Add custom motion prompt for Avatar IV or fallback
-              if (motionConfig.customMotionPrompt && avatarCapabilities.supportsCustomMotionPrompt) {
+              // Always add enhanced custom motion prompt for maximum movement
+              if (motionConfig.customMotionPrompt) {
+                // Override template's motion prompt with our enhanced one for maximum motion
                 nodeOverride.custom_motion_prompt = motionConfig.customMotionPrompt
                 
                 if (motionConfig.enhanceCustomMotionPrompt) {
                   nodeOverride.enhance_custom_motion_prompt = true
                 }
+                console.log(`[Template Generation] Added enhanced motion prompt to node[${nodeIndex}]:`, motionConfig.customMotionPrompt.substring(0, 100))
               } else if (!avatarCapabilities.supportsGestureControl && avatarCapabilities.supportsCustomMotionPrompt) {
-                // Fallback: use custom motion prompt if gestures not supported
-                nodeOverride.custom_motion_prompt = 
-                  motionConfig.customMotionPrompt || 
-                  'Enhanced facial expressions with subtle head movements and natural gestures'
+                // Fallback: use enhanced motion prompt if gestures not supported
+                const fallbackPrompt = 'Expressive head movements with natural hand gestures, friendly facial expressions, and engaging body language. Include waving, pointing, and emphasis gestures throughout.'
+                nodeOverride.custom_motion_prompt = fallbackPrompt
                 nodeOverride.enhance_custom_motion_prompt = true
+                console.log(`[Template Generation] Added fallback motion prompt to node[${nodeIndex}]`)
+              }
+              
+              // Explicitly enable head movement and expressions if supported
+              if (avatarCapabilities.supportsHeadMovement) {
+                // Some APIs might need explicit head_movement flag
+                if (!nodeOverride.head_movement) {
+                  nodeOverride.head_movement = true
+                }
+              }
+              
+              if (avatarCapabilities.supportsEnhancedExpressions) {
+                // Some APIs might need explicit enhanced_expressions flag
+                if (!nodeOverride.enhanced_expressions) {
+                  nodeOverride.enhanced_expressions = true
+                }
               }
             }
             
@@ -745,40 +759,45 @@ async function runTemplateGeneration(
             console.log(`[Template Generation] Preserving fields from template node[${nodeIndex}]:`, preservedFields)
           }
           
-          // Add motion features to character nodes if supported AND template doesn't already have them
-          // Only add our motion config if template doesn't have motion settings
-          const motionFields = [
-            'motion_engine', 
-            'generation_mode', 
-            'motion_config', 
-            'motion_settings', 
-            'full_body_motion',
-            'enable_full_body_motion',
-            'motion_mode'
-          ]
-          const hasTemplateMotion = motionFields.some(field => existingNode[field] !== undefined) ||
-            (oldCharacter && typeof oldCharacter === 'object' && 
-             ['motion_engine', 'generation_mode', 'full_body_motion'].some(field => oldCharacter[field] !== undefined))
-          
-          if (!hasTemplateMotion && motionConfig && avatarCapabilities && nodeInfo.hasCharacter) {
-            // Add gestures if avatar supports gesture control
+          // ALWAYS add motion features to ensure maximum movement, even if template has some motion settings
+          // This ensures we get full body motion, hand gestures, and head movement
+          if (motionConfig && avatarCapabilities && nodeInfo.hasCharacter) {
+            // Add gestures if avatar supports gesture control (always add for maximum motion)
             if (motionConfig.gestures && motionConfig.gestures.length > 0 && avatarCapabilities.supportsGestureControl) {
               nodeOverride.gestures = motionConfig.gestures
+              console.log(`[Template Generation] Added gestures to node[${nodeIndex}]:`, motionConfig.gestures.length, 'gestures')
             }
             
-            // Add custom motion prompt for Avatar IV or fallback
-            if (motionConfig.customMotionPrompt && avatarCapabilities.supportsCustomMotionPrompt) {
+            // Always add enhanced custom motion prompt for maximum movement
+            if (motionConfig.customMotionPrompt) {
+              // Override template's motion prompt with our enhanced one for maximum motion
               nodeOverride.custom_motion_prompt = motionConfig.customMotionPrompt
               
               if (motionConfig.enhanceCustomMotionPrompt) {
                 nodeOverride.enhance_custom_motion_prompt = true
               }
+              console.log(`[Template Generation] Added enhanced motion prompt to node[${nodeIndex}]:`, motionConfig.customMotionPrompt.substring(0, 100))
             } else if (!avatarCapabilities.supportsGestureControl && avatarCapabilities.supportsCustomMotionPrompt) {
-              // Fallback: use custom motion prompt if gestures not supported
-              nodeOverride.custom_motion_prompt = 
-                motionConfig.customMotionPrompt || 
-                'Enhanced facial expressions with subtle head movements and natural gestures'
+              // Fallback: use enhanced motion prompt if gestures not supported
+              const fallbackPrompt = 'Expressive head movements with natural hand gestures, friendly facial expressions, and engaging body language. Include waving, pointing, and emphasis gestures throughout.'
+              nodeOverride.custom_motion_prompt = fallbackPrompt
               nodeOverride.enhance_custom_motion_prompt = true
+              console.log(`[Template Generation] Added fallback motion prompt to node[${nodeIndex}]`)
+            }
+            
+            // Explicitly enable head movement and expressions if supported
+            if (avatarCapabilities.supportsHeadMovement) {
+              // Some APIs might need explicit head_movement flag
+              if (!nodeOverride.head_movement) {
+                nodeOverride.head_movement = true
+              }
+            }
+            
+            if (avatarCapabilities.supportsEnhancedExpressions) {
+              // Some APIs might need explicit enhanced_expressions flag
+              if (!nodeOverride.enhanced_expressions) {
+                nodeOverride.enhanced_expressions = true
+              }
             }
           }
           
