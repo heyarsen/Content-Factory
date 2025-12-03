@@ -235,17 +235,18 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
                   const newLooks = looks.map((look: PhotoAvatarLook) => ({ look, avatar: avatar! }))
                   setAllLooks(prevLooks => {
                     // Remove old looks for this avatar first
-                    const filtered = prevLooks.filter(item => item.avatar.id !== selectedAvatarId)
+                    const filtered = prevLooks.filter(item => item.avatar?.id !== selectedAvatarId)
                     const combined = [...filtered, ...newLooks]
                     // Deduplicate by look.id
-                    return combined.filter((item, index, self) => 
-                      index === self.findIndex((t) => t.look.id === item.look.id && t.avatar.id === item.avatar.id)
-                    )
+                    return combined.filter((item, index, self) => {
+                      if (!item.avatar) return false
+                      return index === self.findIndex((t) => t.look.id === item.look.id && t.avatar?.id === item.avatar.id)
+                    }) as Array<{ look: PhotoAvatarLook; avatar: Avatar }>
                   })
                   console.log(`[useAvatarData] Added ${newLooks.length} looks for avatar ${selectedAvatarId}`)
                 } else {
                   // No looks found, clear any stale looks for this avatar
-                  setAllLooks(prevLooks => prevLooks.filter(item => item.avatar.id !== selectedAvatarId))
+                  setAllLooks(prevLooks => prevLooks.filter(item => item.avatar?.id !== selectedAvatarId))
                   console.log(`[useAvatarData] No looks found for avatar ${selectedAvatarId}, cleared stale looks`)
                 }
               }
@@ -319,17 +320,18 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
         const newLooks = looks.map((look: PhotoAvatarLook) => ({ look, avatar }))
         // Update state: remove old looks for this avatar and add new ones
         setAllLooks(prevLooks => {
-          const filtered = prevLooks.filter(item => item.avatar.id !== avatarId)
+          const filtered = prevLooks.filter(item => item.avatar?.id !== avatarId)
           const combined = [...filtered, ...newLooks]
           // Deduplicate by look.id
-          return combined.filter((item, index, self) => 
-            index === self.findIndex((t) => t.look.id === item.look.id && t.avatar.id === item.avatar.id)
-          )
+          return combined.filter((item, index, self) => {
+            if (!item.avatar) return false
+            return index === self.findIndex((t) => t.look.id === item.look.id && t.avatar?.id === item.avatar.id)
+          }) as Array<{ look: PhotoAvatarLook; avatar: Avatar }>
         })
         console.log(`[useAvatarData] Updated state with ${newLooks.length} looks for avatar ${avatarId}`)
       } else {
         // No looks found, remove any stale looks for this avatar
-        setAllLooks(prevLooks => prevLooks.filter(item => item.avatar.id !== avatarId))
+        setAllLooks(prevLooks => prevLooks.filter(item => item.avatar?.id !== avatarId))
         console.log(`[useAvatarData] No looks found, cleared looks for avatar ${avatarId}`)
       }
     } else {
