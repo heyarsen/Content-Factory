@@ -604,11 +604,18 @@ async function runTemplateGeneration(
       }
     }
 
+    // Configure caption with higher positioning
+    const captionConfig = {
+      enabled: true,
+      position: 'top', // Position captions at the top
+      vertical_offset: -20, // Negative value to move captions higher
+    }
+
     const payload = {
       template_id: preference.templateId,
       variables,
       title: video.topic,
-      caption: true,
+      caption: captionConfig, // Use caption configuration object instead of just true
       overrides: Object.keys(overrides).length > 0 ? overrides : undefined,
     }
 

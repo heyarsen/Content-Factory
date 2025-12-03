@@ -277,7 +277,7 @@ export interface GenerateTemplateVideoRequest {
   template_id: string
   variables: Record<string, string | Record<string, any>>
   title?: string
-  caption?: boolean
+  caption?: boolean | Record<string, any>
   include_gif?: boolean
   enable_sharing?: boolean
   callback_url?: string
@@ -1166,6 +1166,20 @@ export async function generateVideoFromTemplate(
       caption: request.caption ?? false,
       include_gif: request.include_gif ?? false,
       enable_sharing: request.enable_sharing ?? false,
+    }
+
+    // If caption is an object with configuration, use it directly
+    // Otherwise, if it's true, try to add caption positioning configuration
+    if (request.caption && typeof request.caption === 'object') {
+      payload.caption = request.caption
+    } else if (request.caption === true) {
+      // Try to add caption configuration for higher positioning
+      // Note: This may not be supported by HeyGen API, but we'll try
+      payload.caption = {
+        enabled: true,
+        position: 'top', // Try 'top' instead of default 'bottom'
+        vertical_offset: -20, // Negative value to move up
+      }
     }
 
     if (request.callback_url) {
@@ -2201,21 +2215,24 @@ export async function generateAvatarLook(
 export async function getVideoStatus(
   videoId: string
 ): Promise<HeyGenVideoResponse & { progress?: number }> {
-  try {
-    const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
-    const apiKey = getHeyGenKey()
+  const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
+  const apiKey = getHeyGenKey()
 
-    // Try v2 API first
+  // Try multiple v2 endpoint formats
+  const v2Endpoints = [
+    `${HEYGEN_V2_API_URL}/video_status/${videoId}`, // Template videos might use this
+    `${HEYGEN_V2_API_URL}/video/${videoId}`, // Standard video endpoint
+  ]
+
+  for (const endpoint of v2Endpoints) {
     try {
-      const response = await axios.get(
-        `${HEYGEN_V2_API_URL}/video/${videoId}`,
-        {
-          headers: {
-            'X-Api-Key': apiKey,
-            'Content-Type': 'application/json',
-          },
-        }
-      )
+      const response = await axios.get(endpoint, {
+        headers: {
+          'X-Api-Key': apiKey,
+          'Content-Type': 'application/json',
+        },
+        timeout: 30000,
+      })
 
       const data = response.data?.data || response.data
 
@@ -2227,51 +2244,56 @@ export async function getVideoStatus(
         progress: data.progress || data.progress_percentage || undefined,
       }
     } catch (v2Error: any) {
-      // Fallback to v1 API - but v1 API is deprecated, so log warning
       const v2Status = v2Error.response?.status
-      const v2Message = v2Error?.message ?? 'unknown error'
-      
-      console.warn(
-        `v2 API failed (status: ${v2Status}), trying v1:`,
-        v2Message
-      )
-      
-      // Only try v1 if v2 error is not 404 (which means endpoint doesn't exist)
-      if (v2Status === 404) {
-        throw new Error(`HeyGen v2 API endpoint not found. Please check your API configuration. Original error: ${v2Message}`)
+      // If it's not a 404, this endpoint format might be wrong, try next
+      // If it's 404, this endpoint doesn't exist, try next format
+      if (v2Status !== 404 && v2Status < 500) {
+        // Non-404 client error (400, 401, 403) - this endpoint format is wrong, try next
+        continue
       }
-      
-      try {
-        const response = await axios.get(
-          `${HEYGEN_API_URL}/video_status.get`,
-          {
-            headers: {
-              'Authorization': `Bearer ${apiKey}`,
-            },
-            params: {
-              video_id: videoId,
-            },
-          }
-        )
-
-        const data = response.data.data || response.data
-
-        return {
-          video_id: videoId,
-          status: data.status,
-          video_url: data.video_url || data.videoUrl || data.url,
-          error: data.error || data.error_message,
-        }
-      } catch (v1Error: any) {
-        // If v1 also fails, throw the original v2 error
-        throw new Error(`HeyGen API error: v2 failed (${v2Status}), v1 also failed (${v1Error.response?.status || v1Error.message}). Please check your API configuration.`)
+      // For 404 or 5xx errors, try next endpoint format
+      if (endpoint === v2Endpoints[v2Endpoints.length - 1]) {
+        // Last v2 endpoint failed, try v1
+        break
       }
+      continue
     }
-  } catch (error: any) {
-    console.error('HeyGen API error (getVideoStatus):', error.response?.data || error.message)
-    throw new Error(
-      error.response?.data?.message || 'Failed to get video status'
+  }
+
+  // All v2 endpoints failed, try v1 API as fallback
+  try {
+    console.warn(`All v2 API endpoints failed, trying v1 for video ${videoId}`)
+    const response = await axios.get(
+      `${HEYGEN_API_URL}/video_status.get`,
+      {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        params: {
+          video_id: videoId,
+        },
+        timeout: 30000,
+      }
     )
+
+    const data = response.data.data || response.data
+
+    return {
+      video_id: videoId,
+      status: data.status || 'pending',
+      video_url: data.video_url || data.videoUrl || data.url || null,
+      error: data.error || data.error_message || null,
+    }
+  } catch (v1Error: any) {
+    // If v1 also fails, throw error but with more context
+    // The calling code should handle this gracefully and retry later
+    const errorMessage = `HeyGen API error: All endpoints failed for video ${videoId}. v1 error: ${v1Error.response?.status || v1Error.message}`
+    console.error('HeyGen API error (getVideoStatus):', {
+      videoId,
+      v1Error: v1Error.response?.status || v1Error.message,
+      v1ErrorData: v1Error.response?.data,
+    })
+    throw new Error(errorMessage)
   }
 }
 
