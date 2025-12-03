@@ -423,17 +423,26 @@ async function runTemplateGeneration(
     }
 
     // Add avatar_id as a template variable (the template uses this variable name)
+    // Note: The template editor shows this as a variable input field
+    // We pass it as a variable so the template can use it
     if (avatarId) {
       variables['avatar_id'] = avatarId
+      console.log('[Template Generation] Added avatar_id variable:', {
+        avatarId,
+        isPhotoAvatar,
+        variableType: typeof variables['avatar_id'],
+      })
     }
 
     // Build overrides to set avatar in template nodes if needed
     let overrides = { ...preference.overrides }
     
-    // If no overrides provided, create default override to set avatar in template
-    if (!overrides || Object.keys(overrides).length === 0) {
-      // Try to set avatar via nodes_override if avatar is available
-      if (avatarId) {
+    // Always set avatar via nodes_override (this is the correct way for templates)
+    // The avatar_id variable is for the template to use, but the actual avatar assignment
+    // should be done via nodes_override
+    if (avatarId) {
+      if (!overrides || Object.keys(overrides).length === 0) {
+        // Create new overrides with avatar
         overrides = {
           nodes_override: [
             {
@@ -449,19 +458,39 @@ async function runTemplateGeneration(
             },
           ],
         }
-      }
-    } else if (avatarId && overrides.nodes_override) {
-      // If overrides exist, ensure avatar is set in the first node
-      if (Array.isArray(overrides.nodes_override) && overrides.nodes_override.length > 0) {
-        overrides.nodes_override[0].character = isPhotoAvatar
-          ? {
-              type: 'talking_photo',
-              talking_photo_id: avatarId,
-            }
-          : {
-              type: 'avatar',
-              avatar_id: avatarId,
-            }
+      } else {
+        // Merge with existing overrides
+        if (!overrides.nodes_override) {
+          overrides.nodes_override = []
+        }
+        if (!Array.isArray(overrides.nodes_override)) {
+          overrides.nodes_override = [overrides.nodes_override]
+        }
+        // Set avatar in the first node (or create one if none exist)
+        if (overrides.nodes_override.length === 0) {
+          overrides.nodes_override.push({
+            character: isPhotoAvatar
+              ? {
+                  type: 'talking_photo',
+                  talking_photo_id: avatarId,
+                }
+              : {
+                  type: 'avatar',
+                  avatar_id: avatarId,
+                },
+          })
+        } else {
+          // Update the first node's character
+          overrides.nodes_override[0].character = isPhotoAvatar
+            ? {
+                type: 'talking_photo',
+                talking_photo_id: avatarId,
+              }
+            : {
+                type: 'avatar',
+                avatar_id: avatarId,
+              }
+        }
       }
     }
 

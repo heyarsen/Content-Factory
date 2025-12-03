@@ -1211,7 +1211,13 @@ export async function generateVideoFromTemplate(
       video_url: data.video_url || data.videoUrl || data.url || null,
     }
   } catch (error: any) {
-    console.error('HeyGen API error (generateVideoFromTemplate):', error.response?.data || error.message)
+    console.error('HeyGen API error (generateVideoFromTemplate):', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message,
+      payload: JSON.stringify(payload, null, 2), // Log the full payload for debugging
+    })
 
     let errorMessage = 'Failed to generate video from template'
     if (error.response?.status === 401) {
@@ -1224,7 +1230,13 @@ export async function generateVideoFromTemplate(
     } else if (error.response?.status === 429) {
       errorMessage = 'HeyGen API rate limit exceeded. Please try again later.'
     } else if (error.response?.status >= 500) {
-      errorMessage = 'HeyGen API server error. Please try again later.'
+      // For 500 errors, include more details about what might be wrong
+      const errorData = error.response?.data
+      if (errorData?.error?.code === 'internal_error') {
+        errorMessage = `HeyGen API internal error: ${errorData.error.message || 'Something is wrong with the HeyGen API. Please check the payload format and template configuration.'}`
+      } else {
+        errorMessage = 'HeyGen API server error. Please try again later.'
+      }
     } else if (error.response?.data?.message) {
       errorMessage = error.response.data.message
     } else if (error.response?.data?.error?.message) {
