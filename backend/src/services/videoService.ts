@@ -443,16 +443,32 @@ async function runTemplateGeneration(
         avatarCapabilities = await detectAvatarCapabilities(avatarId, !!isPhotoAvatar)
         
         // For photo avatars, use the Add Motion API to enhance motion before video generation
+        // The API returns a new avatar/look ID with motion that we should use
+        let motionEnhancedAvatarId = avatarId
         if (isPhotoAvatar) {
           try {
             const motionPrompt = 'Full body motion with expressive hand gestures, natural head movements, engaging body language, waving, pointing, and emphasis gestures throughout'
-            await addMotionToPhotoAvatar(avatarId, motionPrompt, 'expressive')
-            console.log('[Template Motion] Added motion to photo avatar using Add Motion API')
+            const motionResult = await addMotionToPhotoAvatar(avatarId, motionPrompt, 'expressive')
+            
+            // The Add Motion API returns a new ID for the motion-enhanced avatar/look
+            // Use this ID instead of the original for better motion
+            if (motionResult && motionResult.id) {
+              motionEnhancedAvatarId = motionResult.id
+              console.log('[Template Motion] Using motion-enhanced avatar ID:', {
+                originalId: avatarId,
+                motionEnhancedId: motionEnhancedAvatarId,
+              })
+            } else {
+              console.log('[Template Motion] Add Motion API called but no new ID returned, using original avatar ID')
+            }
           } catch (motionError: any) {
             // Don't fail video generation if Add Motion fails - it's optional enhancement
-            console.warn('[Template Motion] Could not add motion via Add Motion API, continuing with video generation:', motionError.message)
+            console.warn('[Template Motion] Could not add motion via Add Motion API, continuing with original avatar:', motionError.message)
           }
         }
+        
+        // Update avatarId to use motion-enhanced version if available
+        avatarId = motionEnhancedAvatarId
         
         // Auto-generate motion config for templates
         const gestures = avatarCapabilities.supportsGestureControl
@@ -620,26 +636,15 @@ async function runTemplateGeneration(
                 console.log(`[Template Generation] Added enhanced motion prompt to node[${nodeIndex}]:`, motionConfig.customMotionPrompt.substring(0, 100))
               } else if (!avatarCapabilities.supportsGestureControl && avatarCapabilities.supportsCustomMotionPrompt) {
                 // Fallback: use enhanced motion prompt if gestures not supported
-                const fallbackPrompt = 'Expressive head movements with natural hand gestures, friendly facial expressions, and engaging body language. Include waving, pointing, and emphasis gestures throughout.'
-                nodeOverride.custom_motion_prompt = fallbackPrompt
-                nodeOverride.enhance_custom_motion_prompt = true
-                console.log(`[Template Generation] Added fallback motion prompt to node[${nodeIndex}]`)
-              }
-              
-              // Explicitly enable head movement and expressions if supported
-              if (avatarCapabilities.supportsHeadMovement) {
-                // Some APIs might need explicit head_movement flag
-                if (!nodeOverride.head_movement) {
-                  nodeOverride.head_movement = true
-                }
-              }
-              
-              if (avatarCapabilities.supportsEnhancedExpressions) {
-                // Some APIs might need explicit enhanced_expressions flag
-                if (!nodeOverride.enhanced_expressions) {
-                  nodeOverride.enhanced_expressions = true
-                }
-              }
+              const fallbackPrompt = 'Expressive head movements with natural hand gestures, friendly facial expressions, and engaging body language. Include waving, pointing, and emphasis gestures throughout.'
+              nodeOverride.custom_motion_prompt = fallbackPrompt
+              nodeOverride.enhance_custom_motion_prompt = true
+              console.log(`[Template Generation] Added fallback motion prompt to node[${nodeIndex}]`)
+            }
+            
+            // Note: head_movement and enhanced_expressions are typically automatic
+            // for photo avatars when custom_motion_prompt is used with enhance_custom_motion_prompt
+            // We don't need to set these explicitly as they might not be valid fields for template API
             }
             
             overrides.nodes_override[nodeIndex] = nodeOverride
@@ -797,20 +802,9 @@ async function runTemplateGeneration(
               console.log(`[Template Generation] Added fallback motion prompt to node[${nodeIndex}]`)
             }
             
-            // Explicitly enable head movement and expressions if supported
-            if (avatarCapabilities.supportsHeadMovement) {
-              // Some APIs might need explicit head_movement flag
-              if (!nodeOverride.head_movement) {
-                nodeOverride.head_movement = true
-              }
-            }
-            
-            if (avatarCapabilities.supportsEnhancedExpressions) {
-              // Some APIs might need explicit enhanced_expressions flag
-              if (!nodeOverride.enhanced_expressions) {
-                nodeOverride.enhanced_expressions = true
-              }
-            }
+            // Note: head_movement and enhanced_expressions are typically automatic
+            // for photo avatars when custom_motion_prompt is used with enhance_custom_motion_prompt
+            // We don't need to set these explicitly as they might not be valid fields
           }
           
           // Add node_id if available
