@@ -240,6 +240,57 @@ export class AvatarService {
   }
 
   /**
+   * Add a public avatar from HeyGen to user's avatar list
+   */
+  static async addPublicAvatar(userId: string, heygenAvatarId: string, avatarName?: string, avatarUrl?: string): Promise<Avatar> {
+    try {
+      // Check if already exists
+      const { data: existing } = await supabase
+        .from('avatars')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('heygen_avatar_id', heygenAvatarId)
+        .single()
+
+      if (existing) {
+        return existing
+      }
+
+      // Insert new public avatar
+      const newAvatarPayload = {
+        user_id: userId,
+        heygen_avatar_id: heygenAvatarId,
+        avatar_name: avatarName || 'Public Avatar',
+        avatar_url: avatarUrl || null,
+        preview_url: avatarUrl || null,
+        thumbnail_url: avatarUrl || null,
+        gender: null,
+        status: 'active',
+      }
+
+      assignAvatarSource(newAvatarPayload, 'synced') // Mark as synced (public avatar)
+
+      const { data, error } = await executeWithAvatarSourceFallback<Avatar>(
+        newAvatarPayload,
+        () => supabase.from('avatars').insert(newAvatarPayload).select().single()
+      )
+
+      if (error) {
+        throw new Error(`Failed to add public avatar: ${error.message}`)
+      }
+
+      if (!data) {
+        throw new Error('Failed to add public avatar: No data returned')
+      }
+
+      return data
+    } catch (error: any) {
+      console.error('Error adding public avatar:', error)
+      throw error
+    }
+  }
+
+  /**
    * Add a new avatar from HeyGen
    */
   static async addAvatarFromHeyGen(userId: string, heygenAvatarId: string): Promise<Avatar> {

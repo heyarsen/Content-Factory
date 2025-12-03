@@ -16,13 +16,22 @@ router.use(authenticate)
 /**
  * GET /api/avatars
  * Get all avatars for the current user
- * Query params: ?all=true to include synced avatars
+ * Query params: 
+ *   - ?all=true to include synced avatars
+ *   - ?public=true to get public HeyGen avatars
  */
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
-    const showAll = req.query.all === 'true'
     
+    // If public=true, return public avatars from HeyGen
+    if (req.query.public === 'true') {
+      const result = await AvatarController.getPublicAvatars()
+      return res.json(result)
+    }
+    
+    // Otherwise, return user's avatars
+    const showAll = req.query.all === 'true'
     const result = await AvatarController.listAvatars(userId, { includeSynced: showAll })
     return res.json(result)
   } catch (error: any) {
@@ -60,6 +69,29 @@ router.post('/sync', async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     logError(error, { userId: req.userId!, operation: 'sync_avatars' })
     const { statusCode, response } = createErrorResponse(error, 'Failed to sync avatars', ErrorCode.INTERNAL_SERVER_ERROR)
+    return res.status(statusCode).json(response)
+  }
+})
+
+/**
+ * POST /api/avatars/public
+ * Add a public avatar from HeyGen to user's avatar list
+ * Body: { heygen_avatar_id: string, avatar_name?: string, avatar_url?: string }
+ */
+router.post('/public', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { heygen_avatar_id, avatar_name, avatar_url } = req.body
+    
+    if (!heygen_avatar_id) {
+      return res.status(400).json({ error: 'heygen_avatar_id is required' })
+    }
+    
+    const result = await AvatarController.addPublicAvatar(userId, heygen_avatar_id, avatar_name, avatar_url)
+    return res.status(201).json(result)
+  } catch (error: any) {
+    logError(error, { userId: req.userId!, operation: 'add_public_avatar' })
+    const { statusCode, response } = createErrorResponse(error, 'Failed to add public avatar', ErrorCode.INTERNAL_SERVER_ERROR)
     return res.status(statusCode).json(response)
   }
 })

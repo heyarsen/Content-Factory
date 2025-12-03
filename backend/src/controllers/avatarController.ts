@@ -194,6 +194,26 @@ export class AvatarController {
   }
 
   /**
+   * Get public avatars from HeyGen
+   */
+  static async getPublicAvatars() {
+    const { listPublicAvatars } = await import('../lib/heygen.js')
+    const result = await listPublicAvatars()
+    return {
+      avatars: result.avatars,
+      is_public: true,
+    }
+  }
+
+  /**
+   * Add a public avatar to user's avatar list
+   */
+  static async addPublicAvatar(userId: string, heygenAvatarId: string, avatarName?: string, avatarUrl?: string) {
+    const avatar = await AvatarService.addPublicAvatar(userId, heygenAvatarId, avatarName, avatarUrl)
+    return { avatar }
+  }
+
+  /**
    * Get a specific avatar
    */
   static async getAvatar(userId: string, avatarId: string) {
