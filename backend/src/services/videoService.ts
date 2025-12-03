@@ -447,26 +447,38 @@ async function runTemplateGeneration(
         hasAvatarIdVariable = 'avatar_id' in templateVariables
         
         if (hasAvatarIdVariable) {
-          console.log('[Template Generation] Template has avatar_id variable, will try both variable and nodes_override')
-          // Try setting avatar_id as a variable (for character type variables)
-          // But also use nodes_override as backup to ensure it works
+          console.log('[Template Generation] Template has avatar_id variable, will use template character_id and override avatar via nodes_override')
+          
+          // Preserve the template's character_id and other properties to satisfy schema
+          const templateAvatarVar = (templateVariables as any).avatar_id || {}
+          const templateAvatarProps = templateAvatarVar.properties || {}
+          const templateAvatarType = templateAvatarVar.type || 'character'
+
+          // Build avatar_id variable keeping the original character_id, but adding our avatar type hints
           variables['avatar_id'] = {
             name: 'avatar_id',
-            type: 'character',
-            properties: isPhotoAvatar
-              ? {
-                  type: 'talking_photo',
-                  talking_photo_id: avatarId,
-                }
-              : {
-                  type: 'avatar',
-                  avatar_id: avatarId,
-                },
+            type: templateAvatarType,
+            properties: {
+              ...templateAvatarProps,
+              // These hints might be ignored by HeyGen for templates but are safe to include
+              ...(isPhotoAvatar
+                ? {
+                    type: 'talking_photo',
+                    talking_photo_id: avatarId,
+                  }
+                : {
+                    type: 'avatar',
+                    avatar_id: avatarId,
+                  }),
+            },
           }
-          console.log('[Template Generation] Set avatar_id variable:', JSON.stringify(variables['avatar_id'], null, 2))
+
+          console.log('[Template Generation] Set avatar_id variable (preserving template character_id):', {
+            templateCharacterId: templateAvatarProps.character_id,
+            finalVariable: JSON.stringify(variables['avatar_id'], null, 2),
+          })
           
-          // Also use nodes_override to ensure avatar is set (this is more reliable)
-          // Initialize nodes_override array
+          // Still use nodes_override to ensure avatar is actually set in all character nodes
           if (!overrides.nodes_override) {
             overrides.nodes_override = []
           }
@@ -474,7 +486,6 @@ async function runTemplateGeneration(
             overrides.nodes_override = [overrides.nodes_override]
           }
           
-          // Create the character override
           const characterOverride = isPhotoAvatar
             ? {
                 type: 'talking_photo',
@@ -485,7 +496,6 @@ async function runTemplateGeneration(
                 avatar_id: avatarId,
               }
           
-          // Override nodes 0-5 to ensure avatar is set
           const nodesToOverride = Array.from({ length: 6 }, (_, i) => ({ index: i }))
           for (const nodeInfo of nodesToOverride) {
             const nodeIndex = nodeInfo.index
