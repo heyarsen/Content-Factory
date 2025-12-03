@@ -259,6 +259,190 @@ export async function waitForLooksReady(
   )
 }
 
+/**
+ * Gesture definition for HeyGen API
+ * Used to specify gestures at specific times during video playback
+ * 
+ * Supported gesture types (varies by avatar):
+ * - open_hand: Open hand gesture (friendly, welcoming)
+ * - point_right: Point to the right
+ * - point_left: Point to the left
+ * - emphasis: Emphasis gesture (for important points)
+ * - wave: Waving gesture
+ * - thumbs_up: Thumbs up gesture
+ * 
+ * Note: Gesture support depends on avatar type:
+ * - Hyper-Realistic Avatars (video-based): Full gesture control
+ *   These avatars are created from video footage and support the full range of gestures.
+ *   To create a Hyper-Realistic avatar, upload video footage with natural movements.
+ *   See: https://help.heygen.com/en/articles/11691624-how-to-use-gesture-control
+ * 
+ * - Avatar IV: Limited gesture support via custom_motion_prompt
+ *   Avatar IV avatars are generated from photos and support enhanced expressions
+ *   and head movement, but not the gestures array. Use custom_motion_prompt instead.
+ *   See: https://docs.heygen.com/docs/create-avatar-iv-videos
+ * 
+ * - Photo Avatars: Limited to facial expressions and head movement
+ *   Photo avatars (talking_photo) primarily support lip-sync with basic head movement.
+ *   Use custom_motion_prompt for enhanced expressions.
+ * 
+ * How to extend gesture types:
+ * 1. Check HeyGen API documentation for supported gesture types for your avatar
+ * 2. Add new gesture types to the buildGestureArray function
+ * 3. Ensure the avatar supports the gesture type before using it
+ * 
+ * How to upload/select gesture-enabled avatars:
+ * 1. Hyper-Realistic Avatars: Upload video footage with natural gestures during avatar creation
+ * 2. Avatar IV: Generate from high-quality photos - motion is controlled via custom_motion_prompt
+ * 3. Check avatar capabilities using detectAvatarCapabilities() before generating videos
+ */
+export interface GestureDefinition {
+  time: number // Time in seconds when gesture should occur
+  type: string // Gesture type (e.g., 'open_hand', 'point_right', 'emphasis')
+}
+
+/**
+ * Avatar capabilities detected from HeyGen API
+ * Determines which motion features are supported by the avatar
+ */
+export interface AvatarCapabilities {
+  /**
+   * Hyper-Realistic Avatar mode
+   * Avatars created from video footage support full gesture control
+   */
+  supportsHyperRealistic: boolean
+  
+  /**
+   * Gesture Control support
+   * Can use gestures array in video_inputs
+   */
+  supportsGestureControl: boolean
+  
+  /**
+   * Full-body movement support
+   * Avatar can perform full-body gestures and movements
+   */
+  supportsFullBodyMovement: boolean
+  
+  /**
+   * Custom motion prompts (Avatar IV)
+   * Can use custom_motion_prompt parameter
+   */
+  supportsCustomMotionPrompt: boolean
+  
+  /**
+   * Enhanced expressions
+   * Avatar supports enhanced facial expressions
+   */
+  supportsEnhancedExpressions: boolean
+  
+  /**
+   * Natural head movement
+   * Avatar supports natural head movements (most avatars support this)
+   */
+  supportsHeadMovement: boolean
+}
+
+/**
+ * Motion configuration for video generation
+ * Specifies how the avatar should move and express during the video
+ * 
+ * Usage:
+ * 1. For Hyper-Realistic Avatars: Use gestures array for precise gesture control
+ * 2. For Avatar IV: Use customMotionPrompt with enhanceCustomMotionPrompt: true
+ * 3. For Photo Avatars: Use customMotionPrompt for enhanced expressions
+ * 
+ * The system automatically detects avatar capabilities and applies the appropriate
+ * motion features. You can also provide a custom MotionConfig to override defaults.
+ */
+export interface MotionConfig {
+  /**
+   * Array of gestures to perform at specific times
+   * Only used if avatar supports gesture control (Hyper-Realistic Avatars)
+   * 
+   * Example:
+   * [
+   *   { time: 0.5, type: 'open_hand' },
+   *   { time: 2.0, type: 'point_right' },
+   *   { time: 4.0, type: 'emphasis' }
+   * ]
+   */
+  gestures?: GestureDefinition[]
+  
+  /**
+   * Custom motion prompt for Avatar IV or fallback
+   * Describes desired movements and expressions in natural language
+   * 
+   * Examples:
+   * - "Natural head movement with friendly expressions and engaging gestures"
+   * - "Enhanced facial expressions with subtle head movements"
+   * - "Avatar waves with a friendly smile"
+   */
+  customMotionPrompt?: string
+  
+  /**
+   * Enable AI enhancement of custom motion prompt
+   * Allows HeyGen to refine the motion description for better results
+   * Recommended for Avatar IV and Photo Avatars
+   */
+  enhanceCustomMotionPrompt?: boolean
+  
+  /**
+   * Enable natural head movement
+   * Most avatars support this automatically
+   * This is typically enabled by default for supported avatars
+   */
+  enableHeadMovement?: boolean
+  
+  /**
+   * Enable enhanced expressions
+   * More varied and natural facial expressions
+   * This is typically enabled by default for supported avatars
+   */
+  enableEnhancedExpressions?: boolean
+}
+
+/**
+ * ============================================================================
+ * HEYGEN AVATAR MOTION ENHANCEMENT
+ * ============================================================================
+ * 
+ * This section implements dynamic avatar motion features for HeyGen videos,
+ * transforming basic lip-sync videos into expressive, dynamic content.
+ * 
+ * KEY FEATURES:
+ * 1. Automatic Avatar Capability Detection
+ *    - Detects which motion features are supported by the avatar
+ *    - Supports Hyper-Realistic Avatars, Avatar IV, and Photo Avatars
+ * 
+ * 2. Gesture Control (for Hyper-Realistic Avatars)
+ *    - Precise gesture timing with gestures array
+ *    - Supports: open_hand, point_right, point_left, emphasis, wave, thumbs_up
+ * 
+ * 3. Custom Motion Prompts (for Avatar IV and Photo Avatars)
+ *    - Natural language descriptions of desired movements
+ *    - AI-enhanced motion refinement
+ * 
+ * 4. Automatic Fallback Strategy
+ *    - Falls back to custom_motion_prompt if gestures not supported
+ *    - Ensures all avatars get enhanced expressions and head movement
+ * 
+ * USAGE:
+ * - Motion features are automatically enabled for all video generation
+ * - The system detects avatar capabilities and applies appropriate features
+ * - Works with both regular video generation and template-based generation
+ * 
+ * AVATAR SUPPORT:
+ * - Hyper-Realistic Avatars: Full gesture control + head movement + expressions
+ * - Avatar IV: Custom motion prompts + head movement + expressions
+ * - Photo Avatars: Custom motion prompts + basic head movement + expressions
+ * 
+ * For more information, see:
+ * - Gesture Control: https://help.heygen.com/en/articles/11691624-how-to-use-gesture-control
+ * - Avatar IV: https://docs.heygen.com/docs/create-avatar-iv-videos
+ * ============================================================================
+ */
+
 export interface GenerateVideoRequest {
   topic: string
   script?: string
@@ -271,6 +455,7 @@ export interface GenerateVideoRequest {
   aspect_ratio?: string // e.g., "9:16" for vertical videos (Reels/TikTok)
   dimension?: HeyGenDimensionInput
   force_vertical?: boolean
+  motion_config?: MotionConfig // Optional motion configuration
 }
 
 export interface GenerateTemplateVideoRequest {
@@ -283,6 +468,11 @@ export interface GenerateTemplateVideoRequest {
   callback_url?: string
   dimension?: HeyGenDimensionInput
   overrides?: Record<string, any>
+  /**
+   * Motion configuration for template videos
+   * Motion features are applied via nodes_override in the overrides parameter
+   */
+  motion_config?: MotionConfig
 }
 
 export interface HeyGenVideoResponse {
@@ -597,6 +787,205 @@ export async function getAvatar(avatarId: string): Promise<HeyGenAvatar> {
   }
 }
 
+/**
+ * Detect avatar capabilities by checking avatar metadata
+ * 
+ * Determines which motion features are supported:
+ * - Hyper-Realistic Avatars: Created from video footage, support full gesture control
+ * - Avatar IV: Generated from photos, support custom motion prompts
+ * - Photo Avatars: Limited to lip-sync with basic head movement
+ * 
+ * @param avatarId - The avatar ID to check
+ * @param isPhotoAvatar - Whether this is a photo avatar (talking_photo)
+ * @returns AvatarCapabilities object with boolean flags for each capability
+ * 
+ * @example
+ * ```typescript
+ * const capabilities = await detectAvatarCapabilities('avatar_123', false)
+ * if (capabilities.supportsGestureControl) {
+ *   // Use gestures array
+ * } else if (capabilities.supportsCustomMotionPrompt) {
+ *   // Use custom_motion_prompt
+ * }
+ * ```
+ */
+export async function detectAvatarCapabilities(
+  avatarId: string,
+  isPhotoAvatar: boolean = false
+): Promise<AvatarCapabilities> {
+  try {
+    // For photo avatars, check photo avatar details
+    if (isPhotoAvatar) {
+      try {
+        const photoDetails = await getPhotoAvatarDetails(avatarId)
+        // Photo avatars typically have limited motion support
+        // They support basic head movement and expressions, but not full gestures
+        return {
+          supportsHyperRealistic: false,
+          supportsGestureControl: false, // Photo avatars don't support gesture control
+          supportsFullBodyMovement: false,
+          supportsCustomMotionPrompt: true, // Can use custom_motion_prompt for expressions
+          supportsEnhancedExpressions: true,
+          supportsHeadMovement: true, // Most photo avatars support head movement
+        }
+      } catch (error: any) {
+        console.warn('[Avatar Detection] Could not fetch photo avatar details, using defaults:', error.message)
+        // Fallback: assume limited capabilities for photo avatars
+        return {
+          supportsHyperRealistic: false,
+          supportsGestureControl: false,
+          supportsFullBodyMovement: false,
+          supportsCustomMotionPrompt: true,
+          supportsEnhancedExpressions: true,
+          supportsHeadMovement: true,
+        }
+      }
+    }
+
+    // For regular avatars, try to fetch avatar details
+    try {
+      const avatar = await getAvatar(avatarId)
+      
+      // Check avatar metadata for capabilities
+      // HeyGen may expose avatar type in various fields
+      const avatarType = (avatar as any).type || (avatar as any).avatar_type || ''
+      const avatarStatus = avatar.status || ''
+      const avatarName = avatar.avatar_name || ''
+      
+      // Heuristics to detect avatar capabilities:
+      // 1. Hyper-Realistic avatars are typically created from video footage
+      //    They may have specific status or type indicators
+      // 2. Avatar IV avatars are generated from photos and support custom motion prompts
+      // 3. Regular avatars have basic lip-sync with limited motion
+      
+      const isHyperRealistic = 
+        avatarType.toLowerCase().includes('hyper') ||
+        avatarType.toLowerCase().includes('realistic') ||
+        avatarType.toLowerCase().includes('video') ||
+        avatarStatus.toLowerCase().includes('hyper')
+      
+      const isAvatarIV = 
+        avatarType.toLowerCase().includes('iv') ||
+        avatarType.toLowerCase().includes('avatar_iv') ||
+        avatarName.toLowerCase().includes('avatar iv')
+      
+      // Hyper-Realistic avatars support full gesture control
+      if (isHyperRealistic) {
+        return {
+          supportsHyperRealistic: true,
+          supportsGestureControl: true,
+          supportsFullBodyMovement: true,
+          supportsCustomMotionPrompt: true,
+          supportsEnhancedExpressions: true,
+          supportsHeadMovement: true,
+        }
+      }
+      
+      // Avatar IV supports custom motion prompts and enhanced expressions
+      if (isAvatarIV) {
+        return {
+          supportsHyperRealistic: false,
+          supportsGestureControl: false, // Avatar IV doesn't support gesture array
+          supportsFullBodyMovement: false,
+          supportsCustomMotionPrompt: true,
+          supportsEnhancedExpressions: true,
+          supportsHeadMovement: true,
+        }
+      }
+      
+      // Default: assume basic capabilities (head movement, expressions)
+      // Most avatars support at least basic head movement
+      return {
+        supportsHyperRealistic: false,
+        supportsGestureControl: false,
+        supportsFullBodyMovement: false,
+        supportsCustomMotionPrompt: true, // Can try custom_motion_prompt as fallback
+        supportsEnhancedExpressions: true,
+        supportsHeadMovement: true,
+      }
+    } catch (error: any) {
+      console.warn('[Avatar Detection] Could not fetch avatar details, using conservative defaults:', error.message)
+      // Conservative fallback: assume basic capabilities only
+      return {
+        supportsHyperRealistic: false,
+        supportsGestureControl: false,
+        supportsFullBodyMovement: false,
+        supportsCustomMotionPrompt: true,
+        supportsEnhancedExpressions: true,
+        supportsHeadMovement: true,
+      }
+    }
+  } catch (error: any) {
+    console.error('[Avatar Detection] Error detecting capabilities:', error.message)
+    // Return conservative defaults on any error
+    return {
+      supportsHyperRealistic: false,
+      supportsGestureControl: false,
+      supportsFullBodyMovement: false,
+      supportsCustomMotionPrompt: true,
+      supportsEnhancedExpressions: true,
+      supportsHeadMovement: true,
+    }
+  }
+}
+
+/**
+ * Build gesture array based on script duration
+ * 
+ * Generates a placeholder gesture structure with timing based on video duration.
+ * Gestures are spaced throughout the video to add natural movement.
+ * 
+ * @param script - The script text (used to estimate timing)
+ * @param duration - Video duration in seconds
+ * @returns Array of gesture definitions with timing
+ * 
+ * @example
+ * ```typescript
+ * const gestures = buildGestureArray('Hello, welcome to our presentation.', 10)
+ * // Returns: [
+ * //   { time: 0.5, type: 'open_hand' },
+ * //   { time: 2.0, type: 'point_right' },
+ * //   { time: 4.0, type: 'emphasis' }
+ * // ]
+ * ```
+ * 
+ * Supported gesture types:
+ * - open_hand: Open hand gesture (friendly, welcoming)
+ * - point_right: Point to the right
+ * - point_left: Point to the left
+ * - emphasis: Emphasis gesture (for important points)
+ * - wave: Waving gesture
+ * - thumbs_up: Thumbs up gesture
+ * 
+ * Note: Gesture types must be supported by the avatar.
+ * Hyper-Realistic avatars support the full range of gestures.
+ */
+export function buildGestureArray(script: string, duration: number): GestureDefinition[] {
+  // Default gesture sequence for natural movement
+  const defaultGestures: Array<{ time: number; type: string }> = [
+    { time: 0.5, type: 'open_hand' },   // Early welcoming gesture
+    { time: 2.0, type: 'point_right' },  // Mid-early pointing
+    { time: 4.0, type: 'emphasis' },     // Emphasis for key points
+  ]
+  
+  // Filter gestures that occur within video duration
+  const gestures = defaultGestures.filter(g => g.time < duration)
+  
+  // If video is longer, add more gestures at intervals
+  if (duration > 6) {
+    gestures.push({ time: 6.0, type: 'wave' })
+  }
+  if (duration > 8) {
+    gestures.push({ time: 8.0, type: 'emphasis' })
+  }
+  if (duration > 10) {
+    gestures.push({ time: 10.0, type: 'open_hand' })
+  }
+  
+  // Ensure gestures don't exceed duration
+  return gestures.filter(g => g.time < duration)
+}
+
 export async function generateVideo(
   request: GenerateVideoRequest
 ): Promise<HeyGenVideoResponse> {
@@ -607,6 +996,55 @@ export async function generateVideo(
         ? request.output_resolution.trim()
         : DEFAULT_HEYGEN_RESOLUTION
     const requirePortrait = !!request.force_vertical || request.aspect_ratio === '9:16'
+
+    // Detect avatar capabilities for motion features
+    let avatarCapabilities: AvatarCapabilities | null = null
+    let motionConfig: MotionConfig | null = null
+    
+    if (request.motion_config || (request.avatar_id || request.talking_photo_id)) {
+      try {
+        const avatarId = request.avatar_id || request.talking_photo_id
+        const isPhotoAvatar = !!request.talking_photo_id
+        
+        if (avatarId) {
+          avatarCapabilities = await detectAvatarCapabilities(avatarId, isPhotoAvatar)
+          
+          // Build motion config if not provided
+          if (!request.motion_config) {
+            // Auto-generate motion config based on capabilities
+            const gestures = avatarCapabilities.supportsGestureControl
+              ? buildGestureArray(request.script || request.topic, request.duration)
+              : undefined
+            
+            motionConfig = {
+              gestures,
+              customMotionPrompt: avatarCapabilities.supportsCustomMotionPrompt
+                ? 'Natural head movement with friendly expressions and engaging gestures'
+                : undefined,
+              enhanceCustomMotionPrompt: avatarCapabilities.supportsCustomMotionPrompt,
+              enableHeadMovement: avatarCapabilities.supportsHeadMovement,
+              enableEnhancedExpressions: avatarCapabilities.supportsEnhancedExpressions,
+            }
+          } else {
+            motionConfig = request.motion_config
+          }
+          
+          console.log('[HeyGen Motion] Avatar capabilities detected:', {
+            avatarId,
+            isPhotoAvatar,
+            capabilities: avatarCapabilities,
+            motionConfig: motionConfig ? {
+              hasGestures: !!motionConfig.gestures,
+              gestureCount: motionConfig.gestures?.length || 0,
+              hasCustomMotionPrompt: !!motionConfig.customMotionPrompt,
+            } : null,
+          })
+        }
+      } catch (capabilityError: any) {
+        console.warn('[HeyGen Motion] Could not detect avatar capabilities, proceeding without motion features:', capabilityError.message)
+        // Continue without motion features if detection fails
+      }
+    }
 
     // Always use v2 API - https://docs.heygen.com/reference/create-an-avatar-video-v2
     // Build payload with video_inputs array format
@@ -773,6 +1211,57 @@ export async function generateVideo(
       }
     } else {
       throw new Error('Either avatar_id or talking_photo_id must be provided')
+    }
+
+    // Add motion features to video input based on avatar capabilities
+    if (motionConfig && avatarCapabilities) {
+      // Add gestures if avatar supports gesture control
+      if (motionConfig.gestures && motionConfig.gestures.length > 0 && avatarCapabilities.supportsGestureControl) {
+        payload.video_inputs[0].gestures = motionConfig.gestures
+        console.log('[HeyGen Motion] Added gestures to video input:', {
+          gestureCount: motionConfig.gestures.length,
+          gestures: motionConfig.gestures,
+        })
+      }
+      
+      // Add custom motion prompt for Avatar IV or fallback
+      if (motionConfig.customMotionPrompt && avatarCapabilities.supportsCustomMotionPrompt) {
+        payload.video_inputs[0].custom_motion_prompt = motionConfig.customMotionPrompt
+        
+        if (motionConfig.enhanceCustomMotionPrompt) {
+          payload.video_inputs[0].enhance_custom_motion_prompt = true
+        }
+        
+        console.log('[HeyGen Motion] Added custom motion prompt:', {
+          prompt: motionConfig.customMotionPrompt,
+          enhanced: motionConfig.enhanceCustomMotionPrompt,
+        })
+      } else if (!avatarCapabilities.supportsGestureControl && avatarCapabilities.supportsCustomMotionPrompt) {
+        // Fallback: use custom motion prompt if gestures not supported
+        payload.video_inputs[0].custom_motion_prompt = 
+          motionConfig.customMotionPrompt || 
+          'Enhanced facial expressions with subtle head movements and natural gestures'
+        payload.video_inputs[0].enhance_custom_motion_prompt = true
+        
+        console.log('[HeyGen Motion] Using fallback custom motion prompt (gestures not supported)')
+      }
+      
+      // Note: Head movement and enhanced expressions are typically automatic for most avatars
+      // We log them but don't need to set explicit parameters unless HeyGen API requires them
+      if (motionConfig.enableHeadMovement && avatarCapabilities.supportsHeadMovement) {
+        console.log('[HeyGen Motion] Head movement enabled (automatic for this avatar)')
+      }
+      
+      if (motionConfig.enableEnhancedExpressions && avatarCapabilities.supportsEnhancedExpressions) {
+        console.log('[HeyGen Motion] Enhanced expressions enabled (automatic for this avatar)')
+      }
+    } else if (motionConfig && !avatarCapabilities) {
+      // If we have motion config but couldn't detect capabilities, use conservative fallback
+      if (motionConfig.customMotionPrompt) {
+        payload.video_inputs[0].custom_motion_prompt = motionConfig.customMotionPrompt
+        payload.video_inputs[0].enhance_custom_motion_prompt = motionConfig.enhanceCustomMotionPrompt || true
+        console.log('[HeyGen Motion] Using motion config with conservative fallback (capabilities unknown)')
+      }
     }
 
     const requestUrl = `${HEYGEN_V2_API_URL}/video/generate`

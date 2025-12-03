@@ -180,7 +180,8 @@ function buildHeygenPayload(
   isPhotoAvatar: boolean = false,
   outputResolution: string = DEFAULT_HEYGEN_RESOLUTION,
   aspectRatio: string | null = DEFAULT_VERTICAL_ASPECT_RATIO, // e.g., "9:16" for vertical videos
-  dimension?: HeyGenDimensionInput
+  dimension?: HeyGenDimensionInput,
+  motionConfig?: import('../lib/heygen.js').MotionConfig // Optional motion configuration
 ): GenerateVideoRequest {
   const isVertical = aspectRatio === DEFAULT_VERTICAL_ASPECT_RATIO
   const resolvedOutputResolution = isVertical ? DEFAULT_VERTICAL_OUTPUT_RESOLUTION : outputResolution
@@ -208,6 +209,11 @@ function buildHeygenPayload(
     payload.dimension = resolvedDimension
   }
 
+  // Add motion configuration if provided
+  if (motionConfig) {
+    payload.motion_config = motionConfig
+  }
+
   // Log payload details including aspect ratio
   if (aspectRatio) {
     console.log(`[HeyGen Payload] Built payload with aspect_ratio: ${aspectRatio}`, {
@@ -216,6 +222,7 @@ function buildHeygenPayload(
       outputResolution: resolvedOutputResolution,
       hasAvatar: !!avatarId,
       dimension: resolvedDimension,
+      hasMotionConfig: !!motionConfig,
     })
   }
 
@@ -425,6 +432,45 @@ async function runTemplateGeneration(
     // Build overrides to set avatar in template nodes
     let overrides: Record<string, any> = { ...preference.overrides }
     
+    // Detect avatar capabilities for motion features in templates
+    let avatarCapabilities: import('../lib/heygen.js').AvatarCapabilities | null = null
+    let motionConfig: import('../lib/heygen.js').MotionConfig | null = null
+    
+    if (avatarId) {
+      try {
+        const { detectAvatarCapabilities, buildGestureArray } = await import('../lib/heygen.js')
+        avatarCapabilities = await detectAvatarCapabilities(avatarId, !!isPhotoAvatar)
+        
+        // Auto-generate motion config for templates
+        const gestures = avatarCapabilities.supportsGestureControl
+          ? buildGestureArray(scriptText || video.topic || '', video.duration)
+          : undefined
+        
+        motionConfig = {
+          gestures,
+          customMotionPrompt: avatarCapabilities.supportsCustomMotionPrompt
+            ? 'Natural head movement with friendly expressions and engaging gestures'
+            : undefined,
+          enhanceCustomMotionPrompt: avatarCapabilities.supportsCustomMotionPrompt,
+          enableHeadMovement: avatarCapabilities.supportsHeadMovement,
+          enableEnhancedExpressions: avatarCapabilities.supportsEnhancedExpressions,
+        }
+        
+        console.log('[Template Motion] Avatar capabilities detected:', {
+          avatarId,
+          isPhotoAvatar,
+          capabilities: avatarCapabilities,
+          motionConfig: motionConfig ? {
+            hasGestures: !!motionConfig.gestures,
+            gestureCount: motionConfig.gestures?.length || 0,
+            hasCustomMotionPrompt: !!motionConfig.customMotionPrompt,
+          } : null,
+        })
+      } catch (capabilityError: any) {
+        console.warn('[Template Motion] Could not detect avatar capabilities, proceeding without motion features:', capabilityError.message)
+      }
+    }
+    
     if (avatarId) {
       // Try to fetch template details to see if it has an avatar_id variable
       let hasAvatarIdVariable = false
@@ -494,12 +540,38 @@ async function runTemplateGeneration(
             while (overrides.nodes_override.length <= nodeIndex) {
               overrides.nodes_override.push({})
             }
-            overrides.nodes_override[nodeIndex] = {
+            const nodeOverride: any = {
               character: characterOverride,
             }
+            
+            // Add motion features to character nodes if supported
+            if (motionConfig && avatarCapabilities) {
+              // Add gestures if avatar supports gesture control
+              if (motionConfig.gestures && motionConfig.gestures.length > 0 && avatarCapabilities.supportsGestureControl) {
+                nodeOverride.gestures = motionConfig.gestures
+              }
+              
+              // Add custom motion prompt for Avatar IV or fallback
+              if (motionConfig.customMotionPrompt && avatarCapabilities.supportsCustomMotionPrompt) {
+                nodeOverride.custom_motion_prompt = motionConfig.customMotionPrompt
+                
+                if (motionConfig.enhanceCustomMotionPrompt) {
+                  nodeOverride.enhance_custom_motion_prompt = true
+                }
+              } else if (!avatarCapabilities.supportsGestureControl && avatarCapabilities.supportsCustomMotionPrompt) {
+                // Fallback: use custom motion prompt if gestures not supported
+                nodeOverride.custom_motion_prompt = 
+                  motionConfig.customMotionPrompt || 
+                  'Enhanced facial expressions with subtle head movements and natural gestures'
+                nodeOverride.enhance_custom_motion_prompt = true
+              }
+            }
+            
+            overrides.nodes_override[nodeIndex] = nodeOverride
           }
           console.log('[Template Generation] Also set nodes_override as backup:', {
             nodesCount: overrides.nodes_override.length,
+            hasMotionFeatures: !!(motionConfig && avatarCapabilities),
           })
         }
         
@@ -578,6 +650,29 @@ async function runTemplateGeneration(
           // Build the override object
           const nodeOverride: any = {
             character: characterOverride,
+          }
+          
+          // Add motion features to character nodes if supported
+          if (motionConfig && avatarCapabilities && nodeInfo.hasCharacter) {
+            // Add gestures if avatar supports gesture control
+            if (motionConfig.gestures && motionConfig.gestures.length > 0 && avatarCapabilities.supportsGestureControl) {
+              nodeOverride.gestures = motionConfig.gestures
+            }
+            
+            // Add custom motion prompt for Avatar IV or fallback
+            if (motionConfig.customMotionPrompt && avatarCapabilities.supportsCustomMotionPrompt) {
+              nodeOverride.custom_motion_prompt = motionConfig.customMotionPrompt
+              
+              if (motionConfig.enhanceCustomMotionPrompt) {
+                nodeOverride.enhance_custom_motion_prompt = true
+              }
+            } else if (!avatarCapabilities.supportsGestureControl && avatarCapabilities.supportsCustomMotionPrompt) {
+              // Fallback: use custom motion prompt if gestures not supported
+              nodeOverride.custom_motion_prompt = 
+                motionConfig.customMotionPrompt || 
+                'Enhanced facial expressions with subtle head movements and natural gestures'
+              nodeOverride.enhance_custom_motion_prompt = true
+            }
           }
           
           // Add node_id if available
