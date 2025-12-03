@@ -2649,6 +2649,75 @@ export async function deletePhotoAvatarGroup(groupId: string): Promise<void> {
 }
 
 /**
+ * Add motion to a photo avatar or look using the HeyGen Add Motion API
+ * This enhances the avatar with natural movement, gestures, and expressions
+ * 
+ * @param id - Unique identifier of the avatar/look (can be avatar ID or look ID)
+ * @param prompt - Text prompt describing the avatar's movement (optional)
+ * @param motionType - Motion engine to use (defaults to 'expressive' for maximum movement)
+ * @returns Response from the Add Motion API
+ * 
+ * @see https://docs.heygen.com/reference/add-motion
+ */
+export async function addMotionToPhotoAvatar(
+  id: string,
+  prompt?: string,
+  motionType: 'consistent' | 'expressive' | 'consistent_gen_3' | 'hailuo_2' | 'veo2' | 'seedance_lite' | 'kling' = 'expressive'
+): Promise<any> {
+  try {
+    const apiKey = getHeyGenKey()
+    const endpoint = `${HEYGEN_V2_API_URL}/photo_avatar/add_motion`
+    
+    const payload: any = {
+      id: id.trim(),
+    }
+    
+    // Add prompt if provided - use enhanced prompt for maximum movement
+    if (prompt) {
+      payload.prompt = prompt
+    } else {
+      // Default enhanced prompt for maximum movement
+      payload.prompt = 'Full body motion with expressive hand gestures, natural head movements, engaging body language, waving, pointing, and emphasis gestures throughout'
+    }
+    
+    // Use expressive motion type for maximum movement
+    payload.motion_type = motionType
+    
+    console.log('[Add Motion] Calling HeyGen Add Motion API:', {
+      id,
+      motionType,
+      hasPrompt: !!payload.prompt,
+      promptPreview: payload.prompt?.substring(0, 100),
+    })
+    
+    const response = await axios.post(endpoint, payload, {
+      headers: {
+        'X-Api-Key': apiKey,
+        'Content-Type': 'application/json',
+      },
+      timeout: 30000,
+    })
+    
+    console.log('[Add Motion] Successfully added motion to photo avatar:', {
+      id,
+      response: response.data,
+    })
+    
+    return response.data?.data || response.data
+  } catch (error: any) {
+    console.error('[Add Motion] HeyGen API error:', {
+      id,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message,
+    })
+    // Don't throw - motion enhancement is optional, continue with video generation
+    return null
+  }
+}
+
+/**
  * Generate additional looks for avatar group
  */
 export interface GenerateLookRequest {

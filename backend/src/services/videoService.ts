@@ -439,8 +439,20 @@ async function runTemplateGeneration(
     
     if (avatarId) {
       try {
-        const { detectAvatarCapabilities, buildGestureArray } = await import('../lib/heygen.js')
+        const { detectAvatarCapabilities, buildGestureArray, addMotionToPhotoAvatar } = await import('../lib/heygen.js')
         avatarCapabilities = await detectAvatarCapabilities(avatarId, !!isPhotoAvatar)
+        
+        // For photo avatars, use the Add Motion API to enhance motion before video generation
+        if (isPhotoAvatar) {
+          try {
+            const motionPrompt = 'Full body motion with expressive hand gestures, natural head movements, engaging body language, waving, pointing, and emphasis gestures throughout'
+            await addMotionToPhotoAvatar(avatarId, motionPrompt, 'expressive')
+            console.log('[Template Motion] Added motion to photo avatar using Add Motion API')
+          } catch (motionError: any) {
+            // Don't fail video generation if Add Motion fails - it's optional enhancement
+            console.warn('[Template Motion] Could not add motion via Add Motion API, continuing with video generation:', motionError.message)
+          }
+        }
         
         // Auto-generate motion config for templates
         const gestures = avatarCapabilities.supportsGestureControl
