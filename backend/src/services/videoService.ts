@@ -443,25 +443,23 @@ async function runTemplateGeneration(
         avatarCapabilities = await detectAvatarCapabilities(avatarId, !!isPhotoAvatar)
         
         // For photo avatars, use the Add Motion API to enhance motion before video generation
-        // The API returns a new avatar/look ID with motion that we should use
+        // Note: The Add Motion API enhances the original avatar's motion capabilities
+        // We don't use the returned ID for template generation as it may cause errors
+        // Instead, we rely on motion settings in nodes_override for template generation
         if (isPhotoAvatar) {
           try {
             const motionPrompt = 'Full body motion with expressive hand gestures, natural head movements, engaging body language, waving, pointing, and emphasis gestures throughout'
             const motionResult = await addMotionToPhotoAvatar(avatarId, motionPrompt, 'expressive')
             
-            // The Add Motion API returns a new ID for the motion-enhanced avatar/look
-            // Use this ID instead of the original for better motion
-            // Response structure: { error: null, data: { id: '...' } }
-            const motionEnhancedId = motionResult?.id || motionResult?.data?.id
-            if (motionEnhancedId) {
-              console.log('[Template Motion] Using motion-enhanced avatar ID:', {
-                originalId: avatarId,
-                motionEnhancedId: motionEnhancedId,
+            // The Add Motion API enhances the original avatar's motion
+            // We keep using the original avatarId for template generation
+            // The motion enhancement is applied to the avatar itself
+            if (motionResult) {
+              console.log('[Template Motion] Add Motion API called successfully, motion enhancement applied to avatar:', {
+                originalAvatarId: avatarId,
+                motionResultId: motionResult?.id || motionResult?.data?.id,
+                note: 'Using original avatar ID for template generation',
               })
-              // Update avatarId to use motion-enhanced version
-              avatarId = motionEnhancedId
-            } else {
-              console.log('[Template Motion] Add Motion API called but no new ID found in response, using original avatar ID')
             }
           } catch (motionError: any) {
             // Don't fail video generation if Add Motion fails - it's optional enhancement
