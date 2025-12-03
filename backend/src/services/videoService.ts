@@ -431,8 +431,27 @@ async function runTemplateGeneration(
     let overrides: Record<string, any> = { ...preference.overrides }
     
     if (avatarId) {
-      // Initialize nodes_override array - always override the first node (index 0)
-      // which is typically the main character node in HeyGen templates
+      // Try to fetch template details to see node structure
+      let templateNodes: any[] = []
+      try {
+        const { getTemplateDetails } = await import('../lib/heygen.js')
+        const templateDetails = await getTemplateDetails(preference.templateId)
+        templateNodes = templateDetails?.nodes || templateDetails?.data?.nodes || []
+        console.log('[Template Generation] Fetched template details:', {
+          templateId: preference.templateId,
+          nodesCount: templateNodes.length,
+          nodes: templateNodes.map((n: any, i: number) => ({
+            index: i,
+            id: n.id || n.node_id,
+            type: n.type,
+            hasCharacter: !!n.character,
+          })),
+        })
+      } catch (templateError: any) {
+        console.warn('[Template Generation] Could not fetch template details, using default override:', templateError.message)
+      }
+      
+      // Initialize nodes_override array
       if (!overrides.nodes_override) {
         overrides.nodes_override = []
       }
@@ -451,23 +470,52 @@ async function runTemplateGeneration(
             avatar_id: avatarId,
           }
       
-      // Ensure we have at least one node to override (index 0)
-      // If nodes_override is empty, create the first node
-      if (overrides.nodes_override.length === 0) {
-        overrides.nodes_override.push({})
+      // If we found template nodes, override all nodes that have characters
+      // Otherwise, override the first node (index 0) as fallback
+      if (templateNodes.length > 0) {
+        // Override all character nodes in the template
+        for (let i = 0; i < templateNodes.length; i++) {
+          const node = templateNodes[i]
+          if (node.character || node.type === 'character') {
+            // Ensure we have enough nodes in the override array
+            while (overrides.nodes_override.length <= i) {
+              overrides.nodes_override.push({})
+            }
+            // Set node ID if available, otherwise use index
+            if (node.id || node.node_id) {
+              overrides.nodes_override[i] = {
+                node_id: node.id || node.node_id,
+                character: characterOverride,
+              }
+            } else {
+              overrides.nodes_override[i] = {
+                character: characterOverride,
+              }
+            }
+            console.log(`[Template Generation] Overriding node ${i} (${node.id || node.node_id || 'no-id'}):`, {
+              nodeId: node.id || node.node_id,
+              characterType: isPhotoAvatar ? 'talking_photo' : 'avatar',
+            })
+          }
+        }
+      } else {
+        // Fallback: override the first node (index 0)
+        if (overrides.nodes_override.length === 0) {
+          overrides.nodes_override.push({})
+        }
+        if (!overrides.nodes_override[0]) {
+          overrides.nodes_override[0] = {}
+        }
+        overrides.nodes_override[0].character = characterOverride
+        console.log('[Template Generation] Overriding node[0] (fallback):', {
+          characterType: isPhotoAvatar ? 'talking_photo' : 'avatar',
+        })
       }
       
-      // Always override the first node's character (index 0)
-      // This is the main character node in most HeyGen templates
-      if (!overrides.nodes_override[0]) {
-        overrides.nodes_override[0] = {}
-      }
-      overrides.nodes_override[0].character = characterOverride
-      
-      console.log('[Template Generation] Set avatar in nodes_override[0]:', {
+      console.log('[Template Generation] Final nodes_override:', {
         avatarId,
         isPhotoAvatar,
-        characterType: isPhotoAvatar ? 'talking_photo' : 'avatar',
+        nodesCount: overrides.nodes_override.length,
         nodesOverride: JSON.stringify(overrides.nodes_override, null, 2),
       })
     }
