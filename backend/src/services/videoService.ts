@@ -422,15 +422,9 @@ async function runTemplateGeneration(
       variables[scriptKey] = scriptValue
     }
 
-    // Add avatar information as variables for template use
-    if (avatarId) {
-      if (isPhotoAvatar) {
-        variables['talking_photo_id'] = avatarId
-        variables['avatar_id'] = avatarId // Also provide as avatar_id for compatibility
-      } else {
-        variables['avatar_id'] = avatarId
-      }
-    }
+    // NOTE: Avatar information should NOT be passed as template variables
+    // Avatars are set via nodes_override in the overrides object below
+    // Template variables are only for script/text content and other template-defined variables
 
     // Build overrides to set avatar in template nodes if needed
     let overrides = { ...preference.overrides }
@@ -482,6 +476,7 @@ async function runTemplateGeneration(
       templateId: payload.template_id,
       variables: Object.keys(payload.variables),
       hasOverrides: !!payload.overrides && Object.keys(payload.overrides).length > 0,
+      overrides: payload.overrides ? JSON.stringify(payload.overrides, null, 2) : undefined,
     })
 
     const response = await generateVideoFromTemplate(payload)

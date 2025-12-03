@@ -1099,6 +1099,29 @@ export async function generateVideo(
   }
 }
 
+/**
+ * Fetch template details to see available variables and nodes
+ */
+export async function getTemplateDetails(templateId: string): Promise<any> {
+  try {
+    const apiKey = getHeyGenKey()
+    const endpoint = `${HEYGEN_V2_API_URL}/template/${encodeURIComponent(templateId.trim())}`
+    
+    const response = await axios.get(endpoint, {
+      headers: {
+        'X-Api-Key': apiKey,
+        'Content-Type': 'application/json',
+      },
+      timeout: 30000,
+    })
+    
+    return response.data?.data || response.data
+  } catch (error: any) {
+    console.error('Failed to fetch template details:', error?.response?.data || error?.message)
+    throw error
+  }
+}
+
 export async function generateVideoFromTemplate(
   request: GenerateTemplateVideoRequest
 ): Promise<HeyGenVideoResponse> {
