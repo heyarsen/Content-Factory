@@ -262,11 +262,12 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
                 // Deduplicate by look.id and replace looks for this avatar
                 setAllLooks(prevLooks => {
                   // Remove old looks for this avatar first
-                  const filtered = prevLooks.filter(item => item.avatar.id !== selectedAvatarId)
+                  const filtered = prevLooks.filter(item => item.avatar?.id !== selectedAvatarId)
                   const combined = [...filtered, ...newLooks]
-                  return combined.filter((item, index, self) => 
-                    index === self.findIndex((t) => t.look.id === item.look.id && t.avatar.id === item.avatar.id)
-                  )
+                  return combined.filter((item, index, self) => {
+                    if (!item.avatar) return false
+                    return index === self.findIndex((t) => t.look.id === item.look.id && t.avatar?.id === item.avatar.id)
+                  }) as Array<{ look: PhotoAvatarLook; avatar: Avatar }>
                 })
                 console.log(`[useAvatarData] Updated ${newLooks.length} looks for avatar ${selectedAvatarId}`)
               } else {

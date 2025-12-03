@@ -8,7 +8,7 @@ export function useAvatarWorkspaceState(selectedAvatarId: string | null) {
   const { toast } = useToast()
 
   // Load avatar data with lazy loading
-  const { avatars, loading, allLooks, loadingLooks, loadAvatars, invalidateLooksCache, addAvatar, loadLooksForAvatar, refreshLooksForAvatar } = useAvatarData({
+  const { avatars, loading, allLooks, loadingLooks, loadAvatars, invalidateLooksCache, addAvatar, refreshLooksForAvatar } = useAvatarData({
     lazyLoadLooks: true,
     selectedAvatarId,
   })
