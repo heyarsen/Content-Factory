@@ -422,9 +422,10 @@ async function runTemplateGeneration(
       variables[scriptKey] = scriptValue
     }
 
-    // NOTE: Avatar information should NOT be passed as template variables
-    // Avatars are set via nodes_override in the overrides object below
-    // Template variables are only for script/text content and other template-defined variables
+    // Add avatar_id as a template variable (the template uses this variable name)
+    if (avatarId) {
+      variables['avatar_id'] = avatarId
+    }
 
     // Build overrides to set avatar in template nodes if needed
     let overrides = { ...preference.overrides }
