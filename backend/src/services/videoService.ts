@@ -541,12 +541,60 @@ async function runTemplateGeneration(
             while (overrides.nodes_override.length <= nodeIndex) {
               overrides.nodes_override.push({})
             }
+            
+            // Get the existing template node to preserve its motion settings
+            const existingNode = templateNodes[nodeIndex] || {}
+            
+            // Preserve ALL node properties except the old character, then override with new character
+            // This ensures motion settings and all other template configurations are preserved
+            const { character: oldCharacter, ...restOfNode } = existingNode
+            
+            // Build the override object - preserve all node properties, only override character
             const nodeOverride: any = {
-              character: characterOverride,
+              ...restOfNode, // Preserve ALL existing node properties (motion settings, configs, etc.)
+              character: characterOverride, // Override only the character
             }
             
-            // Add motion features to character nodes if supported
-            if (motionConfig && avatarCapabilities) {
+            // Also preserve motion settings that might be nested in the old character object
+            if (oldCharacter && typeof oldCharacter === 'object') {
+              const charMotionFields = ['motion_engine', 'generation_mode', 'full_body_motion', 'generation_mode']
+              for (const field of charMotionFields) {
+                if (oldCharacter[field] !== undefined) {
+                  // Merge motion settings from old character into new character override
+                  nodeOverride.character = {
+                    ...characterOverride,
+                    [field]: oldCharacter[field],
+                  }
+                  console.log(`[Template Generation] Preserving character motion field: ${field} = ${JSON.stringify(oldCharacter[field])}`)
+                }
+              }
+            }
+            
+            // Log what we're preserving for debugging
+            const preservedFields = Object.keys(restOfNode).filter(k => 
+              k.toLowerCase().includes('motion') || 
+              k.toLowerCase().includes('generation') ||
+              k.toLowerCase().includes('engine')
+            )
+            if (preservedFields.length > 0) {
+              console.log(`[Template Generation] Preserving fields from template node[${nodeIndex}]:`, preservedFields)
+            }
+            
+            // Add motion features to character nodes if supported AND template doesn't already have them
+            const motionFields = [
+              'motion_engine', 
+              'generation_mode', 
+              'motion_config', 
+              'motion_settings', 
+              'full_body_motion',
+              'enable_full_body_motion',
+              'motion_mode'
+            ]
+            const hasTemplateMotion = motionFields.some(field => existingNode[field] !== undefined) ||
+              (oldCharacter && typeof oldCharacter === 'object' && 
+               ['motion_engine', 'generation_mode', 'full_body_motion'].some(field => oldCharacter[field] !== undefined))
+            
+            if (!hasTemplateMotion && motionConfig && avatarCapabilities) {
               // Add gestures if avatar supports gesture control
               if (motionConfig.gestures && motionConfig.gestures.length > 0 && avatarCapabilities.supportsGestureControl) {
                 nodeOverride.gestures = motionConfig.gestures
@@ -597,6 +645,15 @@ async function runTemplateGeneration(
           }
         }
         
+        // Log template structure for debugging motion settings
+        console.log('[Template Generation] Template structure:', {
+          templateId: preference.templateId,
+          hasScenes: !!(templateDetails?.scenes || templateDetails?.data?.scenes),
+          hasNodes: templateNodes.length > 0,
+          templateKeys: Object.keys(templateDetails || {}),
+          sampleNode: templateNodes[0] ? JSON.stringify(templateNodes[0], null, 2).substring(0, 1000) : 'none',
+        })
+        
         console.log('[Template Generation] Fetched template details:', {
           templateId: preference.templateId,
           hasAvatarIdVariable,
@@ -606,6 +663,8 @@ async function runTemplateGeneration(
             id: n.id || n.node_id,
             type: n.type,
             hasCharacter: !!n.character,
+            motionFields: Object.keys(n).filter(k => k.toLowerCase().includes('motion') || k.toLowerCase().includes('generation')),
+            fullNode: JSON.stringify(n, null, 2).substring(0, 500), // Log first 500 chars of node for debugging
           })),
         })
       } catch (templateError: any) {
@@ -648,13 +707,60 @@ async function runTemplateGeneration(
             overrides.nodes_override.push({})
           }
           
-          // Build the override object
+          // Get the existing template node to preserve its motion settings
+          const existingNode = templateNodes[nodeIndex] || {}
+          
+          // Preserve ALL node properties except the old character, then override with new character
+          // This ensures motion settings and all other template configurations are preserved
+          const { character: oldCharacter, ...restOfNode } = existingNode
+          
+          // Build the override object - preserve all node properties, only override character
           const nodeOverride: any = {
-            character: characterOverride,
+            ...restOfNode, // Preserve ALL existing node properties (motion settings, configs, etc.)
+            character: characterOverride, // Override only the character
           }
           
-          // Add motion features to character nodes if supported
-          if (motionConfig && avatarCapabilities && nodeInfo.hasCharacter) {
+          // Also preserve motion settings that might be nested in the old character object
+          if (oldCharacter && typeof oldCharacter === 'object') {
+            const charMotionFields = ['motion_engine', 'generation_mode', 'full_body_motion', 'generation_mode']
+            for (const field of charMotionFields) {
+              if (oldCharacter[field] !== undefined) {
+                // Merge motion settings from old character into new character override
+                nodeOverride.character = {
+                  ...characterOverride,
+                  [field]: oldCharacter[field],
+                }
+                console.log(`[Template Generation] Preserving character motion field: ${field} = ${JSON.stringify(oldCharacter[field])}`)
+              }
+            }
+          }
+          
+          // Log what we're preserving for debugging
+          const preservedFields = Object.keys(restOfNode).filter(k => 
+            k.toLowerCase().includes('motion') || 
+            k.toLowerCase().includes('generation') ||
+            k.toLowerCase().includes('engine')
+          )
+          if (preservedFields.length > 0) {
+            console.log(`[Template Generation] Preserving fields from template node[${nodeIndex}]:`, preservedFields)
+          }
+          
+          // Add motion features to character nodes if supported AND template doesn't already have them
+          // Only add our motion config if template doesn't have motion settings
+          const motionFields = [
+            'motion_engine', 
+            'generation_mode', 
+            'motion_config', 
+            'motion_settings', 
+            'full_body_motion',
+            'enable_full_body_motion',
+            'motion_mode'
+          ]
+          const hasTemplateMotion = motionFields.some(field => existingNode[field] !== undefined) ||
+            (oldCharacter && typeof oldCharacter === 'object' && 
+             ['motion_engine', 'generation_mode', 'full_body_motion'].some(field => oldCharacter[field] !== undefined))
+          
+          if (!hasTemplateMotion && motionConfig && avatarCapabilities && nodeInfo.hasCharacter) {
             // Add gestures if avatar supports gesture control
             if (motionConfig.gestures && motionConfig.gestures.length > 0 && avatarCapabilities.supportsGestureControl) {
               nodeOverride.gestures = motionConfig.gestures
