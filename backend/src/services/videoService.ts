@@ -426,64 +426,50 @@ async function runTemplateGeneration(
     // Avatars are set via nodes_override in the overrides object below
     // Template variables are only for script/text content and other template-defined variables
 
-    // Build overrides to set avatar in template nodes if needed
-    let overrides = { ...preference.overrides }
+    // Build overrides to set avatar in template nodes
+    // Always ensure avatar is set via nodes_override (this is the correct way for templates)
+    let overrides: Record<string, any> = { ...preference.overrides }
     
-    // Always set avatar via nodes_override (this is the correct way for templates)
-    // The avatar_id variable is for the template to use, but the actual avatar assignment
-    // should be done via nodes_override
     if (avatarId) {
-      if (!overrides || Object.keys(overrides).length === 0) {
-        // Create new overrides with avatar
-        overrides = {
-          nodes_override: [
-            {
-              character: isPhotoAvatar
-                ? {
-                    type: 'talking_photo',
-                    talking_photo_id: avatarId,
-                  }
-                : {
-                    type: 'avatar',
-                    avatar_id: avatarId,
-                  },
-            },
-          ],
-        }
-      } else {
-        // Merge with existing overrides
-        if (!overrides.nodes_override) {
-          overrides.nodes_override = []
-        }
-        if (!Array.isArray(overrides.nodes_override)) {
-          overrides.nodes_override = [overrides.nodes_override]
-        }
-        // Set avatar in the first node (or create one if none exist)
-        if (overrides.nodes_override.length === 0) {
-          overrides.nodes_override.push({
-            character: isPhotoAvatar
-              ? {
-                  type: 'talking_photo',
-                  talking_photo_id: avatarId,
-                }
-              : {
-                  type: 'avatar',
-                  avatar_id: avatarId,
-                },
-          })
-        } else {
-          // Update the first node's character
-          overrides.nodes_override[0].character = isPhotoAvatar
-            ? {
-                type: 'talking_photo',
-                talking_photo_id: avatarId,
-              }
-            : {
-                type: 'avatar',
-                avatar_id: avatarId,
-              }
-        }
+      // Initialize nodes_override array - always override the first node (index 0)
+      // which is typically the main character node in HeyGen templates
+      if (!overrides.nodes_override) {
+        overrides.nodes_override = []
       }
+      if (!Array.isArray(overrides.nodes_override)) {
+        overrides.nodes_override = [overrides.nodes_override]
+      }
+      
+      // Create the character override
+      const characterOverride = isPhotoAvatar
+        ? {
+            type: 'talking_photo',
+            talking_photo_id: avatarId,
+          }
+        : {
+            type: 'avatar',
+            avatar_id: avatarId,
+          }
+      
+      // Ensure we have at least one node to override (index 0)
+      // If nodes_override is empty, create the first node
+      if (overrides.nodes_override.length === 0) {
+        overrides.nodes_override.push({})
+      }
+      
+      // Always override the first node's character (index 0)
+      // This is the main character node in most HeyGen templates
+      if (!overrides.nodes_override[0]) {
+        overrides.nodes_override[0] = {}
+      }
+      overrides.nodes_override[0].character = characterOverride
+      
+      console.log('[Template Generation] Set avatar in nodes_override[0]:', {
+        avatarId,
+        isPhotoAvatar,
+        characterType: isPhotoAvatar ? 'talking_photo' : 'avatar',
+        nodesOverride: JSON.stringify(overrides.nodes_override, null, 2),
+      })
     }
 
     const payload = {
