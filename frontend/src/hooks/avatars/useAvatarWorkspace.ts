@@ -8,7 +8,7 @@ export function useAvatarWorkspaceState(selectedAvatarId: string | null) {
   const { toast } = useToast()
 
   // Load avatar data with lazy loading
-  const { avatars, loading, allLooks, loadingLooks, loadAvatars, invalidateLooksCache, addAvatar, loadLooksForAvatar } = useAvatarData({
+  const { avatars, loading, allLooks, loadingLooks, loadAvatars, invalidateLooksCache, addAvatar, loadLooksForAvatar, refreshLooksForAvatar } = useAvatarData({
     lazyLoadLooks: true,
     selectedAvatarId,
   })
@@ -44,30 +44,29 @@ export function useAvatarWorkspaceState(selectedAvatarId: string | null) {
   // Look generation
   const { generating, generatingLookIds, generateLook } = useLookGeneration({
     onSuccess: () => {
-      // Invalidate cache first so fresh data is fetched
+      console.log('[useAvatarWorkspace] Look generation successful, reloading looks...')
+      // Invalidate cache and refresh looks for the selected avatar
       if (selectedAvatarId) {
-        invalidateLooksCache(selectedAvatarId)
-        // Reload looks for the selected avatar immediately
-        loadLooksForAvatar(selectedAvatarId).then((looks) => {
-          // Update allLooks state with the new looks
-          const avatar = avatars.find(a => a.id === selectedAvatarId)
-          if (avatar && looks) {
-            // This will be handled by the useEffect, but we trigger it here too
-            // The useEffect depends on avatars, so we need to ensure it runs
-          }
+        // Use refreshLooksForAvatar which handles cache invalidation and state update
+        refreshLooksForAvatar(selectedAvatarId).then((looks) => {
+          console.log(`[useAvatarWorkspace] Refreshed ${looks.length} looks for avatar ${selectedAvatarId}`)
+        }).catch(error => {
+          console.error('[useAvatarWorkspace] Failed to refresh looks:', error)
         })
       } else {
         invalidateLooksCache()
       }
       
-      // Reload avatars to trigger useEffect which will reload looks
+      // Reload avatars to ensure we have the latest avatar data
       loadAvatars()
       
-      // Also reload after a short delay to ensure backend has fully processed the new looks
+      // Also refresh after a short delay to ensure backend has fully processed the new looks
       setTimeout(() => {
+        console.log('[useAvatarWorkspace] Delayed refresh of looks...')
         if (selectedAvatarId) {
-          invalidateLooksCache(selectedAvatarId)
-          loadLooksForAvatar(selectedAvatarId)
+          refreshLooksForAvatar(selectedAvatarId).then((looks) => {
+            console.log(`[useAvatarWorkspace] Delayed refresh: ${looks.length} looks for avatar ${selectedAvatarId}`)
+          })
         } else {
           invalidateLooksCache()
         }

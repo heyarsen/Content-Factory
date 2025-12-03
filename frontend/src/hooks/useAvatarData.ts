@@ -167,21 +167,26 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
     setLoadingLooks(false)
   }, [])
 
-  const loadLooksForAvatar = useCallback(async (avatarId: string) => {
-    // Check cache first
-    if (looksCacheRef.current.has(avatarId)) {
-      return looksCacheRef.current.get(avatarId)!
+  const loadLooksForAvatar = useCallback(async (avatarId: string, forceRefresh = false) => {
+    // Check cache first (unless forcing refresh)
+    if (!forceRefresh && looksCacheRef.current.has(avatarId)) {
+      const cachedLooks = looksCacheRef.current.get(avatarId)!
+      return cachedLooks
     }
 
     try {
+      console.log(`[useAvatarData] Loading looks for avatar ${avatarId}${forceRefresh ? ' (force refresh)' : ''}`)
       const response = await api.get(`/api/avatars/${avatarId}/details`)
       const details = response.data
       if (details?.looks && Array.isArray(details.looks)) {
+        console.log(`[useAvatarData] Loaded ${details.looks.length} looks for avatar ${avatarId}`)
         looksCacheRef.current.set(avatarId, details.looks)
         return details.looks
       }
+      console.log(`[useAvatarData] No looks found for avatar ${avatarId}`)
       return []
     } catch (error) {
+      console.error(`[useAvatarData] Failed to load looks for avatar ${avatarId}:`, error)
       handleError(error, {
         showToast: false,
         logError: true,
@@ -196,25 +201,85 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
     loadAvatars()
   }, [loadAvatars])
 
+  // Track previous selectedAvatarId to detect changes
+  const prevSelectedAvatarIdRef = useRef<string | null>(null)
+
   // Load looks based on lazy loading setting
   useEffect(() => {
     if (lazyLoadLooks) {
       // Only load looks when avatar is selected
       if (selectedAvatarId) {
-        loadLooksForAvatar(selectedAvatarId).then((looks: PhotoAvatarLook[]) => {
-          const avatar = avatars.find(a => a.id === selectedAvatarId)
-          if (avatar) {
-            const newLooks = looks.map((look: PhotoAvatarLook) => ({ look, avatar }))
-            // Deduplicate by look.id
-            setAllLooks(prevLooks => {
-              const combined = [...prevLooks, ...newLooks]
-              return combined.filter((item, index, self) => 
-                index === self.findIndex((t) => t.look.id === item.look.id && t.avatar.id === item.avatar.id)
-              )
+        const avatarChanged = prevSelectedAvatarIdRef.current !== selectedAvatarId
+        prevSelectedAvatarIdRef.current = selectedAvatarId
+        
+        console.log(`[useAvatarData] Avatar selected: ${selectedAvatarId}, loading looks... (changed: ${avatarChanged})`)
+        
+        // Find avatar in current list, or fetch it if not available
+        let avatar = avatars.find(a => a.id === selectedAvatarId)
+        
+        // If avatar not found, try to fetch it from API
+        if (!avatar) {
+          console.log(`[useAvatarData] Avatar ${selectedAvatarId} not in list, fetching from API...`)
+          api.get(`/api/avatars/${selectedAvatarId}`)
+            .then(response => {
+              if (response.data) {
+                avatar = response.data
+                // Load looks for this avatar with force refresh
+                return loadLooksForAvatar(selectedAvatarId, true)
+              }
+              return []
             })
-          }
-        })
+            .then((looks: PhotoAvatarLook[]) => {
+              if (avatar) {
+                if (looks.length > 0) {
+                  const newLooks = looks.map((look: PhotoAvatarLook) => ({ look, avatar: avatar! }))
+                  setAllLooks(prevLooks => {
+                    // Remove old looks for this avatar first
+                    const filtered = prevLooks.filter(item => item.avatar.id !== selectedAvatarId)
+                    const combined = [...filtered, ...newLooks]
+                    // Deduplicate by look.id
+                    return combined.filter((item, index, self) => 
+                      index === self.findIndex((t) => t.look.id === item.look.id && t.avatar.id === item.avatar.id)
+                    )
+                  })
+                  console.log(`[useAvatarData] Added ${newLooks.length} looks for avatar ${selectedAvatarId}`)
+                } else {
+                  // No looks found, clear any stale looks for this avatar
+                  setAllLooks(prevLooks => prevLooks.filter(item => item.avatar.id !== selectedAvatarId))
+                  console.log(`[useAvatarData] No looks found for avatar ${selectedAvatarId}, cleared stale looks`)
+                }
+              }
+            })
+            .catch(error => {
+              console.error(`[useAvatarData] Failed to fetch avatar ${selectedAvatarId}:`, error)
+            })
+        } else {
+          // Avatar is in list, load looks (force refresh if avatar just changed)
+          loadLooksForAvatar(selectedAvatarId, avatarChanged).then((looks: PhotoAvatarLook[]) => {
+            if (avatar) {
+              if (looks.length > 0) {
+                const newLooks = looks.map((look: PhotoAvatarLook) => ({ look, avatar }))
+                // Deduplicate by look.id and replace looks for this avatar
+                setAllLooks(prevLooks => {
+                  // Remove old looks for this avatar first
+                  const filtered = prevLooks.filter(item => item.avatar.id !== selectedAvatarId)
+                  const combined = [...filtered, ...newLooks]
+                  return combined.filter((item, index, self) => 
+                    index === self.findIndex((t) => t.look.id === item.look.id && t.avatar.id === item.avatar.id)
+                  )
+                })
+                console.log(`[useAvatarData] Updated ${newLooks.length} looks for avatar ${selectedAvatarId}`)
+              } else {
+                // No looks found, but ensure we clear any stale looks for this avatar
+                setAllLooks(prevLooks => prevLooks.filter(item => item.avatar.id !== selectedAvatarId))
+                console.log(`[useAvatarData] No looks found for avatar ${selectedAvatarId}, cleared stale looks`)
+              }
+            }
+          })
+        }
       } else {
+        // Clear previous selection when no avatar is selected
+        prevSelectedAvatarIdRef.current = null
         // Load all looks if no avatar selected
         if (avatars.length > 0) {
           loadAllLooks(avatars)
@@ -236,6 +301,43 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
     }
   }, [])
 
+  // Function to refresh looks for a specific avatar and update state
+  const refreshLooksForAvatar = useCallback(async (avatarId: string) => {
+    console.log(`[useAvatarData] Refreshing looks for avatar ${avatarId}`)
+    // Invalidate cache first
+    invalidateLooksCache(avatarId)
+    
+    // Load fresh looks
+    const looks = await loadLooksForAvatar(avatarId, true)
+    
+    // Find avatar in current list
+    const avatar = avatars.find(a => a.id === avatarId)
+    
+    if (avatar) {
+      if (looks.length > 0) {
+        const newLooks = looks.map((look: PhotoAvatarLook) => ({ look, avatar }))
+        // Update state: remove old looks for this avatar and add new ones
+        setAllLooks(prevLooks => {
+          const filtered = prevLooks.filter(item => item.avatar.id !== avatarId)
+          const combined = [...filtered, ...newLooks]
+          // Deduplicate by look.id
+          return combined.filter((item, index, self) => 
+            index === self.findIndex((t) => t.look.id === item.look.id && t.avatar.id === item.avatar.id)
+          )
+        })
+        console.log(`[useAvatarData] Updated state with ${newLooks.length} looks for avatar ${avatarId}`)
+      } else {
+        // No looks found, remove any stale looks for this avatar
+        setAllLooks(prevLooks => prevLooks.filter(item => item.avatar.id !== avatarId))
+        console.log(`[useAvatarData] No looks found, cleared looks for avatar ${avatarId}`)
+      }
+    } else {
+      console.warn(`[useAvatarData] Avatar ${avatarId} not found in avatars list, cannot update looks state`)
+    }
+    
+    return looks
+  }, [avatars, loadLooksForAvatar, invalidateLooksCache])
+
   const addAvatar = useCallback((avatar: Avatar) => {
     setAvatars((prevAvatars: Avatar[]) => {
       // Check if avatar already exists
@@ -255,6 +357,7 @@ export function useAvatarData({ lazyLoadLooks = false, selectedAvatarId }: UseAv
     loadingLooks,
     loadAvatars,
     loadLooksForAvatar,
+    refreshLooksForAvatar,
     invalidateLooksCache,
     addAvatar,
   }
