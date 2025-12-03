@@ -447,34 +447,26 @@ async function runTemplateGeneration(
         hasAvatarIdVariable = 'avatar_id' in templateVariables
         
         if (hasAvatarIdVariable) {
-          console.log('[Template Generation] Template has avatar_id variable, will use template character_id and override avatar via nodes_override')
+          console.log('[Template Generation] Template has avatar_id variable, will replace character_id with selected avatar and also override via nodes_override')
           
-          // Preserve the template's character_id and other properties to satisfy schema
+          // Use the template's avatar_id variable structure but swap its character_id
           const templateAvatarVar = (templateVariables as any).avatar_id || {}
           const templateAvatarProps = templateAvatarVar.properties || {}
           const templateAvatarType = templateAvatarVar.type || 'character'
 
-          // Build avatar_id variable keeping the original character_id, but adding our avatar type hints
+          // IMPORTANT: HeyGen expects character_id here; use our talking_photo_id / avatar_id
           variables['avatar_id'] = {
             name: 'avatar_id',
             type: templateAvatarType,
             properties: {
               ...templateAvatarProps,
-              // These hints might be ignored by HeyGen for templates but are safe to include
-              ...(isPhotoAvatar
-                ? {
-                    type: 'talking_photo',
-                    talking_photo_id: avatarId,
-                  }
-                : {
-                    type: 'avatar',
-                    avatar_id: avatarId,
-                  }),
+              character_id: avatarId, // force template to use our character instead of default
             },
           }
 
-          console.log('[Template Generation] Set avatar_id variable (preserving template character_id):', {
-            templateCharacterId: templateAvatarProps.character_id,
+          console.log('[Template Generation] Set avatar_id variable (replaced character_id):', {
+            originalCharacterId: templateAvatarProps.character_id,
+            newCharacterId: avatarId,
             finalVariable: JSON.stringify(variables['avatar_id'], null, 2),
           })
           
