@@ -1216,7 +1216,8 @@ export async function generateVideoFromTemplate(
       statusText: error.response?.statusText,
       data: error.response?.data,
       message: error.message,
-      payload: JSON.stringify(payload, null, 2), // Log the full payload for debugging
+      // Note: we can't log the full payload here because it's out of scope;
+      // the caller (videoService) logs the payload before calling this function.
     })
 
     let errorMessage = 'Failed to generate video from template'
