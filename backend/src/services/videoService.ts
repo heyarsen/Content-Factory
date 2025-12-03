@@ -422,16 +422,12 @@ async function runTemplateGeneration(
       variables[scriptKey] = scriptValue
     }
 
-    // NOTE: Avatar information should NOT be passed as template variables
-    // Avatars are set via nodes_override in the overrides object below
-    // Template variables are only for script/text content and other template-defined variables
-
     // Build overrides to set avatar in template nodes
-    // Always ensure avatar is set via nodes_override (this is the correct way for templates)
     let overrides: Record<string, any> = { ...preference.overrides }
     
     if (avatarId) {
-      // Try to fetch template details to see node structure
+      // Try to fetch template details to see if it has an avatar_id variable
+      let hasAvatarIdVariable = false
       let templateNodes: any[] = []
       try {
         const { getTemplateDetails } = await import('../lib/heygen.js')
@@ -445,6 +441,36 @@ async function runTemplateGeneration(
           keys: Object.keys(templateDetails || {}),
           fullResponse: JSON.stringify(templateDetails, null, 2).substring(0, 1000), // First 1000 chars
         })
+        
+        // Check if template has avatar_id variable
+        const templateVariables = templateDetails?.variables || templateDetails?.data?.variables || {}
+        hasAvatarIdVariable = 'avatar_id' in templateVariables
+        
+        if (hasAvatarIdVariable) {
+          console.log('[Template Generation] Template has avatar_id variable, using it instead of nodes_override')
+          // Set avatar_id as a variable (for character type variables)
+          // Format should match HeyGen's character variable format
+          if (isPhotoAvatar) {
+            variables['avatar_id'] = {
+              name: 'avatar_id',
+              type: 'character',
+              properties: {
+                type: 'talking_photo',
+                talking_photo_id: avatarId,
+              },
+            }
+          } else {
+            variables['avatar_id'] = {
+              name: 'avatar_id',
+              type: 'character',
+              properties: {
+                type: 'avatar',
+                avatar_id: avatarId,
+              },
+            }
+          }
+          console.log('[Template Generation] Set avatar_id variable:', variables['avatar_id'])
+        }
         
         // Try multiple possible paths for nodes
         // HeyGen template structure can vary, so check multiple locations
@@ -469,6 +495,7 @@ async function runTemplateGeneration(
         
         console.log('[Template Generation] Fetched template details:', {
           templateId: preference.templateId,
+          hasAvatarIdVariable,
           nodesCount: templateNodes.length,
           nodes: templateNodes.map((n: any, i: number) => ({
             index: i,
@@ -478,69 +505,72 @@ async function runTemplateGeneration(
           })),
         })
       } catch (templateError: any) {
-        console.warn('[Template Generation] Could not fetch template details, using default override:', templateError.message)
+        console.warn('[Template Generation] Could not fetch template details, using nodes_override fallback:', templateError.message)
       }
       
-      // Initialize nodes_override array
-      if (!overrides.nodes_override) {
-        overrides.nodes_override = []
-      }
-      if (!Array.isArray(overrides.nodes_override)) {
-        overrides.nodes_override = [overrides.nodes_override]
-      }
-      
-      // Create the character override
-      const characterOverride = isPhotoAvatar
-        ? {
-            type: 'talking_photo',
-            talking_photo_id: avatarId,
+      // Only use nodes_override if template doesn't have avatar_id variable
+      if (!hasAvatarIdVariable) {
+        // Initialize nodes_override array
+        if (!overrides.nodes_override) {
+          overrides.nodes_override = []
+        }
+        if (!Array.isArray(overrides.nodes_override)) {
+          overrides.nodes_override = [overrides.nodes_override]
+        }
+        
+        // Create the character override
+        const characterOverride = isPhotoAvatar
+          ? {
+              type: 'talking_photo',
+              talking_photo_id: avatarId,
+            }
+          : {
+              type: 'avatar',
+              avatar_id: avatarId,
+            }
+        
+        // Override strategy: Since template details may not expose nodes correctly,
+        // we'll override multiple nodes to ensure the character is set
+        // If we have template nodes, use them; otherwise override nodes 0-5 to catch the character
+        const nodesToOverride: Array<{ index: number; id?: string; hasCharacter?: boolean }> = templateNodes.length > 0 
+          ? templateNodes.map((n: any, i: number) => ({ index: i, id: n.id || n.node_id, hasCharacter: !!n.character }))
+          : Array.from({ length: 6 }, (_, i) => ({ index: i })) // Fallback: override nodes 0-5 to ensure we catch the character
+        
+        // Override all identified nodes (or first 3 as fallback)
+        for (const nodeInfo of nodesToOverride) {
+          const nodeIndex = nodeInfo.index
+          // Ensure we have enough nodes in the override array
+          while (overrides.nodes_override.length <= nodeIndex) {
+            overrides.nodes_override.push({})
           }
-        : {
-            type: 'avatar',
-            avatar_id: avatarId,
+          
+          // Build the override object
+          const nodeOverride: any = {
+            character: characterOverride,
           }
-      
-      // Override strategy: Since template details may not expose nodes correctly,
-      // we'll override multiple nodes to ensure the character is set
-      // If we have template nodes, use them; otherwise override nodes 0-5 to catch the character
-      const nodesToOverride: Array<{ index: number; id?: string; hasCharacter?: boolean }> = templateNodes.length > 0 
-        ? templateNodes.map((n: any, i: number) => ({ index: i, id: n.id || n.node_id, hasCharacter: !!n.character }))
-        : Array.from({ length: 6 }, (_, i) => ({ index: i })) // Fallback: override nodes 0-5 to ensure we catch the character
-      
-      // Override all identified nodes (or first 3 as fallback)
-      for (const nodeInfo of nodesToOverride) {
-        const nodeIndex = nodeInfo.index
-        // Ensure we have enough nodes in the override array
-        while (overrides.nodes_override.length <= nodeIndex) {
-          overrides.nodes_override.push({})
+          
+          // Add node_id if available
+          if (nodeInfo.id) {
+            nodeOverride.node_id = nodeInfo.id
+          }
+          
+          overrides.nodes_override[nodeIndex] = nodeOverride
+          
+          console.log(`[Template Generation] Overriding node[${nodeIndex}]:`, {
+            nodeId: nodeInfo.id || 'no-id',
+            characterType: isPhotoAvatar ? 'talking_photo' : 'avatar',
+            talkingPhotoId: isPhotoAvatar ? avatarId : undefined,
+            avatarId: !isPhotoAvatar ? avatarId : undefined,
+          })
         }
         
-        // Build the override object
-        const nodeOverride: any = {
-          character: characterOverride,
-        }
-        
-        // Add node_id if available
-        if (nodeInfo.id) {
-          nodeOverride.node_id = nodeInfo.id
-        }
-        
-        overrides.nodes_override[nodeIndex] = nodeOverride
-        
-        console.log(`[Template Generation] Overriding node[${nodeIndex}]:`, {
-          nodeId: nodeInfo.id || 'no-id',
-          characterType: isPhotoAvatar ? 'talking_photo' : 'avatar',
-          talkingPhotoId: isPhotoAvatar ? avatarId : undefined,
-          avatarId: !isPhotoAvatar ? avatarId : undefined,
+        console.log('[Template Generation] Final nodes_override:', {
+          avatarId,
+          isPhotoAvatar,
+          nodesCount: overrides.nodes_override.length,
+          nodesOverride: JSON.stringify(overrides.nodes_override, null, 2),
         })
       }
-      
-      console.log('[Template Generation] Final nodes_override:', {
-        avatarId,
-        isPhotoAvatar,
-        nodesCount: overrides.nodes_override.length,
-        nodesOverride: JSON.stringify(overrides.nodes_override, null, 2),
-      })
     }
 
     const payload = {
