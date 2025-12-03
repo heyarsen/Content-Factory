@@ -1649,26 +1649,16 @@ export async function generateVideoFromTemplate(
       return formatted
     }
 
+    // HeyGen template API only accepts boolean for caption, not an object
+    // Convert caption to boolean (default to false if not provided)
+    const captionValue = typeof request.caption === 'boolean' ? request.caption : (request.caption ? true : false)
+
     const payload: Record<string, any> = {
       variables: formatTemplateVariables(request.variables),
       title: request.title || 'Untitled Video',
-      caption: request.caption ?? false,
+      caption: captionValue,
       include_gif: request.include_gif ?? false,
       enable_sharing: request.enable_sharing ?? false,
-    }
-
-    // If caption is an object with configuration, use it directly
-    // Otherwise, if it's true, try to add caption positioning configuration
-    if (request.caption && typeof request.caption === 'object') {
-      payload.caption = request.caption
-    } else if (request.caption === true) {
-      // Try to add caption configuration for higher positioning
-      // Note: This may not be supported by HeyGen API, but we'll try
-      payload.caption = {
-        enabled: true,
-        position: 'top', // Try 'top' instead of default 'bottom'
-        vertical_offset: -20, // Negative value to move up
-      }
     }
 
     if (request.callback_url) {

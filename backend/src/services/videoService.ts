@@ -408,7 +408,8 @@ async function runTemplateGeneration(
   scriptText: string,
   planItemId?: string | null,
   avatarId?: string,
-  isPhotoAvatar?: boolean
+  isPhotoAvatar?: boolean,
+  generateCaption?: boolean
 ): Promise<void> {
   try {
     console.log('[Template Generation] Starting template video generation:', {
@@ -699,18 +700,12 @@ async function runTemplateGeneration(
       }
     }
 
-    // Configure caption with higher positioning
-    const captionConfig = {
-      enabled: true,
-      position: 'top', // Position captions at the top
-      vertical_offset: -20, // Negative value to move captions higher
-    }
-
+    // HeyGen template API only accepts boolean for caption, not an object
     const payload = {
       template_id: preference.templateId,
       variables,
       title: video.topic,
-      caption: captionConfig, // Use caption configuration object instead of just true
+      caption: generateCaption ?? true, // Use boolean, not object
       overrides: Object.keys(overrides).length > 0 ? overrides : undefined,
     }
 
@@ -871,7 +866,7 @@ export class VideoService {
       })
       
       // Try template generation (async, fire-and-forget with error handling)
-      void runTemplateGeneration(video, templatePreference, scriptText, input.plan_item_id || null, avatarId, isPhotoAvatar).catch(
+      void runTemplateGeneration(video, templatePreference, scriptText, input.plan_item_id || null, avatarId, isPhotoAvatar, input.generate_caption).catch(
         (error: any) => {
           console.error('[Video Generation] Template generation failed; falling back to avatar-based generation:', {
             error: error?.message || error,
