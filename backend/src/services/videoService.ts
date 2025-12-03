@@ -489,7 +489,7 @@ async function runTemplateGeneration(
       // Override strategy: Since template details may not expose nodes correctly,
       // we'll override multiple nodes to ensure the character is set
       // Try overriding nodes 0, 1, and 2 (most templates have the character in one of these)
-      const nodesToOverride = templateNodes.length > 0 
+      const nodesToOverride: Array<{ index: number; id?: string; hasCharacter?: boolean }> = templateNodes.length > 0 
         ? templateNodes.map((n: any, i: number) => ({ index: i, id: n.id || n.node_id, hasCharacter: !!n.character }))
         : [{ index: 0 }, { index: 1 }, { index: 2 }] // Fallback: override first 3 nodes
       
