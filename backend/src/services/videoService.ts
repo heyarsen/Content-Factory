@@ -436,7 +436,23 @@ async function runTemplateGeneration(
       try {
         const { getTemplateDetails } = await import('../lib/heygen.js')
         const templateDetails = await getTemplateDetails(preference.templateId)
-        templateNodes = templateDetails?.nodes || templateDetails?.data?.nodes || []
+        
+        // Log full template details to understand structure
+        console.log('[Template Generation] Full template details response:', {
+          templateId: preference.templateId,
+          hasData: !!templateDetails?.data,
+          hasNodes: !!templateDetails?.nodes,
+          keys: Object.keys(templateDetails || {}),
+          fullResponse: JSON.stringify(templateDetails, null, 2).substring(0, 1000), // First 1000 chars
+        })
+        
+        // Try multiple possible paths for nodes
+        templateNodes = 
+          templateDetails?.nodes || 
+          templateDetails?.data?.nodes || 
+          templateDetails?.data?.template?.nodes ||
+          (Array.isArray(templateDetails) ? templateDetails : [])
+        
         console.log('[Template Generation] Fetched template details:', {
           templateId: preference.templateId,
           nodesCount: templateNodes.length,
@@ -470,45 +486,38 @@ async function runTemplateGeneration(
             avatar_id: avatarId,
           }
       
-      // If we found template nodes, override all nodes that have characters
-      // Otherwise, override the first node (index 0) as fallback
-      if (templateNodes.length > 0) {
-        // Override all character nodes in the template
-        for (let i = 0; i < templateNodes.length; i++) {
-          const node = templateNodes[i]
-          if (node.character || node.type === 'character') {
-            // Ensure we have enough nodes in the override array
-            while (overrides.nodes_override.length <= i) {
-              overrides.nodes_override.push({})
-            }
-            // Set node ID if available, otherwise use index
-            if (node.id || node.node_id) {
-              overrides.nodes_override[i] = {
-                node_id: node.id || node.node_id,
-                character: characterOverride,
-              }
-            } else {
-              overrides.nodes_override[i] = {
-                character: characterOverride,
-              }
-            }
-            console.log(`[Template Generation] Overriding node ${i} (${node.id || node.node_id || 'no-id'}):`, {
-              nodeId: node.id || node.node_id,
-              characterType: isPhotoAvatar ? 'talking_photo' : 'avatar',
-            })
-          }
-        }
-      } else {
-        // Fallback: override the first node (index 0)
-        if (overrides.nodes_override.length === 0) {
+      // Override strategy: Since template details may not expose nodes correctly,
+      // we'll override multiple nodes to ensure the character is set
+      // Try overriding nodes 0, 1, and 2 (most templates have the character in one of these)
+      const nodesToOverride = templateNodes.length > 0 
+        ? templateNodes.map((n: any, i: number) => ({ index: i, id: n.id || n.node_id, hasCharacter: !!n.character }))
+        : [{ index: 0 }, { index: 1 }, { index: 2 }] // Fallback: override first 3 nodes
+      
+      // Override all identified nodes (or first 3 as fallback)
+      for (const nodeInfo of nodesToOverride) {
+        const nodeIndex = nodeInfo.index
+        // Ensure we have enough nodes in the override array
+        while (overrides.nodes_override.length <= nodeIndex) {
           overrides.nodes_override.push({})
         }
-        if (!overrides.nodes_override[0]) {
-          overrides.nodes_override[0] = {}
+        
+        // Build the override object
+        const nodeOverride: any = {
+          character: characterOverride,
         }
-        overrides.nodes_override[0].character = characterOverride
-        console.log('[Template Generation] Overriding node[0] (fallback):', {
+        
+        // Add node_id if available
+        if (nodeInfo.id) {
+          nodeOverride.node_id = nodeInfo.id
+        }
+        
+        overrides.nodes_override[nodeIndex] = nodeOverride
+        
+        console.log(`[Template Generation] Overriding node[${nodeIndex}]:`, {
+          nodeId: nodeInfo.id || 'no-id',
           characterType: isPhotoAvatar ? 'talking_photo' : 'avatar',
+          talkingPhotoId: isPhotoAvatar ? avatarId : undefined,
+          avatarId: !isPhotoAvatar ? avatarId : undefined,
         })
       }
       
