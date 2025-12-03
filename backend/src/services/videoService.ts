@@ -422,17 +422,9 @@ async function runTemplateGeneration(
       variables[scriptKey] = scriptValue
     }
 
-    // Add avatar_id as a template variable (the template uses this variable name)
-    // Note: The template editor shows this as a variable input field
-    // We pass it as a variable so the template can use it
-    if (avatarId) {
-      variables['avatar_id'] = avatarId
-      console.log('[Template Generation] Added avatar_id variable:', {
-        avatarId,
-        isPhotoAvatar,
-        variableType: typeof variables['avatar_id'],
-      })
-    }
+    // NOTE: Avatar information should NOT be passed as template variables
+    // Avatars are set via nodes_override in the overrides object below
+    // Template variables are only for script/text content and other template-defined variables
 
     // Build overrides to set avatar in template nodes if needed
     let overrides = { ...preference.overrides }
