@@ -476,8 +476,10 @@ async function runTemplateGeneration(
     console.log('[Template Generation] Calling HeyGen template API with payload:', {
       templateId: payload.template_id,
       variables: Object.keys(payload.variables),
+      variableValues: payload.variables, // Log actual variable values for debugging
       hasOverrides: !!payload.overrides && Object.keys(payload.overrides).length > 0,
       overrides: payload.overrides ? JSON.stringify(payload.overrides, null, 2) : undefined,
+      fullPayload: JSON.stringify(payload, null, 2), // Log full payload for debugging
     })
 
     const response = await generateVideoFromTemplate(payload)
@@ -616,26 +618,35 @@ export class VideoService {
 
     // Always use template - it's hardcoded for everyone
     if (templatePreference) {
-      console.log('[Video Generation] Using template:', {
+      console.log('[Video Generation] Attempting template generation:', {
         templateId: templatePreference.templateId,
         videoId: video.id,
         scriptKey: templatePreference.scriptKey,
         hasScript: !!scriptText,
+        scriptLength: scriptText?.length || 0,
         avatarId: avatarId,
         isPhotoAvatar: isPhotoAvatar,
+        hasAvatarId: !!avatarId,
       })
+      
+      // Try template generation (async, fire-and-forget with error handling)
       void runTemplateGeneration(video, templatePreference, scriptText, input.plan_item_id || null, avatarId, isPhotoAvatar).catch(
-        (error) => {
-          console.error('Template video generation failed; falling back to avatar-based generation:', {
-            error: error.message || error,
+        (error: any) => {
+          console.error('[Video Generation] Template generation failed; falling back to avatar-based generation:', {
+            error: error?.message || error,
+            errorStack: error?.stack,
+            errorResponse: error?.response?.data,
             videoId: video.id,
             templateId: templatePreference.templateId,
+            avatarId: avatarId,
+            isPhotoAvatar: isPhotoAvatar,
           })
+          // Fall back to regular generation
           void scheduleManualGeneration()
         }
       )
     } else {
-      console.error('[Video Generation] ERROR: Template preference is null! This should never happen.')
+      console.error('[Video Generation] ERROR: Template preference is null! This should never happen. Falling back to regular generation.')
       void scheduleManualGeneration()
     }
     return video
