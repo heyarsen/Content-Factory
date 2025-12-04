@@ -610,111 +610,79 @@ async function getDefaultHeygenVoiceId(): Promise<string> {
 /**
  * List public/shared avatars from HeyGen
  * These are pre-built avatars available to all users
+ * Uses the List All Avatars (V2) API endpoint which includes HeyGen's public/studio avatars
+ * Reference: https://docs.heygen.com/reference/list-avatars-v2
  */
 export async function listPublicAvatars(): Promise<HeyGenAvatarsResponse> {
   try {
     const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
     const apiKey = getHeyGenKey()
 
-    // Try to fetch public avatars - HeyGen may have a specific endpoint
-    // Common patterns: /avatars/public, /avatars/shared, /avatars?public=true, /avatar.list?public=true
-    const endpoints = [
-      {
-        type: 'v2-public',
-        method: 'GET' as const,
-        url: `${HEYGEN_V2_API_URL}/avatars/public`,
-        useXApiKey: true,
-      },
-      {
-        type: 'v2-shared',
-        method: 'GET' as const,
-        url: `${HEYGEN_V2_API_URL}/avatars/shared`,
-        useXApiKey: true,
-      },
-      {
-        type: 'v2-list-public',
-        method: 'GET' as const,
-        url: `${HEYGEN_V2_API_URL}/avatar.list?public=true`,
-        useXApiKey: true,
-      },
-      {
-        type: 'v1-public',
-        method: 'GET' as const,
-        url: `${HEYGEN_API_URL}/avatars/public`,
-        useXApiKey: false,
-      },
-      {
-        type: 'v1-list-public',
-        method: 'POST' as const,
-        url: `${HEYGEN_API_URL}/avatar.list`,
-        useXApiKey: false,
-        body: { public: true },
-      },
-    ]
+    // Use the List All Avatars (V2) endpoint as confirmed by HeyGen support
+    // This endpoint returns all available avatars including public/studio avatars
+    const endpoint = `${HEYGEN_V2_API_URL}/avatars`
 
-    let lastError: any = null
-    for (const endpoint of endpoints) {
-      try {
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-        }
-
-        if (endpoint.useXApiKey) {
-          headers['X-Api-Key'] = apiKey
-        } else {
-          headers['Authorization'] = `Bearer ${apiKey}`
-        }
-
-        const requestConfig = { headers }
-
-        const response = endpoint.method === 'POST'
-          ? await axios.post(endpoint.url, endpoint.body || {}, requestConfig)
-          : await axios.get(endpoint.url, requestConfig)
-
-        console.log(`[Public Avatars] Response from ${endpoint.url} (${endpoint.type}):`, {
-          status: response.status,
-          hasData: !!response.data?.data,
-        })
-
-        // Handle different response structures
-        let avatars: any[] = []
-        if (response.data?.data?.avatars && Array.isArray(response.data.data.avatars)) {
-          avatars = response.data.data.avatars
-        } else if (response.data?.data?.avatar_list && Array.isArray(response.data.data.avatar_list)) {
-          avatars = response.data.data.avatar_list
-        } else if (response.data?.data && Array.isArray(response.data.data)) {
-          avatars = response.data.data
-        } else if (response.data?.avatars && Array.isArray(response.data.avatars)) {
-          avatars = response.data.avatars
-        } else if (Array.isArray(response.data)) {
-          avatars = response.data
-        }
-
-        if (avatars.length > 0) {
-          console.log(`[Public Avatars] Successfully fetched ${avatars.length} public avatars from ${endpoint.type}`)
-          const normalizedAvatars = avatars.map((avatar: any) => ({
-            avatar_id: avatar.avatar_id || avatar.id || avatar.avatarId,
-            avatar_name: avatar.avatar_name || avatar.name || avatar.avatarName || 'Unnamed Avatar',
-            avatar_url: avatar.avatar_url || avatar.url || avatar.avatarUrl || avatar.image_url,
-            preview_url: avatar.preview_url || avatar.previewUrl || avatar.preview || avatar.image_url,
-            thumbnail_url: avatar.thumbnail_url || avatar.thumbnailUrl || avatar.thumbnail || avatar.image_url,
-            gender: avatar.gender,
-            status: 'active', // Public avatars are always active
-            is_public: true, // Mark as public avatar
-          }))
-          return { avatars: normalizedAvatars }
-        }
-      } catch (err: any) {
-        console.log(`[Public Avatars] Tried ${endpoint.url} (${endpoint.type}), got status ${err.response?.status}:`, err.response?.data?.error?.message || err.message)
-        lastError = err
-      }
+    const headers = {
+      'X-Api-Key': apiKey,
+      'Content-Type': 'application/json',
     }
 
-    // If all endpoints fail, return empty list (public avatars might not be available via API)
-    console.warn('[Public Avatars] Could not fetch public avatars from any endpoint, returning empty list')
+    console.log('[Public Avatars] Fetching avatars from List All Avatars (V2) endpoint...')
+
+    const response = await axios.get(endpoint, { headers })
+
+    console.log('[Public Avatars] Response received:', {
+      status: response.status,
+      hasData: !!response.data?.data,
+      dataKeys: response.data ? Object.keys(response.data) : [],
+    })
+
+    // Handle different response structures
+    let avatars: any[] = []
+    if (response.data?.data?.avatars && Array.isArray(response.data.data.avatars)) {
+      avatars = response.data.data.avatars
+    } else if (response.data?.data?.avatar_list && Array.isArray(response.data.data.avatar_list)) {
+      avatars = response.data.data.avatar_list
+    } else if (response.data?.data && Array.isArray(response.data.data)) {
+      avatars = response.data.data
+    } else if (response.data?.avatars && Array.isArray(response.data.avatars)) {
+      avatars = response.data.avatars
+    } else if (Array.isArray(response.data)) {
+      avatars = response.data
+    }
+
+    if (avatars.length > 0) {
+      console.log(`[Public Avatars] Successfully fetched ${avatars.length} avatars from List All Avatars (V2)`)
+      
+      // Normalize avatar data structure
+      // Note: The endpoint returns all avatars (user's own + public), but we mark them all as potentially public
+      // In practice, users can use any avatar ID from this list in video generation
+      const normalizedAvatars = avatars.map((avatar: any) => ({
+        avatar_id: avatar.avatar_id || avatar.id || avatar.avatarId,
+        avatar_name: avatar.avatar_name || avatar.name || avatar.avatarName || 'Unnamed Avatar',
+        avatar_url: avatar.avatar_url || avatar.url || avatar.avatarUrl || avatar.image_url,
+        preview_url: avatar.preview_url || avatar.previewUrl || avatar.preview || avatar.image_url,
+        thumbnail_url: avatar.thumbnail_url || avatar.thumbnailUrl || avatar.thumbnail || avatar.image_url,
+        gender: avatar.gender,
+        status: avatar.status || 'active',
+        is_public: avatar.is_public !== undefined ? avatar.is_public : true, // Mark as public if field exists, otherwise assume public
+        // Additional fields that might be present
+        type: avatar.type,
+        created_at: avatar.created_at,
+      }))
+
+      return { avatars: normalizedAvatars }
+    }
+
+    console.warn('[Public Avatars] No avatars found in response')
     return { avatars: [] }
   } catch (error: any) {
-    console.error('[Public Avatars] Error fetching public avatars:', error.response?.data || error.message)
+    console.error('[Public Avatars] Error fetching public avatars:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message,
+    })
     // Return empty list instead of throwing - public avatars are optional
     return { avatars: [] }
   }
