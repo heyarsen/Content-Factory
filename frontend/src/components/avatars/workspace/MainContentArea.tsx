@@ -36,7 +36,6 @@ export function MainContentArea({
   onQuickGenerate,
   generating,
   onAvatarClick,
-  isPublicAvatars = false,
 }: MainContentAreaProps) {
   const { viewMode, setViewMode } = useAvatarWorkspace()
   
