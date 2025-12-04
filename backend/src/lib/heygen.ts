@@ -658,8 +658,10 @@ export async function listPublicAvatars(): Promise<HeyGenAvatarsResponse> {
       // Note: The endpoint returns all avatars (user's own + public), but we mark them all as potentially public
       // In practice, users can use any avatar ID from this list in video generation
       const normalizedAvatars = avatars.map((avatar: any) => {
-        // Try to find the best image URL from multiple possible fields
+        // Try to find the best image URL from multiple possible fields.
+        // According to docs, public avatars expose `preview_image_url`.
         const imageUrl =
+          avatar.preview_image_url ||
           avatar.image_url ||
           avatar.avatar_url ||
           avatar.preview_url ||
@@ -671,8 +673,10 @@ export async function listPublicAvatars(): Promise<HeyGenAvatarsResponse> {
         return {
           avatar_id: avatar.avatar_id || avatar.id || avatar.avatarId,
           avatar_name: avatar.avatar_name || avatar.name || avatar.avatarName || 'Unnamed Avatar',
+          // Main URL we store should be the preview-style image if available
           avatar_url: imageUrl || avatar.avatar_url || avatar.url || avatar.avatarUrl,
           preview_url:
+            avatar.preview_image_url ||
             avatar.preview_url ||
             avatar.previewUrl ||
             avatar.preview ||
