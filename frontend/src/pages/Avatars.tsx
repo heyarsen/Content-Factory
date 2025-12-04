@@ -22,12 +22,13 @@ function AvatarsContent() {
   const [publicAvatars, setPublicAvatars] = useState<Avatar[]>([])
   const [loadingPublicAvatars, setLoadingPublicAvatars] = useState(false)
   const [publicAvatarGroups, setPublicAvatarGroups] = useState<
-    Array<{ id: string; name: string; avatars: Avatar[] }>
+    Array<{ id: string; name: string; avatars: Avatar[]; categories: string[] }>
   >([])
   const [selectedPublicGroupId, setSelectedPublicGroupId] = useState<string | null>(null)
   const [publicSearch, setPublicSearch] = useState('')
   const [publicCategories, setPublicCategories] = useState<string[]>(['All'])
   const [selectedPublicCategory, setSelectedPublicCategory] = useState<string>('All')
+  const [hasRealPublicCategories, setHasRealPublicCategories] = useState(false)
   
   // AI Generation state (kept as modal for now)
   const [showGenerateAIModal, setShowGenerateAIModal] = useState(false)
@@ -109,22 +110,31 @@ function AvatarsContent() {
       if (derivedCategories.length > 0) {
         setPublicCategories(['All', ...derivedCategories])
         setSelectedPublicCategory('All')
+        setHasRealPublicCategories(true)
       } else {
         setPublicCategories(['All', 'Professional', 'Lifestyle', 'UGC', 'Community', 'Favorites'])
         setSelectedPublicCategory('All')
+        setHasRealPublicCategories(false)
       }
 
       // Group public avatars by base name so sidebar shows one entry per character
-      const groupMap = new Map<string, { id: string; name: string; avatars: Avatar[] }>()
+      const groupMap = new Map<string, { id: string; name: string; avatars: Avatar[]; categories: string[] }>()
       for (const avatar of normalizedAvatars) {
         const baseName = getPublicAvatarBaseName(avatar.avatar_name)
         const key = baseName.toLowerCase()
         let group = groupMap.get(key)
         if (!group) {
-          group = { id: key, name: baseName, avatars: [] }
+          group = { id: key, name: baseName, avatars: [], categories: [] }
           groupMap.set(key, group)
         }
         group.avatars.push(avatar)
+        if (avatar.categories) {
+          for (const c of avatar.categories) {
+            if (c && !group.categories.includes(c)) {
+              group.categories.push(c)
+            }
+          }
+        }
       }
 
       const groups = Array.from(groupMap.values()).sort((a, b) =>
@@ -607,23 +617,18 @@ function AvatarsContent() {
 
         <div className="flex-1 min-h-0">
           {activeTab === 'public-avatars' ? (
-            // Custom workspace for public avatars: sidebar = avatar groups, main = looks (variants)
-            <div className="flex h-full gap-6">
-              {/* Sidebar: Public avatar groups */}
-              <div className="w-72 flex-shrink-0 flex flex-col">
-                <div className="mb-4">
-                  <input
-                    type="text"
-                    placeholder="Search avatars..."
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                    onChange={(e) => {
-                      setPublicSearch(e.target.value)
-                    }}
-                  />
-                </div>
-
-                {/* Category chips */}
-                <div className="mb-3 flex flex-wrap gap-2">
+            // Public avatars view: grid of avatars, then looks for a selected avatar
+            <div className="flex flex-col h-full">
+              {/* Search + categories row */}
+              <div className="mb-4 flex flex-col gap-3">
+                <input
+                  type="text"
+                  placeholder="Search avatars..."
+                  value={publicSearch}
+                  onChange={(e) => setPublicSearch(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                />
+                <div className="flex flex-wrap gap-2">
                   {publicCategories.map((cat) => (
                     <button
                       key={cat}
@@ -638,115 +643,133 @@ function AvatarsContent() {
                     </button>
                   ))}
                 </div>
-
-                <div className="mb-3">
-                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                    Avatars
-                  </div>
-                  <div className="space-y-2 max-h-[calc(100vh-260px)] overflow-y-auto pr-1">
-                    {publicAvatarGroups
-                      .filter((group) => {
-                        const matchesSearch = publicSearch
-                          ? group.name.toLowerCase().includes(publicSearch.toLowerCase())
-                          : true
-                        const matchesCategory =
-                          selectedPublicCategory === 'All'
-                            ? true
-                            : group.avatars.some((avatar) =>
-                                avatar.categories?.includes(selectedPublicCategory),
-                              )
-                        return matchesSearch && matchesCategory
-                      })
-                      .map((group) => {
-                      const isSelected = group.id === selectedPublicGroupId
-                      return (
-                        <button
-                          key={group.id}
-                          onClick={() => setSelectedPublicGroupId(group.id)}
-                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-left text-sm transition-colors ${
-                            isSelected
-                              ? 'border-cyan-500 bg-cyan-50 text-slate-900'
-                              : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                          }`}
-                        >
-                          <span className="truncate">{group.name}</span>
-                          <span className="ml-2 text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
-                            {group.avatars.length}
-                          </span>
-                        </button>
-                      )
-                    })}
-                    {publicAvatarGroups.length === 0 && !loadingPublicAvatars && (
-                      <div className="text-xs text-slate-500 px-1">
-                        No public avatars found.
-                      </div>
-                    )}
-                  </div>
-                </div>
               </div>
 
-              {/* Main content: looks (variants) for selected public avatar group */}
-              <div className="flex-1 min-w-0 flex flex-col">
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xl font-semibold text-slate-900">
-                      {publicAvatarGroups.find((g) => g.id === selectedPublicGroupId)?.name ||
-                        'Public Avatars'}
-                    </h2>
-                    <p className="text-sm text-slate-500 mt-1">
-                      Click a look to add it to your avatars.
-                    </p>
-                  </div>
-                </div>
-
-                {loadingPublicAvatars ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                    {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-                      <div
-                        key={i}
-                        className="aspect-[3/4] rounded-2xl bg-slate-200 animate-pulse"
-                      />
-                    ))}
-                  </div>
+              {/* Main content */}
+              <div className="flex-1 min-h-0">
+                {selectedPublicGroupId === null ? (
+                  // Avatar grid (like HeyGen gallery)
+                  <>
+                    {loadingPublicAvatars ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                          <div
+                            key={i}
+                            className="aspect-[3/4] rounded-2xl bg-slate-200 animate-pulse"
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                        {publicAvatarGroups
+                          .filter((group) => {
+                            const matchesSearch = publicSearch
+                              ? group.name.toLowerCase().includes(publicSearch.toLowerCase())
+                              : true
+                            const matchesCategory =
+                              selectedPublicCategory === 'All' || !hasRealPublicCategories
+                                ? true
+                                : group.categories.includes(selectedPublicCategory)
+                            return matchesSearch && matchesCategory
+                          })
+                          .map((group) => {
+                            const heroAvatar = group.avatars[0]
+                            return (
+                              <button
+                                key={group.id}
+                                onClick={() => setSelectedPublicGroupId(group.id)}
+                                className="group relative aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 hover:shadow-xl transition-all duration-300 text-left"
+                              >
+                                <div className="relative w-full h-full">
+                                  <AvatarImage
+                                    avatar={heroAvatar}
+                                    className="w-full h-full rounded-none"
+                                  />
+                                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-3">
+                                    <p className="text-white text-sm font-semibold truncate">
+                                      {group.name}
+                                    </p>
+                                    <p className="text-white/80 text-xs mt-0.5">
+                                      {group.avatars.length} looks
+                                    </p>
+                                  </div>
+                                </div>
+                              </button>
+                            )
+                          })}
+                        {publicAvatarGroups.length === 0 && !loadingPublicAvatars && (
+                          <div className="text-sm text-slate-500">
+                            No public avatars found.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                    {publicAvatarGroups
-                      .find((g) => g.id === selectedPublicGroupId)
-                      ?.avatars.map((avatar) => (
-                        <div
-                          key={avatar.heygen_avatar_id}
-                          className="group relative aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 hover:border-cyan-500 hover:shadow-lg transition-all duration-300 flex flex-col"
-                        >
-                          <div className="relative flex-1">
-                            <AvatarImage
-                              avatar={avatar}
-                              className="w-full h-full rounded-none"
-                            />
-                          </div>
-                          <div className="p-3 bg-white">
-                            <p className="text-sm font-semibold text-slate-900 truncate">
-                              {avatar.avatar_name}
-                            </p>
-                            <p className="text-[11px] text-slate-500 mt-0.5">
-                              Studio avatar
-                            </p>
-                            <Button
-                              size="sm"
-                              className="mt-2 w-full"
-                              onClick={() => handleAddPublicAvatar(avatar)}
-                            >
-                              Use this look
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+                  // Looks view for a selected public avatar
+                  <div className="flex flex-col h-full">
+                    <div className="mb-4 flex items-center justify-between">
+                      <div>
+                        <h2 className="text-xl font-semibold text-slate-900">
+                          {publicAvatarGroups.find((g) => g.id === selectedPublicGroupId)?.name ||
+                            'Public Avatars'}
+                        </h2>
+                        <p className="text-sm text-slate-500 mt-1">
+                          Click a look to add it to your avatars.
+                        </p>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setSelectedPublicGroupId(null)}
+                      >
+                        Back to all avatars
+                      </Button>
+                    </div>
 
-                    {!publicAvatarGroups.find((g) => g.id === selectedPublicGroupId) &&
-                      !loadingPublicAvatars && (
-                        <div className="text-sm text-slate-500">
-                          Select an avatar on the left to see its looks.
-                        </div>
-                      )}
+                    {loadingPublicAvatars ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                          <div
+                            key={i}
+                            className="aspect-[3/4] rounded-2xl bg-slate-200 animate-pulse"
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                        {publicAvatarGroups
+                          .find((g) => g.id === selectedPublicGroupId)
+                          ?.avatars.map((avatar) => (
+                            <div
+                              key={avatar.heygen_avatar_id}
+                              className="group relative aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 hover:border-cyan-500 hover:shadow-lg transition-all duration-300 flex flex-col"
+                            >
+                              <div className="relative flex-1">
+                                <AvatarImage
+                                  avatar={avatar}
+                                  className="w-full h-full rounded-none"
+                                />
+                              </div>
+                              <div className="p-3 bg-white">
+                                <p className="text-sm font-semibold text-slate-900 truncate">
+                                  {avatar.avatar_name}
+                                </p>
+                                <p className="text-[11px] text-slate-500 mt-0.5">
+                                  Studio avatar
+                                </p>
+                                <Button
+                                  size="sm"
+                                  className="mt-2 w-full"
+                                  onClick={() => handleAddPublicAvatar(avatar)}
+                                >
+                                  Use this look
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
