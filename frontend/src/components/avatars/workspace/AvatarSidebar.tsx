@@ -9,6 +9,7 @@ interface AvatarSidebarProps {
   selectedAvatarId: string | null
   onSelectAvatar: (avatarId: string | null) => void
   onCreateAvatarClick: () => void
+  isPublicAvatars?: boolean
 }
 
 export function AvatarSidebar({
@@ -17,6 +18,7 @@ export function AvatarSidebar({
   selectedAvatarId,
   onSelectAvatar,
   onCreateAvatarClick,
+  isPublicAvatars = false,
 }: AvatarSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -55,14 +57,16 @@ export function AvatarSidebar({
         </div>
       </div>
 
-      {/* Create Avatar Button */}
-      <button
-        onClick={onCreateAvatarClick}
-        className="w-full mb-4 p-4 bg-gradient-to-br from-cyan-500 to-blue-500 text-white rounded-xl hover:from-cyan-600 hover:to-blue-600 transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/25"
-      >
-        <Plus className="h-5 w-5" />
-        <span className="font-semibold">Create Avatar</span>
-      </button>
+      {/* Create Avatar Button - Only show for user avatars */}
+      {!isPublicAvatars && (
+        <button
+          onClick={onCreateAvatarClick}
+          className="w-full mb-4 p-4 bg-gradient-to-br from-cyan-500 to-blue-500 text-white rounded-xl hover:from-cyan-600 hover:to-blue-600 transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/25"
+        >
+          <Plus className="h-5 w-5" />
+          <span className="font-semibold">Create Avatar</span>
+        </button>
+      )}
 
       {/* All Avatars Option */}
       <button

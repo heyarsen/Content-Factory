@@ -19,6 +19,7 @@ interface MainContentAreaProps {
   onQuickGenerate?: (prompt: string) => void
   generating?: boolean
   onAvatarClick?: (avatar: Avatar) => void
+  isPublicAvatars?: boolean
 }
 
 export function MainContentArea({
@@ -35,6 +36,7 @@ export function MainContentArea({
   onQuickGenerate,
   generating,
   onAvatarClick,
+  isPublicAvatars = false,
 }: MainContentAreaProps) {
   const { viewMode, setViewMode } = useAvatarWorkspace()
   

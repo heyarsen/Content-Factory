@@ -33,6 +33,7 @@ interface AvatarWorkspaceProps {
   generating?: boolean
   generatingLookIds?: Set<string>
   addingMotionLookIds?: Set<string>
+  isPublicAvatars?: boolean
 }
 
 export function AvatarWorkspace({
@@ -55,6 +56,7 @@ export function AvatarWorkspace({
   generating,
   generatingLookIds = new Set(),
   addingMotionLookIds = new Set(),
+  isPublicAvatars = false,
 }: AvatarWorkspaceProps) {
   const panel = useContextPanel()
   
@@ -117,6 +119,7 @@ export function AvatarWorkspace({
         selectedAvatarId={selectedAvatarId}
         onSelectAvatar={onSelectAvatar}
         onCreateAvatarClick={onCreateAvatarClick}
+        isPublicAvatars={isPublicAvatars}
       />
 
       {/* Main Content Area - Avatars or Looks Display */}
@@ -144,6 +147,7 @@ export function AvatarWorkspace({
         addingMotionLookIds={addingMotionLookIds}
         onQuickGenerate={onQuickGenerate}
         generating={generating}
+        isPublicAvatars={isPublicAvatars}
       />
 
       {/* Context Panel - Slide-in panels for details/actions */}

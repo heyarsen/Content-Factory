@@ -15,6 +15,11 @@ function AvatarsContent() {
   const { selectedAvatarId, setSelectedAvatarId } = useAvatarWorkspace()
   const panel = useContextPanel()
   
+  // Tab state: 'my-avatars' or 'public-avatars'
+  const [activeTab, setActiveTab] = useState<'my-avatars' | 'public-avatars'>('my-avatars')
+  const [publicAvatars, setPublicAvatars] = useState<Avatar[]>([])
+  const [loadingPublicAvatars, setLoadingPublicAvatars] = useState(false)
+  
   // AI Generation state (kept as modal for now)
   const [showGenerateAIModal, setShowGenerateAIModal] = useState(false)
   const [checkingStatus, setCheckingStatus] = useState(false)
@@ -38,6 +43,54 @@ function AvatarsContent() {
     generating,
     generatingLookIds,
   } = useAvatarWorkspaceState(selectedAvatarId)
+
+  // Load public avatars
+  const loadPublicAvatars = useCallback(async () => {
+    try {
+      setLoadingPublicAvatars(true)
+      const response = await api.get('/api/avatars?public=true')
+      const publicAvatarsList = response.data?.avatars || []
+      
+      // Convert HeyGen avatar format to our Avatar format
+      const normalizedAvatars: Avatar[] = publicAvatarsList.map((avatar: any) => ({
+        id: avatar.avatar_id, // Use HeyGen avatar_id as our id
+        user_id: '', // Public avatars don't have a user_id
+        heygen_avatar_id: avatar.avatar_id,
+        avatar_name: avatar.avatar_name || 'Unnamed Avatar',
+        avatar_url: avatar.avatar_url || null,
+        preview_url: avatar.preview_url || avatar.avatar_url || null,
+        thumbnail_url: avatar.thumbnail_url || avatar.avatar_url || null,
+        gender: avatar.gender || null,
+        status: avatar.status || 'active',
+        is_default: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        source: null,
+      }))
+      
+      setPublicAvatars(normalizedAvatars)
+      console.log('[Public Avatars] Loaded', normalizedAvatars.length, 'public avatars')
+    } catch (error: any) {
+      console.error('[Public Avatars] Failed to load public avatars:', error)
+      handleError(error, {
+        showToast: true,
+        logError: true,
+      })
+      toast.error('Failed to load public avatars')
+    } finally {
+      setLoadingPublicAvatars(false)
+    }
+  }, [toast])
+
+  // Load public avatars when switching to public tab
+  const handleTabChange = useCallback((tab: 'my-avatars' | 'public-avatars') => {
+    setActiveTab(tab)
+    if (tab === 'public-avatars' && publicAvatars.length === 0) {
+      loadPublicAvatars()
+    }
+    // Clear selection when switching tabs
+    setSelectedAvatarId(null)
+  }, [publicAvatars.length, loadPublicAvatars, setSelectedAvatarId])
 
   // Handle avatar creation
   const handleCreateAvatar = useCallback(async (data: { avatarName: string; photoFiles: File[] }) => {
@@ -349,6 +402,29 @@ function AvatarsContent() {
     panel.openLookDetails(look, avatar)
   }, [panel])
 
+  // Handle adding public avatar to user's list
+  const handleAddPublicAvatar = useCallback(async (avatar: Avatar) => {
+    try {
+      await api.post('/api/avatars/public', {
+        heygen_avatar_id: avatar.heygen_avatar_id,
+        avatar_name: avatar.avatar_name,
+        avatar_url: avatar.avatar_url,
+      })
+      toast.success(`Added "${avatar.avatar_name}" to your avatars!`)
+      // Switch to my avatars tab and reload
+      setActiveTab('my-avatars')
+      await loadAvatars()
+    } catch (error: any) {
+      const errorMessage = formatSpecificError(error)
+      handleError(error, {
+        showToast: true,
+        logError: true,
+        customMessage: errorMessage,
+      })
+      toast.error(errorMessage || 'Failed to add public avatar')
+    }
+  }, [toast, loadAvatars])
+
   // Handle add motion to look
   const [addingMotionLookIds, setAddingMotionLookIds] = useState<Set<string>>(new Set())
   const handleAddMotion = useCallback(async (look: PhotoAvatarLook, avatar: Avatar) => {
@@ -425,34 +501,70 @@ function AvatarsContent() {
     )
   }
 
+  // Determine which avatars to show based on active tab
+  const displayedAvatars = activeTab === 'public-avatars' ? publicAvatars : avatars
+  const displayedLoading = activeTab === 'public-avatars' ? loadingPublicAvatars : loading
+
   return (
     <Layout>
-      <div className="h-[calc(100vh-12rem)]">
-        <AvatarWorkspace
-          avatars={avatars}
-          loading={loading}
-          allLooks={allLooks}
-          loadingLooks={loadingLooks}
-          selectedAvatarId={selectedAvatarId}
-          onSelectAvatar={setSelectedAvatarId}
-          onCreateAvatarClick={() => panel.openCreateAvatar()}
-          onCreateAvatar={handleCreateAvatar}
-          onGenerateLook={handleGenerateLook}
-          onLookClick={handleLookClick}
-          onAddMotion={handleAddMotion}
-          onQuickGenerate={handleQuickGenerate}
-          onGenerateAIClick={() => setShowGenerateAIModal(true)}
-          onAvatarClick={(avatar) => {
-            // Clicking avatar in gallery opens details panel instead of just selecting
-            panel.openAvatarDetails(avatar)
-            setSelectedAvatarId(avatar.id)
-          }}
-          onTrainAvatar={handleTrainAvatar}
-          trainingAvatarId={trainingAvatarId}
-          generating={generating}
-          generatingLookIds={generatingLookIds}
-          addingMotionLookIds={addingMotionLookIds}
-        />
+      <div className="h-[calc(100vh-12rem)] flex flex-col">
+        {/* Tab Toggle */}
+        <div className="flex items-center gap-2 mb-4 px-1">
+          <button
+            onClick={() => handleTabChange('my-avatars')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === 'my-avatars'
+                ? 'bg-slate-900 text-white'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            My Avatars
+          </button>
+          <button
+            onClick={() => handleTabChange('public-avatars')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === 'public-avatars'
+                ? 'bg-slate-900 text-white'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            Public Avatars
+          </button>
+        </div>
+
+        <div className="flex-1 min-h-0">
+          <AvatarWorkspace
+            avatars={displayedAvatars}
+            loading={displayedLoading}
+            allLooks={activeTab === 'my-avatars' ? allLooks : []} // Public avatars don't have looks
+            loadingLooks={activeTab === 'my-avatars' ? loadingLooks : false}
+            selectedAvatarId={selectedAvatarId}
+            onSelectAvatar={setSelectedAvatarId}
+            onCreateAvatarClick={() => panel.openCreateAvatar()}
+            onCreateAvatar={handleCreateAvatar}
+            onGenerateLook={handleGenerateLook}
+            onLookClick={handleLookClick}
+            onAddMotion={handleAddMotion}
+            onQuickGenerate={handleQuickGenerate}
+            onGenerateAIClick={() => setShowGenerateAIModal(true)}
+            onAvatarClick={(avatar) => {
+              if (activeTab === 'public-avatars') {
+                // For public avatars, show option to add to user's list
+                handleAddPublicAvatar(avatar)
+              } else {
+                // For user avatars, open details panel
+                panel.openAvatarDetails(avatar)
+                setSelectedAvatarId(avatar.id)
+              }
+            }}
+            onTrainAvatar={activeTab === 'my-avatars' ? handleTrainAvatar : undefined}
+            trainingAvatarId={trainingAvatarId}
+            generating={generating}
+            generatingLookIds={generatingLookIds}
+            addingMotionLookIds={addingMotionLookIds}
+            isPublicAvatars={activeTab === 'public-avatars'}
+          />
+        </div>
       </div>
 
       {/* AI Generation Modal (kept as modal for complex flow) */}
