@@ -91,7 +91,6 @@ function AvatarsContent() {
           status: avatar.status || 'active',
           is_default: false,
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
           source: null,
           categories: Array.isArray(avatar.categories) ? avatar.categories : null,
         }
