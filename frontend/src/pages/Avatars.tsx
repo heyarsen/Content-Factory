@@ -9,6 +9,8 @@ import api from '../lib/api'
 import { handleError, formatSpecificError } from '../lib/errorHandler'
 import { Avatar, PhotoAvatarLook } from '../types/avatar'
 import { AIGenerationModal } from '../components/avatars/AIGenerationModal'
+import { AvatarImage } from '../components/avatars/AvatarImage'
+import { Button } from '../components/ui/Button'
 
 function AvatarsContent() {
   const { toast } = useToast()
@@ -19,6 +21,10 @@ function AvatarsContent() {
   const [activeTab, setActiveTab] = useState<'my-avatars' | 'public-avatars'>('my-avatars')
   const [publicAvatars, setPublicAvatars] = useState<Avatar[]>([])
   const [loadingPublicAvatars, setLoadingPublicAvatars] = useState(false)
+  const [publicAvatarGroups, setPublicAvatarGroups] = useState<
+    Array<{ id: string; name: string; avatars: Avatar[] }>
+  >([])
+  const [selectedPublicGroupId, setSelectedPublicGroupId] = useState<string | null>(null)
   
   // AI Generation state (kept as modal for now)
   const [showGenerateAIModal, setShowGenerateAIModal] = useState(false)
@@ -43,6 +49,24 @@ function AvatarsContent() {
     generating,
     generatingLookIds,
   } = useAvatarWorkspaceState(selectedAvatarId)
+
+  // Helper to derive a base name for grouping public avatars (e.g. \"Abigail Office Front\" -> \"Abigail\")
+  const getPublicAvatarBaseName = (name: string): string => {
+    if (!name) return 'Unknown'
+    // Cut off at first '(' or '-' if present, otherwise use first word
+    const bracketIndex = name.indexOf('(')
+    const dashIndex = name.indexOf('-')
+    let endIndex = -1
+    if (bracketIndex >= 0 && dashIndex >= 0) {
+      endIndex = Math.min(bracketIndex, dashIndex)
+    } else if (bracketIndex >= 0) {
+      endIndex = bracketIndex
+    } else if (dashIndex >= 0) {
+      endIndex = dashIndex
+    }
+    const raw = endIndex > 0 ? name.slice(0, endIndex) : name
+    return raw.trim().split(' ')[0] || raw.trim() || 'Unknown'
+  }
 
   // Load public avatars
   const loadPublicAvatars = useCallback(async () => {
@@ -69,7 +93,30 @@ function AvatarsContent() {
       }))
       
       setPublicAvatars(normalizedAvatars)
-      console.log('[Public Avatars] Loaded', normalizedAvatars.length, 'public avatars')
+
+      // Group public avatars by base name so sidebar shows one entry per character
+      const groupMap = new Map<string, { id: string; name: string; avatars: Avatar[] }>()
+      for (const avatar of normalizedAvatars) {
+        const baseName = getPublicAvatarBaseName(avatar.avatar_name)
+        const key = baseName.toLowerCase()
+        let group = groupMap.get(key)
+        if (!group) {
+          group = { id: key, name: baseName, avatars: [] }
+          groupMap.set(key, group)
+        }
+        group.avatars.push(avatar)
+      }
+
+      const groups = Array.from(groupMap.values()).sort((a, b) =>
+        a.name.localeCompare(b.name),
+      )
+      setPublicAvatarGroups(groups)
+      // Select first group by default
+      if (groups.length > 0) {
+        setSelectedPublicGroupId(groups[0].id)
+      }
+
+      console.log('[Public Avatars] Loaded', normalizedAvatars.length, 'public avatars in', groups.length, 'groups')
     } catch (error: any) {
       console.error('[Public Avatars] Failed to load public avatars:', error)
       handleError(error, {
@@ -539,37 +586,161 @@ function AvatarsContent() {
         </div>
 
         <div className="flex-1 min-h-0">
-          <AvatarWorkspace
-            avatars={displayedAvatars}
-            loading={displayedLoading}
-            allLooks={activeTab === 'my-avatars' ? allLooks : []} // Public avatars don't have looks
-            loadingLooks={activeTab === 'my-avatars' ? loadingLooks : false}
-            selectedAvatarId={selectedAvatarId}
-            onSelectAvatar={setSelectedAvatarId}
-            onCreateAvatarClick={() => panel.openCreateAvatar()}
-            onCreateAvatar={handleCreateAvatar}
-            onGenerateLook={handleGenerateLook}
-            onLookClick={handleLookClick}
-            onAddMotion={handleAddMotion}
-            onQuickGenerate={handleQuickGenerate}
-            onGenerateAIClick={() => setShowGenerateAIModal(true)}
-            onAvatarClick={(avatar) => {
-              if (activeTab === 'public-avatars') {
-                // For public avatars, show option to add to user's list
-                handleAddPublicAvatar(avatar)
-              } else {
-                // For user avatars, open details panel
+          {activeTab === 'public-avatars' ? (
+            // Custom workspace for public avatars: sidebar = avatar groups, main = looks (variants)
+            <div className="flex h-full gap-6">
+              {/* Sidebar: Public avatar groups */}
+              <div className="w-72 flex-shrink-0 flex flex-col">
+                <div className="mb-4">
+                  <input
+                    type="text"
+                    placeholder="Search avatars..."
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                    // Simple search: filter groups by name on the fly
+                    onChange={(e) => {
+                      const query = e.target.value.toLowerCase()
+                      if (!query) {
+                        // Reset selection but keep existing groups
+                        if (publicAvatarGroups.length > 0) {
+                          setSelectedPublicGroupId(publicAvatarGroups[0].id)
+                        }
+                        return
+                      }
+                      const match = publicAvatarGroups.find((g) =>
+                        g.name.toLowerCase().includes(query),
+                      )
+                      if (match) {
+                        setSelectedPublicGroupId(match.id)
+                      }
+                    }}
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                    Avatars
+                  </div>
+                  <div className="space-y-2 max-h-[calc(100vh-260px)] overflow-y-auto pr-1">
+                    {publicAvatarGroups.map((group) => {
+                      const isSelected = group.id === selectedPublicGroupId
+                      return (
+                        <button
+                          key={group.id}
+                          onClick={() => setSelectedPublicGroupId(group.id)}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-left text-sm transition-colors ${
+                            isSelected
+                              ? 'border-cyan-500 bg-cyan-50 text-slate-900'
+                              : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                          }`}
+                        >
+                          <span className="truncate">{group.name}</span>
+                          <span className="ml-2 text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                            {group.avatars.length}
+                          </span>
+                        </button>
+                      )
+                    })}
+                    {publicAvatarGroups.length === 0 && !loadingPublicAvatars && (
+                      <div className="text-xs text-slate-500 px-1">
+                        No public avatars found.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Main content: looks (variants) for selected public avatar group */}
+              <div className="flex-1 min-w-0 flex flex-col">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-slate-900">
+                      {publicAvatarGroups.find((g) => g.id === selectedPublicGroupId)?.name ||
+                        'Public Avatars'}
+                    </h2>
+                    <p className="text-sm text-slate-500 mt-1">
+                      Click a look to add it to your avatars.
+                    </p>
+                  </div>
+                </div>
+
+                {loadingPublicAvatars ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                      <div
+                        key={i}
+                        className="aspect-[3/4] rounded-2xl bg-slate-200 animate-pulse"
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    {publicAvatarGroups
+                      .find((g) => g.id === selectedPublicGroupId)
+                      ?.avatars.map((avatar) => (
+                        <div
+                          key={avatar.heygen_avatar_id}
+                          className="group relative aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 hover:border-cyan-500 hover:shadow-lg transition-all duration-300 flex flex-col"
+                        >
+                          <div className="relative flex-1">
+                            <AvatarImage
+                              avatar={avatar}
+                              className="w-full h-full rounded-none"
+                            />
+                          </div>
+                          <div className="p-3 bg-white">
+                            <p className="text-sm font-semibold text-slate-900 truncate">
+                              {avatar.avatar_name}
+                            </p>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              Studio avatar
+                            </p>
+                            <Button
+                              size="sm"
+                              className="mt-2 w-full"
+                              onClick={() => handleAddPublicAvatar(avatar)}
+                            >
+                              Use this look
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+
+                    {!publicAvatarGroups.find((g) => g.id === selectedPublicGroupId) &&
+                      !loadingPublicAvatars && (
+                        <div className="text-sm text-slate-500">
+                          Select an avatar on the left to see its looks.
+                        </div>
+                      )}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <AvatarWorkspace
+              avatars={displayedAvatars}
+              loading={displayedLoading}
+              allLooks={allLooks}
+              loadingLooks={loadingLooks}
+              selectedAvatarId={selectedAvatarId}
+              onSelectAvatar={setSelectedAvatarId}
+              onCreateAvatarClick={() => panel.openCreateAvatar()}
+              onCreateAvatar={handleCreateAvatar}
+              onGenerateLook={handleGenerateLook}
+              onLookClick={handleLookClick}
+              onAddMotion={handleAddMotion}
+              onQuickGenerate={handleQuickGenerate}
+              onGenerateAIClick={() => setShowGenerateAIModal(true)}
+              onAvatarClick={(avatar) => {
                 panel.openAvatarDetails(avatar)
                 setSelectedAvatarId(avatar.id)
-              }
-            }}
-            onTrainAvatar={activeTab === 'my-avatars' ? handleTrainAvatar : undefined}
-            trainingAvatarId={trainingAvatarId}
-            generating={generating}
-            generatingLookIds={generatingLookIds}
-            addingMotionLookIds={addingMotionLookIds}
-            isPublicAvatars={activeTab === 'public-avatars'}
-          />
+              }}
+              onTrainAvatar={handleTrainAvatar}
+              trainingAvatarId={trainingAvatarId}
+              generating={generating}
+              generatingLookIds={generatingLookIds}
+              addingMotionLookIds={addingMotionLookIds}
+            />
+          )}
         </div>
       </div>
 
