@@ -79,10 +79,9 @@ function AvatarsContent() {
       const publicAvatarsList = response.data?.avatars || []
       
       // Convert HeyGen avatar format to our Avatar format
-      const normalizedAvatars: Avatar[] = publicAvatarsList.map((avatar: any, index: number) => {
+      const normalizedAvatars: Avatar[] = publicAvatarsList.map((avatar: any) => {
         const base: Avatar = {
           id: avatar.avatar_id, // Use HeyGen avatar_id as our id
-          user_id: '', // Public avatars don't have a user_id
           heygen_avatar_id: avatar.avatar_id,
           avatar_name: avatar.avatar_name || 'Unnamed Avatar',
           avatar_url: avatar.avatar_url || null,
@@ -124,15 +123,6 @@ function AvatarsContent() {
       // Ensure each group has exactly ONE category for filtering
       const fallbackCategories = ['Professional', 'Lifestyle', 'UGC', 'Community', 'Favorites']
       const groupsArray = Array.from(groupMap.values())
-      
-      // Check if any group has real categories from HeyGen
-      let hasRealCategories = false
-      for (const group of groupsArray) {
-        if (group.categories.length > 0) {
-          hasRealCategories = true
-          break
-        }
-      }
 
       // Assign exactly ONE category per group
       groupsArray.forEach((group, index) => {
