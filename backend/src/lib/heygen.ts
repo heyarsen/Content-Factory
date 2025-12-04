@@ -671,12 +671,14 @@ export async function listPublicAvatars(): Promise<HeyGenAvatarsResponse> {
           avatar.cover_url ||
           avatar.url
 
-        // Try to infer categories/tags if provided by HeyGen
+        // Extract tags from HeyGen API (tags field is the primary source per docs)
+        // Reference: https://docs.heygen.com/reference/list-avatars-v2
         let categories: string[] = []
-        if (Array.isArray(avatar.categories)) {
-          categories = avatar.categories.map((c: any) => String(c))
-        } else if (Array.isArray(avatar.tags)) {
+        if (Array.isArray(avatar.tags)) {
+          // Tags is the primary field according to HeyGen docs
           categories = avatar.tags.map((c: any) => String(c))
+        } else if (Array.isArray(avatar.categories)) {
+          categories = avatar.categories.map((c: any) => String(c))
         } else if (Array.isArray(avatar.labels)) {
           categories = avatar.labels.map((c: any) => String(c))
         }
@@ -700,9 +702,13 @@ export async function listPublicAvatars(): Promise<HeyGenAvatarsResponse> {
           gender: avatar.gender,
           status: avatar.status || 'active',
           is_public: avatar.is_public !== undefined ? avatar.is_public : true, // Mark as public if field exists, otherwise assume public
-          categories,
+          categories, // Tags/categories for filtering
+          tags: categories, // Also expose as tags for frontend convenience
           // Additional fields that might be present
           type: avatar.type,
+          premium: avatar.premium,
+          preview_video_url: avatar.preview_video_url,
+          default_voice_id: avatar.default_voice_id,
           created_at: avatar.created_at,
         }
       })

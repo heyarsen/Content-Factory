@@ -80,22 +80,33 @@ function AvatarsContent() {
       
       // Convert HeyGen avatar format to our Avatar format
       const normalizedAvatars: Avatar[] = publicAvatarsList.map((avatar: any) => {
+        // Use tags from HeyGen API (backend extracts tags and puts them in both tags and categories fields)
+        // Priority: tags field > categories field
+        const tags = Array.isArray(avatar.tags) && avatar.tags.length > 0
+          ? avatar.tags
+          : (Array.isArray(avatar.categories) && avatar.categories.length > 0 ? avatar.categories : [])
+        
         const base: Avatar = {
           id: avatar.avatar_id, // Use HeyGen avatar_id as our id
           heygen_avatar_id: avatar.avatar_id,
           avatar_name: avatar.avatar_name || 'Unnamed Avatar',
           avatar_url: avatar.avatar_url || null,
-          preview_url: avatar.preview_url || avatar.avatar_url || null,
-          thumbnail_url: avatar.thumbnail_url || avatar.avatar_url || null,
+          preview_url: avatar.preview_url || avatar.preview_image_url || avatar.avatar_url || null,
+          thumbnail_url: avatar.thumbnail_url || avatar.preview_image_url || avatar.avatar_url || null,
           gender: avatar.gender || null,
           status: avatar.status || 'active',
           is_default: false,
           created_at: new Date().toISOString(),
           source: null,
-          categories: Array.isArray(avatar.categories) ? avatar.categories : null,
+          categories: tags.length > 0 ? tags : null,
         }
         return base
       })
+      
+      console.log('[Public Avatars] Sample avatar tags:', normalizedAvatars.slice(0, 3).map(a => ({
+        name: a.avatar_name,
+        tags: a.categories,
+      })))
       
       setPublicAvatars(normalizedAvatars)
 
@@ -119,6 +130,18 @@ function AvatarsContent() {
         }
       }
 
+      // Map HeyGen tags to user-friendly category names
+      const tagToCategoryMap: Record<string, string> = {
+        'NEW': 'New',
+        'AVATAR_IV': 'Avatar IV',
+        'PREMIUM': 'Premium',
+        'PROFESSIONAL': 'Professional',
+        'LIFESTYLE': 'Lifestyle',
+        'UGC': 'UGC',
+        'COMMUNITY': 'Community',
+        // Add more mappings as needed based on actual HeyGen tags
+      }
+      
       // Ensure each group has exactly ONE category for filtering
       const fallbackCategories = ['Professional', 'Lifestyle', 'UGC', 'Community', 'Favorites']
       const groupsArray = Array.from(groupMap.values())
@@ -126,16 +149,34 @@ function AvatarsContent() {
       // Assign exactly ONE category per group
       groupsArray.forEach((group, index) => {
         if (group.categories.length === 0) {
-          // No categories from HeyGen, use fallback
+          // No tags/categories from HeyGen, use fallback
           const cat = fallbackCategories[index % fallbackCategories.length]
           group.categories = [cat]
           group.avatars.forEach((avatar) => {
             avatar.categories = [cat]
           })
         } else {
-          // Has categories from HeyGen - use only the FIRST one for filtering
-          // This ensures each group matches exactly one category filter
-          const primaryCategory = group.categories[0]
+          // Has tags from HeyGen - map them to user-friendly category names
+          // Try to find a mapped category, otherwise use the first tag as-is
+          let primaryCategory: string | null = null
+          for (const tag of group.categories) {
+            const mapped = tagToCategoryMap[tag.toUpperCase()]
+            if (mapped) {
+              primaryCategory = mapped
+              break
+            }
+          }
+          
+          // If no mapping found, use the first tag as category name (capitalize it nicely)
+          if (!primaryCategory) {
+            const firstTag = group.categories[0]
+            // Convert "AVATAR_IV" to "Avatar IV", "NEW" to "New", etc.
+            primaryCategory = firstTag
+              .split('_')
+              .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+              .join(' ')
+          }
+          
           group.categories = [primaryCategory]
         }
       })
