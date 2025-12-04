@@ -405,15 +405,21 @@ function AvatarsContent() {
   // Handle adding public avatar to user's list
   const handleAddPublicAvatar = useCallback(async (avatar: Avatar) => {
     try {
-      await api.post('/api/avatars/public', {
+      const response = await api.post('/api/avatars/public', {
         heygen_avatar_id: avatar.heygen_avatar_id,
         avatar_name: avatar.avatar_name,
         avatar_url: avatar.avatar_url,
       })
+      const newAvatar = response.data?.avatar as Avatar | undefined
+
       toast.success(`Added "${avatar.avatar_name}" to your avatars!`)
-      // Switch to my avatars tab and reload
+
+      // Switch to my avatars tab, reload, and select the new avatar so looks view opens
       setActiveTab('my-avatars')
       await loadAvatars()
+      if (newAvatar?.id) {
+        setSelectedAvatarId(newAvatar.id)
+      }
     } catch (error: any) {
       const errorMessage = formatSpecificError(error)
       handleError(error, {
@@ -423,7 +429,7 @@ function AvatarsContent() {
       })
       toast.error(errorMessage || 'Failed to add public avatar')
     }
-  }, [toast, loadAvatars])
+  }, [toast, loadAvatars, setSelectedAvatarId])
 
   // Handle add motion to look
   const [addingMotionLookIds, setAddingMotionLookIds] = useState<Set<string>>(new Set())

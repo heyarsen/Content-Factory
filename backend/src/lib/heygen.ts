@@ -657,19 +657,39 @@ export async function listPublicAvatars(): Promise<HeyGenAvatarsResponse> {
       // Normalize avatar data structure
       // Note: The endpoint returns all avatars (user's own + public), but we mark them all as potentially public
       // In practice, users can use any avatar ID from this list in video generation
-      const normalizedAvatars = avatars.map((avatar: any) => ({
-        avatar_id: avatar.avatar_id || avatar.id || avatar.avatarId,
-        avatar_name: avatar.avatar_name || avatar.name || avatar.avatarName || 'Unnamed Avatar',
-        avatar_url: avatar.avatar_url || avatar.url || avatar.avatarUrl || avatar.image_url,
-        preview_url: avatar.preview_url || avatar.previewUrl || avatar.preview || avatar.image_url,
-        thumbnail_url: avatar.thumbnail_url || avatar.thumbnailUrl || avatar.thumbnail || avatar.image_url,
-        gender: avatar.gender,
-        status: avatar.status || 'active',
-        is_public: avatar.is_public !== undefined ? avatar.is_public : true, // Mark as public if field exists, otherwise assume public
-        // Additional fields that might be present
-        type: avatar.type,
-        created_at: avatar.created_at,
-      }))
+      const normalizedAvatars = avatars.map((avatar: any) => {
+        // Try to find the best image URL from multiple possible fields
+        const imageUrl =
+          avatar.image_url ||
+          avatar.avatar_url ||
+          avatar.preview_url ||
+          avatar.thumbnail_url ||
+          avatar.portrait_url ||
+          avatar.cover_url ||
+          avatar.url
+
+        return {
+          avatar_id: avatar.avatar_id || avatar.id || avatar.avatarId,
+          avatar_name: avatar.avatar_name || avatar.name || avatar.avatarName || 'Unnamed Avatar',
+          avatar_url: imageUrl || avatar.avatar_url || avatar.url || avatar.avatarUrl,
+          preview_url:
+            avatar.preview_url ||
+            avatar.previewUrl ||
+            avatar.preview ||
+            imageUrl,
+          thumbnail_url:
+            avatar.thumbnail_url ||
+            avatar.thumbnailUrl ||
+            avatar.thumbnail ||
+            imageUrl,
+          gender: avatar.gender,
+          status: avatar.status || 'active',
+          is_public: avatar.is_public !== undefined ? avatar.is_public : true, // Mark as public if field exists, otherwise assume public
+          // Additional fields that might be present
+          type: avatar.type,
+          created_at: avatar.created_at,
+        }
+      })
 
       return { avatars: normalizedAvatars }
     }
