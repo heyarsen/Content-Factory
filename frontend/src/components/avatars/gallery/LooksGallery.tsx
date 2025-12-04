@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Star, Sparkles, Plus, Image as ImageIcon } from 'lucide-react'
+import { Star, Sparkles, Plus, Image as ImageIcon, Zap } from 'lucide-react'
 import { Avatar, PhotoAvatarLook } from '../../../types/avatar'
 import { Button } from '../../ui/Button'
 
@@ -10,7 +10,9 @@ interface LooksGalleryProps {
   viewMode: 'grid' | 'list'
   onCreateClick: () => void
   onLookClick?: (look: PhotoAvatarLook, avatar: Avatar) => void
+  onAddMotion?: (look: PhotoAvatarLook, avatar: Avatar) => void
   generatingLookIds: Set<string>
+  addingMotionLookIds?: Set<string>
   loading: boolean
 }
 
@@ -21,7 +23,9 @@ export function LooksGallery({
   viewMode,
   onCreateClick,
   onLookClick,
+  onAddMotion,
   generatingLookIds,
+  addingMotionLookIds = new Set(),
   loading,
 }: LooksGalleryProps) {
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set())
@@ -120,11 +124,13 @@ export function LooksGallery({
           return (
             <div
               key={`${avatar.id}-${look.id}`}
-              onClick={() => onLookClick?.(look, avatar)}
-              className="group relative flex items-center gap-4 p-4 rounded-xl bg-white border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all duration-200 cursor-pointer"
+              className="group relative flex items-center gap-4 p-4 rounded-xl bg-white border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all duration-200"
             >
               {/* Thumbnail */}
-              <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-slate-100 flex-shrink-0">
+              <div 
+                onClick={() => onLookClick?.(look, avatar)}
+                className="relative w-20 h-20 rounded-lg overflow-hidden bg-slate-100 flex-shrink-0 cursor-pointer"
+              >
                 {!hasValidUrl ? (
                   <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-200 to-slate-300">
                     <ImageIcon className="h-8 w-8 text-slate-400" />
@@ -147,7 +153,10 @@ export function LooksGallery({
               </div>
 
               {/* Content */}
-              <div className="flex-1 min-w-0">
+              <div 
+                onClick={() => onLookClick?.(look, avatar)}
+                className="flex-1 min-w-0 cursor-pointer"
+              >
                 <div className="flex items-center gap-2 mb-1">
                   <h3 className="text-sm font-semibold text-slate-900 truncate">
                     {look.name || 'Unnamed Look'}
@@ -164,11 +173,30 @@ export function LooksGallery({
                 )}
               </div>
 
-              {/* Arrow indicator */}
-              <div className="flex-shrink-0 text-slate-400 group-hover:text-slate-600 transition-colors">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
+              {/* Actions */}
+              <div className="flex-shrink-0 flex items-center gap-2">
+                {onAddMotion && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onAddMotion(look, avatar)
+                    }}
+                    disabled={addingMotionLookIds.has(look.id)}
+                    className="p-2 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-600 hover:text-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Add motion to this look"
+                  >
+                    {addingMotionLookIds.has(look.id) ? (
+                      <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <Zap className="h-4 w-4" />
+                    )}
+                  </button>
+                )}
+                <div className="text-slate-400 group-hover:text-slate-600 transition-colors">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
               </div>
             </div>
           )
@@ -221,10 +249,12 @@ export function LooksGallery({
         return (
           <div
             key={`${avatar.id}-${look.id}`}
-            onClick={() => onLookClick?.(look, avatar)}
-            className="group relative aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 hover:shadow-xl transition-all duration-300 cursor-pointer"
+            className="group relative aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 hover:shadow-xl transition-all duration-300"
           >
-            <div className="relative w-full h-full">
+            <div 
+              onClick={() => onLookClick?.(look, avatar)}
+              className="relative w-full h-full cursor-pointer"
+            >
               {/* Placeholder */}
               {!hasValidUrl && (
                 <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-200 to-slate-300">
@@ -248,6 +278,27 @@ export function LooksGallery({
                 <div className="w-8 h-8 rounded-full bg-cyan-500 flex items-center justify-center shadow-lg">
                   <Star className="h-4 w-4 text-white fill-current" />
                 </div>
+              </div>
+            )}
+
+            {/* Add Motion button */}
+            {onAddMotion && (
+              <div className="absolute top-3 left-3 z-20">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onAddMotion(look, avatar)
+                  }}
+                  disabled={addingMotionLookIds.has(look.id)}
+                  className="p-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                  title="Add motion to this look"
+                >
+                  {addingMotionLookIds.has(look.id) ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <Zap className="h-4 w-4" />
+                  )}
+                </button>
               </div>
             )}
 

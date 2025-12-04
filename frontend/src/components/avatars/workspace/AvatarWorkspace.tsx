@@ -24,6 +24,7 @@ interface AvatarWorkspaceProps {
     style: 'Realistic' | 'Cartoon' | 'Anime'
   }) => Promise<void>
   onLookClick?: (look: PhotoAvatarLook, avatar: Avatar) => void
+  onAddMotion?: (look: PhotoAvatarLook, avatar: Avatar) => void
   onQuickGenerate?: (prompt: string) => void
   onGenerateAIClick?: () => void
   onAvatarClick?: (avatar: Avatar) => void
@@ -31,6 +32,7 @@ interface AvatarWorkspaceProps {
   trainingAvatarId?: string | null
   generating?: boolean
   generatingLookIds?: Set<string>
+  addingMotionLookIds?: Set<string>
 }
 
 export function AvatarWorkspace({
@@ -44,6 +46,7 @@ export function AvatarWorkspace({
   onCreateAvatar,
   onGenerateLook,
   onLookClick,
+  onAddMotion,
   onQuickGenerate,
   onGenerateAIClick,
   onAvatarClick,
@@ -51,6 +54,7 @@ export function AvatarWorkspace({
   trainingAvatarId,
   generating,
   generatingLookIds = new Set(),
+  addingMotionLookIds = new Set(),
 }: AvatarWorkspaceProps) {
   const panel = useContextPanel()
   
@@ -123,6 +127,7 @@ export function AvatarWorkspace({
         selectedAvatarId={selectedAvatarId}
         onSelectAvatar={onSelectAvatar}
         onLookClick={onLookClick}
+        onAddMotion={onAddMotion}
         onAvatarClick={onAvatarClick}
         onCreateClick={() => {
           // If avatar is selected, open look generation, otherwise open avatar creation
@@ -136,6 +141,7 @@ export function AvatarWorkspace({
           }
         }}
         generatingLookIds={generatingLookIds}
+        addingMotionLookIds={addingMotionLookIds}
         onQuickGenerate={onQuickGenerate}
         generating={generating}
       />

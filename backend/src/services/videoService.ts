@@ -439,33 +439,8 @@ async function runTemplateGeneration(
     
     if (avatarId) {
       try {
-        const { detectAvatarCapabilities, buildGestureArray, addMotionToPhotoAvatar } = await import('../lib/heygen.js')
+        const { detectAvatarCapabilities, buildGestureArray } = await import('../lib/heygen.js')
         avatarCapabilities = await detectAvatarCapabilities(avatarId, !!isPhotoAvatar)
-        
-        // For photo avatars, use the Add Motion API to enhance motion before video generation
-        // Note: The Add Motion API enhances the original avatar's motion capabilities
-        // We don't use the returned ID for template generation as it may cause errors
-        // Instead, we rely on motion settings in nodes_override for template generation
-        if (isPhotoAvatar) {
-          try {
-            const motionPrompt = 'Full body motion with expressive hand gestures, natural head movements, engaging body language, waving, pointing, and emphasis gestures throughout'
-            const motionResult = await addMotionToPhotoAvatar(avatarId, motionPrompt, 'expressive')
-            
-            // The Add Motion API enhances the original avatar's motion
-            // We keep using the original avatarId for template generation
-            // The motion enhancement is applied to the avatar itself
-            if (motionResult) {
-              console.log('[Template Motion] Add Motion API called successfully, motion enhancement applied to avatar:', {
-                originalAvatarId: avatarId,
-                motionResultId: motionResult?.id || motionResult?.data?.id,
-                note: 'Using original avatar ID for template generation',
-              })
-            }
-          } catch (motionError: any) {
-            // Don't fail video generation if Add Motion fails - it's optional enhancement
-            console.warn('[Template Motion] Could not add motion via Add Motion API, continuing with original avatar:', motionError.message)
-          }
-        }
         
         // Auto-generate motion config for templates
         const gestures = avatarCapabilities.supportsGestureControl

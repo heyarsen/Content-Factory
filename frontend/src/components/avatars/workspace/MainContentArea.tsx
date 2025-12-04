@@ -12,8 +12,10 @@ interface MainContentAreaProps {
   selectedAvatarId: string | null
   onSelectAvatar?: (avatarId: string | null) => void
   onLookClick?: (look: PhotoAvatarLook, avatar: Avatar) => void
+  onAddMotion?: (look: PhotoAvatarLook, avatar: Avatar) => void
   onCreateClick?: () => void
   generatingLookIds?: Set<string>
+  addingMotionLookIds?: Set<string>
   onQuickGenerate?: (prompt: string) => void
   generating?: boolean
   onAvatarClick?: (avatar: Avatar) => void
@@ -26,8 +28,10 @@ export function MainContentArea({
   selectedAvatarId,
   onSelectAvatar,
   onLookClick,
+  onAddMotion,
   onCreateClick,
   generatingLookIds = new Set(),
+  addingMotionLookIds = new Set(),
   onQuickGenerate,
   generating,
   onAvatarClick,
@@ -119,7 +123,9 @@ export function MainContentArea({
             viewMode={viewMode}
             onCreateClick={onCreateClick || (() => {})}
             onLookClick={onLookClick}
+            onAddMotion={onAddMotion}
             generatingLookIds={generatingLookIds}
+            addingMotionLookIds={addingMotionLookIds}
             loading={loadingLooks}
           />
         )}

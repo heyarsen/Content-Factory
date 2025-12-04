@@ -242,6 +242,53 @@ router.post('/:id/set-default-look', async (req: AuthRequest, res: Response) => 
 })
 
 /**
+ * POST /api/avatars/:id/looks/:lookId/add-motion
+ * Add motion to a specific look
+ * Body: { prompt?: string, motion_type?: 'consistent' | 'expressive' | ... }
+ */
+router.post('/:id/looks/:lookId/add-motion', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const avatarId = req.params.id
+    const lookId = req.params.lookId
+    const { prompt, motion_type = 'expressive' } = req.body
+
+    // Verify the avatar belongs to the user
+    const { supabase } = await import('../lib/supabase.js')
+    const { data: avatar, error: avatarError } = await supabase
+      .from('avatars')
+      .select('id, heygen_avatar_id')
+      .eq('id', avatarId)
+      .eq('user_id', userId)
+      .single()
+
+    if (avatarError || !avatar) {
+      return res.status(404).json({ error: 'Avatar not found' })
+    }
+
+    // Add motion to the look using HeyGen API
+    const { addMotionToPhotoAvatar } = await import('../lib/heygen.js')
+    const defaultPrompt = 'Full body motion with expressive hand gestures, natural head movements, engaging body language, waving, pointing, and emphasis gestures throughout'
+    const motionResult = await addMotionToPhotoAvatar(lookId, prompt || defaultPrompt, motion_type)
+
+    if (!motionResult) {
+      return res.status(500).json({ error: 'Failed to add motion to look' })
+    }
+
+    return res.json({
+      success: true,
+      look_id: lookId,
+      motion_result: motionResult,
+      message: 'Motion added successfully to look',
+    })
+  } catch (error: any) {
+    logError(error, { userId: req.userId!, operation: 'add_motion_to_look' })
+    const { statusCode, response } = createErrorResponse(error, 'Failed to add motion to look', ErrorCode.INTERNAL_SERVER_ERROR)
+    return res.status(statusCode).json(response)
+  }
+})
+
+/**
  * DELETE /api/avatars/:id/looks/:lookId
  * Delete a look from an avatar
  */

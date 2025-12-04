@@ -7,7 +7,7 @@ import { useContextPanel } from '../hooks/avatars/useContextPanel'
 import { useToast } from '../hooks/useToast'
 import api from '../lib/api'
 import { handleError, formatSpecificError } from '../lib/errorHandler'
-import { Avatar } from '../types/avatar'
+import { Avatar, PhotoAvatarLook } from '../types/avatar'
 import { AIGenerationModal } from '../components/avatars/AIGenerationModal'
 
 function AvatarsContent() {
@@ -349,6 +349,36 @@ function AvatarsContent() {
     panel.openLookDetails(look, avatar)
   }, [panel])
 
+  // Handle add motion to look
+  const [addingMotionLookIds, setAddingMotionLookIds] = useState<Set<string>>(new Set())
+  const handleAddMotion = useCallback(async (look: PhotoAvatarLook, avatar: Avatar) => {
+    if (addingMotionLookIds.has(look.id)) return
+    
+    try {
+      setAddingMotionLookIds(prev => new Set(prev).add(look.id))
+      await api.post(`/api/avatars/${avatar.id}/looks/${look.id}/add-motion`, {
+        motion_type: 'expressive',
+        prompt: 'Full body motion with expressive hand gestures, natural head movements, engaging body language, waving, pointing, and emphasis gestures throughout',
+      })
+      toast.success('Motion added successfully to look!')
+      invalidateLooksCache()
+    } catch (error: any) {
+      const errorMessage = formatSpecificError(error)
+      handleError(error, {
+        showToast: true,
+        logError: true,
+        customMessage: errorMessage,
+      })
+      toast.error(errorMessage || 'Failed to add motion to look')
+    } finally {
+      setAddingMotionLookIds(prev => {
+        const next = new Set(prev)
+        next.delete(look.id)
+        return next
+      })
+    }
+  }, [toast, invalidateLooksCache, addingMotionLookIds])
+
   // Handle train avatar
   const [trainingAvatarId, setTrainingAvatarId] = useState<string | null>(null)
   const handleTrainAvatar = useCallback(async (avatar: Avatar) => {
@@ -409,6 +439,7 @@ function AvatarsContent() {
           onCreateAvatar={handleCreateAvatar}
           onGenerateLook={handleGenerateLook}
           onLookClick={handleLookClick}
+          onAddMotion={handleAddMotion}
           onQuickGenerate={handleQuickGenerate}
           onGenerateAIClick={() => setShowGenerateAIModal(true)}
           onAvatarClick={(avatar) => {
@@ -420,6 +451,7 @@ function AvatarsContent() {
           trainingAvatarId={trainingAvatarId}
           generating={generating}
           generatingLookIds={generatingLookIds}
+          addingMotionLookIds={addingMotionLookIds}
         />
       </div>
 
