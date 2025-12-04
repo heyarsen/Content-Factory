@@ -199,8 +199,8 @@ export function VideoPlanning() {
   const loadAvatars = async () => {
     try {
       setLoadingAvatars(true)
-      // Only fetch user-created avatars (default behavior, no 'all' parameter)
-      const response = await api.get('/api/avatars')
+      // Fetch all avatars (including synced/public) so they can be used for planning
+      const response = await api.get('/api/avatars?all=true')
       const loadedAvatars = response.data.avatars || []
       setAvatars(loadedAvatars)
       setDefaultAvatarId(response.data.default_avatar_id || null)

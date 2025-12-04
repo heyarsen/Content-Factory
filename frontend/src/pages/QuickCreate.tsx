@@ -120,7 +120,8 @@ export function QuickCreate() {
       return true
     }
     if (avatar.source === 'synced') {
-      return false
+      // Include synced avatars (e.g. public/studio avatars or synced from HeyGen)
+      return true
     }
     if (avatar.avatar_url && avatar.avatar_url.includes('supabase.co/storage')) {
       return true
@@ -195,8 +196,8 @@ export function QuickCreate() {
 
   const loadAvatars = async () => {
     try {
-      // Only fetch user-created avatars (default behavior, no 'all' parameter)
-      const response = await api.get('/api/avatars')
+      // Fetch all avatars (including synced/public) so they can be used for quick create
+      const response = await api.get('/api/avatars?all=true')
       const allAvatars: AvatarRecord[] = (response.data.avatars || []) as AvatarRecord[]
       // Filter to ensure only user-created avatars (backend should already filter, but double-check)
       const avatarsToUse = allAvatars.filter((avatar) => isUserCreatedAvatar(avatar))
