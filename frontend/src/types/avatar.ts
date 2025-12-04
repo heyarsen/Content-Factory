@@ -11,6 +11,7 @@ export interface Avatar {
   is_default: boolean
   created_at: string
   source?: 'synced' | 'user_photo' | 'ai_generated' | null
+  categories?: string[] | null
 }
 
 export interface PhotoAvatarLook {

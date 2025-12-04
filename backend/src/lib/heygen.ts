@@ -493,6 +493,7 @@ export interface HeyGenAvatar {
   is_public?: boolean // Indicates if this is a public/shared avatar
   group_id?: string // For photo avatars
   group_name?: string // For photo avatars
+  categories?: string[]
 }
 
 export interface HeyGenAvatarsResponse {
@@ -670,6 +671,16 @@ export async function listPublicAvatars(): Promise<HeyGenAvatarsResponse> {
           avatar.cover_url ||
           avatar.url
 
+        // Try to infer categories/tags if provided by HeyGen
+        let categories: string[] = []
+        if (Array.isArray(avatar.categories)) {
+          categories = avatar.categories.map((c: any) => String(c))
+        } else if (Array.isArray(avatar.tags)) {
+          categories = avatar.tags.map((c: any) => String(c))
+        } else if (Array.isArray(avatar.labels)) {
+          categories = avatar.labels.map((c: any) => String(c))
+        }
+
         return {
           avatar_id: avatar.avatar_id || avatar.id || avatar.avatarId,
           avatar_name: avatar.avatar_name || avatar.name || avatar.avatarName || 'Unnamed Avatar',
@@ -689,6 +700,7 @@ export async function listPublicAvatars(): Promise<HeyGenAvatarsResponse> {
           gender: avatar.gender,
           status: avatar.status || 'active',
           is_public: avatar.is_public !== undefined ? avatar.is_public : true, // Mark as public if field exists, otherwise assume public
+          categories,
           // Additional fields that might be present
           type: avatar.type,
           created_at: avatar.created_at,

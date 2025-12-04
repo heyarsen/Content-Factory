@@ -25,6 +25,9 @@ function AvatarsContent() {
     Array<{ id: string; name: string; avatars: Avatar[] }>
   >([])
   const [selectedPublicGroupId, setSelectedPublicGroupId] = useState<string | null>(null)
+  const [publicSearch, setPublicSearch] = useState('')
+  const [publicCategories, setPublicCategories] = useState<string[]>(['All'])
+  const [selectedPublicCategory, setSelectedPublicCategory] = useState<string>('All')
   
   // AI Generation state (kept as modal for now)
   const [showGenerateAIModal, setShowGenerateAIModal] = useState(false)
@@ -90,9 +93,26 @@ function AvatarsContent() {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         source: null,
+        categories: Array.isArray(avatar.categories) ? avatar.categories : null,
       }))
       
       setPublicAvatars(normalizedAvatars)
+
+      // Build category list from avatars, fallback to presets if none
+      const categorySet = new Set<string>()
+      normalizedAvatars.forEach((avatar) => {
+        avatar.categories?.forEach((c) => {
+          if (c && c.trim()) categorySet.add(c.trim())
+        })
+      })
+      const derivedCategories = Array.from(categorySet)
+      if (derivedCategories.length > 0) {
+        setPublicCategories(['All', ...derivedCategories])
+        setSelectedPublicCategory('All')
+      } else {
+        setPublicCategories(['All', 'Professional', 'Lifestyle', 'UGC', 'Community', 'Favorites'])
+        setSelectedPublicCategory('All')
+      }
 
       // Group public avatars by base name so sidebar shows one entry per character
       const groupMap = new Map<string, { id: string; name: string; avatars: Avatar[] }>()
@@ -596,24 +616,27 @@ function AvatarsContent() {
                     type="text"
                     placeholder="Search avatars..."
                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                    // Simple search: filter groups by name on the fly
                     onChange={(e) => {
-                      const query = e.target.value.toLowerCase()
-                      if (!query) {
-                        // Reset selection but keep existing groups
-                        if (publicAvatarGroups.length > 0) {
-                          setSelectedPublicGroupId(publicAvatarGroups[0].id)
-                        }
-                        return
-                      }
-                      const match = publicAvatarGroups.find((g) =>
-                        g.name.toLowerCase().includes(query),
-                      )
-                      if (match) {
-                        setSelectedPublicGroupId(match.id)
-                      }
+                      setPublicSearch(e.target.value)
                     }}
                   />
+                </div>
+
+                {/* Category chips */}
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {publicCategories.map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setSelectedPublicCategory(cat)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                        selectedPublicCategory === cat
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
                 </div>
 
                 <div className="mb-3">
@@ -621,7 +644,20 @@ function AvatarsContent() {
                     Avatars
                   </div>
                   <div className="space-y-2 max-h-[calc(100vh-260px)] overflow-y-auto pr-1">
-                    {publicAvatarGroups.map((group) => {
+                    {publicAvatarGroups
+                      .filter((group) => {
+                        const matchesSearch = publicSearch
+                          ? group.name.toLowerCase().includes(publicSearch.toLowerCase())
+                          : true
+                        const matchesCategory =
+                          selectedPublicCategory === 'All'
+                            ? true
+                            : group.avatars.some((avatar) =>
+                                avatar.categories?.includes(selectedPublicCategory),
+                              )
+                        return matchesSearch && matchesCategory
+                      })
+                      .map((group) => {
                       const isSelected = group.id === selectedPublicGroupId
                       return (
                         <button
