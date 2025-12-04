@@ -101,30 +101,6 @@ function AvatarsContent() {
       
       setPublicAvatars(normalizedAvatars)
 
-      // Ensure every avatar has at least one category
-      const fallbackCategories = ['Professional', 'Lifestyle', 'UGC', 'Community', 'Favorites']
-      let hasAnyCategories = false
-      normalizedAvatars.forEach((avatar, index) => {
-        if (avatar.categories && avatar.categories.length > 0) {
-          hasAnyCategories = true
-        } else {
-          // Assign a deterministic fallback category so filters always work
-          const cat = fallbackCategories[index % fallbackCategories.length]
-          avatar.categories = [cat]
-        }
-      })
-
-      // Build category list from avatars (real or fallback)
-      const categorySet = new Set<string>()
-      normalizedAvatars.forEach((avatar) => {
-        avatar.categories?.forEach((c) => {
-          if (c && c.trim()) categorySet.add(c.trim())
-        })
-      })
-      const derivedCategories = Array.from(categorySet)
-      setPublicCategories(['All', ...derivedCategories])
-      setSelectedPublicCategory('All')
-
       // Group public avatars by base name so sidebar shows one entry per character
       const groupMap = new Map<string, { id: string; name: string; avatars: Avatar[]; categories: string[] }>()
       for (const avatar of normalizedAvatars) {
@@ -145,7 +121,40 @@ function AvatarsContent() {
         }
       }
 
-      const groups = Array.from(groupMap.values()).sort((a, b) =>
+      // If HeyGen didn't provide any categories, assign fallback categories per group
+      const fallbackCategories = ['Professional', 'Lifestyle', 'UGC', 'Community', 'Favorites']
+      let anyGroupHasCategory = false
+      for (const group of groupMap.values()) {
+        if (group.categories.length > 0) {
+          anyGroupHasCategory = true
+          break
+        }
+      }
+
+      const groupsArray = Array.from(groupMap.values())
+
+      if (!anyGroupHasCategory) {
+        groupsArray.forEach((group, index) => {
+          const cat = fallbackCategories[index % fallbackCategories.length]
+          group.categories = [cat]
+          group.avatars.forEach((avatar) => {
+            avatar.categories = [cat]
+          })
+        })
+      }
+
+      // Build category list from groups
+      const categorySet = new Set<string>()
+      groupsArray.forEach((group) => {
+        group.categories.forEach((c) => {
+          if (c && c.trim()) categorySet.add(c.trim())
+        })
+      })
+      const derivedCategories = Array.from(categorySet)
+      setPublicCategories(['All', ...derivedCategories])
+      setSelectedPublicCategory('All')
+
+      const groups = groupsArray.sort((a, b) =>
         a.name.localeCompare(b.name),
       )
       setPublicAvatarGroups(groups)
