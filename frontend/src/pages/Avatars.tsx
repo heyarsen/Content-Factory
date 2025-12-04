@@ -121,27 +121,35 @@ function AvatarsContent() {
         }
       }
 
-      // If HeyGen didn't provide any categories, assign fallback categories per group
+      // Ensure each group has exactly ONE category for filtering
       const fallbackCategories = ['Professional', 'Lifestyle', 'UGC', 'Community', 'Favorites']
-      let anyGroupHasCategory = false
-      for (const group of groupMap.values()) {
+      const groupsArray = Array.from(groupMap.values())
+      
+      // Check if any group has real categories from HeyGen
+      let hasRealCategories = false
+      for (const group of groupsArray) {
         if (group.categories.length > 0) {
-          anyGroupHasCategory = true
+          hasRealCategories = true
           break
         }
       }
 
-      const groupsArray = Array.from(groupMap.values())
-
-      if (!anyGroupHasCategory) {
-        groupsArray.forEach((group, index) => {
+      // Assign exactly ONE category per group
+      groupsArray.forEach((group, index) => {
+        if (group.categories.length === 0) {
+          // No categories from HeyGen, use fallback
           const cat = fallbackCategories[index % fallbackCategories.length]
           group.categories = [cat]
           group.avatars.forEach((avatar) => {
             avatar.categories = [cat]
           })
-        })
-      }
+        } else {
+          // Has categories from HeyGen - use only the FIRST one for filtering
+          // This ensures each group matches exactly one category filter
+          const primaryCategory = group.categories[0]
+          group.categories = [primaryCategory]
+        }
+      })
 
       // Build category list from groups
       const categorySet = new Set<string>()
@@ -686,7 +694,7 @@ function AvatarsContent() {
                             const matchesCategory =
                               selectedPublicCategory === 'All'
                                 ? true
-                                : group.categories.includes(selectedPublicCategory)
+                                : group.categories && group.categories.length > 0 && group.categories.includes(selectedPublicCategory)
                             return matchesSearch && matchesCategory
                           })
                           .map((group) => {
