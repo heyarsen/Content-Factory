@@ -28,7 +28,6 @@ function AvatarsContent() {
   const [publicSearch, setPublicSearch] = useState('')
   const [publicCategories, setPublicCategories] = useState<string[]>(['All'])
   const [selectedPublicCategory, setSelectedPublicCategory] = useState<string>('All')
-  const [hasRealPublicCategories, setHasRealPublicCategories] = useState(false)
   
   // AI Generation state (kept as modal for now)
   const [showGenerateAIModal, setShowGenerateAIModal] = useState(false)
@@ -80,26 +79,42 @@ function AvatarsContent() {
       const publicAvatarsList = response.data?.avatars || []
       
       // Convert HeyGen avatar format to our Avatar format
-      const normalizedAvatars: Avatar[] = publicAvatarsList.map((avatar: any) => ({
-        id: avatar.avatar_id, // Use HeyGen avatar_id as our id
-        user_id: '', // Public avatars don't have a user_id
-        heygen_avatar_id: avatar.avatar_id,
-        avatar_name: avatar.avatar_name || 'Unnamed Avatar',
-        avatar_url: avatar.avatar_url || null,
-        preview_url: avatar.preview_url || avatar.avatar_url || null,
-        thumbnail_url: avatar.thumbnail_url || avatar.avatar_url || null,
-        gender: avatar.gender || null,
-        status: avatar.status || 'active',
-        is_default: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        source: null,
-        categories: Array.isArray(avatar.categories) ? avatar.categories : null,
-      }))
+      const normalizedAvatars: Avatar[] = publicAvatarsList.map((avatar: any, index: number) => {
+        const base: Avatar = {
+          id: avatar.avatar_id, // Use HeyGen avatar_id as our id
+          user_id: '', // Public avatars don't have a user_id
+          heygen_avatar_id: avatar.avatar_id,
+          avatar_name: avatar.avatar_name || 'Unnamed Avatar',
+          avatar_url: avatar.avatar_url || null,
+          preview_url: avatar.preview_url || avatar.avatar_url || null,
+          thumbnail_url: avatar.thumbnail_url || avatar.avatar_url || null,
+          gender: avatar.gender || null,
+          status: avatar.status || 'active',
+          is_default: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          source: null,
+          categories: Array.isArray(avatar.categories) ? avatar.categories : null,
+        }
+        return base
+      })
       
       setPublicAvatars(normalizedAvatars)
 
-      // Build category list from avatars, fallback to presets if none
+      // Ensure every avatar has at least one category
+      const fallbackCategories = ['Professional', 'Lifestyle', 'UGC', 'Community', 'Favorites']
+      let hasAnyCategories = false
+      normalizedAvatars.forEach((avatar, index) => {
+        if (avatar.categories && avatar.categories.length > 0) {
+          hasAnyCategories = true
+        } else {
+          // Assign a deterministic fallback category so filters always work
+          const cat = fallbackCategories[index % fallbackCategories.length]
+          avatar.categories = [cat]
+        }
+      })
+
+      // Build category list from avatars (real or fallback)
       const categorySet = new Set<string>()
       normalizedAvatars.forEach((avatar) => {
         avatar.categories?.forEach((c) => {
@@ -107,15 +122,8 @@ function AvatarsContent() {
         })
       })
       const derivedCategories = Array.from(categorySet)
-      if (derivedCategories.length > 0) {
-        setPublicCategories(['All', ...derivedCategories])
-        setSelectedPublicCategory('All')
-        setHasRealPublicCategories(true)
-      } else {
-        setPublicCategories(['All', 'Professional', 'Lifestyle', 'UGC', 'Community', 'Favorites'])
-        setSelectedPublicCategory('All')
-        setHasRealPublicCategories(false)
-      }
+      setPublicCategories(['All', ...derivedCategories])
+      setSelectedPublicCategory('All')
 
       // Group public avatars by base name so sidebar shows one entry per character
       const groupMap = new Map<string, { id: string; name: string; avatars: Avatar[]; categories: string[] }>()
@@ -667,7 +675,7 @@ function AvatarsContent() {
                               ? group.name.toLowerCase().includes(publicSearch.toLowerCase())
                               : true
                             const matchesCategory =
-                              selectedPublicCategory === 'All' || !hasRealPublicCategories
+                              selectedPublicCategory === 'All'
                                 ? true
                                 : group.categories.includes(selectedPublicCategory)
                             return matchesSearch && matchesCategory
