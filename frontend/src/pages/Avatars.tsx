@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useState, useMemo } from 'react'
 import { Layout } from '../components/layout/Layout'
 import { AvatarWorkspaceProvider, useAvatarWorkspace } from '../contexts/AvatarWorkspaceContext'
 import { AvatarWorkspace } from '../components/avatars/workspace/AvatarWorkspace'
