@@ -163,7 +163,7 @@ export function VideoPlanning() {
   const [videoTopics, setVideoTopics] = useState<string[]>(['', '', '']) // Topics for each video slot
   const [videoAvatars, setVideoAvatars] = useState<string[]>(['', '', '']) // Avatar IDs for each video slot
   const [videoLooks, setVideoLooks] = useState<(string | null)[]>(['', '', '']) // Look IDs for each video slot
-  const [avatars, setAvatars] = useState<Array<{ id: string; avatar_name: string; thumbnail_url: string | null; preview_url: string | null; is_default?: boolean; heygen_avatar_id?: string }>>([])
+  const [avatars, setAvatars] = useState<Array<{ id: string; avatar_name: string; thumbnail_url: string | null; preview_url: string | null; is_default?: boolean; heygen_avatar_id?: string; has_motion?: boolean }>>([])
   const [loadingAvatars, setLoadingAvatars] = useState(false)
   const [defaultAvatarId, setDefaultAvatarId] = useState<string | null>(null)
   const [avatarModalOpen, setAvatarModalOpen] = useState(false)
@@ -216,8 +216,23 @@ export function VideoPlanning() {
         // Exclude everything else
         return false
       })
+
+      // Merge in local motion flags (from Add Motion success)
+      let motionSet = new Set<string>()
+      try {
+        const raw = typeof window !== 'undefined' ? window.localStorage.getItem('motion_applied_avatar_ids') : null
+        const arr: string[] = raw ? JSON.parse(raw) : []
+        motionSet = new Set(arr)
+      } catch (e) {
+        console.warn('[Motion] Could not read motion flags from localStorage')
+      }
+
+      const avatarsWithMotion = loadedAvatars.map((a: any) => ({
+        ...a,
+        has_motion: motionSet.has(a.id),
+      }))
       
-      setAvatars(loadedAvatars)
+      setAvatars(avatarsWithMotion)
       setDefaultAvatarId(response.data.default_avatar_id || null)
       
       // Set default avatar for all video slots that don't have an avatar selected
@@ -3129,6 +3144,14 @@ export function VideoPlanning() {
                           : 'border-slate-200 bg-white hover:border-brand-300 hover:shadow-md'
                       }`}
                     >
+                      {avatar.has_motion && (
+                        <div className="absolute top-2 left-2 z-10">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-600 text-white shadow-sm">
+                            <span className="h-2 w-2 rounded-full bg-white"></span>
+                            Motion
+                          </span>
+                        </div>
+                      )}
                       {avatar.thumbnail_url || avatar.preview_url ? (
                         <img
                           src={avatar.thumbnail_url || avatar.preview_url || ''}

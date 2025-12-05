@@ -595,6 +595,21 @@ function AvatarsContent() {
       })
       toast.success('Motion added successfully to look!')
       invalidateLooksCache()
+
+      // Persist motion-applied flag locally for this avatar so we can show a badge
+      try {
+        const key = 'motion_applied_avatar_ids'
+        const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null
+        const arr: string[] = raw ? JSON.parse(raw) : []
+        if (!arr.includes(avatar.id)) {
+          arr.push(avatar.id)
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem(key, JSON.stringify(arr))
+          }
+        }
+      } catch (e) {
+        console.warn('[Motion] Could not persist motion flag locally:', (e as Error).message)
+      }
     } catch (error: any) {
       const errorMessage = formatSpecificError(error)
       handleError(error, {
