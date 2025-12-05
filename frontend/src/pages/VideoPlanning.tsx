@@ -206,15 +206,11 @@ export function VideoPlanning() {
       
       // Filter to only show:
       // 1. User-created avatars (source: 'user_photo' or 'ai_generated')
-      // 2. Public avatars the user has added (source: 'synced')
-      // Exclude any other avatars
+      // NOTE: We now exclude synced/public avatars to avoid listing the full HeyGen library.
+      // If public avatars are needed, they must be explicitly added later with a clear flag.
       const loadedAvatars = allAvatars.filter((avatar: any) => {
         // Include user-created avatars
         if (avatar.source === 'user_photo' || avatar.source === 'ai_generated') {
-          return true
-        }
-        // Include synced avatars (public avatars user has added)
-        if (avatar.source === 'synced') {
           return true
         }
         // Exclude everything else
