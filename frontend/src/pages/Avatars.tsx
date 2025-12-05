@@ -128,14 +128,14 @@ function AvatarsContent() {
       
       setPublicAvatars(normalizedAvatars)
 
-      // Group public avatars by base name so sidebar shows one entry per character
-      const groupMap = new Map<string, { id: string; name: string; avatars: Avatar[]; categories: string[] }>()
+      // Group public avatars by base name so grid shows one tile per character, with all variants
+      const groupMap = new Map<string, { id: string; name: string; avatars: Avatar[]; categories: string[]; motionLookIds: Set<string> }>()
       for (const avatar of normalizedAvatars) {
         const baseName = getPublicAvatarBaseName(avatar.avatar_name)
         const key = baseName.toLowerCase()
         let group = groupMap.get(key)
         if (!group) {
-          group = { id: key, name: baseName, avatars: [], categories: [] }
+          group = { id: key, name: baseName, avatars: [], categories: [], motionLookIds: new Set() }
           groupMap.set(key, group)
         }
         group.avatars.push(avatar)
@@ -197,6 +197,26 @@ function AvatarsContent() {
           
           group.categories = [primaryCategory]
         }
+      })
+
+      // Motion: load locally stored motion looks and attach to groups
+      let motionLookSet = new Set<string>()
+      try {
+        if (typeof window !== 'undefined') {
+          const rawLooks = window.localStorage.getItem('motion_applied_look_ids')
+          const lookArr: string[] = rawLooks ? JSON.parse(rawLooks) : []
+          motionLookSet = new Set(lookArr)
+        }
+      } catch (e) {
+        console.warn('[Motion] Could not read motion look flags from localStorage')
+      }
+
+      groupsArray.forEach((group) => {
+        group.motionLookIds = new Set(
+          group.avatars
+            .filter(a => a.id && motionLookSet.has(a.id)) // if avatars are stored as looks; if looks have separate IDs, adjust below
+            .map(a => a.id)
+        )
       })
 
       // Build category list from groups
@@ -596,16 +616,21 @@ function AvatarsContent() {
       toast.success('Motion added successfully to look!')
       invalidateLooksCache()
 
-      // Persist motion-applied flag locally for this avatar so we can show a badge
+      // Persist motion-applied flag locally for this avatar/look so we can show a badge and hide non-motion variants
       try {
-        const key = 'motion_applied_avatar_ids'
-        const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null
-        const arr: string[] = raw ? JSON.parse(raw) : []
-        if (!arr.includes(avatar.id)) {
-          arr.push(avatar.id)
-          if (typeof window !== 'undefined') {
-            window.localStorage.setItem(key, JSON.stringify(arr))
-          }
+        if (typeof window !== 'undefined') {
+          const avatarKey = 'motion_applied_avatar_ids'
+          const lookKey = 'motion_applied_look_ids'
+          const rawAvatars = window.localStorage.getItem(avatarKey)
+          const rawLooks = window.localStorage.getItem(lookKey)
+          const avatarArr: string[] = rawAvatars ? JSON.parse(rawAvatars) : []
+          const lookArr: string[] = rawLooks ? JSON.parse(rawLooks) : []
+          
+          if (!avatarArr.includes(avatar.id)) avatarArr.push(avatar.id)
+          if (!lookArr.includes(look.id)) lookArr.push(look.id)
+          
+          window.localStorage.setItem(avatarKey, JSON.stringify(avatarArr))
+          window.localStorage.setItem(lookKey, JSON.stringify(lookArr))
         }
       } catch (e) {
         console.warn('[Motion] Could not persist motion flag locally:', (e as Error).message)
