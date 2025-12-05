@@ -25,6 +25,7 @@ export interface PhotoAvatarLook {
   created_at?: number
   updated_at?: number | null
   is_default?: boolean
+  has_motion?: boolean
 }
 
 export type PanelType = 'avatar-details' | 'look-details' | 'create-avatar' | 'generate-look' | null

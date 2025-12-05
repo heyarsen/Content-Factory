@@ -53,6 +53,52 @@ function AvatarsContent() {
     generatingLookIds,
   } = useAvatarWorkspaceState(selectedAvatarId)
 
+  // Motion: read locally stored motioned looks
+  const motionLookSet = useMemo(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const raw = window.localStorage.getItem('motion_applied_look_ids')
+        const arr: string[] = raw ? JSON.parse(raw) : []
+        return new Set(arr)
+      }
+    } catch (e) {
+      console.warn('[Motion] Could not read motion look flags from localStorage')
+    }
+    return new Set<string>()
+  }, [])
+
+  // For My Avatars: mark looks with motion and hide non-motion variants if a motioned look exists for that avatar
+  const filteredAllLooks = useMemo(() => {
+    // Attach has_motion flag
+    const withFlags = allLooks.map(entry => ({
+      avatar: entry.avatar,
+      look: {
+        ...entry.look,
+        has_motion: motionLookSet.has(entry.look.id),
+      },
+    }))
+
+    // Group by avatar and, if any motioned looks exist, only keep those
+    const byAvatar = new Map<string, Array<{ look: any; avatar: Avatar }>>()
+    for (const entry of withFlags) {
+      const list = byAvatar.get(entry.avatar.id) || []
+      list.push(entry)
+      byAvatar.set(entry.avatar.id, list)
+    }
+
+    const pruned: Array<{ look: any; avatar: Avatar }> = []
+    for (const [_, list] of byAvatar.entries()) {
+      const motioned = list.filter(item => item.look.has_motion)
+      if (motioned.length > 0) {
+        pruned.push(...motioned)
+      } else {
+        pruned.push(...list)
+      }
+    }
+
+    return pruned
+  }, [allLooks, motionLookSet])
+
   // Helper to derive a base name for grouping public avatars (e.g. "Abigail Office Front" -> "Abigail", "Silvia" -> "Silvia")
   const getPublicAvatarBaseName = (name: string): string => {
     if (!name) return 'Unknown'
@@ -889,30 +935,30 @@ function AvatarsContent() {
               </div>
             </div>
           ) : (
-            <AvatarWorkspace
+        <AvatarWorkspace
               avatars={displayedAvatars}
               loading={displayedLoading}
-              allLooks={allLooks}
-              loadingLooks={loadingLooks}
-              selectedAvatarId={selectedAvatarId}
-              onSelectAvatar={setSelectedAvatarId}
-              onCreateAvatarClick={() => panel.openCreateAvatar()}
-              onCreateAvatar={handleCreateAvatar}
-              onGenerateLook={handleGenerateLook}
-              onLookClick={handleLookClick}
+              allLooks={filteredAllLooks}
+          loadingLooks={loadingLooks}
+          selectedAvatarId={selectedAvatarId}
+          onSelectAvatar={setSelectedAvatarId}
+          onCreateAvatarClick={() => panel.openCreateAvatar()}
+          onCreateAvatar={handleCreateAvatar}
+          onGenerateLook={handleGenerateLook}
+          onLookClick={handleLookClick}
               onAddMotion={handleAddMotion}
-              onQuickGenerate={handleQuickGenerate}
-              onGenerateAIClick={() => setShowGenerateAIModal(true)}
-              onAvatarClick={(avatar) => {
-                panel.openAvatarDetails(avatar)
-                setSelectedAvatarId(avatar.id)
-              }}
-              onTrainAvatar={handleTrainAvatar}
-              trainingAvatarId={trainingAvatarId}
-              generating={generating}
-              generatingLookIds={generatingLookIds}
+          onQuickGenerate={handleQuickGenerate}
+          onGenerateAIClick={() => setShowGenerateAIModal(true)}
+          onAvatarClick={(avatar) => {
+            panel.openAvatarDetails(avatar)
+            setSelectedAvatarId(avatar.id)
+          }}
+          onTrainAvatar={handleTrainAvatar}
+          trainingAvatarId={trainingAvatarId}
+          generating={generating}
+          generatingLookIds={generatingLookIds}
               addingMotionLookIds={addingMotionLookIds}
-            />
+        />
           )}
         </div>
       </div>

@@ -122,10 +122,18 @@ export function LooksGallery({
           const hasValidUrl = imageUrl && imageUrl.trim() !== '' && !imageErrors.has(look.id)
 
           return (
-            <div
+              <div
               key={`${avatar.id}-${look.id}`}
               className="group relative flex items-center gap-4 p-4 rounded-xl bg-white border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all duration-200"
             >
+                {look.has_motion && (
+                  <div className="absolute top-2 left-2 z-10">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-600 text-white shadow-sm">
+                      <span className="h-2 w-2 rounded-full bg-white"></span>
+                      Motion
+                    </span>
+                  </div>
+                )}
               {/* Thumbnail */}
               <div 
                 onClick={() => onLookClick?.(look, avatar)}
@@ -251,6 +259,14 @@ export function LooksGallery({
             key={`${avatar.id}-${look.id}`}
             className="group relative aspect-[3/4] rounded-2xl overflow-hidden bg-slate-100 hover:shadow-xl transition-all duration-300"
           >
+            {look.has_motion && (
+              <div className="absolute top-3 left-3 z-20">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-600 text-white shadow-sm">
+                  <span className="h-2 w-2 rounded-full bg-white"></span>
+                  Motion
+                </span>
+              </div>
+            )}
             <div 
               onClick={() => onLookClick?.(look, avatar)}
               className="relative w-full h-full cursor-pointer"
