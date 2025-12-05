@@ -199,9 +199,28 @@ export function VideoPlanning() {
   const loadAvatars = async () => {
     try {
       setLoadingAvatars(true)
-      // Fetch all avatars (including synced/public) so they can be used for planning
+      // Fetch user's avatars (including synced/public ones they've added, but NOT all public avatars)
+      // This shows only avatars the user has created or explicitly added from public library
       const response = await api.get('/api/avatars?all=true')
-      const loadedAvatars = response.data.avatars || []
+      const allAvatars = response.data.avatars || []
+      
+      // Filter to only show:
+      // 1. User-created avatars (source: 'user_photo' or 'ai_generated')
+      // 2. Public avatars the user has added (source: 'synced')
+      // Exclude any other avatars
+      const loadedAvatars = allAvatars.filter((avatar: any) => {
+        // Include user-created avatars
+        if (avatar.source === 'user_photo' || avatar.source === 'ai_generated') {
+          return true
+        }
+        // Include synced avatars (public avatars user has added)
+        if (avatar.source === 'synced') {
+          return true
+        }
+        // Exclude everything else
+        return false
+      })
+      
       setAvatars(loadedAvatars)
       setDefaultAvatarId(response.data.default_avatar_id || null)
       

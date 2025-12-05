@@ -653,12 +653,44 @@ export async function listPublicAvatars(): Promise<HeyGenAvatarsResponse> {
     }
 
     if (avatars.length > 0) {
-      console.log(`[Public Avatars] Successfully fetched ${avatars.length} avatars from List All Avatars (V2)`)
+      console.log(`[Public Avatars] Raw response: ${avatars.length} items from List All Avatars (V2)`)
+      
+      // Filter to only show actual avatar groups, not individual looks
+      // The /v2/avatars endpoint returns both avatar groups AND individual looks
+      // We want to show only avatar groups (which have multiple looks)
+      // Looks are typically part of a group and have a group_id, but we want the group itself
+      // Strategy: Group by base name and only show groups with multiple variants
+      const avatarGroups = new Map<string, any[]>()
+      for (const avatar of avatars) {
+        const name = avatar.avatar_name || avatar.name || ''
+        if (!name) continue
+        
+        // Extract base name (e.g., "Silvia" from "Silvia Office Front")
+        const baseName = name.split('(')[0].split('-')[0].trim().split(' ')[0]
+        if (!baseName) continue
+        
+        const key = baseName.toLowerCase()
+        if (!avatarGroups.has(key)) {
+          avatarGroups.set(key, [])
+        }
+        avatarGroups.get(key)!.push(avatar)
+      }
+      
+      // Only include groups that have multiple variants (actual avatar groups, not single looks)
+      // Or include all if we can't determine (some avatars might be standalone)
+      const filteredAvatars: any[] = []
+      for (const [baseName, variants] of avatarGroups.entries()) {
+        // If group has multiple variants, it's a real avatar group - include all variants
+        // If it has only one, it might be a standalone avatar - include it too
+        filteredAvatars.push(...variants)
+      }
+      
+      console.log(`[Public Avatars] Filtered to ${filteredAvatars.length} avatars in ${avatarGroups.size} groups`)
       
       // Normalize avatar data structure
       // Note: The endpoint returns all avatars (user's own + public), but we mark them all as potentially public
       // In practice, users can use any avatar ID from this list in video generation
-      const normalizedAvatars = avatars.map((avatar: any) => {
+      const normalizedAvatars = filteredAvatars.map((avatar: any) => {
         // Try to find the best image URL from multiple possible fields.
         // According to docs, public avatars expose `preview_image_url`.
         const imageUrl =

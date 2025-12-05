@@ -53,10 +53,13 @@ function AvatarsContent() {
     generatingLookIds,
   } = useAvatarWorkspaceState(selectedAvatarId)
 
-  // Helper to derive a base name for grouping public avatars (e.g. \"Abigail Office Front\" -> \"Abigail\")
+  // Helper to derive a base name for grouping public avatars (e.g. "Abigail Office Front" -> "Abigail", "Silvia" -> "Silvia")
   const getPublicAvatarBaseName = (name: string): string => {
     if (!name) return 'Unknown'
-    // Cut off at first '(' or '-' if present, otherwise use first word
+    // Try multiple strategies to extract base name:
+    // 1. Cut off at first '(' or '-' if present
+    // 2. Use first word if it's a simple name like "Silvia"
+    // 3. Otherwise use first word before common separators
     const bracketIndex = name.indexOf('(')
     const dashIndex = name.indexOf('-')
     let endIndex = -1
@@ -67,8 +70,23 @@ function AvatarsContent() {
     } else if (dashIndex >= 0) {
       endIndex = dashIndex
     }
-    const raw = endIndex > 0 ? name.slice(0, endIndex) : name
-    return raw.trim().split(' ')[0] || raw.trim() || 'Unknown'
+    
+    let raw = endIndex > 0 ? name.slice(0, endIndex) : name
+    raw = raw.trim()
+    
+    // If the name is simple (one or two words), use it as-is
+    const words = raw.split(' ')
+    if (words.length <= 2) {
+      // Check if second word is a common descriptor (Office, Sofa, etc.)
+      const descriptors = ['office', 'sofa', 'front', 'side', 'upper', 'body', 'full', 'half', 'close']
+      if (words.length === 2 && descriptors.includes(words[1].toLowerCase())) {
+        return words[0] // Just use first word
+      }
+      return raw // Use both words for names like "Santa Claus"
+    }
+    
+    // For longer names, use first word
+    return words[0] || raw || 'Unknown'
   }
 
   // Load public avatars
@@ -201,7 +219,8 @@ function AvatarsContent() {
         setSelectedPublicGroupId(groups[0].id)
       }
 
-      console.log('[Public Avatars] Loaded', normalizedAvatars.length, 'public avatars in', groups.length, 'groups')
+      console.log('[Public Avatars] Loaded', normalizedAvatars.length, 'avatar looks/variants in', groups.length, 'avatar groups')
+      console.log('[Public Avatars] Sample groups:', groups.slice(0, 5).map(g => ({ name: g.name, looks: g.avatars.length })))
     } catch (error: any) {
       console.error('[Public Avatars] Failed to load public avatars:', error)
       handleError(error, {
