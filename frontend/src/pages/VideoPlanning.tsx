@@ -29,6 +29,7 @@ import {
   RefreshCw,
   CheckCircle2,
   Users,
+  Zap,
 } from 'lucide-react'
 import api from '../lib/api'
 
@@ -3146,9 +3147,8 @@ export function VideoPlanning() {
                     >
                       {avatar.has_motion && (
                         <div className="absolute top-2 left-2 z-10">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-600 text-white shadow-sm">
-                            <span className="h-2 w-2 rounded-full bg-white"></span>
-                            Motion
+                          <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-purple-600 text-white shadow-sm">
+                            <Zap className="h-3 w-3" />
                           </span>
                         </div>
                       )}
