@@ -78,25 +78,8 @@ function AvatarsContent() {
       },
     }))
 
-    // Group by avatar and, if any motioned looks exist, only keep those
-    const byAvatar = new Map<string, Array<{ look: any; avatar: Avatar }>>()
-    for (const entry of withFlags) {
-      const list = byAvatar.get(entry.avatar.id) || []
-      list.push(entry)
-      byAvatar.set(entry.avatar.id, list)
-    }
-
-    const pruned: Array<{ look: any; avatar: Avatar }> = []
-    for (const [_, list] of byAvatar.entries()) {
-      const motioned = list.filter(item => item.look.has_motion)
-      if (motioned.length > 0) {
-        pruned.push(...motioned)
-      } else {
-        pruned.push(...list)
-      }
-    }
-
-    return pruned
+    // Show all looks; motioned looks carry the badge
+    return withFlags
   }, [allLooks, motionLookSet])
 
   // Helper to derive a base name for grouping public avatars (e.g. "Abigail Office Front" -> "Abigail", "Silvia" -> "Silvia")
