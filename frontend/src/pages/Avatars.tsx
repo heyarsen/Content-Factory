@@ -67,6 +67,19 @@ function AvatarsContent() {
     return new Set<string>()
   }, [])
 
+  const motionSourceLookSet = useMemo(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const raw = window.localStorage.getItem('motion_source_look_ids')
+        const arr: string[] = raw ? JSON.parse(raw) : []
+        return new Set(arr)
+      }
+    } catch (e) {
+      console.warn('[Motion] Could not read motion source look flags from localStorage')
+    }
+    return new Set<string>()
+  }, [])
+
   // For My Avatars: mark looks with motion; if a motioned variant exists for a given look name, hide non-motion originals
   const filteredAllLooks = useMemo(() => {
     // Attach has_motion flag
@@ -78,31 +91,19 @@ function AvatarsContent() {
       },
     }))
 
-    // Group by avatar + look name; if a motioned look exists for that name, keep only motioned ones
-    const byAvatar = new Map<string, Map<string, Array<{ look: any; avatar: Avatar }>>>()
-    for (const entry of withFlags) {
-      const name = (entry.look.name || '').trim() || `__no_name_${entry.look.id}`
-      const avatarMap = byAvatar.get(entry.avatar.id) || new Map()
-      const list = avatarMap.get(name) || []
-      list.push(entry)
-      avatarMap.set(name, list)
-      byAvatar.set(entry.avatar.id, avatarMap)
-    }
-
+    // Hide only the original look that was motioned (source look), keep all others
     const pruned: Array<{ look: any; avatar: Avatar }> = []
-    for (const avatarMap of byAvatar.values()) {
-      for (const list of avatarMap.values()) {
-        const motioned = list.filter(item => item.look.has_motion)
-        if (motioned.length > 0) {
-          pruned.push(...motioned)
-        } else {
-          pruned.push(...list)
-        }
+    for (const entry of withFlags) {
+      const isSource = motionSourceLookSet.has(entry.look.id)
+      if (isSource && !entry.look.has_motion) {
+        // this is the original look that was used to generate motion; hide it
+        continue
       }
+      pruned.push(entry)
     }
 
     return pruned
-  }, [allLooks, motionLookSet])
+  }, [allLooks, motionLookSet, motionSourceLookSet])
 
   // Helper to derive a base name for grouping public avatars (e.g. "Abigail Office Front" -> "Abigail", "Silvia" -> "Silvia")
   const getPublicAvatarBaseName = (name: string): string => {
@@ -667,21 +668,26 @@ function AvatarsContent() {
       toast.success('Motion added successfully to look!')
       invalidateLooksCache()
 
-      // Persist motion-applied flag locally for this avatar/look so we can show a badge and hide non-motion variants
+      // Persist motion-applied flag locally for this avatar/look so we can show a badge and hide the original look
       try {
         if (typeof window !== 'undefined') {
           const avatarKey = 'motion_applied_avatar_ids'
           const lookKey = 'motion_applied_look_ids'
+          const sourceKey = 'motion_source_look_ids'
           const rawAvatars = window.localStorage.getItem(avatarKey)
           const rawLooks = window.localStorage.getItem(lookKey)
+          const rawSources = window.localStorage.getItem(sourceKey)
           const avatarArr: string[] = rawAvatars ? JSON.parse(rawAvatars) : []
           const lookArr: string[] = rawLooks ? JSON.parse(rawLooks) : []
+          const sourceArr: string[] = rawSources ? JSON.parse(rawSources) : []
           
           if (!avatarArr.includes(avatar.id)) avatarArr.push(avatar.id)
           if (!lookArr.includes(look.id)) lookArr.push(look.id)
+          if (!sourceArr.includes(look.id)) sourceArr.push(look.id) // mark this look as the source/original
           
           window.localStorage.setItem(avatarKey, JSON.stringify(avatarArr))
           window.localStorage.setItem(lookKey, JSON.stringify(lookArr))
+          window.localStorage.setItem(sourceKey, JSON.stringify(sourceArr))
         }
       } catch (e) {
         console.warn('[Motion] Could not persist motion flag locally:', (e as Error).message)
