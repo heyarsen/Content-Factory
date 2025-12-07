@@ -67,7 +67,7 @@ function AvatarsContent() {
     return new Set<string>()
   }, [])
 
-  // For My Avatars: mark looks with motion; show all looks, motion gets a badge
+  // For My Avatars: mark looks with motion; if a motioned variant exists for a given look name, hide non-motion originals
   const filteredAllLooks = useMemo(() => {
     // Attach has_motion flag
     const withFlags = allLooks.map(entry => ({
@@ -78,7 +78,30 @@ function AvatarsContent() {
       },
     }))
 
-    return withFlags
+    // Group by avatar + look name; if a motioned look exists for that name, keep only motioned ones
+    const byAvatar = new Map<string, Map<string, Array<{ look: any; avatar: Avatar }>>>()
+    for (const entry of withFlags) {
+      const name = (entry.look.name || '').trim() || `__no_name_${entry.look.id}`
+      const avatarMap = byAvatar.get(entry.avatar.id) || new Map()
+      const list = avatarMap.get(name) || []
+      list.push(entry)
+      avatarMap.set(name, list)
+      byAvatar.set(entry.avatar.id, avatarMap)
+    }
+
+    const pruned: Array<{ look: any; avatar: Avatar }> = []
+    for (const avatarMap of byAvatar.values()) {
+      for (const list of avatarMap.values()) {
+        const motioned = list.filter(item => item.look.has_motion)
+        if (motioned.length > 0) {
+          pruned.push(...motioned)
+        } else {
+          pruned.push(...list)
+        }
+      }
+    }
+
+    return pruned
   }, [allLooks, motionLookSet])
 
   // Helper to derive a base name for grouping public avatars (e.g. "Abigail Office Front" -> "Abigail", "Silvia" -> "Silvia")
