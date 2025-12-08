@@ -560,18 +560,14 @@ async function runTemplateGeneration(
         if (hasAvatarIdVariable) {
           console.log('[Template Generation] Template has avatar_id variable, will replace character_id with selected avatar and also override via nodes_override')
           
-          // Use the template's avatar_id variable structure but swap its character_id
-          const templateAvatarVar = (templateVariables as any).avatar_id || {}
-          const templateAvatarProps = templateAvatarVar.properties || {}
-          const templateAvatarType = templateAvatarVar.type || 'character'
-
-          // IMPORTANT: HeyGen expects character_id here; use our talking_photo_id / avatar_id
+          // Use a sanitized avatar_id variable so type matches the avatar we pass
+          const targetType = isPhotoAvatar ? 'talking_photo' : 'avatar'
           variables['avatar_id'] = {
             name: 'avatar_id',
-            type: templateAvatarType,
+            type: 'character',
             properties: {
-              ...templateAvatarProps,
-              character_id: avatarId, // force template to use our character instead of default
+              character_id: avatarId,
+              type: targetType,
             },
           }
 
