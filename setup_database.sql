@@ -127,6 +127,7 @@ CREATE TABLE IF NOT EXISTS video_plan_items (
   script_status TEXT CHECK (script_status IN ('draft', 'approved', 'rejected')),
   platforms TEXT[],
   caption TEXT,
+  talking_photo_id TEXT,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'researching', 'ready', 'draft', 'approved', 'generating', 'completed', 'scheduled', 'posted', 'failed')),
   video_id UUID REFERENCES videos(id) ON DELETE SET NULL,
   error_message TEXT,
@@ -223,4 +224,3 @@ CREATE POLICY "Users can update own video plan items" ON video_plan_items FOR UP
 DROP POLICY IF EXISTS "Users can delete own video plan items" ON video_plan_items;
 CREATE POLICY "Users can delete own video plan items" ON video_plan_items FOR DELETE 
   USING (EXISTS (SELECT 1 FROM video_plans WHERE video_plans.id = video_plan_items.plan_id AND video_plans.user_id = auth.uid()));
-

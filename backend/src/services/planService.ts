@@ -38,6 +38,7 @@ export interface VideoPlanItem {
   platforms?: string[] | null
   caption?: string | null
   avatar_id?: string | null
+  talking_photo_id?: string | null
   status: 'pending' | 'researching' | 'ready' | 'draft' | 'approved' | 'generating' | 'completed' | 'scheduled' | 'posted' | 'failed'
   video_id: string | null
   error_message: string | null
@@ -46,6 +47,9 @@ export interface VideoPlanItem {
 }
 
 export class PlanService {
+  private static avatarColumnAvailable: boolean | null = null
+  private static talkingPhotoColumnAvailable: boolean | null = null
+
   /**
    * Create a new video plan
    */
@@ -180,12 +184,17 @@ export class PlanService {
     }
     
     // Create a date formatter to ensure consistent YYYY-MM-DD format
-    const formatDateForDB = (date: Date): string => {
-      const year = date.getUTCFullYear()
-      const month = String(date.getUTCMonth() + 1).padStart(2, '0')
-      const day = String(date.getUTCDate()).padStart(2, '0')
-      return `${year}-${month}-${day}`
-    }
+  const formatDateForDB = (date: Date): string => {
+    const year = date.getUTCFullYear()
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+    const day = String(date.getUTCDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+  const isMissingColumnError = (error: any, column: string): boolean => {
+    if (!error || error.code !== 'PGRST204') return false
+    const message = typeof error.message === 'string' ? error.message : ''
+    return message.includes(`'${column}'`)
+  }
     
     let start = parseDate(startDate)
     
@@ -338,12 +347,12 @@ export class PlanService {
           // Only include avatar_id if it's provided and not empty
           // This prevents errors if the column doesn't exist in the database
           // Check if avatarId is a non-empty string
-          if (avatarId && typeof avatarId === 'string' && avatarId.trim().length > 0) {
+          if (PlanService.avatarColumnAvailable !== false && avatarId && typeof avatarId === 'string' && avatarId.trim().length > 0) {
             insertData.avatar_id = avatarId.trim()
           }
-          
+
           // Include talking_photo_id (look ID) if provided
-          if (lookId && typeof lookId === 'string' && lookId.trim().length > 0) {
+          if (PlanService.talkingPhotoColumnAvailable !== false && lookId && typeof lookId === 'string' && lookId.trim().length > 0) {
             insertData.talking_photo_id = lookId.trim()
           }
           
@@ -359,27 +368,36 @@ export class PlanService {
             talking_photo_id: lookId || 'null (not included)',
           })
           
-          let { data: item, error } = await supabase
-            .from('video_plan_items')
-            .insert(insertData)
-            .select()
-            .single()
-
-          // If error is about avatar_id column not existing, retry without it
-          if (error && error.message && error.message.includes('avatar_id') && error.code === 'PGRST204') {
-            console.warn(`[Plan Service] ⚠️ avatar_id column doesn't exist in database, retrying without it`)
-            // Remove avatar_id from insert data and retry
-            const insertDataWithoutAvatar = { ...insertData }
-            delete insertDataWithoutAvatar.avatar_id
-            
-            const retryResult = await supabase
+          const insertPlanItem = () =>
+            supabase
               .from('video_plan_items')
-              .insert(insertDataWithoutAvatar)
+              .insert(insertData)
               .select()
               .single()
-            
-            item = retryResult.data
-            error = retryResult.error
+
+          let { data: item, error } = await insertPlanItem()
+
+          if (error && isMissingColumnError(error, 'avatar_id') && 'avatar_id' in insertData) {
+            console.warn('[Plan Service] ⚠️ avatar_id column missing in video_plan_items, skipping avatar assignment until migration 007 runs')
+            delete insertData.avatar_id
+            PlanService.avatarColumnAvailable = false
+            ;({ data: item, error } = await insertPlanItem())
+          }
+
+          if (error && isMissingColumnError(error, 'talking_photo_id') && 'talking_photo_id' in insertData) {
+            console.warn('[Plan Service] ⚠️ talking_photo_id column missing in video_plan_items, skipping look assignment until migration 012 runs')
+            delete insertData.talking_photo_id
+            PlanService.talkingPhotoColumnAvailable = false
+            ;({ data: item, error } = await insertPlanItem())
+          }
+
+          if (!error) {
+            if ('avatar_id' in insertData && PlanService.avatarColumnAvailable === null) {
+              PlanService.avatarColumnAvailable = true
+            }
+            if ('talking_photo_id' in insertData && PlanService.talkingPhotoColumnAvailable === null) {
+              PlanService.talkingPhotoColumnAvailable = true
+            }
           }
 
           if (error) {
@@ -754,4 +772,3 @@ export class PlanService {
     return data || []
   }
 }
-
