@@ -110,27 +110,17 @@ async function resolveAvatarContext(
     })
 
   if (!requestedAvatarId) {
-    // Prefer the user’s default avatar if set
     const defaultAvatar = await AvatarService.getDefaultAvatar(userId)
-    if (defaultAvatar) {
-      return mapAvatarRecord(defaultAvatar as AvatarRecord)
-    }
-
-    // Fallback: if the user has any avatars, use the first active/training one and set it default
-    const userAvatars = await AvatarService.getUserAvatars(userId)
-    const fallbackAvatar =
-      userAvatars.find((avatar) => avatar.status === 'active') || userAvatars[0]
-
-    if (fallbackAvatar) {
-      try {
-        await AvatarService.setDefaultAvatar(fallbackAvatar.id, userId)
-      } catch (error) {
-        console.warn('Failed to set fallback default avatar, continuing with available avatar', error)
+    if (!defaultAvatar) {
+      // Fallback: use first active avatar if no default is set
+      const userAvatars = await AvatarService.getUserAvatars(userId)
+      const firstActiveAvatar = userAvatars.find((avatar: AvatarRecord) => avatar.status === 'active')
+      if (firstActiveAvatar) {
+        return mapAvatarRecord(firstActiveAvatar)
       }
-      return mapAvatarRecord(fallbackAvatar as AvatarRecord)
+      throw new Error('No avatar configured. Please create or select an avatar before generating videos.')
     }
-
-    throw new Error('No avatar configured. Please create or select an avatar before generating videos.')
+    return mapAvatarRecord(defaultAvatar as AvatarRecord)
   }
 
   let avatar: AvatarRecord | null = await AvatarService.getAvatarById(requestedAvatarId, userId)
