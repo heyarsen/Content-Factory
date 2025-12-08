@@ -34,6 +34,7 @@ type AvatarRecord = {
   heygen_avatar_id: string
   avatar_url: string | null
   source?: 'synced' | 'user_photo' | 'ai_generated' | null
+  status?: string
 }
 
 const isPhotoAvatarRecord = (avatar?: AvatarRecord | null): boolean => {
