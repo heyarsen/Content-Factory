@@ -571,8 +571,10 @@ async function runTemplateGeneration(
             },
           }
 
+          const originalCharacterId =
+            (templateVariables as any)?.avatar_id?.properties?.character_id || null
           console.log('[Template Generation] Set avatar_id variable (replaced character_id):', {
-            originalCharacterId: templateAvatarProps.character_id,
+            originalCharacterId,
             newCharacterId: avatarId,
             finalVariable: JSON.stringify(variables['avatar_id'], null, 2),
           })
