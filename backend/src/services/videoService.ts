@@ -465,7 +465,8 @@ async function runTemplateGeneration(
   planItemId?: string | null,
   avatarId?: string,
   isPhotoAvatar?: boolean,
-  generateCaption?: boolean
+  generateCaption?: boolean,
+  allowAvatarFallback: boolean = true
 ): Promise<void> {
   try {
     console.log('[Template Generation] Starting template video generation:', {
@@ -886,6 +887,36 @@ async function runTemplateGeneration(
     await applyManualGenerationSuccess(video.id, response)
     await updatePlanItemStatus(planItemId, response.status)
   } catch (error: any) {
+    // If the avatar is invalid/unavailable, retry once with the user's default avatar
+    if (allowAvatarFallback && isAvatarNotFoundError(error)) {
+      try {
+        console.warn('[Template Generation] Avatar not found, attempting fallback to default avatar', {
+          videoId: video.id,
+          userId: video.user_id,
+          badAvatarId: avatarId,
+        })
+        const { avatarId: fallbackAvatarId, isPhotoAvatar: fallbackIsPhoto } = await resolveAvatarContext(
+          video.user_id,
+          null
+        )
+        if (fallbackAvatarId && fallbackAvatarId !== avatarId) {
+          await runTemplateGeneration(
+            video,
+            preference,
+            scriptText,
+            planItemId,
+            fallbackAvatarId,
+            fallbackIsPhoto,
+            generateCaption,
+            false // prevent recursion
+          )
+          return
+        }
+      } catch (fallbackError) {
+        console.error('[Template Generation] Avatar fallback failed:', fallbackError)
+      }
+    }
+
     console.error('[Template Generation] Template generation error:', {
       error: error.message || error,
       errorResponse: error.response?.data,
