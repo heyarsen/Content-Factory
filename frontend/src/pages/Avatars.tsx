@@ -12,6 +12,152 @@ import { AIGenerationModal } from '../components/avatars/AIGenerationModal'
 import { AvatarImage } from '../components/avatars/AvatarImage'
 import { Button } from '../components/ui/Button'
 
+const MOTION_AVATAR_KEY = 'motion_applied_avatar_ids'
+const MOTION_LOOK_KEY = 'motion_applied_look_ids'
+const MOTION_SOURCE_KEY = 'motion_source_look_ids'
+const MOTION_PAIR_KEY = 'motion_look_pairs'
+
+type MotionStorageState = {
+  lookSet: Set<string>
+  sourceSet: Set<string>
+  pairs: Record<string, string>
+}
+
+const emptyMotionState: MotionStorageState = {
+  lookSet: new Set<string>(),
+  sourceSet: new Set<string>(),
+  pairs: {},
+}
+
+const readStringArray = (key: string): string[] => {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(key)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((value: unknown): value is string => typeof value === 'string' && value.trim().length > 0)
+  } catch (error) {
+    console.warn(`[Motion] Could not parse localStorage key ${key}:`, (error as Error).message)
+    return []
+  }
+}
+
+const writeStringArray = (key: string, values: Iterable<string>) => {
+  if (typeof window === 'undefined') return
+  const uniqueValues = Array.from(new Set(Array.from(values).filter(value => typeof value === 'string' && value.trim().length > 0)))
+  window.localStorage.setItem(key, JSON.stringify(uniqueValues))
+}
+
+const readMotionPairs = (): Record<string, string> => {
+  if (typeof window === 'undefined') return {}
+  try {
+    const raw = window.localStorage.getItem(MOTION_PAIR_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return {}
+    const normalized: Record<string, string> = {}
+    for (const [source, motion] of Object.entries(parsed)) {
+      if (typeof source === 'string' && source.trim().length > 0 && typeof motion === 'string' && motion.trim().length > 0) {
+        normalized[source.trim()] = motion.trim()
+      }
+    }
+    return normalized
+  } catch (error) {
+    console.warn('[Motion] Could not parse motion look pairs:', (error as Error).message)
+    return {}
+  }
+}
+
+const writeMotionPairs = (pairs: Record<string, string>) => {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(MOTION_PAIR_KEY, JSON.stringify(pairs))
+}
+
+const loadMotionStorage = (): MotionStorageState => {
+  if (typeof window === 'undefined') return emptyMotionState
+
+  const pairs = readMotionPairs()
+  const lookSet = new Set<string>()
+  const sourceSet = new Set<string>()
+
+  Object.entries(pairs).forEach(([source, motion]) => {
+    if (source) sourceSet.add(source)
+    if (motion) lookSet.add(motion)
+  })
+
+  const legacySources = readStringArray(MOTION_SOURCE_KEY)
+  legacySources.forEach(id => {
+    if (id) sourceSet.add(id)
+  })
+
+  const legacyLooks = readStringArray(MOTION_LOOK_KEY)
+  legacyLooks.forEach(id => {
+    if (id && !sourceSet.has(id)) {
+      lookSet.add(id)
+    }
+  })
+
+  return {
+    lookSet,
+    sourceSet,
+    pairs,
+  }
+}
+
+const persistMotionMetadata = (avatarId: string, sourceLookId: string, motionLookId?: string | null) => {
+  if (typeof window === 'undefined') return
+
+  const avatarIds = new Set(readStringArray(MOTION_AVATAR_KEY))
+  if (avatarId) avatarIds.add(avatarId)
+  writeStringArray(MOTION_AVATAR_KEY, avatarIds)
+
+  const sourceIds = new Set(readStringArray(MOTION_SOURCE_KEY))
+  if (sourceLookId) sourceIds.add(sourceLookId)
+  writeStringArray(MOTION_SOURCE_KEY, sourceIds)
+
+  if (motionLookId && motionLookId !== sourceLookId) {
+    const lookIds = new Set(readStringArray(MOTION_LOOK_KEY))
+    lookIds.add(motionLookId)
+    writeStringArray(MOTION_LOOK_KEY, lookIds)
+  }
+
+  const pairs = readMotionPairs()
+  if (motionLookId && motionLookId !== sourceLookId) {
+    pairs[sourceLookId] = motionLookId
+  } else {
+    delete pairs[sourceLookId]
+  }
+  writeMotionPairs(pairs)
+}
+
+const extractMotionLookId = (motionResult: any): string | null => {
+  if (!motionResult || typeof motionResult !== 'object') return null
+
+  const candidates = [
+    motionResult.motion_photo_avatar_id,
+    motionResult.motion_avatar_id,
+    motionResult.photo_avatar_motion_id,
+    motionResult.photo_avatar_id,
+    motionResult.look_id,
+    motionResult.lookId,
+    motionResult.talking_photo_id,
+    motionResult.id,
+  ]
+
+  for (const value of candidates) {
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim()
+    }
+  }
+
+  if (motionResult.data && typeof motionResult.data === 'object') {
+    return extractMotionLookId(motionResult.data)
+  }
+
+  return null
+}
+
 function AvatarsContent() {
   const { toast } = useToast()
   const { selectedAvatarId, setSelectedAvatarId } = useAvatarWorkspace()
@@ -53,31 +199,12 @@ function AvatarsContent() {
     generatingLookIds,
   } = useAvatarWorkspaceState(selectedAvatarId)
 
-  // Motion: read locally stored motioned looks
-  const motionLookSet = useMemo(() => {
-    try {
-      if (typeof window !== 'undefined') {
-        const raw = window.localStorage.getItem('motion_applied_look_ids')
-        const arr: string[] = raw ? JSON.parse(raw) : []
-        return new Set(arr)
-      }
-    } catch (e) {
-      console.warn('[Motion] Could not read motion look flags from localStorage')
-    }
-    return new Set<string>()
-  }, [])
-
-  const motionSourceLookSet = useMemo(() => {
-    try {
-      if (typeof window !== 'undefined') {
-        const raw = window.localStorage.getItem('motion_source_look_ids')
-        const arr: string[] = raw ? JSON.parse(raw) : []
-        return new Set(arr)
-      }
-    } catch (e) {
-      console.warn('[Motion] Could not read motion source look flags from localStorage')
-    }
-    return new Set<string>()
+  // Motion metadata stored locally so we can merge motion looks with their sources
+  const [motionStorage, setMotionStorage] = useState<MotionStorageState>(() => loadMotionStorage())
+  const motionLookSet = motionStorage.lookSet
+  const motionSourceLookSet = motionStorage.sourceSet
+  const refreshMotionStorage = useCallback(() => {
+    setMotionStorage(loadMotionStorage())
   }, [])
 
   // For My Avatars: mark looks with motion; if a motioned variant exists for a given look name, hide non-motion originals
@@ -95,8 +222,8 @@ function AvatarsContent() {
     const pruned: Array<{ look: any; avatar: Avatar }> = []
     for (const entry of withFlags) {
       const isSource = motionSourceLookSet.has(entry.look.id)
-      if (isSource && !entry.look.has_motion) {
-        // this is the original look that was used to generate motion; hide it
+      if (isSource) {
+        // Hide the original look whenever a motion variant exists or has been requested
         continue
       }
       pruned.push(entry)
@@ -661,7 +788,7 @@ function AvatarsContent() {
     
     try {
       setAddingMotionLookIds(prev => new Set(prev).add(look.id))
-      await api.post(`/api/avatars/${avatar.id}/looks/${look.id}/add-motion`, {
+      const response = await api.post(`/api/avatars/${avatar.id}/looks/${look.id}/add-motion`, {
         motion_type: 'expressive',
         prompt: 'Full body motion with expressive hand gestures, natural head movements, engaging body language, waving, pointing, and emphasis gestures throughout',
       })
@@ -670,25 +797,13 @@ function AvatarsContent() {
 
       // Persist motion-applied flag locally for this avatar/look so we can show a badge and hide the original look
       try {
-        if (typeof window !== 'undefined') {
-          const avatarKey = 'motion_applied_avatar_ids'
-          const lookKey = 'motion_applied_look_ids'
-          const sourceKey = 'motion_source_look_ids'
-          const rawAvatars = window.localStorage.getItem(avatarKey)
-          const rawLooks = window.localStorage.getItem(lookKey)
-          const rawSources = window.localStorage.getItem(sourceKey)
-          const avatarArr: string[] = rawAvatars ? JSON.parse(rawAvatars) : []
-          const lookArr: string[] = rawLooks ? JSON.parse(rawLooks) : []
-          const sourceArr: string[] = rawSources ? JSON.parse(rawSources) : []
-          
-          if (!avatarArr.includes(avatar.id)) avatarArr.push(avatar.id)
-          if (!lookArr.includes(look.id)) lookArr.push(look.id)
-          if (!sourceArr.includes(look.id)) sourceArr.push(look.id) // mark this look as the source/original
-          
-          window.localStorage.setItem(avatarKey, JSON.stringify(avatarArr))
-          window.localStorage.setItem(lookKey, JSON.stringify(lookArr))
-          window.localStorage.setItem(sourceKey, JSON.stringify(sourceArr))
+        const motionResult = response?.data?.motion_result
+        const motionLookId = extractMotionLookId(motionResult)
+        if (!motionLookId) {
+          console.warn('[Motion] Could not determine motion look ID from HeyGen response. Source look will be hidden until motion variant syncs.', motionResult)
         }
+        persistMotionMetadata(avatar.id, look.id, motionLookId)
+        refreshMotionStorage()
       } catch (e) {
         console.warn('[Motion] Could not persist motion flag locally:', (e as Error).message)
       }
@@ -707,7 +822,7 @@ function AvatarsContent() {
         return next
       })
     }
-  }, [toast, invalidateLooksCache, addingMotionLookIds])
+  }, [toast, invalidateLooksCache, addingMotionLookIds, refreshMotionStorage])
 
   // Handle train avatar
   const [trainingAvatarId, setTrainingAvatarId] = useState<string | null>(null)
@@ -1006,4 +1121,3 @@ export default function Avatars() {
     </AvatarWorkspaceProvider>
   )
 }
-
