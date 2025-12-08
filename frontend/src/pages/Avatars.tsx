@@ -203,34 +203,93 @@ function AvatarsContent() {
   const [motionStorage, setMotionStorage] = useState<MotionStorageState>(() => loadMotionStorage())
   const motionLookSet = motionStorage.lookSet
   const motionSourceLookSet = motionStorage.sourceSet
+  const motionPairs = motionStorage.pairs
   const refreshMotionStorage = useCallback(() => {
     setMotionStorage(loadMotionStorage())
   }, [])
 
+  const reverseMotionPairs = useMemo(() => {
+    const reverse = new Map<string, string>()
+    Object.entries(motionPairs).forEach(([sourceId, motionId]) => {
+      if (sourceId && motionId) {
+        reverse.set(motionId, sourceId)
+      }
+    })
+    return reverse
+  }, [motionPairs])
+
   // For My Avatars: mark looks with motion; if a motioned variant exists for a given look name, hide non-motion originals
   const filteredAllLooks = useMemo(() => {
-    // Attach has_motion flag
-    const withFlags = allLooks.map(entry => ({
-      avatar: entry.avatar,
-      look: {
-        ...entry.look,
-        has_motion: motionLookSet.has(entry.look.id),
-      },
-    }))
+    if (allLooks.length === 0) return []
 
-    // Hide only the original look that was motioned (source look), keep all others
-    const pruned: Array<{ look: any; avatar: Avatar }> = []
-    for (const entry of withFlags) {
-      const isSource = motionSourceLookSet.has(entry.look.id)
-      if (isSource) {
-        // Hide the original look whenever a motion variant exists or has been requested
-        continue
+    // Quick lookup table for looks by ID
+    const lookMap = new Map<string, { look: PhotoAvatarLook; avatar: Avatar }>()
+    for (const entry of allLooks) {
+      if (entry.look?.id) {
+        lookMap.set(entry.look.id, entry)
       }
-      pruned.push(entry)
     }
 
-    return pruned
-  }, [allLooks, motionLookSet, motionSourceLookSet])
+    const results: Array<{ look: PhotoAvatarLook; avatar: Avatar }> = []
+    const seenIds = new Set<string>()
+    const motionTargetIds = new Set(Object.values(motionPairs).filter(Boolean))
+
+    for (const entry of allLooks) {
+      const lookId = entry.look.id
+      if (!lookId || seenIds.has(lookId)) {
+        continue
+      }
+
+      const replacementId = motionPairs[lookId]
+      if (replacementId) {
+        seenIds.add(lookId)
+        const replacementEntry = lookMap.get(replacementId)
+        if (replacementEntry && !seenIds.has(replacementId)) {
+          seenIds.add(replacementId)
+          results.push({
+            avatar: replacementEntry.avatar,
+            look: {
+              ...replacementEntry.look,
+              has_motion: true,
+              motion_source_id: lookId,
+            },
+          })
+        }
+        // Always skip the source entry so we don't show duplicates
+        continue
+      }
+
+      if (motionTargetIds.has(lookId)) {
+        seenIds.add(lookId)
+        results.push({
+          avatar: entry.avatar,
+          look: {
+            ...entry.look,
+            has_motion: true,
+            motion_source_id: reverseMotionPairs.get(lookId) || null,
+          },
+        })
+        continue
+      }
+
+      if (motionSourceLookSet.has(lookId)) {
+        // Legacy data without an explicit motion look yet - hide the source entry
+        seenIds.add(lookId)
+        continue
+      }
+
+      seenIds.add(lookId)
+      results.push({
+        avatar: entry.avatar,
+        look: {
+          ...entry.look,
+          has_motion: motionLookSet.has(lookId),
+        },
+      })
+    }
+
+    return results
+  }, [allLooks, motionLookSet, motionSourceLookSet, motionPairs, reverseMotionPairs])
 
   // Helper to derive a base name for grouping public avatars (e.g. "Abigail Office Front" -> "Abigail", "Silvia" -> "Silvia")
   const getPublicAvatarBaseName = (name: string): string => {
