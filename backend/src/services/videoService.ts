@@ -55,6 +55,34 @@ const isAvatarNotFoundError = (error: any): boolean => {
   )
 }
 
+// Find the first available talking_photo_id (look) for any active user avatar
+async function resolveFallbackPhotoLook(userId: string): Promise<{ lookId: string | null }> {
+  try {
+    const { AvatarService } = await import('./avatarService.js')
+    const avatars = await AvatarService.getUserAvatars(userId)
+    const { fetchAvatarGroupLooks } = await import('../lib/heygen.js')
+
+    for (const avatar of avatars) {
+      if (!avatar.heygen_avatar_id) continue
+      try {
+        const looks = await fetchAvatarGroupLooks(avatar.heygen_avatar_id)
+        if (Array.isArray(looks) && looks.length > 0) {
+          const lookId = looks[0]?.id
+          if (lookId) {
+            return { lookId }
+          }
+        }
+      } catch (lookError: any) {
+        console.warn('[Avatar Fallback] Failed fetching looks for avatar', avatar.id, lookError.message)
+        continue
+      }
+    }
+  } catch (error: any) {
+    console.warn('[Avatar Fallback] Failed to resolve fallback photo look:', error.message)
+  }
+  return { lookId: null }
+}
+
 const isPhotoAvatarRecord = (avatar?: AvatarRecord | null): boolean => {
   if (!avatar) {
     return false
@@ -395,6 +423,22 @@ async function runHeygenGeneration(
             aspectRatio,
             dimension,
             false // prevent recursion
+          )
+          return
+        }
+
+        // Try photo-look fallback if no different avatar could be found
+        const { lookId } = await resolveFallbackPhotoLook(video.user_id)
+        if (lookId && lookId !== avatarId) {
+          await runHeygenGeneration(
+            video,
+            lookId,
+            true, // treat as photo avatar
+            outputResolution,
+            planItemId,
+            aspectRatio,
+            dimension,
+            false
           )
           return
         }
@@ -909,6 +953,22 @@ async function runTemplateGeneration(
             fallbackIsPhoto,
             generateCaption,
             false // prevent recursion
+          )
+          return
+        }
+
+        // Try photo-look fallback if available
+        const { lookId } = await resolveFallbackPhotoLook(video.user_id)
+        if (lookId && lookId !== avatarId) {
+          await runTemplateGeneration(
+            video,
+            preference,
+            scriptText,
+            planItemId,
+            lookId,
+            true, // treat as photo avatar
+            generateCaption,
+            false
           )
           return
         }
