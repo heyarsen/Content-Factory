@@ -37,6 +37,24 @@ type AvatarRecord = {
   status?: string
 }
 
+const isAvatarNotFoundError = (error: any): boolean => {
+  const code = error?.response?.data?.error?.code
+  const message =
+    error?.response?.data?.error?.message ||
+    error?.response?.data?.error?.error ||
+    error?.message ||
+    ''
+  const lower = `${message}`.toLowerCase()
+  return (
+    code === 'avatar_not_found' ||
+    lower.includes('avatar not found') ||
+    lower.includes('look not found') ||
+    lower.includes('look_id') ||
+    lower.includes('endpoint not found') ||
+    (error?.response?.status === 404 && lower.includes('avatar'))
+  )
+}
+
 const isPhotoAvatarRecord = (avatar?: AvatarRecord | null): boolean => {
   if (!avatar) {
     return false
@@ -308,7 +326,8 @@ async function runHeygenGeneration(
   outputResolution: string = DEFAULT_VERTICAL_OUTPUT_RESOLUTION,
   planItemId?: string | null,
   aspectRatio: string | null = DEFAULT_VERTICAL_ASPECT_RATIO,
-  dimension?: HeyGenDimensionInput
+  dimension?: HeyGenDimensionInput,
+  allowAvatarFallback: boolean = true
 ): Promise<void> {
   try {
     // Idempotency guard: if a HeyGen video was already created for this record, do not create again
@@ -354,6 +373,36 @@ async function runHeygenGeneration(
     await applyManualGenerationSuccess(video.id, response)
     await updatePlanItemStatus(planItemId, response.status)
   } catch (error: any) {
+    // If avatar is invalid/missing in HeyGen, retry once with user's default avatar
+    if (allowAvatarFallback && isAvatarNotFoundError(error)) {
+      try {
+        console.warn('Avatar not found, attempting fallback to default avatar', {
+          videoId: video.id,
+          userId: video.user_id,
+          badAvatarId: avatarId,
+        })
+        const { avatarId: fallbackAvatarId, isPhotoAvatar: fallbackIsPhoto } = await resolveAvatarContext(
+          video.user_id,
+          null
+        )
+        if (fallbackAvatarId && fallbackAvatarId !== avatarId) {
+          await runHeygenGeneration(
+            video,
+            fallbackAvatarId,
+            fallbackIsPhoto,
+            outputResolution,
+            planItemId,
+            aspectRatio,
+            dimension,
+            false // prevent recursion
+          )
+          return
+        }
+      } catch (fallbackError) {
+        console.error('Avatar fallback failed:', fallbackError)
+      }
+    }
+
     console.error('HeyGen generation error:', error)
     
     // Extract detailed error message
