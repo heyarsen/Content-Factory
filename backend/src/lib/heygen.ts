@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { retryWithBackoff } from './perplexity.js'
 
 const HEYGEN_API_URL = 'https://api.heygen.com/v1'
 const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
@@ -2481,7 +2482,7 @@ export async function addLooksToAvatarGroup(
  * Check training status for avatar group
  */
 export interface TrainingStatus {
-  status: 'pending' | 'training' | 'ready' | 'failed' | 'empty'
+  status: 'pending' | 'training' | 'ready' | 'failed' | 'empty' | 'processing'
   error_msg?: string | null
   created_at?: number
   updated_at?: number | null
