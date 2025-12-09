@@ -2078,7 +2078,7 @@ export class AutomationService {
     const recentScripts =
       recentItems
         ?.map((s: any) => s.script as string | null)
-        .filter(Boolean)
+        .filter((s: string | null): s is string => !!s)
         .map((s: string) => s.slice(0, 200)) || []
 
     const antiRepeatHint =
