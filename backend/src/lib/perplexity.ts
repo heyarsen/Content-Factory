@@ -50,7 +50,7 @@ export interface ResearchResponse {
 /**
  * Retry function with exponential backoff for handling rate limits
  */
-async function retryWithBackoff<T>(
+export async function retryWithBackoff<T>(
   fn: () => Promise<T>,
   maxRetries: number = 3,
   initialDelay: number = 1000
