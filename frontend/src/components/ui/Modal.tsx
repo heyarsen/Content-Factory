@@ -36,7 +36,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', closeOnOv
 
   return (
     <div
-      className="fixed inset-0 z-[9999]"
+      className="fixed inset-0 z-[9999] flex items-start justify-center"
       onClick={closeOnOverlayClick ? handleClose : undefined}
       style={{ 
         position: 'fixed', 
@@ -55,7 +55,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', closeOnOv
 
       {/* Modal Content - Centered */}
       <div
-        className={`modal-content absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full ${sizes[size]} transform overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-xl transition-all flex flex-col`}
+        className={`modal-content relative mt-8 w-full ${sizes[size]} transform overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-xl transition-all flex flex-col`}
         onClick={(e) => e.stopPropagation()}
         style={{
           maxHeight: 'calc(100vh - 4rem)'

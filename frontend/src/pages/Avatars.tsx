@@ -1127,7 +1127,7 @@ function AvatarsContent() {
           loadingLooks={loadingLooks}
           selectedAvatarId={selectedAvatarId}
           onSelectAvatar={setSelectedAvatarId}
-          onCreateAvatarClick={() => panel.openCreateAvatar()}
+          onCreateAvatarClick={() => setShowGenerateAIModal(true)}
           onCreateAvatar={handleCreateAvatar}
           onGenerateLook={handleGenerateLook}
           onLookClick={handleLookClick}

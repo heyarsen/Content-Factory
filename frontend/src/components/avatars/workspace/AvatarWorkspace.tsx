@@ -140,7 +140,11 @@ export function AvatarWorkspace({
               panel.openGenerateLook(avatar)
             }
           } else {
-            panel.openCreateAvatar()
+            if (onGenerateAIClick) {
+              onGenerateAIClick()
+            } else {
+              panel.openCreateAvatar()
+            }
           }
         }}
         generatingLookIds={generatingLookIds}
