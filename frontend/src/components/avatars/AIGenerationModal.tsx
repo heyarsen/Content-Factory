@@ -84,8 +84,8 @@ export function AIGenerationModal({
   const [aiAge, setAiAge] = useState<AIAgeOption>('Unspecified')
   const [aiGender, setAiGender] = useState<'Man' | 'Woman'>('Man')
   const [aiEthnicity, setAiEthnicity] = useState<(typeof AI_ETHNICITY_OPTIONS)[number]>('Unspecified')
-  const [aiPose, setAiPose] = useState<'half_body' | 'full_body' | 'close_up'>('close_up')
-  const [aiStyle, setAiStyle] = useState<'Realistic' | 'Cartoon' | 'Anime'>('Realistic')
+  const aiPose: 'half_body' | 'full_body' | 'close_up' = 'close_up'
+  const aiStyle: 'Realistic' | 'Cartoon' | 'Anime' = 'Realistic'
   const [aiAppearance, setAiAppearance] = useState('')
 
   type AIAgeOption = 'Young Adult' | 'Early Middle Age' | 'Late Middle Age' | 'Senior' | 'Unspecified'
@@ -112,8 +112,6 @@ export function AIGenerationModal({
       setAiAge('Unspecified')
       setAiGender('Man')
       setAiEthnicity('Unspecified')
-      setAiPose('close_up')
-      setAiStyle('Realistic')
       setAiAppearance('')
       onClose()
     }
@@ -267,30 +265,10 @@ export function AIGenerationModal({
                 options={AI_ETHNICITY_OPTIONS.map(value => ({ value, label: value }))}
                 disabled={checkingStatus}
               />
+            </div>
 
-              <Select
-                label="Pose *"
-                value={aiPose}
-                onChange={(e) => setAiPose(e.target.value as 'half_body' | 'full_body' | 'close_up')}
-                options={[
-                  { value: 'close_up', label: 'Close Up' },
-                  { value: 'half_body', label: 'Half Body' },
-                  { value: 'full_body', label: 'Full Body' },
-                ]}
-                disabled={checkingStatus}
-              />
-
-              <Select
-                label="Style *"
-                value={aiStyle}
-                onChange={(e) => setAiStyle(e.target.value as 'Realistic' | 'Cartoon' | 'Anime')}
-                options={[
-                  { value: 'Realistic', label: 'Realistic' },
-                  { value: 'Cartoon', label: 'Cartoon' },
-                  { value: 'Anime', label: 'Anime' },
-                ]}
-                disabled={checkingStatus}
-              />
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+              Pose is set to Close Up and style is fixed to Realistic for best results.
             </div>
 
             <Textarea
