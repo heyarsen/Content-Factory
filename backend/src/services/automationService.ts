@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase.js'
 import { PlanService } from './planService.js'
+import { ResearchService } from './researchService.js'
 import { ScriptService } from './scriptService.js'
 import { VideoService } from './videoService.js'
 import { postVideo } from '../lib/uploadpost.js'
@@ -2042,13 +2043,59 @@ export class AutomationService {
       throw new Error('No topic available for script generation')
     }
 
-    const script = await ScriptService.generateScriptCustom({
-      idea: topicToUse, // Always use the item's topic first
-      description: item.description || research?.Description || '',
-      whyItMatters: item.why_important || research?.WhyItMatters || '',
-      usefulTips: item.useful_tips || research?.UsefulTips || '',
-      category: item.category || research?.Category || 'Trading',
-    }, userId)
+    let enrichedResearch = research as any
+
+    // If we lack rich research details, fetch them via Perplexity to improve script quality
+    if (!enrichedResearch || !enrichedResearch.Description || !enrichedResearch.UsefulTips) {
+      try {
+        const researchCategory = item.category || enrichedResearch?.Category || 'Lifestyle'
+        enrichedResearch = await ResearchService.researchTopic(topicToUse, researchCategory, userId)
+
+        await supabase
+          .from('video_plan_items')
+          .update({
+            description: enrichedResearch.description,
+            why_important: enrichedResearch.whyItMatters,
+            useful_tips: enrichedResearch.usefulTips,
+            category: enrichedResearch.category || item.category,
+            research_data: enrichedResearch,
+          })
+          .eq('id', itemId)
+      } catch (researchError: any) {
+        console.error('[Script Generation] Research fallback failed, continuing with existing data:', researchError.message)
+      }
+    }
+
+    // Pull a few recent scripts to discourage repetition
+    const { data: recentItems } = await supabase
+      .from('video_plan_items')
+      .select('script')
+      .eq('plan_id', item.plan_id)
+      .not('script', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(5)
+
+    const recentScripts =
+      recentItems
+        ?.map((s: any) => s.script as string | null)
+        .filter(Boolean)
+        .map((s: string) => s.slice(0, 200)) || []
+
+    const antiRepeatHint =
+      recentScripts.length > 0
+        ? `Avoid repeating or slightly rephrasing these recent scripts or angles:\n- ${recentScripts.join('\n- ')}`
+        : ''
+
+    const script = await ScriptService.generateScriptCustom(
+      {
+        idea: topicToUse, // Always use the item's topic first
+        description: [item.description || enrichedResearch?.Description || '', antiRepeatHint].filter(Boolean).join('\n'),
+        whyItMatters: item.why_important || enrichedResearch?.WhyItMatters || '',
+        usefulTips: item.useful_tips || enrichedResearch?.UsefulTips || '',
+        category: item.category || enrichedResearch?.Category || 'Lifestyle',
+      },
+      userId
+    )
     
     console.log(`[Script Generation] Generated script for topic: "${topicToUse}" (item topic: "${item.topic || 'N/A'}")`)
 
