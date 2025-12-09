@@ -2035,35 +2035,33 @@ export class AutomationService {
       throw new Error('Item must be ready to generate script')
     }
 
-    const research = item.research_data
+    const existingResearch = item.research_data
     
-    // Prioritize item.topic over research.Idea - user's topic input should always be used
-    const topicToUse = item.topic || research?.Idea || ''
+    // Always use the user's topic (can be short or long-form)
+    const topicToUse = item.topic || existingResearch?.Idea || ''
     if (!topicToUse) {
       throw new Error('No topic available for script generation')
     }
 
-    let enrichedResearch = research as any
+    // Always (re)run research so scripts are based on fresh data and long topics
+    const researchCategory = item.category || existingResearch?.Category || existingResearch?.category || 'Lifestyle'
+    let enrichedResearch: any = null
+    try {
+      enrichedResearch = await ResearchService.researchTopic(topicToUse, researchCategory, userId)
 
-    // If we lack rich research details, fetch them via Perplexity to improve script quality
-    if (!enrichedResearch || !enrichedResearch.Description || !enrichedResearch.UsefulTips) {
-      try {
-        const researchCategory = item.category || enrichedResearch?.Category || 'Lifestyle'
-        enrichedResearch = await ResearchService.researchTopic(topicToUse, researchCategory, userId)
-
-        await supabase
-          .from('video_plan_items')
-          .update({
-            description: enrichedResearch.description,
-            why_important: enrichedResearch.whyItMatters,
-            useful_tips: enrichedResearch.usefulTips,
-            category: enrichedResearch.category || item.category,
-            research_data: enrichedResearch,
-          })
-          .eq('id', itemId)
-      } catch (researchError: any) {
-        console.error('[Script Generation] Research fallback failed, continuing with existing data:', researchError.message)
-      }
+      await supabase
+        .from('video_plan_items')
+        .update({
+          description: enrichedResearch.description,
+          why_important: enrichedResearch.whyItMatters,
+          useful_tips: enrichedResearch.usefulTips,
+          category: enrichedResearch.category || item.category,
+          research_data: enrichedResearch,
+        })
+        .eq('id', itemId)
+    } catch (researchError: any) {
+      console.error('[Script Generation] Research failed; aborting script generation to avoid low-quality output:', researchError.message)
+      throw new Error('Research failed; unable to generate script')
     }
 
     // Pull a few recent scripts to discourage repetition
@@ -2089,10 +2087,13 @@ export class AutomationService {
     const script = await ScriptService.generateScriptCustom(
       {
         idea: topicToUse, // Always use the item's topic first
-        description: [item.description || enrichedResearch?.Description || '', antiRepeatHint].filter(Boolean).join('\n'),
-        whyItMatters: item.why_important || enrichedResearch?.WhyItMatters || '',
-        usefulTips: item.useful_tips || enrichedResearch?.UsefulTips || '',
-        category: item.category || enrichedResearch?.Category || 'Lifestyle',
+        description: [
+          item.description || enrichedResearch?.description || enrichedResearch?.Description || '',
+          antiRepeatHint,
+        ].filter(Boolean).join('\n'),
+        whyItMatters: item.why_important || enrichedResearch?.whyItMatters || enrichedResearch?.WhyItMatters || '',
+        usefulTips: item.useful_tips || enrichedResearch?.usefulTips || enrichedResearch?.UsefulTips || '',
+        category: item.category || enrichedResearch?.category || enrichedResearch?.Category || 'Lifestyle',
       },
       userId
     )
