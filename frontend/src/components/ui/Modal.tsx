@@ -36,7 +36,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', closeOnOv
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-start justify-center"
+      className="fixed inset-0 z-[9999] flex items-start justify-center pt-16 pb-8 sm:pt-20 sm:pb-10"
       onClick={closeOnOverlayClick ? handleClose : undefined}
       style={{ 
         position: 'fixed', 
@@ -55,10 +55,10 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', closeOnOv
 
       {/* Modal Content - Centered */}
       <div
-        className={`modal-content relative mt-8 w-full ${sizes[size]} transform overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-xl transition-all flex flex-col`}
+        className={`modal-content relative w-full ${sizes[size]} transform overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-xl transition-all flex flex-col`}
         onClick={(e) => e.stopPropagation()}
         style={{
-          maxHeight: 'calc(100vh - 4rem)'
+          maxHeight: 'calc(100vh - 6rem)'
         }}
       >
         {/* Header - Fixed height */}
