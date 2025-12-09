@@ -2363,21 +2363,26 @@ export async function generateAIAvatar(
     const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
     const apiKey = getHeyGenKey()
 
-    const response = await axios.post(
-      `${HEYGEN_V2_API_URL}/photo_avatar/photo/generate`,
-      request,
-      {
-        headers: {
-          'X-Api-Key': apiKey,
-          'Content-Type': 'application/json',
-        },
-      }
+    const response = await retryWithBackoff(
+      async () =>
+        axios.post(`${HEYGEN_V2_API_URL}/photo_avatar/photo/generate`, request, {
+          headers: {
+            'X-Api-Key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          timeout: 20000, // allow slower responses
+        }),
+      2,
+      750
     )
 
     return {
       generation_id: response.data?.data?.generation_id || response.data?.generation_id,
     }
   } catch (error: any) {
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      console.error('[HeyGen] generateAIAvatar timed out after retries:', error.message)
+    }
     console.error('HeyGen API error (generateAIAvatar):', error.response?.data || error.message)
     throw error
   }
@@ -2501,16 +2506,20 @@ interface ResolvedPhotoAvatarTarget {
   details?: PhotoAvatarDetails
 }
 
-const fetchPhotoAvatarDetails = async (photoAvatarId: string): Promise<PhotoAvatarDetails> => {
+const fetchPhotoAvatarDetails = async (
+  photoAvatarId: string
+): Promise<PhotoAvatarDetails> => {
   const apiKey = getHeyGenKey()
   try {
-    const response = await axios.get(`${HEYGEN_V2_API_URL}/photo_avatar/details/${photoAvatarId}`, {
-      headers: {
-        'X-Api-Key': apiKey,
-        'Content-Type': 'application/json',
-      },
-      timeout: 10000, // 10 second timeout
-    })
+    const response = await retryWithBackoff(async () => {
+      return axios.get(`${HEYGEN_V2_API_URL}/photo_avatar/details/${photoAvatarId}`, {
+        headers: {
+          'X-Api-Key': apiKey,
+          'Content-Type': 'application/json',
+        },
+        timeout: 20000, // increase timeout to 20s to handle HeyGen slowness
+      })
+    }, 2, 750)
 
     const data = response.data?.data || response.data
     if (!data) {
@@ -2550,13 +2559,15 @@ const resolvePhotoAvatarTarget = async (
 
   // Otherwise, treat it as a group_id and fetch the first look
   const apiKey = getHeyGenKey()
-  const groupResponse = await axios.get(`${HEYGEN_V2_API_URL}/avatar_group/${identifier}/avatars`, {
-    headers: {
-      'X-Api-Key': apiKey,
-      'Content-Type': 'application/json',
-    },
-    timeout: 10000, // 10 second timeout
-  })
+  const groupResponse = await retryWithBackoff(async () => {
+    return axios.get(`${HEYGEN_V2_API_URL}/avatar_group/${identifier}/avatars`, {
+      headers: {
+        'X-Api-Key': apiKey,
+        'Content-Type': 'application/json',
+      },
+      timeout: 20000, // increase timeout to 20s
+    })
+  }, 2, 750)
 
   const avatarList =
     groupResponse.data?.data?.avatar_list ||
@@ -2617,14 +2628,17 @@ export async function checkTrainingStatus(
     const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
     const apiKey = getHeyGenKey()
 
-    const response = await axios.get(
-      `${HEYGEN_V2_API_URL}/photo_avatar/train/status/${groupId}`,
-      {
-        headers: {
-          'X-Api-Key': apiKey,
-          'Content-Type': 'application/json',
-        },
-      }
+    const response = await retryWithBackoff(
+      async () =>
+        axios.get(`${HEYGEN_V2_API_URL}/photo_avatar/train/status/${groupId}`, {
+          headers: {
+            'X-Api-Key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          timeout: 20000, // 20s to ride out slow HeyGen responses
+        }),
+      2,
+      750
     )
 
     const data = response.data?.data || response.data
@@ -2635,6 +2649,13 @@ export async function checkTrainingStatus(
       updated_at: data.updated_at || null,
     }
   } catch (error: any) {
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      console.warn('[Avatar Details] Training status timeout, returning processing fallback', {
+        groupId,
+        message: error.message,
+      })
+      return { status: 'processing', error_msg: 'timeout' }
+    }
     console.error('HeyGen API error (checkTrainingStatus):', error.response?.data || error.message)
     throw error
   }
@@ -2738,9 +2759,21 @@ export async function getPhotoAvatarDetails(
         status: 'unknown',
       }
     }
-    // Only log actual errors (not 404s)
+    // For timeouts or other errors, return a soft fallback so callers can proceed
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      console.warn('[Avatar Details] Timeout fetching photo avatar details, returning unknown:', {
+        identifier,
+        message: error.message,
+      })
+      return {
+        id: identifier,
+        group_id: identifier,
+        status: 'unknown',
+      }
+    }
+    // Only log actual errors (not 404s/timeouts handled above)
     if (error.response?.status !== 404) {
-    console.error('HeyGen API error (getPhotoAvatarDetails):', error.response?.data || error.message)
+      console.error('HeyGen API error (getPhotoAvatarDetails):', error.response?.data || error.message)
     }
     throw error
   }
