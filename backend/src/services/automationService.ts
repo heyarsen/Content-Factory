@@ -2047,7 +2047,22 @@ export class AutomationService {
     const researchCategory = item.category || existingResearch?.Category || existingResearch?.category || 'Lifestyle'
     let enrichedResearch: any = null
     try {
+      console.log('[Research] Starting research for item', {
+        itemId,
+        topic: topicToUse,
+        category: researchCategory,
+        planId: item.plan_id,
+      })
+
       enrichedResearch = await ResearchService.researchTopic(topicToUse, researchCategory, userId)
+
+      console.log('[Research] Completed research for item', {
+        itemId,
+        topic: topicToUse,
+        category: enrichedResearch?.category || researchCategory,
+        hasDescription: !!enrichedResearch?.description,
+        hasTips: !!enrichedResearch?.usefulTips,
+      })
 
       await supabase
         .from('video_plan_items')
@@ -2060,7 +2075,11 @@ export class AutomationService {
         })
         .eq('id', itemId)
     } catch (researchError: any) {
-      console.error('[Script Generation] Research failed; aborting script generation to avoid low-quality output:', researchError.message)
+      console.error('[Research] Failed for item; aborting script generation to avoid low-quality output:', {
+        itemId,
+        topic: topicToUse,
+        error: researchError.message,
+      })
       throw new Error('Research failed; unable to generate script')
     }
 
