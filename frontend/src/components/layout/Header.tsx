@@ -36,7 +36,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   }, [notificationsOpen])
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/80 backdrop-blur-xl overflow-hidden">
+    <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/80 backdrop-blur-xl overflow-visible">
       <div className="flex h-16 w-full items-center justify-between px-4 sm:px-6 lg:px-8 gap-4">
         <div className="flex items-center gap-4 min-w-0 flex-1">
           <button
