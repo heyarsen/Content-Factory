@@ -91,7 +91,7 @@ export function ManageLooksModal({
         </div>
 
         {activeTab === 'looks' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-[60vh] overflow-y-auto pr-1">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 max-h-[60vh] overflow-y-auto pr-1">
             {sortedLooks.length === 0 && (
               <div className="col-span-full rounded-xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
                 No looks yet. Upload or generate to get started.

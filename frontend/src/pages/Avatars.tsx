@@ -724,29 +724,30 @@ function AvatarsContent() {
                   placeholder="Search avatars..."
                 />
               </div>
-              <Select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'training' | 'failed')}
-                options={[
-                  { value: 'all', label: 'Status: All' },
-                  { value: 'active', label: 'Status: Active' },
-                  { value: 'training', label: 'Status: Training' },
-                  { value: 'failed', label: 'Status: Failed' },
-                ]}
-                className="min-w-[160px]"
-              />
-              <Select
-                value={sortOption}
-                onChange={(e) => setSortOption(e.target.value as 'recent' | 'name')}
-                options={[
-                  { value: 'recent', label: 'Sort: Recent' },
-                  { value: 'name', label: 'Sort: Name' },
-                ]}
-                className="min-w-[150px]"
-              />
-              <div className="flex-1" />
+              <div className="flex items-center gap-2">
+                <Select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'training' | 'failed')}
+                  options={[
+                    { value: 'all', label: 'Status: All' },
+                    { value: 'active', label: 'Status: Active' },
+                    { value: 'training', label: 'Status: Training' },
+                    { value: 'failed', label: 'Status: Failed' },
+                  ]}
+                  className="min-w-[150px]"
+                />
+                <Select
+                  value={sortOption}
+                  onChange={(e) => setSortOption(e.target.value as 'recent' | 'name')}
+                  options={[
+                    { value: 'recent', label: 'Sort: Recent' },
+                    { value: 'name', label: 'Sort: Name' },
+                  ]}
+                  className="min-w-[130px]"
+                />
+              </div>
               <Button onClick={() => setShowGenerateAIModal(true)}>
-                Create/Train Avatar
+                Create Avatar
               </Button>
             </div>
 
@@ -781,6 +782,11 @@ function AvatarsContent() {
                     >
                       <div className="relative aspect-[3/4] bg-slate-50">
                         <AvatarImage avatar={avatar} className="w-full h-full rounded-none" />
+                        {avatar.is_default && (
+                          <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-semibold text-emerald-700">
+                            Default
+                          </span>
+                        )}
                         {isTraining && (
                           <span className="absolute top-3 right-3 rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700">
                             Training
