@@ -44,7 +44,6 @@ code {
   left: auto !important;
   top: auto !important;
   transform: none !important;
-  max-width: 100%;
 }
 
 /* Hide scrollbar utility */
