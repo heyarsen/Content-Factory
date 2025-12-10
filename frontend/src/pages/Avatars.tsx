@@ -17,7 +17,6 @@ import { LookGenerationModal } from '../components/avatars/LookGenerationModal'
 import { ManageLooksModal } from '../components/avatars/ManageLooksModal'
 import { Modal } from '../components/ui/Modal'
 
-const MOTION_AVATAR_KEY = 'motion_applied_avatar_ids'
 const MOTION_LOOK_KEY = 'motion_applied_look_ids'
 const MOTION_SOURCE_KEY = 'motion_source_look_ids'
 const MOTION_PAIR_KEY = 'motion_look_pairs'
@@ -48,12 +47,6 @@ const readStringArray = (key: string): string[] => {
   }
 }
 
-const writeStringArray = (key: string, values: Iterable<string>) => {
-  if (typeof window === 'undefined') return
-  const uniqueValues = Array.from(new Set(Array.from(values).filter(value => typeof value === 'string' && value.trim().length > 0)))
-  window.localStorage.setItem(key, JSON.stringify(uniqueValues))
-}
-
 const readMotionPairs = (): Record<string, string> => {
   if (typeof window === 'undefined') return {}
   try {
@@ -72,11 +65,6 @@ const readMotionPairs = (): Record<string, string> => {
     console.warn('[Motion] Could not parse motion look pairs:', (error as Error).message)
     return {}
   }
-}
-
-const writeMotionPairs = (pairs: Record<string, string>) => {
-  if (typeof window === 'undefined') return
-  window.localStorage.setItem(MOTION_PAIR_KEY, JSON.stringify(pairs))
 }
 
 const loadMotionStorage = (): MotionStorageState => {
@@ -168,9 +156,6 @@ function AvatarsContent() {
   const motionLookSet = motionStorage.lookSet
   const motionSourceLookSet = motionStorage.sourceSet
   const motionPairs = motionStorage.pairs
-  const refreshMotionStorage = useCallback(() => {
-    setMotionStorage(loadMotionStorage())
-  }, [])
 
   const reverseMotionPairs = useMemo(() => {
     const reverse = new Map<string, string>()

@@ -9,17 +9,17 @@ interface ManageLooksModalProps {
   isOpen: boolean
   onClose: () => void
   avatar: Avatar | null
-  looks: PhotoAvatarLook[]
+  looks?: PhotoAvatarLook[]
   onUploadLooks: () => void
   onGenerateLook: () => void
-  onSetDefaultLook: (lookId: string) => Promise<void>
+  onSetDefaultLook?: (lookId: string) => Promise<void>
 }
 
 export function ManageLooksModal({
   isOpen,
   onClose,
   avatar,
-  looks,
+  looks = [],
   onUploadLooks,
   onGenerateLook,
   onSetDefaultLook,
@@ -122,15 +122,17 @@ export function ManageLooksModal({
                       {look.status ? look.status : 'Ready'}
                     </p>
                   </div>
-                  <Button
-                    size="sm"
-                    variant={look.is_default ? 'ghost' : 'secondary'}
-                    disabled={!!look.is_default}
-                    onClick={() => onSetDefaultLook(look.id)}
-                    className="w-full"
-                  >
-                    {look.is_default ? 'Current default' : 'Set as default'}
-                  </Button>
+                  {onSetDefaultLook && (
+                    <Button
+                      size="sm"
+                      variant={look.is_default ? 'ghost' : 'secondary'}
+                      disabled={!!look.is_default}
+                      onClick={() => onSetDefaultLook(look.id)}
+                      className="w-full"
+                    >
+                      {look.is_default ? 'Current default' : 'Set as default'}
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}

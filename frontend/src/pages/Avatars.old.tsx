@@ -602,6 +602,7 @@ export default function Avatars() {
           setShowLooksModal(null)
         }}
         avatar={showLooksModal}
+        looks={showLooksModal ? allLooks.filter((l) => l.avatar.id === showLooksModal.id).map((l) => l.look) : []}
         onUploadLooks={() => {
           setShowAddLooksModal(true)
         }}
@@ -611,6 +612,12 @@ export default function Avatars() {
             setGenerateLookStep('generate')
             setShowGenerateLookModal(true)
           }
+        }}
+        onSetDefaultLook={async (lookId: string) => {
+          if (!showLooksModal) return
+          await api.post(`/api/avatars/${showLooksModal.id}/set-default-look`, { look_id: lookId })
+          await loadAvatars()
+          invalidateLooksCache()
         }}
       />
 
