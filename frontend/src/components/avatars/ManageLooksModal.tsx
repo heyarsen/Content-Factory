@@ -24,13 +24,13 @@ export function ManageLooksModal({
   onGenerateLook,
   onSetDefaultLook,
 }: ManageLooksModalProps) {
-  if (!avatar) return null
-
   const [activeTab, setActiveTab] = useState<'looks' | 'history'>('looks')
   const sortedLooks = useMemo(
     () => [...looks].sort((a, b) => (b.created_at || 0) - (a.created_at || 0)),
     [looks],
   )
+
+  if (!avatar) return null
 
   return (
     <Modal
