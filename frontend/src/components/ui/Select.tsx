@@ -17,7 +17,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         )}
         <select
           ref={ref}
-          className={`w-full rounded-2xl border px-4 py-3 text-sm transition focus:outline-none ${
+          className={`w-full rounded-2xl border px-4 pr-10 py-3 text-sm transition focus:outline-none appearance-none bg-[url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236789a1' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M6 9l6 6 6-6'/%3E%3C/svg%3E")] bg-[length:16px_16px] bg-no-repeat bg-[right_0.85rem_center] ${
             error
               ? 'border-red-300 bg-white focus:border-red-400 focus:ring-2 focus:ring-red-200'
               : 'border-slate-300 bg-white shadow-sm focus:border-brand-400 focus:ring-2 focus:ring-brand-200'

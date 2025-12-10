@@ -783,7 +783,7 @@ function AvatarsContent() {
                       <div className="relative aspect-[3/4] bg-slate-50">
                         <AvatarImage avatar={avatar} className="w-full h-full rounded-none" />
                         {avatar.is_default && (
-                          <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-semibold text-emerald-700">
+                          <span className="absolute right-3 bottom-3 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-semibold text-emerald-700">
                             Default
                           </span>
                         )}
