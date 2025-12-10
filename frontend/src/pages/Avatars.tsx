@@ -152,7 +152,7 @@ function AvatarsContent() {
   } = useAvatarWorkspaceState(selectedAvatarId)
 
   // Motion metadata stored locally so we can merge motion looks with their sources
-  const [motionStorage, setMotionStorage] = useState<MotionStorageState>(() => loadMotionStorage())
+  const motionStorage = loadMotionStorage()
   const motionLookSet = motionStorage.lookSet
   const motionSourceLookSet = motionStorage.sourceSet
   const motionPairs = motionStorage.pairs
