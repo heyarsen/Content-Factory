@@ -2,18 +2,9 @@ import { useState } from 'react'
 import { User, CheckCircle2 } from 'lucide-react'
 import { Modal } from '../ui/Modal'
 import { Textarea } from '../ui/Textarea'
-import { Select } from '../ui/Select'
 import { Button } from '../ui/Button'
 import { AvatarImage } from './AvatarImage'
-
-interface Avatar {
-  id: string
-  avatar_name: string
-  avatar_url: string | null
-  preview_url: string | null
-  thumbnail_url: string | null
-  status: string
-}
+import { Avatar } from '../../types/avatar'
 
 interface LookGenerationModalProps {
   isOpen: boolean
@@ -25,8 +16,6 @@ interface LookGenerationModalProps {
   onGenerate: (data: {
     avatar: Avatar
     prompt: string
-    pose: 'half_body' | 'full_body' | 'close_up'
-    style: 'Realistic' | 'Cartoon' | 'Anime'
   }) => Promise<void>
   generating: boolean
 }
@@ -42,8 +31,6 @@ export function LookGenerationModal({
   generating,
 }: LookGenerationModalProps) {
   const [lookPrompt, setLookPrompt] = useState('')
-  const [lookPose, setLookPose] = useState<'half_body' | 'full_body' | 'close_up'>('close_up')
-  const [lookStyle, setLookStyle] = useState<'Realistic' | 'Cartoon' | 'Anime'>('Realistic')
 
   const handleGenerate = async () => {
     if (!avatar || !lookPrompt.trim()) {
@@ -53,21 +40,15 @@ export function LookGenerationModal({
     await onGenerate({
       avatar,
       prompt: lookPrompt,
-      pose: lookPose,
-      style: lookStyle,
     })
 
     // Reset form on success
     setLookPrompt('')
-    setLookPose('close_up')
-    setLookStyle('Realistic')
   }
 
   const handleClose = () => {
     if (!generating) {
       setLookPrompt('')
-      setLookPose('close_up')
-      setLookStyle('Realistic')
       onClose()
     }
   }
@@ -139,32 +120,6 @@ export function LookGenerationModal({
             rows={4}
             disabled={generating}
           />
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <Select
-              label="Pose *"
-              value={lookPose}
-              onChange={(e) => setLookPose(e.target.value as 'half_body' | 'full_body' | 'close_up')}
-              options={[
-                { value: 'close_up', label: 'Close Up' },
-                { value: 'half_body', label: 'Half Body' },
-                { value: 'full_body', label: 'Full Body' },
-              ]}
-              disabled={generating}
-            />
-
-            <Select
-              label="Style *"
-              value={lookStyle}
-              onChange={(e) => setLookStyle(e.target.value as 'Realistic' | 'Cartoon' | 'Anime')}
-              options={[
-                { value: 'Realistic', label: 'Realistic' },
-                { value: 'Cartoon', label: 'Cartoon' },
-                { value: 'Anime', label: 'Anime' },
-              ]}
-              disabled={generating}
-            />
-          </div>
 
           <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
             <Button variant="ghost" onClick={handleClose} disabled={generating}>

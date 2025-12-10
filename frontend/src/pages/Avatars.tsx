@@ -15,6 +15,7 @@ import { Input } from '../components/ui/Input'
 import { Select } from '../components/ui/Select'
 import { LookGenerationModal } from '../components/avatars/LookGenerationModal'
 import { ManageLooksModal } from '../components/avatars/ManageLooksModal'
+import { Modal } from '../components/ui/Modal'
 
 const MOTION_AVATAR_KEY = 'motion_applied_avatar_ids'
 const MOTION_LOOK_KEY = 'motion_applied_look_ids'
@@ -109,59 +110,6 @@ const loadMotionStorage = (): MotionStorageState => {
   }
 }
 
-const persistMotionMetadata = (avatarId: string, sourceLookId: string, motionLookId?: string | null) => {
-  if (typeof window === 'undefined') return
-
-  const avatarIds = new Set(readStringArray(MOTION_AVATAR_KEY))
-  if (avatarId) avatarIds.add(avatarId)
-  writeStringArray(MOTION_AVATAR_KEY, avatarIds)
-
-  const sourceIds = new Set(readStringArray(MOTION_SOURCE_KEY))
-  if (sourceLookId) sourceIds.add(sourceLookId)
-  writeStringArray(MOTION_SOURCE_KEY, sourceIds)
-
-  if (motionLookId && motionLookId !== sourceLookId) {
-    const lookIds = new Set(readStringArray(MOTION_LOOK_KEY))
-    lookIds.add(motionLookId)
-    writeStringArray(MOTION_LOOK_KEY, lookIds)
-  }
-
-  const pairs = readMotionPairs()
-  if (motionLookId && motionLookId !== sourceLookId) {
-    pairs[sourceLookId] = motionLookId
-  } else {
-    delete pairs[sourceLookId]
-  }
-  writeMotionPairs(pairs)
-}
-
-const extractMotionLookId = (motionResult: any): string | null => {
-  if (!motionResult || typeof motionResult !== 'object') return null
-
-  const candidates = [
-    motionResult.motion_photo_avatar_id,
-    motionResult.motion_avatar_id,
-    motionResult.photo_avatar_motion_id,
-    motionResult.photo_avatar_id,
-    motionResult.look_id,
-    motionResult.lookId,
-    motionResult.talking_photo_id,
-    motionResult.id,
-  ]
-
-  for (const value of candidates) {
-    if (typeof value === 'string' && value.trim().length > 0) {
-      return value.trim()
-    }
-  }
-
-  if (motionResult.data && typeof motionResult.data === 'object') {
-    return extractMotionLookId(motionResult.data)
-  }
-
-  return null
-}
-
 function AvatarsContent() {
   const { toast } = useToast()
   const { selectedAvatarId, setSelectedAvatarId } = useAvatarWorkspace()
@@ -189,6 +137,9 @@ function AvatarsContent() {
   const [lookGenStep, setLookGenStep] = useState<'select-avatar' | 'generate'>('select-avatar')
   const [lookGenAvatar, setLookGenAvatar] = useState<Avatar | null>(null)
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
+  const [renameTarget, setRenameTarget] = useState<Avatar | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<Avatar | null>(null)
   
   // AI Generation state (kept as modal for now)
   const [showGenerateAIModal, setShowGenerateAIModal] = useState(false)
@@ -205,13 +156,11 @@ function AvatarsContent() {
     avatars,
     allLooks,
     loading,
-    loadingLooks,
     loadAvatars,
     invalidateLooksCache,
     addAvatar,
     generateLook,
     generating,
-    generatingLookIds,
   } = useAvatarWorkspaceState(selectedAvatarId)
 
   // Motion metadata stored locally so we can merge motion looks with their sources
@@ -550,74 +499,6 @@ function AvatarsContent() {
     setSelectedAvatarId(null)
   }, [publicAvatars.length, loadPublicAvatars, setSelectedAvatarId])
 
-  // Handle avatar creation
-  const handleCreateAvatar = useCallback(async (data: { avatarName: string; photoFiles: File[] }) => {
-    try {
-      const formData = new FormData()
-      formData.append('avatar_name', data.avatarName)
-      
-      // Convert first file to base64
-      const primaryFile = data.photoFiles[0]
-      const primaryBase64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onloadend = () => {
-          if (typeof reader.result === 'string') {
-            resolve(reader.result)
-          } else {
-            reject(new Error('Failed to read file'))
-          }
-        }
-        reader.onerror = () => reject(new Error('Failed to read file'))
-        reader.readAsDataURL(primaryFile)
-      })
-      formData.append('photo_data', primaryBase64)
-
-      // Add additional photos if any
-      if (data.photoFiles.length > 1) {
-        const additionalPhotos = await Promise.all(
-          data.photoFiles.slice(1).map(file =>
-            new Promise<string>((resolve, reject) => {
-              const reader = new FileReader()
-              reader.onloadend = () => {
-                if (typeof reader.result === 'string') {
-                  resolve(reader.result)
-                } else {
-                  reject(new Error('Failed to read file'))
-                }
-              }
-              reader.onerror = () => reject(new Error('Failed to read file'))
-              reader.readAsDataURL(file)
-            })
-          )
-        )
-        formData.append('additional_photos', JSON.stringify(additionalPhotos))
-      }
-
-      const response = await api.post('/api/avatars/upload-photo', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
-
-      // Add the avatar immediately to state so it shows up right away
-      if (response.data?.avatar) {
-        addAvatar(response.data.avatar)
-      }
-
-      toast.success('Avatar created successfully!')
-      panel.closePanel()
-      // Also refresh the list to ensure we have the latest data
-      await loadAvatars()
-      invalidateLooksCache()
-    } catch (error: any) {
-      const errorMessage = formatSpecificError(error)
-      handleError(error, {
-        showToast: true,
-        logError: true,
-        customMessage: errorMessage,
-      })
-      toast.error(errorMessage)
-    }
-  }, [toast, loadAvatars, invalidateLooksCache, panel])
-
   // Handle AI generation
   const handleGenerateAI = useCallback(async (data: {
     name: string
@@ -833,10 +714,12 @@ function AvatarsContent() {
   const handleGenerateLook = useCallback(async (data: {
     avatar: Avatar
     prompt: string
-    pose: 'half_body' | 'full_body' | 'close_up'
-    style: 'Realistic' | 'Cartoon' | 'Anime'
   }) => {
-    await generateLook(data)
+    await generateLook({
+      ...data,
+      pose: 'close_up',
+      style: 'Realistic',
+    })
     panel.closePanel()
   }, [generateLook, panel])
 
@@ -867,11 +750,6 @@ function AvatarsContent() {
     setShowManageModal(false)
   }, [])
 
-  // Handle look click
-  const handleLookClick = useCallback((look: any, avatar: Avatar) => {
-    panel.openLookDetails(look, avatar)
-  }, [panel])
-
   // Handle adding public avatar to user's list
   const handleAddPublicAvatar = useCallback(async (avatar: Avatar) => {
     try {
@@ -901,68 +779,63 @@ function AvatarsContent() {
     }
   }, [toast, loadAvatars, setSelectedAvatarId])
 
-  // Handle add motion to look
-  const [addingMotionLookIds, setAddingMotionLookIds] = useState<Set<string>>(new Set())
-  const handleAddMotion = useCallback(async (look: PhotoAvatarLook, avatar: Avatar) => {
-    if (addingMotionLookIds.has(look.id)) return
-    
+  const handleSetDefaultAvatar = useCallback(async (avatar: Avatar) => {
     try {
-      setAddingMotionLookIds(prev => new Set(prev).add(look.id))
-      const response = await api.post(`/api/avatars/${avatar.id}/looks/${look.id}/add-motion`, {
-        motion_type: 'expressive',
-        prompt: 'Full body motion with expressive hand gestures, natural head movements, engaging body language, waving, pointing, and emphasis gestures throughout',
-      })
-      toast.success('Motion added successfully to look!')
-      invalidateLooksCache()
-
-      // Persist motion-applied flag locally for this avatar/look so we can show a badge and hide the original look
-      try {
-        const motionResult = response?.data?.motion_result
-        const motionLookId = extractMotionLookId(motionResult)
-        if (!motionLookId) {
-          console.warn('[Motion] Could not determine motion look ID from HeyGen response. Source look will be hidden until motion variant syncs.', motionResult)
-        }
-        persistMotionMetadata(avatar.id, look.id, motionLookId)
-        refreshMotionStorage()
-      } catch (e) {
-        console.warn('[Motion] Could not persist motion flag locally:', (e as Error).message)
-      }
+      await api.post(`/api/avatars/${avatar.id}/set-default`)
+      toast.success(`"${avatar.avatar_name}" is now your default avatar`)
+      await loadAvatars()
     } catch (error: any) {
       const errorMessage = formatSpecificError(error)
-      handleError(error, {
-        showToast: true,
-        logError: true,
-        customMessage: errorMessage,
-      })
-      toast.error(errorMessage || 'Failed to add motion to look')
-    } finally {
-      setAddingMotionLookIds(prev => {
-        const next = new Set(prev)
-        next.delete(look.id)
-        return next
-      })
+      handleError(error, { showToast: true, logError: true, customMessage: errorMessage })
+      toast.error(errorMessage || 'Failed to set default avatar')
     }
-  }, [toast, invalidateLooksCache, addingMotionLookIds, refreshMotionStorage])
+  }, [toast, loadAvatars])
 
-  // Handle train avatar
-  const [trainingAvatarId, setTrainingAvatarId] = useState<string | null>(null)
-  const handleTrainAvatar = useCallback(async (avatar: Avatar) => {
+  const handleRenameAvatar = useCallback(async () => {
+    if (!renameTarget) return
+    const nextName = renameValue.trim()
+    if (!nextName) {
+      toast.error('Name cannot be empty')
+      return
+    }
     try {
-      setTrainingAvatarId(avatar.id)
-      await api.post(`/api/avatars/${avatar.id}/train`)
-      toast.success('Avatar training started! This may take a few minutes.')
+      await api.patch(`/api/avatars/${renameTarget.id}`, { avatar_name: nextName })
+      toast.success('Avatar renamed')
+      setRenameTarget(null)
+      setRenameValue('')
+      await loadAvatars()
+    } catch (error: any) {
+      const errorMessage = formatSpecificError(error)
+      handleError(error, { showToast: true, logError: true, customMessage: errorMessage })
+      toast.error(errorMessage || 'Failed to rename avatar')
+    }
+  }, [renameTarget, renameValue, toast, loadAvatars])
+
+  const handleDeleteAvatar = useCallback(async () => {
+    if (!deleteTarget) return
+    try {
+      await api.delete(`/api/avatars/${deleteTarget.id}`)
+      toast.success(`Deleted "${deleteTarget.avatar_name}"`)
+      setDeleteTarget(null)
       await loadAvatars()
       invalidateLooksCache()
     } catch (error: any) {
       const errorMessage = formatSpecificError(error)
-      handleError(error, {
-        showToast: true,
-        logError: true,
-        customMessage: errorMessage,
-      })
-      toast.error(errorMessage)
-    } finally {
-      setTrainingAvatarId(null)
+      handleError(error, { showToast: true, logError: true, customMessage: errorMessage })
+      toast.error(errorMessage || 'Failed to delete avatar')
+    }
+  }, [deleteTarget, toast, loadAvatars, invalidateLooksCache])
+
+  const handleSetDefaultLook = useCallback(async (avatarId: string, lookId: string) => {
+    try {
+      await api.post(`/api/avatars/${avatarId}/set-default-look`, { look_id: lookId })
+      toast.success('Default look updated')
+      await loadAvatars()
+      invalidateLooksCache()
+    } catch (error: any) {
+      const errorMessage = formatSpecificError(error)
+      handleError(error, { showToast: true, logError: true, customMessage: errorMessage })
+      toast.error(errorMessage || 'Failed to set default look')
     }
   }, [toast, loadAvatars, invalidateLooksCache])
 
@@ -1114,7 +987,7 @@ function AvatarsContent() {
                               className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                               onClick={() => {
                                 setMenuOpenId(null)
-                                toast.info('Set default is not available yet.')
+                                handleSetDefaultAvatar(avatar)
                               }}
                             >
                               <Star className="h-4 w-4 text-amber-500" />
@@ -1124,7 +997,8 @@ function AvatarsContent() {
                               className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                               onClick={() => {
                                 setMenuOpenId(null)
-                                toast.info('Rename is not available yet.')
+                                setRenameTarget(avatar)
+                                setRenameValue(avatar.avatar_name)
                               }}
                             >
                               <Pencil className="h-4 w-4" />
@@ -1134,7 +1008,7 @@ function AvatarsContent() {
                               className="flex w-full items-center gap-2 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50"
                               onClick={() => {
                                 setMenuOpenId(null)
-                                toast.info('Delete is not available yet.')
+                                setDeleteTarget(avatar)
                               }}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -1375,12 +1249,74 @@ function AvatarsContent() {
         isOpen={showManageModal}
         onClose={closeManageLooks}
         avatar={manageAvatar}
+        looks={manageAvatar ? getAvatarLooks(manageAvatar.id).map((entry) => entry.look) : []}
         onUploadLooks={() => toast.info('Upload looks is not available yet.')}
         onGenerateLook={() => {
           closeManageLooks()
           openGenerateLookModal(manageAvatar || undefined)
         }}
+        onSetDefaultLook={async (lookId) => {
+          if (manageAvatar) {
+            await handleSetDefaultLook(manageAvatar.id, lookId)
+          }
+        }}
       />
+
+      {/* Rename Modal */}
+      <Modal
+        isOpen={!!renameTarget}
+        onClose={() => {
+          setRenameTarget(null)
+          setRenameValue('')
+        }}
+        title="Rename Avatar"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <Input
+            label="New name"
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            placeholder="Enter a new name"
+          />
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setRenameTarget(null)
+                setRenameValue('')
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleRenameAvatar} disabled={!renameValue.trim()}>
+              Save
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete confirm */}
+      <Modal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Delete avatar"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            This will remove the avatar permanently. This action cannot be undone.
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={handleDeleteAvatar}>
+              Delete
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </Layout>
   )
 }
