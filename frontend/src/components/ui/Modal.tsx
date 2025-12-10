@@ -36,16 +36,8 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', closeOnOv
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-start justify-center pt-24 pb-8 sm:pt-28 sm:pb-10"
+      className="fixed inset-0 z-[9999] flex items-start justify-center pt-24 pb-8 sm:pt-28 sm:pb-10 px-4 lg:left-72 lg:top-16 lg:right-0 lg:bottom-0 lg:px-6"
       onClick={closeOnOverlayClick ? handleClose : undefined}
-      style={{ 
-        position: 'fixed', 
-        top: 0, 
-        left: 0, 
-        right: 0, 
-        bottom: 0, 
-        padding: '1rem'
-      }}
     >
       {/* Backdrop */}
       <div
