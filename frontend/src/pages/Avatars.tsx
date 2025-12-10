@@ -658,6 +658,11 @@ function AvatarsContent() {
     }
   }, [toast, loadAvatars, invalidateLooksCache])
 
+  const getAvatarLooks = useCallback(
+    (avatarId: string) => filteredAllLooks.filter((entry) => entry.avatar.id === avatarId),
+    [filteredAllLooks],
+  )
+
   if (loading) {
     return (
       <Layout>
@@ -681,11 +686,6 @@ function AvatarsContent() {
       </Layout>
     )
   }
-
-  const getAvatarLooks = useCallback(
-    (avatarId: string) => filteredAllLooks.filter((entry) => entry.avatar.id === avatarId),
-    [filteredAllLooks],
-  )
 
   return (
     <Layout>
