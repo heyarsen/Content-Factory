@@ -28,10 +28,10 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', closeOnOv
 
   const sizes = {
     sm: 'max-w-md',
-    md: 'max-w-lg',
-    lg: 'max-w-2xl',
-    xl: 'max-w-5xl',
-    full: 'max-w-[min(90vw,1100px)]',
+    md: 'max-w-3xl',
+    lg: 'max-w-4xl',
+    xl: 'max-w-6xl',
+    full: 'max-w-[min(96vw,1400px)]',
   }
 
   return (
