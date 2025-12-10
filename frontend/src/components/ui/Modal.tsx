@@ -27,16 +27,16 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', closeOnOv
   if (!isOpen) return null
 
   const sizes = {
-    sm: 'max-w-md',
-    md: 'max-w-3xl',
-    lg: 'max-w-4xl',
-    xl: 'max-w-6xl',
-    full: 'max-w-[min(96vw,1400px)]',
+    sm: 'max-w-4xl',
+    md: 'max-w-4xl',
+    lg: 'max-w-5xl',
+    xl: 'max-w-7xl',
+    full: 'max-w-[min(98vw,1600px)]',
   }
 
   return (
     <div
-      className="fixed z-[9999] inset-x-0 bottom-0 top-16 lg:left-72 flex items-start justify-center pt-8 sm:pt-12 pb-8 sm:pb-10 px-4 lg:px-6"
+      className="fixed z-[9999] top-16 bottom-0 left-0 right-0 lg:left-72 flex items-start justify-center p-4 sm:p-6"
       onClick={closeOnOverlayClick ? handleClose : undefined}
     >
       {/* Backdrop */}
