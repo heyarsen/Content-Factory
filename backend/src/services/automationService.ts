@@ -1429,43 +1429,42 @@ export class AutomationService {
     const allItemsCount = items?.length || 0
     console.log(`[Distribution] Found ${itemsToProcess.length} items to process for posting (out of ${allItemsCount} total)`)
 
-    // Check if items have existing failed posts that should prevent retry
+    // Check if items have existing posts that should prevent duplicate posting
+    // This check is important even for items without scheduled_post_id, as posts might exist
     for (const item of itemsToProcess) {
-      if (item.scheduled_post_id) {
-        // Check if there are any scheduled posts for this item
-        const { data: existingPosts } = await supabase
-          .from('scheduled_posts')
-          .select('status')
-          .eq('video_id', item.video_id)
+      // Always check for existing scheduled posts, regardless of scheduled_post_id
+      const { data: existingPosts } = await supabase
+        .from('scheduled_posts')
+        .select('status, created_at')
+        .eq('video_id', item.video_id)
+      
+      if (existingPosts && existingPosts.length > 0) {
+        const allFailed = existingPosts.every(p => p.status === 'failed')
+        const anyPending = existingPosts.some(p => p.status === 'pending' || p.status === 'scheduled')
+        const anyPosted = existingPosts.some(p => p.status === 'posted')
         
-        // If all posts failed and it's been less than 1 hour, skip retry to avoid spam
-        if (existingPosts && existingPosts.length > 0) {
-          const allFailed = existingPosts.every(p => p.status === 'failed')
-          const anyPending = existingPosts.some(p => p.status === 'pending' || p.status === 'scheduled')
+        // If any posts are pending or posted, skip to prevent duplicates
+        if (anyPending || anyPosted) {
+          console.log(`[Distribution] Skipping item ${item.id} - has ${existingPosts.length} existing post(s) with status: ${existingPosts.map(p => p.status).join(', ')}`)
+          itemsToProcess.splice(itemsToProcess.indexOf(item), 1)
+          continue
+        }
+        
+        // If all posts failed, check if we should retry
+        if (allFailed) {
+          // Check when posts were created - if recent (< 1 hour), don't retry yet
+          const mostRecentPost = existingPosts.sort((a, b) => 
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          )[0]
           
-          if (allFailed) {
-            // Check when posts were created - if recent (< 1 hour), don't retry yet
-            const { data: postDetails } = await supabase
-              .from('scheduled_posts')
-              .select('created_at')
-              .eq('video_id', item.video_id)
-              .order('created_at', { ascending: false })
-              .limit(1)
-            
-            if (postDetails && postDetails.length > 0) {
-              const postAge = Date.now() - new Date(postDetails[0].created_at).getTime()
-              const oneHour = 60 * 60 * 1000
-              if (postAge < oneHour) {
-                console.log(`[Distribution] Skipping item ${item.id} - all posts failed recently, waiting before retry`)
-                itemsToProcess.splice(itemsToProcess.indexOf(item), 1)
-                continue
-              }
+          if (mostRecentPost) {
+            const postAge = Date.now() - new Date(mostRecentPost.created_at).getTime()
+            const oneHour = 60 * 60 * 1000
+            if (postAge < oneHour) {
+              console.log(`[Distribution] Skipping item ${item.id} - all posts failed recently, waiting before retry`)
+              itemsToProcess.splice(itemsToProcess.indexOf(item), 1)
+              continue
             }
-          } else if (anyPending) {
-            // Has pending posts, don't create new ones
-            console.log(`[Distribution] Skipping item ${item.id} - has pending posts`)
-            itemsToProcess.splice(itemsToProcess.indexOf(item), 1)
-            continue
           }
         }
       }
@@ -1770,6 +1769,26 @@ export class AutomationService {
           console.log(`[Distribution] Posting item ${item.id} immediately - no scheduled time set`)
         }
 
+        // Check if scheduled_posts already exist for this video to prevent duplicates
+        // IMPORTANT: This check must happen BEFORE calling postVideo API to prevent duplicate posts
+        const { data: existingPosts } = await supabase
+          .from('scheduled_posts')
+          .select('id, platform, status')
+          .eq('video_id', item.video_id)
+
+        if (existingPosts && existingPosts.length > 0) {
+          console.log(`[Distribution] Item ${item.id} already has ${existingPosts.length} scheduled post(s), skipping to prevent duplicates`)
+          // Update item status to scheduled if it's not already
+          if (item.status !== 'scheduled') {
+            await supabase
+              .from('video_plan_items')
+              .update({ status: 'scheduled' })
+              .eq('id', item.id)
+            console.log(`[Distribution] Updated item ${item.id} status to 'scheduled' (already had scheduled posts)`)
+          }
+          continue // Skip creating duplicate posts - don't call postVideo API
+        }
+
         // Call upload-post.com API
         console.log(`[Distribution] Posting video ${item.video_id} to platforms: ${platforms.join(', ')}`)
         let postResponse
@@ -1819,25 +1838,6 @@ export class AutomationService {
           uploadId: postResponse.upload_id,
           resultsCount: postResponse.results?.length || 0,
         })
-
-        // Check if scheduled_posts already exist for this video to prevent duplicates
-        const { data: existingPosts } = await supabase
-          .from('scheduled_posts')
-          .select('id, platform, status')
-          .eq('video_id', item.video_id)
-
-        if (existingPosts && existingPosts.length > 0) {
-          console.log(`[Distribution] Item ${item.id} already has ${existingPosts.length} scheduled post(s), skipping creation to prevent duplicates`)
-          // Update item status to scheduled if it's not already
-          if (item.status !== 'scheduled') {
-            await supabase
-              .from('video_plan_items')
-              .update({ status: 'scheduled' })
-              .eq('id', item.id)
-            console.log(`[Distribution] Updated item ${item.id} status to 'scheduled' (already had scheduled posts)`)
-          }
-          continue // Skip creating duplicate posts
-        }
 
         // Create scheduled_posts records for each platform
         const postIds: string[] = []
