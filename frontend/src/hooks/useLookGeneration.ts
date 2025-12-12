@@ -3,6 +3,7 @@ import api from '../lib/api'
 import { pollingManager } from '../lib/pollingManager'
 import { handleError, formatSpecificError } from '../lib/errorHandler'
 import { useToast } from './useToast'
+import { useCredits } from './useCredits'
 
 interface Avatar {
   id: string
@@ -21,6 +22,7 @@ export function useLookGeneration({ onSuccess, onError }: UseLookGenerationOptio
   const [generatingLookIds, setGeneratingLookIds] = useState<Set<string>>(new Set())
   const pollingCleanupsRef = useState<Map<string, () => void>>(new Map())[0]
   const { toast } = useToast()
+  const { refreshCredits } = useCredits()
 
   const pollLookGenerationStatus = useCallback(
     (generationId: string, avatarId: string) => {
@@ -130,9 +132,10 @@ export function useLookGeneration({ onSuccess, onError }: UseLookGenerationOptio
         if (generationId) {
           setGeneratingLookIds(prev => new Set(prev).add(avatar.id))
           pollLookGenerationStatus(generationId, avatar.id)
+          toast.success('Look generation started! This may take a few minutes.')
+        } else {
+          throw new Error('No generation ID returned from server')
         }
-
-        toast.success('Look generation started! This may take a few minutes.')
       } catch (error: any) {
         setGeneratingLookIds(prev => {
           const next = new Set(prev)
@@ -148,6 +151,14 @@ export function useLookGeneration({ onSuccess, onError }: UseLookGenerationOptio
         })
         toast.error(errorMessage)
         onError?.(errorMessage)
+        
+        // Refresh credits if it's a credit-related error (402 status)
+        if (error?.response?.status === 402) {
+          refreshCredits()
+        }
+        
+        // Re-throw error so caller can handle it
+        throw error
       } finally {
         setGenerating(false)
       }

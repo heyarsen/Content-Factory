@@ -511,12 +511,18 @@ function AvatarsContent() {
     avatar: Avatar
     prompt: string
   }) => {
-    await generateLook({
-      ...data,
-      pose: 'close_up',
-      style: 'Realistic',
-    })
-    panel.closePanel()
+    try {
+      await generateLook({
+        ...data,
+        pose: 'close_up',
+        style: 'Realistic',
+      })
+      // Only close panel on success
+      panel.closePanel()
+    } catch (error) {
+      // Error is already handled by useLookGeneration hook
+      // Don't close panel so user can see the error and try again
+    }
   }, [generateLook, panel])
 
   const openGenerateLookModal = useCallback((avatar?: Avatar) => {

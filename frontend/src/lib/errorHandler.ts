@@ -166,6 +166,16 @@ export function formatSpecificError(error: unknown): string {
       ? undefined 
       : (errorObj as any)?.code
 
+  // Handle 402 Payment Required (insufficient credits)
+  if (apiError.response?.status === 402) {
+    const message = extractErrorMessage(error)
+    // If the error message mentions credits, use it directly
+    if (message.toLowerCase().includes('credit')) {
+      return message
+    }
+    return 'Insufficient credits. Please add credits to continue.'
+  }
+
   // HeyGen specific errors
   if (errorCode === 'insufficient_credit' || 
       extractErrorMessage(error).includes('Insufficient credit')) {
