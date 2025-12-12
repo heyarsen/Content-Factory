@@ -65,6 +65,14 @@ router.post('/generate', authenticate, async (req: AuthRequest, res: Response) =
       return res.status(400).json({ error: 'Duration must be between 15 and 180 seconds' })
     }
 
+    // Check and deduct credits
+    const { CreditsService } = await import('../services/creditsService.js')
+    try {
+      await CreditsService.checkAndDeduct(userId, CreditsService.COSTS.VIDEO_GENERATION, 'video generation')
+    } catch (creditError: any) {
+      return res.status(402).json({ error: creditError.message || 'Insufficient credits' })
+    }
+
     const video = await VideoService.requestManualVideo(userId, {
       topic,
       script: script || undefined,

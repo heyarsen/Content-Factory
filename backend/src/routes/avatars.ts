@@ -103,6 +103,15 @@ router.post('/public', async (req: AuthRequest, res: Response) => {
 router.post('/generate-ai', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
+    
+    // Check and deduct credits
+    const { CreditsService } = await import('../services/creditsService.js')
+    try {
+      await CreditsService.checkAndDeduct(userId, CreditsService.COSTS.AVATAR_GENERATION, 'avatar generation')
+    } catch (creditError: any) {
+      return res.status(402).json({ error: creditError.message || 'Insufficient credits' })
+    }
+    
     const result = await AvatarController.generateAI(userId, req.body)
     return res.json(result)
   } catch (error: any) {
@@ -349,6 +358,15 @@ router.post('/add-looks', async (req: AuthRequest, res: Response) => {
 router.post('/generate-look', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
+    
+    // Check and deduct credits
+    const { CreditsService } = await import('../services/creditsService.js')
+    try {
+      await CreditsService.checkAndDeduct(userId, CreditsService.COSTS.LOOK_GENERATION, 'look generation')
+    } catch (creditError: any) {
+      return res.status(402).json({ error: creditError.message || 'Insufficient credits' })
+    }
+    
     const result = await AvatarController.generateLook(userId, req.body)
     return res.json(result)
   } catch (error: any) {

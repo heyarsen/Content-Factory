@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNotifications } from '../../contexts/NotificationContext'
-import { Bell, Menu, User, X, CheckCircle2, AlertCircle, Info, AlertTriangle } from 'lucide-react'
+import { useCredits } from '../../hooks/useCredits'
+import { Bell, Menu, User, X, CheckCircle2, AlertCircle, Info, AlertTriangle, Coins } from 'lucide-react'
 import { useMemo, useState, useRef, useEffect } from 'react'
 
 interface HeaderProps {
@@ -12,6 +13,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const { notifications, unreadCount, markAsRead, markAllAsRead, removeNotification } = useNotifications()
+  const { credits, loading: creditsLoading } = useCredits()
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const notificationRef = useRef<HTMLDivElement>(null)
 
@@ -157,6 +159,15 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Credits Display */}
+          <div className="hidden sm:flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm">
+            <Coins className="h-4 w-4 text-amber-500" />
+            <span className="font-semibold text-slate-900">
+              {creditsLoading ? '...' : credits ?? 0}
+            </span>
+            <span className="text-xs text-slate-500">credits</span>
           </div>
 
           {/* Account Button - Mobile */}
