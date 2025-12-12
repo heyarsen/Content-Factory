@@ -334,17 +334,6 @@ export function VideoPlanning() {
       loadingLooksRef.current = false
     }
   }
-  
-  // Load looks for an avatar if not already loaded
-  const _ensureLooksLoaded = async (avatarId: string) => {
-    const avatar = avatars.find(a => a.id === avatarId)
-    if (!avatar || !avatar.heygen_avatar_id) return
-    
-    // Check if looks are already loaded
-    if (!looksByAvatar.has(avatar.heygen_avatar_id)) {
-      await loadAvatarLooks(avatarId)
-    }
-  }
 
   const handleSelectLook = (lookId: string) => {
     const newLooks = [...videoLooks]
@@ -1150,14 +1139,6 @@ export function VideoPlanning() {
   const closeDetailDrawer = () => {
     setIsDetailDrawerOpen(false)
     setSelectedItem(null)
-  }
-
-  const _selectAllForDate = (dateKey: string) => {
-    const dateItems = itemsByDate[dateKey] || []
-    const idsForDate = dateItems
-      .filter((item) => !isScheduledPost(item))
-      .map((item) => item.id)
-    setSelectedItemIds((prev) => Array.from(new Set([...prev, ...idsForDate])))
   }
 
   const clearSelection = () => setSelectedItemIds([])
