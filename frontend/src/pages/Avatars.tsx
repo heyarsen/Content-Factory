@@ -691,65 +691,38 @@ function AvatarsContent() {
     <Layout>
       <div className="space-y-6">
         {/* Tabs */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => handleTabChange('my-avatars')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              activeTab === 'my-avatars'
-                ? 'bg-slate-900 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            My Avatars
-          </button>
-          <button
-            onClick={() => handleTabChange('public-avatars')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              activeTab === 'public-avatars'
-                ? 'bg-slate-900 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            Public Avatars
-          </button>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleTabChange('my-avatars')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === 'my-avatars'
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              My Avatars
+            </button>
+            <button
+              onClick={() => handleTabChange('public-avatars')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === 'public-avatars'
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Public Avatars
+            </button>
+          </div>
+          {activeTab === 'my-avatars' && (
+            <Button onClick={() => setShowGenerateAIModal(true)}>
+              Create Avatar
+            </Button>
+          )}
         </div>
 
         {activeTab === 'my-avatars' ? (
           <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex-1 min-w-[220px]">
-                <Input
-                  value={mySearch}
-                  onChange={(e) => setMySearch(e.target.value)}
-                  placeholder="Search avatars..."
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'training' | 'failed')}
-                  options={[
-                    { value: 'all', label: 'Status: All' },
-                    { value: 'active', label: 'Status: Active' },
-                    { value: 'training', label: 'Status: Training' },
-                    { value: 'failed', label: 'Status: Failed' },
-                  ]}
-                  className="min-w-[150px]"
-                />
-                <Select
-                  value={sortOption}
-                  onChange={(e) => setSortOption(e.target.value as 'recent' | 'name')}
-                  options={[
-                    { value: 'recent', label: 'Sort: Recent' },
-                    { value: 'name', label: 'Sort: Name' },
-                  ]}
-                  className="min-w-[130px]"
-                />
-              </div>
-              <Button onClick={() => setShowGenerateAIModal(true)}>
-                Create Avatar
-              </Button>
-            </div>
 
             {loading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
