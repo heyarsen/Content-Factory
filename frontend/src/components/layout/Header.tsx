@@ -15,7 +15,9 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   const { notifications, unreadCount, markAsRead, markAllAsRead, removeNotification } = useNotifications()
   const { credits, unlimited, loading: creditsLoading } = useCredits()
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [creditsOpen, setCreditsOpen] = useState(false)
   const notificationRef = useRef<HTMLDivElement>(null)
+  const creditsRef = useRef<HTMLDivElement>(null)
 
   const greetingName = useMemo(() => {
     if (!user?.email) return 'Creator'
@@ -29,13 +31,16 @@ export function Header({ onToggleSidebar }: HeaderProps) {
       if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
         setNotificationsOpen(false)
       }
+      if (creditsRef.current && !creditsRef.current.contains(event.target as Node)) {
+        setCreditsOpen(false)
+      }
     }
 
-    if (notificationsOpen) {
+    if (notificationsOpen || creditsOpen) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [notificationsOpen])
+  }, [notificationsOpen, creditsOpen])
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/80 backdrop-blur-xl overflow-visible">
@@ -162,12 +167,59 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           </div>
 
           {/* Credits Display */}
-          <div className="hidden sm:flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm">
-            <Coins className="h-4 w-4 text-amber-500" />
-            <span className="font-semibold text-slate-900">
-              {creditsLoading ? '...' : unlimited ? 'Unlimited' : credits ?? 0}
-            </span>
-            {!unlimited && <span className="text-xs text-slate-500">credits</span>}
+          <div className="relative hidden sm:block" ref={creditsRef}>
+            <button
+              type="button"
+              onClick={() => setCreditsOpen(!creditsOpen)}
+              className="flex h-10 min-h-[44px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 touch-manipulation"
+              aria-label="Credits"
+            >
+              <Coins className="h-4 w-4 text-amber-500" />
+              <span className="font-semibold text-slate-900">
+                {creditsLoading ? '...' : unlimited ? 'Unlimited' : credits ?? 0}
+              </span>
+              {!unlimited && <span className="text-xs text-slate-500">credits</span>}
+            </button>
+
+            {creditsOpen && (
+              <div className="absolute right-0 mt-2 w-80 rounded-xl border border-slate-200 bg-white shadow-lg z-50">
+                <div className="p-4 border-b border-slate-200">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Coins className="h-5 w-5 text-amber-500" />
+                    <div className="text-sm font-semibold text-slate-900">Credits</div>
+                  </div>
+                  <div className="text-2xl font-bold text-slate-900 mt-1">
+                    {creditsLoading ? '...' : unlimited ? 'Unlimited' : credits ?? 0}
+                  </div>
+                </div>
+                <div className="p-4 space-y-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
+                    Credit Costs
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-600">Video Generation</span>
+                      <span className="font-semibold text-slate-900">1 credit</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-600">Avatar Generation</span>
+                      <span className="font-semibold text-slate-900">5 credits</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-600">Look Generation</span>
+                      <span className="font-semibold text-slate-900">1 credit</span>
+                    </div>
+                  </div>
+                  {!unlimited && (
+                    <div className="pt-3 mt-3 border-t border-slate-200">
+                      <div className="text-xs text-slate-500">
+                        New users start with 20 credits. Different tariff plans will be available soon.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Account Button - Mobile */}
