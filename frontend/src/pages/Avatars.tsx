@@ -36,10 +36,7 @@ function AvatarsContent() {
   const [publicCategories, setPublicCategories] = useState<string[]>(['All'])
   const [selectedPublicCategory, setSelectedPublicCategory] = useState<string>('All')
 
-  // My avatars filters & UI state
-  const [mySearch, setMySearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'training' | 'failed'>('all')
-  const [sortOption, setSortOption] = useState<'recent' | 'name'>('recent')
+  // My avatars UI state
   const [manageAvatar, setManageAvatar] = useState<Avatar | null>(null)
   const [showManageModal, setShowManageModal] = useState(false)
   const [lookGenModalOpen, setLookGenModalOpen] = useState(false)
@@ -75,38 +72,19 @@ function AvatarsContent() {
   const filteredAllLooks = allLooks
 
   const filteredMyAvatars = useMemo(() => {
-    const normalizedStatus = (status: string | null | undefined) => {
-      if (!status) return 'unknown'
-      if (status === 'ready') return 'active'
-      return status.toLowerCase()
-    }
-
-    let list = avatars
-    if (mySearch.trim()) {
-      list = list.filter(a => a.avatar_name.toLowerCase().includes(mySearch.trim().toLowerCase()))
-    }
-    if (statusFilter !== 'all') {
-      list = list.filter(a => normalizedStatus(a.status) === statusFilter)
-    }
-
+    // Sort by most recent first (default behavior)
     const sortByTimestamp = (value?: string | null) => {
       if (!value) return 0
       const ts = new Date(value).getTime()
       return Number.isNaN(ts) ? 0 : ts
     }
 
-    if (sortOption === 'recent') {
-      list = [...list].sort((a, b) => {
-        const aTime = sortByTimestamp((a as any).updated_at || (a as any).created_at)
-        const bTime = sortByTimestamp((b as any).updated_at || (b as any).created_at)
-        return bTime - aTime
-      })
-    } else {
-      list = [...list].sort((a, b) => a.avatar_name.localeCompare(b.avatar_name))
-    }
-
-    return list
-  }, [avatars, mySearch, statusFilter, sortOption])
+    return [...avatars].sort((a, b) => {
+      const aTime = sortByTimestamp((a as any).updated_at || (a as any).created_at)
+      const bTime = sortByTimestamp((b as any).updated_at || (b as any).created_at)
+      return bTime - aTime
+    })
+  }, [avatars])
 
   // Helper to derive a base name for grouping public avatars (e.g. "Abigail Office Front" -> "Abigail", "Silvia" -> "Silvia")
   const getPublicAvatarBaseName = (name: string): string => {
