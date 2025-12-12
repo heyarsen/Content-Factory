@@ -138,6 +138,22 @@ async function processVideoGeneration(job: BackgroundJob): Promise<void> {
     throw new Error('Reel must have a script')
   }
 
+  // Check and deduct credits before generating video
+  const { CreditsService } = await import('../services/creditsService.js')
+  try {
+    await CreditsService.checkAndDeduct(reel.user_id, CreditsService.COSTS.VIDEO_GENERATION, 'reel video generation')
+  } catch (creditError: any) {
+    console.error(`[Background Job] Insufficient credits for user ${reel.user_id} to generate video for reel ${reel_id}:`, creditError.message)
+    // Update reel with error
+    const { ReelService } = await import('../services/reelService.js')
+    await ReelService.updateReelVideo(reel_id, {
+      video_url: null,
+      heygen_video_id: null,
+      template: null,
+    })
+    throw new Error(`Insufficient credits: ${creditError.message}`)
+  }
+
   const videoData = await VideoService.generateVideoForReel(reel)
 
   // Update reel with video information

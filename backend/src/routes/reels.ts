@@ -134,6 +134,14 @@ router.post('/:id/generate-video', async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Reel must have a script' })
     }
 
+    // Check and deduct credits
+    const { CreditsService } = await import('../services/creditsService.js')
+    try {
+      await CreditsService.checkAndDeduct(userId, CreditsService.COSTS.VIDEO_GENERATION, 'reel video generation')
+    } catch (creditError: any) {
+      return res.status(402).json({ error: creditError.message || 'Insufficient credits' })
+    }
+
     // Generate video
     const videoData = await VideoService.generateVideoForReel(reel)
 

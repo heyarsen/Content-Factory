@@ -416,6 +416,14 @@ router.post('/items/:id/create-video', authenticate, async (req: AuthRequest, re
       })
     }
 
+    // Check and deduct credits
+    const { CreditsService } = await import('../services/creditsService.js')
+    try {
+      await CreditsService.checkAndDeduct(userId, CreditsService.COSTS.VIDEO_GENERATION, 'plan video generation')
+    } catch (creditError: any) {
+      return res.status(402).json({ error: creditError.message || 'Insufficient credits' })
+    }
+
     // Create video using existing endpoint logic
     const { VideoService } = await import('../services/videoService.js')
 
