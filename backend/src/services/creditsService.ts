@@ -10,8 +10,9 @@ export class CreditsService {
 
   /**
    * Get user's current credits
+   * Returns null if user has unlimited credits
    */
-  static async getUserCredits(userId: string): Promise<number> {
+  static async getUserCredits(userId: string): Promise<number | null> {
     const { data, error } = await supabase
       .from('user_profiles')
       .select('credits')
@@ -34,22 +35,27 @@ export class CreditsService {
       }
     }
 
+    // NULL means unlimited credits
     return data?.credits ?? 20
   }
 
   /**
    * Check if user has enough credits for an operation
+   * Returns true if user has unlimited credits (null)
    */
   static async hasEnoughCredits(userId: string, cost: number): Promise<boolean> {
     const credits = await this.getUserCredits(userId)
+    // NULL means unlimited credits
+    if (credits === null) return true
     return credits >= cost
   }
 
   /**
    * Deduct credits from user account
-   * Returns the new credit balance
+   * Returns the new credit balance (null if unlimited)
+   * Does nothing if user has unlimited credits (null)
    */
-  static async deductCredits(userId: string, cost: number, operation: string): Promise<number> {
+  static async deductCredits(userId: string, cost: number, operation: string): Promise<number | null> {
     if (cost <= 0) {
       return await this.getUserCredits(userId)
     }
@@ -75,6 +81,12 @@ export class CreditsService {
       }
       
       const currentCredits = newProfile.credits
+      // NULL means unlimited, so no deduction needed
+      if (currentCredits === null) {
+        console.log(`[Credits] User ${userId} has unlimited credits, skipping deduction for ${operation}`)
+        return null
+      }
+      
       if (currentCredits < cost) {
         throw new Error(`Insufficient credits. You have ${currentCredits} credits but need ${cost} credits for ${operation}.`)
       }
@@ -96,7 +108,13 @@ export class CreditsService {
       return data.credits
     }
 
-    const currentCredits = currentUser?.credits ?? 20
+    const currentCredits = currentUser?.credits
+
+    // NULL means unlimited credits, so no deduction needed
+    if (currentCredits === null) {
+      console.log(`[Credits] User ${userId} has unlimited credits, skipping deduction for ${operation}`)
+      return null
+    }
 
     if (currentCredits < cost) {
       throw new Error(`Insufficient credits. You have ${currentCredits} credits but need ${cost} credits for ${operation}.`)
@@ -122,8 +140,9 @@ export class CreditsService {
 
   /**
    * Add credits to user account (for admin operations or refunds)
+   * Returns the new credit balance (null if unlimited)
    */
-  static async addCredits(userId: string, amount: number, reason?: string): Promise<number> {
+  static async addCredits(userId: string, amount: number, reason?: string): Promise<number | null> {
     if (amount <= 0) {
       return await this.getUserCredits(userId)
     }
@@ -148,6 +167,11 @@ export class CreditsService {
       }
       
       const currentCredits = newProfile.credits
+      // If unlimited, stay unlimited
+      if (currentCredits === null) {
+        return null
+      }
+      
       const newCredits = currentCredits + amount
       
       const { data, error } = await supabase
@@ -166,8 +190,13 @@ export class CreditsService {
       return data.credits
     }
 
-    const currentCredits = currentUser?.credits ?? 20
-    const newCredits = currentCredits + amount
+    const currentCredits = currentUser?.credits
+    // If unlimited, stay unlimited
+    if (currentCredits === null) {
+      return null
+    }
+    
+    const newCredits = (currentCredits ?? 20) + amount
 
     const { data, error } = await supabase
       .from('user_profiles')
@@ -188,12 +217,14 @@ export class CreditsService {
   /**
    * Check credits and deduct if sufficient
    * Throws error if insufficient credits
+   * Returns null if user has unlimited credits
    */
-  static async checkAndDeduct(userId: string, cost: number, operation: string): Promise<number> {
+  static async checkAndDeduct(userId: string, cost: number, operation: string): Promise<number | null> {
     const hasEnough = await this.hasEnoughCredits(userId, cost)
     if (!hasEnough) {
       const credits = await this.getUserCredits(userId)
-      throw new Error(`Insufficient credits. You have ${credits} credits but need ${cost} credits for ${operation}.`)
+      const creditsDisplay = credits === null ? 'unlimited' : credits.toString()
+      throw new Error(`Insufficient credits. You have ${creditsDisplay} credits but need ${cost} credits for ${operation}.`)
     }
 
     return await this.deductCredits(userId, cost, operation)

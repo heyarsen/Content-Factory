@@ -13,7 +13,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const { notifications, unreadCount, markAsRead, markAllAsRead, removeNotification } = useNotifications()
-  const { credits, loading: creditsLoading } = useCredits()
+  const { credits, unlimited, loading: creditsLoading } = useCredits()
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const notificationRef = useRef<HTMLDivElement>(null)
 
@@ -165,9 +165,9 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           <div className="hidden sm:flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm">
             <Coins className="h-4 w-4 text-amber-500" />
             <span className="font-semibold text-slate-900">
-              {creditsLoading ? '...' : credits ?? 0}
+              {creditsLoading ? '...' : unlimited ? 'Unlimited' : credits ?? 0}
             </span>
-            <span className="text-xs text-slate-500">credits</span>
+            {!unlimited && <span className="text-xs text-slate-500">credits</span>}
           </div>
 
           {/* Account Button - Mobile */}

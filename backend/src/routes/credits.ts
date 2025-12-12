@@ -12,7 +12,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const credits = await CreditsService.getUserCredits(userId)
-    res.json({ credits })
+    res.json({ credits, unlimited: credits === null })
   } catch (error: any) {
     console.error('Get credits error:', error)
     res.status(500).json({ error: 'Failed to get credits' })

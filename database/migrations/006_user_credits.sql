@@ -4,10 +4,27 @@
 -- Create user_profiles table if it doesn't exist
 CREATE TABLE IF NOT EXISTS user_profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  credits INTEGER DEFAULT 20 NOT NULL,
+  credits INTEGER DEFAULT 20,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Allow NULL credits to represent unlimited credits
+-- When credits is NULL, user has unlimited credits
+COMMENT ON COLUMN user_profiles.credits IS 'User credits. NULL = unlimited credits. Default: 20 credits.';
+
+-- If table already exists with NOT NULL constraint, alter it to allow NULL
+DO $$ 
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'user_profiles' 
+    AND column_name = 'credits' 
+    AND is_nullable = 'NO'
+  ) THEN
+    ALTER TABLE user_profiles ALTER COLUMN credits DROP NOT NULL;
+  END IF;
+END $$;
 
 -- Create index for performance
 CREATE INDEX IF NOT EXISTS idx_user_profiles_credits ON user_profiles(credits);
