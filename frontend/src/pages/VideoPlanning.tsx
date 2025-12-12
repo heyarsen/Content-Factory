@@ -336,7 +336,7 @@ export function VideoPlanning() {
   }
   
   // Load looks for an avatar if not already loaded
-  const ensureLooksLoaded = async (avatarId: string) => {
+  const _ensureLooksLoaded = async (avatarId: string) => {
     const avatar = avatars.find(a => a.id === avatarId)
     if (!avatar || !avatar.heygen_avatar_id) return
     
@@ -634,7 +634,7 @@ export function VideoPlanning() {
     try {
       const avatarsForSlots =
         videoAvatars.length === videosPerDay
-          ? videoAvatars.map((avatarId, idx) =>
+          ? videoAvatars.map((avatarId) =>
               avatarId || planDefaultAvatarId || defaultAvatarId || '',
             )
           : Array(videosPerDay)
@@ -1152,7 +1152,7 @@ export function VideoPlanning() {
     setSelectedItem(null)
   }
 
-  const selectAllForDate = (dateKey: string) => {
+  const _selectAllForDate = (dateKey: string) => {
     const dateItems = itemsByDate[dateKey] || []
     const idsForDate = dateItems
       .filter((item) => !isScheduledPost(item))
