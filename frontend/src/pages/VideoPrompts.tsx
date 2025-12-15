@@ -144,9 +144,7 @@ export function VideoPrompts() {
                     <h2 className="text-base sm:text-lg font-semibold text-primary">
                       {template.name}
                     </h2>
-                    <Badge variant="info" className="text-[10px] uppercase tracking-wide">
-                      For videos
-                    </Badge>
+                    <Badge variant="info">For videos</Badge>
                   </div>
                   <p className="text-xs text-slate-500">{template.goal}</p>
                   <p className="text-[11px] font-medium text-slate-400">
