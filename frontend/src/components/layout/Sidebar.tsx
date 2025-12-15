@@ -20,6 +20,7 @@ interface SidebarProps {
 const navigation = [
   { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
   { label: 'Create Video', to: '/create', icon: Zap },
+  { label: 'Prompts', to: '/prompts', icon: Sparkles },
   { label: 'Video Planning', to: '/planning', icon: Calendar },
   { label: 'My Videos', to: '/videos', icon: Clapperboard },
   { label: 'Social Accounts', to: '/social', icon: Share2 },

@@ -26,6 +26,7 @@ import { VideoPlanning } from './pages/VideoPlanning'
 import { ProfileSettings } from './pages/ProfileSettings'
 import { Preferences } from './pages/Preferences'
 import Avatars from './pages/Avatars'
+import { VideoPrompts } from './pages/VideoPrompts'
 
 function AppContent() {
   const { toasts, removeToast } = useToast()
@@ -53,6 +54,14 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <Videos />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/prompts"
+          element={
+            <ProtectedRoute>
+              <VideoPrompts />
             </ProtectedRoute>
           }
         />
