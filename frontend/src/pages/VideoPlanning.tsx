@@ -905,13 +905,17 @@ export function VideoPlanning() {
   const handleSelectPrompt = (promptId: string, isDrawer: boolean = false) => {
     const selectedPrompt = prompts.find(p => p.id === promptId)
     if (selectedPrompt) {
-      setEditForm(prev => ({
-        ...prev,
-        topic: selectedPrompt.topic || prev.topic,
-        description: selectedPrompt.description || prev.description,
-        why_important: selectedPrompt.why_important || prev.why_important,
-        useful_tips: selectedPrompt.useful_tips || prev.useful_tips,
-      }))
+      console.log('Selected prompt:', selectedPrompt)
+      setEditForm(prev => {
+        const newForm = { ...prev }
+        // Set values from prompt - use empty string if null/undefined to clear fields
+        newForm.topic = selectedPrompt.topic || ''
+        newForm.description = selectedPrompt.description || ''
+        newForm.why_important = selectedPrompt.why_important || ''
+        newForm.useful_tips = selectedPrompt.useful_tips || ''
+        console.log('Updated form:', newForm)
+        return newForm
+      })
       // Reset after a short delay
       setTimeout(() => {
         if (isDrawer) {

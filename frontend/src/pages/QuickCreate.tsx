@@ -111,10 +111,18 @@ export function QuickCreate() {
   const handleSelectPrompt = (promptId: string) => {
     const selectedPrompt = prompts.find(p => p.id === promptId)
     if (selectedPrompt) {
-      setTopic(selectedPrompt.topic || topic)
-      setDescription(selectedPrompt.description || description)
-      setWhyImportant(selectedPrompt.why_important || whyImportant)
-      setUsefulTips(selectedPrompt.useful_tips || usefulTips)
+      console.log('Selected prompt:', selectedPrompt)
+      // Set all values from prompt - use empty string if null/undefined
+      setTopic(selectedPrompt.topic || '')
+      setDescription(selectedPrompt.description || '')
+      setWhyImportant(selectedPrompt.why_important || '')
+      setUsefulTips(selectedPrompt.useful_tips || '')
+      console.log('Updated fields:', {
+        topic: selectedPrompt.topic || '',
+        description: selectedPrompt.description || '',
+        why_important: selectedPrompt.why_important || '',
+        useful_tips: selectedPrompt.useful_tips || '',
+      })
       // Reset after a short delay
       setTimeout(() => {
         setSelectedPromptId('')
