@@ -41,10 +41,8 @@ export function GenerateVideo() {
     const selectedPrompt = prompts.find(p => p.id === promptId)
     if (selectedPrompt && selectedPrompt.topic) {
       setTopic(selectedPrompt.topic)
-      // Reset after a short delay
-      setTimeout(() => {
-        setSelectedPromptId('')
-      }, 500)
+      // Keep the selection visible - don't reset it
+      setSelectedPromptId(promptId)
     }
   }
 
@@ -136,9 +134,11 @@ export function GenerateVideo() {
                   value={selectedPromptId}
                   onChange={(e) => {
                     const value = e.target.value
-                    setSelectedPromptId(value)
                     if (value) {
                       handleSelectPrompt(value)
+                    } else {
+                      // Allow clearing selection
+                      setSelectedPromptId('')
                     }
                   }}
                   className="w-full"

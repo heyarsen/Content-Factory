@@ -216,9 +216,26 @@ export function VideoPlanning() {
   useEffect(() => {
     if (isDetailDrawerOpen && selectedItem) {
       loadPrompts()
-      setSelectedPromptIdDrawer('') // Reset prompt selection
     }
   }, [isDetailDrawerOpen, selectedItem])
+
+  // Try to match prompt when prompts are loaded and item is selected
+  useEffect(() => {
+    if (isDetailDrawerOpen && selectedItem && prompts.length > 0) {
+      // Try to find matching prompt based on filled fields
+      const matchingPrompt = prompts.find(p => 
+        p.topic === selectedItem.topic && 
+        p.description === selectedItem.description &&
+        p.why_important === selectedItem.why_important &&
+        p.useful_tips === selectedItem.useful_tips
+      )
+      if (matchingPrompt) {
+        setSelectedPromptIdDrawer(matchingPrompt.id)
+      } else {
+        setSelectedPromptIdDrawer('') // Reset if no match
+      }
+    }
+  }, [prompts, isDetailDrawerOpen, selectedItem])
 
   // Persist compact status filter choice
   useEffect(() => {
@@ -897,10 +914,26 @@ export function VideoPlanning() {
       caption: item.caption || '',
       platforms: item.platforms || [],
     })
-    setSelectedPromptId('') // Reset prompt selection
+    setSelectedPromptId('') // Will be set by useEffect when prompts load
     // Load prompts when opening edit modal
     loadPrompts()
   }
+
+  // Try to match prompt when editing item and prompts are loaded
+  useEffect(() => {
+    if (editingItem && prompts.length > 0) {
+      // Find prompt that matches the item's fields
+      const matchingPrompt = prompts.find(p => 
+        p.topic === editingItem.topic && 
+        p.description === editingItem.description &&
+        p.why_important === editingItem.why_important &&
+        p.useful_tips === editingItem.useful_tips
+      )
+      if (matchingPrompt) {
+        setSelectedPromptId(matchingPrompt.id)
+      }
+    }
+  }, [prompts, editingItem])
 
   const handleSelectPrompt = (promptId: string, isDrawer: boolean = false) => {
     const selectedPrompt = prompts.find(p => p.id === promptId)
@@ -916,14 +949,12 @@ export function VideoPlanning() {
         console.log('Updated form:', newForm)
         return newForm
       })
-      // Reset after a short delay
-      setTimeout(() => {
-        if (isDrawer) {
-          setSelectedPromptIdDrawer('')
-        } else {
-          setSelectedPromptId('')
-        }
-      }, 500)
+      // Keep the selection visible - don't reset it
+      if (isDrawer) {
+        setSelectedPromptIdDrawer(promptId)
+      } else {
+        setSelectedPromptId(promptId)
+      }
     }
   }
 
@@ -2265,9 +2296,11 @@ export function VideoPlanning() {
                         value={selectedPromptIdDrawer}
                         onChange={(e) => {
                           const value = e.target.value
-                          setSelectedPromptIdDrawer(value)
                           if (value) {
                             handleSelectPrompt(value, true)
+                          } else {
+                            // Allow clearing selection
+                            setSelectedPromptIdDrawer('')
                           }
                         }}
                         className="w-full"
@@ -3335,9 +3368,11 @@ export function VideoPlanning() {
                     value={selectedPromptId}
                     onChange={(e) => {
                       const value = e.target.value
-                      setSelectedPromptId(value)
                       if (value) {
                         handleSelectPrompt(value, false)
+                      } else {
+                        // Allow clearing selection
+                        setSelectedPromptId('')
                       }
                     }}
                     className="w-full"
