@@ -91,6 +91,7 @@ export function QuickCreate() {
   const [posting, setPosting] = useState(false)
   const [generateCaption, setGenerateCaption] = useState(true)
   const [prompts, setPrompts] = useState<Array<{ id: string; name: string; topic: string | null; category: string | null; description: string | null; why_important: string | null; useful_tips: string | null }>>([])
+  const [selectedPromptId, setSelectedPromptId] = useState<string>('')
 
   useEffect(() => {
     loadSocialAccounts()
@@ -114,6 +115,10 @@ export function QuickCreate() {
       setDescription(selectedPrompt.description || description)
       setWhyImportant(selectedPrompt.why_important || whyImportant)
       setUsefulTips(selectedPrompt.useful_tips || usefulTips)
+      // Reset after a short delay
+      setTimeout(() => {
+        setSelectedPromptId('')
+      }, 500)
     }
   }
 
@@ -639,12 +644,12 @@ export function QuickCreate() {
                     { value: '', label: 'Select a prompt to auto-fill fields...' },
                     ...prompts.map(p => ({ value: p.id, label: p.name }))
                   ]}
-                  value=""
+                  value={selectedPromptId}
                   onChange={(e) => {
-                    if (e.target.value) {
-                      handleSelectPrompt(e.target.value)
-                      // Reset select after selection
-                      e.target.value = ''
+                    const value = e.target.value
+                    setSelectedPromptId(value)
+                    if (value) {
+                      handleSelectPrompt(value)
                     }
                   }}
                   className="w-full"

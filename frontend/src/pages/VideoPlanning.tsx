@@ -192,6 +192,8 @@ export function VideoPlanning() {
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([])
   const [bulkTime, setBulkTime] = useState('09:00')
   const [prompts, setPrompts] = useState<Array<{ id: string; name: string; topic: string | null; category: string | null; description: string | null; why_important: string | null; useful_tips: string | null }>>([])
+  const [selectedPromptId, setSelectedPromptId] = useState<string>('')
+  const [selectedPromptIdDrawer, setSelectedPromptIdDrawer] = useState<string>('')
 
   // Preset times for quick selection
   const timePresets = [
@@ -214,6 +216,7 @@ export function VideoPlanning() {
   useEffect(() => {
     if (isDetailDrawerOpen && selectedItem) {
       loadPrompts()
+      setSelectedPromptIdDrawer('') // Reset prompt selection
     }
   }, [isDetailDrawerOpen, selectedItem])
 
@@ -894,11 +897,12 @@ export function VideoPlanning() {
       caption: item.caption || '',
       platforms: item.platforms || [],
     })
+    setSelectedPromptId('') // Reset prompt selection
     // Load prompts when opening edit modal
     loadPrompts()
   }
 
-  const handleSelectPrompt = (promptId: string) => {
+  const handleSelectPrompt = (promptId: string, isDrawer: boolean = false) => {
     const selectedPrompt = prompts.find(p => p.id === promptId)
     if (selectedPrompt) {
       setEditForm(prev => ({
@@ -908,6 +912,14 @@ export function VideoPlanning() {
         why_important: selectedPrompt.why_important || prev.why_important,
         useful_tips: selectedPrompt.useful_tips || prev.useful_tips,
       }))
+      // Reset after a short delay
+      setTimeout(() => {
+        if (isDrawer) {
+          setSelectedPromptIdDrawer('')
+        } else {
+          setSelectedPromptId('')
+        }
+      }, 500)
     }
   }
 
@@ -2246,12 +2258,12 @@ export function VideoPlanning() {
                           { value: '', label: 'Select a prompt...' },
                           ...prompts.map(p => ({ value: p.id, label: p.name }))
                         ]}
-                        value=""
+                        value={selectedPromptIdDrawer}
                         onChange={(e) => {
-                          if (e.target.value) {
-                            handleSelectPrompt(e.target.value)
-                            // Reset select after selection
-                            e.target.value = ''
+                          const value = e.target.value
+                          setSelectedPromptIdDrawer(value)
+                          if (value) {
+                            handleSelectPrompt(value, true)
                           }
                         }}
                         className="w-full"
@@ -2681,15 +2693,18 @@ export function VideoPlanning() {
                                 ]}
                                 value=""
                                 onChange={(e) => {
-                                  if (e.target.value) {
-                                    const selectedPrompt = prompts.find(p => p.id === e.target.value)
+                                  const value = e.target.value
+                                  if (value) {
+                                    const selectedPrompt = prompts.find(p => p.id === value)
                                     if (selectedPrompt) {
                                       const newTopics = [...videoTopics]
                                       newTopics[index] = selectedPrompt.topic || newTopics[index]
                                       setVideoTopics(newTopics)
                                     }
                                     // Reset select after selection
-                                    e.target.value = ''
+                                    setTimeout(() => {
+                                      e.target.value = ''
+                                    }, 100)
                                   }
                                 }}
                                 className="w-full text-xs"
@@ -3313,12 +3328,12 @@ export function VideoPlanning() {
                       { value: '', label: 'Select a prompt...' },
                       ...prompts.map(p => ({ value: p.id, label: p.name }))
                     ]}
-                    value=""
+                    value={selectedPromptId}
                     onChange={(e) => {
-                      if (e.target.value) {
-                        handleSelectPrompt(e.target.value)
-                        // Reset select after selection
-                        e.target.value = ''
+                      const value = e.target.value
+                      setSelectedPromptId(value)
+                      if (value) {
+                        handleSelectPrompt(value, false)
                       }
                     }}
                     className="w-full"

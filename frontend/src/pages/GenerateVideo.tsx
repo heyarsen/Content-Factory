@@ -22,6 +22,7 @@ export function GenerateVideo() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [prompts, setPrompts] = useState<Array<{ id: string; name: string; topic: string | null }>>([])
+  const [selectedPromptId, setSelectedPromptId] = useState<string>('')
 
   useEffect(() => {
     loadPrompts()
@@ -40,6 +41,10 @@ export function GenerateVideo() {
     const selectedPrompt = prompts.find(p => p.id === promptId)
     if (selectedPrompt && selectedPrompt.topic) {
       setTopic(selectedPrompt.topic)
+      // Reset after a short delay
+      setTimeout(() => {
+        setSelectedPromptId('')
+      }, 500)
     }
   }
 
@@ -128,12 +133,12 @@ export function GenerateVideo() {
                     { value: '', label: 'Select a prompt to auto-fill topic...' },
                     ...prompts.map(p => ({ value: p.id, label: p.name }))
                   ]}
-                  value=""
+                  value={selectedPromptId}
                   onChange={(e) => {
-                    if (e.target.value) {
-                      handleSelectPrompt(e.target.value)
-                      // Reset select after selection
-                      e.target.value = ''
+                    const value = e.target.value
+                    setSelectedPromptId(value)
+                    if (value) {
+                      handleSelectPrompt(value)
                     }
                   }}
                   className="w-full"
