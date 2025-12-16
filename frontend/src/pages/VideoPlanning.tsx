@@ -169,6 +169,7 @@ export function VideoPlanning() {
   const [videoTopics, setVideoTopics] = useState<string[]>(['', '', '']) // Topics for each video slot
   const [videoAvatars, setVideoAvatars] = useState<string[]>(['', '', '']) // Avatar IDs for each video slot
   const [videoLooks, setVideoLooks] = useState<(string | null)[]>(['', '', '']) // Look IDs for each video slot
+  const [videoPrompts, setVideoPrompts] = useState<string[]>(['', '', '']) // Selected prompt IDs for each video slot
   const [avatars, setAvatars] = useState<Array<{ id: string; avatar_name: string; thumbnail_url: string | null; preview_url: string | null; is_default?: boolean; heygen_avatar_id?: string; has_motion?: boolean }>>([])
   const [loadingAvatars, setLoadingAvatars] = useState(false)
   const [defaultAvatarId, setDefaultAvatarId] = useState<string | null>(null)
@@ -743,6 +744,7 @@ export function VideoPlanning() {
         setPlanDefaultAvatarId(null)
       }
       setVideoLooks([null, null, null])
+      setVideoPrompts(['', '', ''])
       setAutoScheduleTrigger('daily')
       setTriggerTime('09:00')
       setDefaultPlatforms([])
@@ -752,6 +754,7 @@ export function VideoPlanning() {
       setVideoTopics(['', '', ''])
       setVideoAvatars(['', '', ''])
       setVideoLooks([null, null, null])
+      setVideoPrompts(['', '', ''])
     } catch (error: any) {
       alert(error.response?.data?.error || 'Failed to create plan')
     } finally {
@@ -2728,20 +2731,23 @@ export function VideoPlanning() {
                                   { value: '', label: 'Select a prompt...' },
                                   ...prompts.map(p => ({ value: p.id, label: p.name }))
                                 ]}
-                                value=""
+                                value={videoPrompts[index] || ''}
                                 onChange={(e) => {
                                   const value = e.target.value
+                                  const newPrompts = [...videoPrompts]
                                   if (value) {
                                     const selectedPrompt = prompts.find(p => p.id === value)
                                     if (selectedPrompt) {
                                       const newTopics = [...videoTopics]
                                       newTopics[index] = selectedPrompt.topic || newTopics[index]
                                       setVideoTopics(newTopics)
+                                      newPrompts[index] = value
+                                      setVideoPrompts(newPrompts)
                                     }
-                                    // Reset select after selection
-                                    setTimeout(() => {
-                                      e.target.value = ''
-                                    }, 100)
+                                  } else {
+                                    // Clear selection
+                                    newPrompts[index] = ''
+                                    setVideoPrompts(newPrompts)
                                   }
                                 }}
                                 className="w-full text-xs"
