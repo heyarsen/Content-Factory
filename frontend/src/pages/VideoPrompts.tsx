@@ -12,9 +12,7 @@ import {
   Plus,
   Edit2,
   Trash2,
-  X,
   Save,
-  Loader,
 } from 'lucide-react'
 import api from '../lib/api'
 import { useNotifications } from '../contexts/NotificationContext'

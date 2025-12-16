@@ -31,7 +31,6 @@ import {
   Users,
   Zap,
 } from 'lucide-react'
-import { Select } from '../components/ui/Select'
 import api from '../lib/api'
 
 const STATUS_FILTER_KEY = 'video_planning_status_filter'
@@ -193,7 +192,6 @@ export function VideoPlanning() {
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([])
   const [bulkTime, setBulkTime] = useState('09:00')
   const [prompts, setPrompts] = useState<Array<{ id: string; name: string; topic: string | null; category: string | null; description: string | null; why_important: string | null; useful_tips: string | null }>>([])
-  const [loadingPrompts, setLoadingPrompts] = useState(false)
 
   // Preset times for quick selection
   const timePresets = [
@@ -877,13 +875,10 @@ export function VideoPlanning() {
 
   const loadPrompts = async () => {
     try {
-      setLoadingPrompts(true)
       const response = await api.get('/api/prompts')
       setPrompts(response.data.prompts || [])
     } catch (error) {
       console.error('Failed to load prompts:', error)
-    } finally {
-      setLoadingPrompts(false)
     }
   }
 
