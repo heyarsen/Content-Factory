@@ -16,6 +16,7 @@ import planRoutes from './routes/plans.js'
 import preferencesRoutes from './routes/preferences.js'
 import avatarRoutes from './routes/avatars.js'
 import creditsRoutes from './routes/credits.js'
+import promptsRoutes from './routes/prompts.js'
 import { initializeScheduler } from './jobs/scheduler.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -244,6 +245,7 @@ app.use('/api/plans', planRoutes)
 app.use('/api/preferences', preferencesRoutes)
 app.use('/api/avatars', avatarRoutes)
 app.use('/api/credits', creditsRoutes)
+app.use('/api/prompts', promptsRoutes)
 
 // Serve static files from frontend build (if exists)
 // Compiled path: backend/dist/server.js -> go up one level to backend/public

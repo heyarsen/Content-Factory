@@ -1,114 +1,182 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
-import { Badge } from '../components/ui/Badge'
+import { Input } from '../components/ui/Input'
 import { Textarea } from '../components/ui/Textarea'
-import { Sparkles, Copy, CheckCircle2 } from 'lucide-react'
+import { Modal } from '../components/ui/Modal'
+import { EmptyState } from '../components/ui/EmptyState'
+import { Skeleton } from '../components/ui/Skeleton'
+import {
+  Sparkles,
+  Plus,
+  Edit2,
+  Trash2,
+  X,
+  Save,
+  Loader,
+} from 'lucide-react'
+import api from '../lib/api'
+import { useNotifications } from '../contexts/NotificationContext'
 
-type PromptTemplate = {
+interface VideoPrompt {
   id: string
   name: string
-  goal: string
-  bestFor: string
-  prompt: string
+  topic: string | null
+  category: string | null
+  description: string | null
+  why_important: string | null
+  useful_tips: string | null
+  created_at: string
+  updated_at: string
 }
 
-const PROMPT_TEMPLATES: PromptTemplate[] = [
-  {
-    id: 'hook-education',
-    name: 'Hook + Education',
-    goal: 'Stop the scroll and teach 1 clear concept',
-    bestFor: 'Short-form reels, TikTok, YouTube Shorts',
-    prompt: `You are a world-class creator writing a short-form educational script.
-
-Write a video script that:
-- Starts with a bold hook that calls out the exact audience and problem
-- Uses a simple story or example to explain the main idea
-- Shares 3 punchy, practical tips
-- Ends with a clear call-to-action to follow for more content like this
-
-Constraints:
-- Length: 40–60 seconds of spoken video
-- Tone: confident, friendly, and direct
-- Write in first person, present tense
-- Avoid fluff and long intros
-
-Now create the full script.`,
-  },
-  {
-    id: 'product-launch',
-    name: 'Product Launch Announcement',
-    goal: 'Announce a new feature or product in a clear, exciting way',
-    bestFor: 'Launch videos, product updates, feature drops',
-    prompt: `You are a product-focused creator announcing a new feature.
-
-Write a video script that:
-- Opens with the problem your audience is struggling with
-- Clearly announces the new product or feature as the solution
-- Shows 2–3 concrete ways it helps (with simple examples)
-- Ends with a strong call-to-action to try, sign up, or learn more
-
-Constraints:
-- Length: 45–75 seconds of spoken video
-- Tone: energetic but not hypey, clear and specific
-- Speak directly to "you" (the viewer)
-
-Now write the full script.`,
-  },
-  {
-    id: 'story-lesson',
-    name: 'Story + Lesson',
-    goal: 'Tell a short story that leads to 1 main lesson',
-    bestFor: 'Founder stories, personal brand, LinkedIn-style content',
-    prompt: `You are a storyteller teaching through a real, specific moment.
-
-Write a video script that:
-- Opens in the middle of the action (no long backstory)
-- Describes a specific moment, decision, or mistake
-- Shares what you realized or learned
-- Ends with 1 clear takeaway the viewer can apply today
-
-Constraints:
-- Length: 60–90 seconds of spoken video
-- Tone: honest, conversational, and reflective
-- Use simple, concrete language and short sentences
-
-Now write the full script.`,
-  },
-  {
-    id: 'list-tips',
-    name: 'List of Tips / Playbook',
-    goal: 'Deliver a high-value list in a structured way',
-    bestFor: 'How‑to videos, playbooks, checklists',
-    prompt: `You are an expert sharing a concise playbook.
-
-Write a video script that:
-- Opens with a hook like "If you want X, do these Y things"
-- Shares 5–7 specific tips or steps in a numbered list
-- Gives 1 concrete example or micro-story where it makes sense
-- Ends with a recap of the 1–2 most important points
-
-Constraints:
-- Length: 60–90 seconds of spoken video
-- Tone: clear, actionable, slightly fast‑paced
-- Avoid jargon unless you briefly explain it
-
-Now write the full script.`,
-  },
-]
-
 export function VideoPrompts() {
-  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const { addNotification } = useNotifications()
+  const [prompts, setPrompts] = useState<VideoPrompt[]>([])
+  const [loading, setLoading] = useState(true)
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [editingPrompt, setEditingPrompt] = useState<VideoPrompt | null>(null)
+  const [deleteModalOpen, setDeleteModalOpen] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
-  const handleCopy = async (template: PromptTemplate) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    topic: '',
+    category: '',
+    description: '',
+    why_important: '',
+    useful_tips: '',
+  })
+
+  useEffect(() => {
+    loadPrompts()
+  }, [])
+
+  const loadPrompts = async () => {
     try {
-      await navigator.clipboard.writeText(template.prompt)
-      setCopiedId(template.id)
-      setTimeout(() => setCopiedId(null), 2000)
-    } catch (e) {
-      console.error('Failed to copy prompt', e)
+      setLoading(true)
+      const response = await api.get('/api/prompts')
+      setPrompts(response.data.prompts || [])
+    } catch (error: any) {
+      console.error('Failed to load prompts:', error)
+      addNotification({
+        type: 'error',
+        title: 'Failed to load prompts',
+        message: error.response?.data?.error || 'Could not load your prompts',
+      })
+    } finally {
+      setLoading(false)
     }
+  }
+
+  const handleCreate = () => {
+    setFormData({
+      name: '',
+      topic: '',
+      category: '',
+      description: '',
+      why_important: '',
+      useful_tips: '',
+    })
+    setEditingPrompt(null)
+    setCreateModalOpen(true)
+  }
+
+  const handleEdit = (prompt: VideoPrompt) => {
+    setFormData({
+      name: prompt.name,
+      topic: prompt.topic || '',
+      category: prompt.category || '',
+      description: prompt.description || '',
+      why_important: prompt.why_important || '',
+      useful_tips: prompt.useful_tips || '',
+    })
+    setEditingPrompt(prompt)
+    setCreateModalOpen(true)
+  }
+
+  const handleSave = async () => {
+    if (!formData.name.trim()) {
+      addNotification({
+        type: 'error',
+        title: 'Validation Error',
+        message: 'Prompt name is required',
+      })
+      return
+    }
+
+    setSaving(true)
+    try {
+      if (editingPrompt) {
+        // Update existing prompt
+        await api.put(`/api/prompts/${editingPrompt.id}`, formData)
+        addNotification({
+          type: 'success',
+          title: 'Prompt updated',
+          message: 'Your prompt has been updated successfully',
+        })
+      } else {
+        // Create new prompt
+        await api.post('/api/prompts', formData)
+        addNotification({
+          type: 'success',
+          title: 'Prompt created',
+          message: 'Your new prompt has been created successfully',
+        })
+      }
+      setCreateModalOpen(false)
+      setEditingPrompt(null)
+      loadPrompts()
+    } catch (error: any) {
+      console.error('Failed to save prompt:', error)
+      addNotification({
+        type: 'error',
+        title: 'Failed to save prompt',
+        message: error.response?.data?.error || 'Could not save your prompt',
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    setDeleting(true)
+    try {
+      await api.delete(`/api/prompts/${id}`)
+      addNotification({
+        type: 'success',
+        title: 'Prompt deleted',
+        message: 'Your prompt has been deleted successfully',
+      })
+      setDeleteModalOpen(null)
+      loadPrompts()
+    } catch (error: any) {
+      console.error('Failed to delete prompt:', error)
+      addNotification({
+        type: 'error',
+        title: 'Failed to delete prompt',
+        message: error.response?.data?.error || 'Could not delete your prompt',
+      })
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="space-y-8">
+          <Skeleton className="h-32 rounded-[28px]" />
+          <div className="grid gap-6 lg:grid-cols-2">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-80 rounded-3xl" />
+            ))}
+          </div>
+        </div>
+      </Layout>
+    )
   }
 
   return (
@@ -121,75 +189,214 @@ export function VideoPrompts() {
                 prompts
               </p>
               <h1 className="mt-3 text-2xl sm:text-3xl font-semibold text-primary">
-                Video Prompt Library
+                Video Prompts
               </h1>
               <p className="mt-2 max-w-2xl text-sm text-slate-500">
-                Use these battle-tested prompt structures to generate stronger video scripts.
-                Copy a prompt, tweak it for your niche, then paste it into your script step or
-                content tools.
+                Create and manage reusable prompts for your video planning. These prompts can be
+                used to quickly fill in video details when creating new videos.
               </p>
             </div>
-            <div className="hidden sm:flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-indigo-400 text-white shadow-md">
-              <Sparkles className="h-5 w-5" />
+            <div className="flex items-center gap-3">
+              <div className="hidden sm:flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-indigo-400 text-white shadow-md">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <Button onClick={handleCreate} leftIcon={<Plus className="h-4 w-4" />}>
+                Create Prompt
+              </Button>
             </div>
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          {PROMPT_TEMPLATES.map((template) => (
-            <Card key={template.id} className="flex h-full flex-col gap-4 p-5 sm:p-6">
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
+        {prompts.length === 0 ? (
+          <EmptyState
+            icon={<Sparkles className="w-16 h-16" />}
+            title="No prompts yet"
+            description="Create your first prompt template to speed up video planning."
+            action={
+              <Button onClick={handleCreate} leftIcon={<Plus className="h-4 w-4" />}>
+                Create Your First Prompt
+              </Button>
+            }
+          />
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-2">
+            {prompts.map((prompt) => (
+              <Card key={prompt.id} className="flex h-full flex-col gap-4 p-5 sm:p-6">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 space-y-2">
                     <h2 className="text-base sm:text-lg font-semibold text-primary">
-                      {template.name}
+                      {prompt.name}
                     </h2>
-                    <Badge variant="info">For videos</Badge>
+                    {prompt.category && (
+                      <p className="text-xs font-medium text-slate-500">
+                        Category: <span className="text-slate-700">{prompt.category}</span>
+                      </p>
+                    )}
+                    {prompt.topic && (
+                      <p className="text-xs text-slate-600 line-clamp-2">
+                        <span className="font-medium">Topic:</span> {prompt.topic}
+                      </p>
+                    )}
                   </div>
-                  <p className="text-xs text-slate-500">{template.goal}</p>
-                  <p className="text-[11px] font-medium text-slate-400">
-                    Best for: <span className="text-slate-600">{template.bestFor}</span>
-                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEdit(prompt)}
+                      leftIcon={<Edit2 className="h-3.5 w-3.5" />}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDeleteModalOpen(prompt.id)}
+                      leftIcon={<Trash2 className="h-3.5 w-3.5" />}
+                      className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                    >
+                      Delete
+                    </Button>
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex-1 space-y-3">
-                <Textarea
-                  value={template.prompt}
-                  readOnly
-                  rows={10}
-                  className="text-xs sm:text-sm font-mono bg-slate-50/70"
-                />
-              </div>
-
-              <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-[11px] text-slate-400">
-                  Tip: Copy this into your script or quick create flow, then plug in your niche,
-                  audience, and offer.
-                </p>
-                <div className="flex gap-2 sm:justify-end">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => handleCopy(template)}
-                    leftIcon={
-                      copiedId === template.id ? (
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                      ) : (
-                        <Copy className="h-3.5 w-3.5" />
-                      )
-                    }
-                  >
-                    {copiedId === template.id ? 'Copied' : 'Copy prompt'}
-                  </Button>
+                <div className="flex-1 space-y-3 text-sm">
+                  {prompt.description && (
+                    <div>
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                        Description
+                      </p>
+                      <p className="text-slate-600 line-clamp-3">{prompt.description}</p>
+                    </div>
+                  )}
+                  {prompt.why_important && (
+                    <div>
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                        Why Important
+                      </p>
+                      <p className="text-slate-600 line-clamp-2">{prompt.why_important}</p>
+                    </div>
+                  )}
+                  {prompt.useful_tips && (
+                    <div>
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                        Useful Tips
+                      </p>
+                      <p className="text-slate-600 line-clamp-2">{prompt.useful_tips}</p>
+                    </div>
+                  )}
                 </div>
-              </div>
-            </Card>
-          ))}
-        </div>
+
+                <div className="pt-3 border-t border-white/60 text-xs text-slate-400">
+                  Created {new Date(prompt.created_at).toLocaleDateString()}
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Create/Edit Modal */}
+        <Modal
+          isOpen={createModalOpen}
+          onClose={() => {
+            setCreateModalOpen(false)
+            setEditingPrompt(null)
+          }}
+          title={editingPrompt ? 'Edit Prompt' : 'Create New Prompt'}
+          size="lg"
+        >
+          <div className="space-y-6">
+            <Input
+              label="Prompt Name *"
+              placeholder="e.g., Trading Tips Template"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
+            />
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Input
+                label="Topic (optional)"
+                placeholder="e.g., Trading mistakes"
+                value={formData.topic}
+                onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
+              />
+              <Input
+                label="Category (optional)"
+                placeholder="e.g., Trading, Lifestyle"
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+              />
+            </div>
+
+            <Textarea
+              label="Description (optional)"
+              placeholder="Describe what this prompt is for..."
+              rows={4}
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            />
+
+            <Textarea
+              label="Why Important (optional)"
+              placeholder="Why should viewers care about this topic?"
+              rows={3}
+              value={formData.why_important}
+              onChange={(e) => setFormData({ ...formData, why_important: e.target.value })}
+            />
+
+            <Textarea
+              label="Useful Tips (optional)"
+              placeholder="Any key points or tips to include?"
+              rows={3}
+              value={formData.useful_tips}
+              onChange={(e) => setFormData({ ...formData, useful_tips: e.target.value })}
+            />
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setCreateModalOpen(false)
+                  setEditingPrompt(null)
+                }}
+                disabled={saving}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleSave} loading={saving} leftIcon={<Save className="h-4 w-4" />}>
+                {editingPrompt ? 'Update Prompt' : 'Create Prompt'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Delete Confirmation Modal */}
+        <Modal
+          isOpen={deleteModalOpen !== null}
+          onClose={() => setDeleteModalOpen(null)}
+          title="Delete Prompt"
+          size="sm"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Are you sure you want to delete this prompt? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="ghost" onClick={() => setDeleteModalOpen(null)} disabled={deleting}>
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => deleteModalOpen && handleDelete(deleteModalOpen)}
+                loading={deleting}
+                leftIcon={<Trash2 className="h-4 w-4" />}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </Modal>
       </div>
     </Layout>
   )
 }
-
-

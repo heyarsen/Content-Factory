@@ -31,6 +31,7 @@ import {
   Users,
   Zap,
 } from 'lucide-react'
+import { Select } from '../components/ui/Select'
 import api from '../lib/api'
 
 const STATUS_FILTER_KEY = 'video_planning_status_filter'
@@ -191,6 +192,8 @@ export function VideoPlanning() {
   const [createStep, setCreateStep] = useState<1 | 2>(1)
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([])
   const [bulkTime, setBulkTime] = useState('09:00')
+  const [prompts, setPrompts] = useState<Array<{ id: string; name: string; topic: string | null; category: string | null; description: string | null; why_important: string | null; useful_tips: string | null }>>([])
+  const [loadingPrompts, setLoadingPrompts] = useState(false)
 
   // Preset times for quick selection
   const timePresets = [
@@ -207,6 +210,13 @@ export function VideoPlanning() {
       setCreateStep(1)
     }
   }, [createModal])
+
+  // Load prompts when detail drawer opens
+  useEffect(() => {
+    if (isDetailDrawerOpen && selectedItem) {
+      loadPrompts()
+    }
+  }, [isDetailDrawerOpen, selectedItem])
 
   // Persist compact status filter choice
   useEffect(() => {
@@ -865,6 +875,18 @@ export function VideoPlanning() {
     }
   }
 
+  const loadPrompts = async () => {
+    try {
+      setLoadingPrompts(true)
+      const response = await api.get('/api/prompts')
+      setPrompts(response.data.prompts || [])
+    } catch (error) {
+      console.error('Failed to load prompts:', error)
+    } finally {
+      setLoadingPrompts(false)
+    }
+  }
+
   const handleEditItem = (item: VideoPlanItem) => {
     setEditingItem(item)
     setEditForm({
@@ -876,6 +898,21 @@ export function VideoPlanning() {
       caption: item.caption || '',
       platforms: item.platforms || [],
     })
+    // Load prompts when opening edit modal
+    loadPrompts()
+  }
+
+  const handleSelectPrompt = (promptId: string) => {
+    const selectedPrompt = prompts.find(p => p.id === promptId)
+    if (selectedPrompt) {
+      setEditForm(prev => ({
+        ...prev,
+        topic: selectedPrompt.topic || prev.topic,
+        description: selectedPrompt.description || prev.description,
+        why_important: selectedPrompt.why_important || prev.why_important,
+        useful_tips: selectedPrompt.useful_tips || prev.useful_tips,
+      }))
+    }
   }
 
   const handleSaveItem = async () => {
@@ -2199,6 +2236,36 @@ export function VideoPlanning() {
                     )}
                   </div>
 
+                  {/* Prompt Selector */}
+                  {prompts.length > 0 && (
+                    <div className="rounded-lg border border-brand-200 bg-brand-50/50 p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Sparkles className="h-4 w-4 text-brand-600" />
+                        <label className="text-sm font-semibold text-slate-700">
+                          Use a Prompt Template
+                        </label>
+                      </div>
+                      <Select
+                        options={[
+                          { value: '', label: 'Select a prompt...' },
+                          ...prompts.map(p => ({ value: p.id, label: p.name }))
+                        ]}
+                        value=""
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            handleSelectPrompt(e.target.value)
+                            // Reset select after selection
+                            e.target.value = ''
+                          }
+                        }}
+                        className="w-full"
+                      />
+                      <p className="mt-2 text-xs text-slate-500">
+                        Select a prompt to auto-fill the fields below. You can still edit them after.
+                      </p>
+                    </div>
+                  )}
+
                   <div className="space-y-3">
                     <Input
                       label="Topic"
@@ -3204,6 +3271,36 @@ export function VideoPlanning() {
         >
           {editingItem && (
             <div className="space-y-4">
+              {/* Prompt Selector */}
+              {prompts.length > 0 && (
+                <div className="rounded-lg border border-brand-200 bg-brand-50/50 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="h-4 w-4 text-brand-600" />
+                    <label className="text-sm font-semibold text-slate-700">
+                      Use a Prompt Template
+                    </label>
+                  </div>
+                  <Select
+                    options={[
+                      { value: '', label: 'Select a prompt...' },
+                      ...prompts.map(p => ({ value: p.id, label: p.name }))
+                    ]}
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleSelectPrompt(e.target.value)
+                        // Reset select after selection
+                        e.target.value = ''
+                      }
+                    }}
+                    className="w-full"
+                  />
+                  <p className="mt-2 text-xs text-slate-500">
+                    Select a prompt to auto-fill the fields below. You can still edit them after.
+                  </p>
+                </div>
+              )}
+
               <div className="grid gap-4 md:grid-cols-2">
                 <Input
                   label="Topic"
