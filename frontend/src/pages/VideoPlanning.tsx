@@ -2510,7 +2510,11 @@ export function VideoPlanning() {
         {/* Create Plan Modal */}
         <Modal
           isOpen={createModal}
-          onClose={() => setCreateModal(false)}
+          onClose={() => {
+            setCreateModal(false)
+            setCreateStep(1)
+            setVideoPrompts(['', '', ''])
+          }}
           title="Create Video Plan"
         >
           <div className="space-y-6">
@@ -3263,6 +3267,7 @@ export function VideoPlanning() {
                   setVideoTopics(['', '', ''])
                   setVideoAvatars(['', '', ''])
                   setVideoLooks([null, null, null])
+                  setVideoPrompts(['', '', ''])
                 }}
               >
                 Cancel
