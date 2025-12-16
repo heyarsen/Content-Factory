@@ -538,18 +538,29 @@ export class PlanService {
           userId
         )
 
-        // Update the plan item with research data but keep the original topic
+        // Update the plan item with research data but keep the original topic and prompt fields
+        // Only update description, why_important, useful_tips if they're not already set (from prompts)
+        const updateData: any = {
+          // Keep the original topic - don't overwrite it
+          category: research.category as string || item.category,
+          research_data: research,
+          status: 'ready',
+        }
+        
+        // Only overwrite if field is empty/null (preserve prompt values)
+        if (!item.description) {
+          updateData.description = research.description
+        }
+        if (!item.why_important) {
+          updateData.why_important = research.whyItMatters
+        }
+        if (!item.useful_tips) {
+          updateData.useful_tips = research.usefulTips
+        }
+        
         await supabase
           .from('video_plan_items')
-          .update({
-            // Keep the original topic - don't overwrite it
-            category: research.category as string || item.category,
-            description: research.description,
-            why_important: research.whyItMatters,
-            useful_tips: research.usefulTips,
-            research_data: research,
-            status: 'ready',
-          })
+          .update(updateData)
           .eq('id', itemId)
         
         return

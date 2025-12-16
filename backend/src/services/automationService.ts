@@ -2133,15 +2133,27 @@ export class AutomationService {
         hasTips: !!enrichedResearch?.usefulTips,
       })
 
+      // Only update description, why_important, useful_tips if they're not already set (from prompts)
+      // This preserves user-provided values from prompts
+      const updateData: any = {
+        category: enrichedResearch.category || item.category,
+        research_data: enrichedResearch,
+      }
+      
+      // Only overwrite if field is empty/null (preserve prompt values)
+      if (!item.description) {
+        updateData.description = enrichedResearch.description
+      }
+      if (!item.why_important) {
+        updateData.why_important = enrichedResearch.whyItMatters
+      }
+      if (!item.useful_tips) {
+        updateData.useful_tips = enrichedResearch.usefulTips
+      }
+      
       await supabase
         .from('video_plan_items')
-        .update({
-          description: enrichedResearch.description,
-          why_important: enrichedResearch.whyItMatters,
-          useful_tips: enrichedResearch.usefulTips,
-          category: enrichedResearch.category || item.category,
-          research_data: enrichedResearch,
-        })
+        .update(updateData)
         .eq('id', itemId)
     } catch (researchError: any) {
       console.error('[Research] Failed for item; aborting script generation to avoid low-quality output:', {
