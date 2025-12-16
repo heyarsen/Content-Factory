@@ -201,10 +201,11 @@ export function VideoPlanning() {
     { label: 'Evening (6:00 PM)', value: '18:00' },
   ]
 
-  // Load avatars when create modal opens
+  // Load avatars and prompts when create modal opens
   useEffect(() => {
     if (createModal) {
       loadAvatars()
+      loadPrompts()
       setCreateStep(1)
     }
   }, [createModal])
@@ -2663,6 +2664,38 @@ export function VideoPlanning() {
                           ))}
                       </div>
                     </div>
+
+                          {/* Prompt Selector for this video slot */}
+                          {prompts.length > 0 && (
+                            <div className="rounded-lg border border-brand-200 bg-brand-50/50 p-3">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Sparkles className="h-3.5 w-3.5 text-brand-600" />
+                                <label className="text-xs font-semibold text-slate-700">
+                                  Use a Prompt Template
+                                </label>
+                              </div>
+                              <Select
+                                options={[
+                                  { value: '', label: 'Select a prompt...' },
+                                  ...prompts.map(p => ({ value: p.id, label: p.name }))
+                                ]}
+                                value=""
+                                onChange={(e) => {
+                                  if (e.target.value) {
+                                    const selectedPrompt = prompts.find(p => p.id === e.target.value)
+                                    if (selectedPrompt) {
+                                      const newTopics = [...videoTopics]
+                                      newTopics[index] = selectedPrompt.topic || newTopics[index]
+                                      setVideoTopics(newTopics)
+                                    }
+                                    // Reset select after selection
+                                    e.target.value = ''
+                                  }
+                                }}
+                                className="w-full text-xs"
+                              />
+                            </div>
+                          )}
 
                           <div className="grid gap-3 md:grid-cols-2">
                       <Input

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
@@ -6,9 +6,10 @@ import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { Textarea } from '../components/ui/Textarea'
 import { Select } from '../components/ui/Select'
-import { Video } from 'lucide-react'
+import { Video, Sparkles } from 'lucide-react'
 import { createVideo } from '../lib/videos'
 import { useNotifications } from '../contexts/NotificationContext'
+import api from '../lib/api'
 
 export function GenerateVideo() {
   const navigate = useNavigate()
@@ -20,6 +21,27 @@ export function GenerateVideo() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [prompts, setPrompts] = useState<Array<{ id: string; name: string; topic: string | null }>>([])
+
+  useEffect(() => {
+    loadPrompts()
+  }, [])
+
+  const loadPrompts = async () => {
+    try {
+      const response = await api.get('/api/prompts')
+      setPrompts(response.data.prompts || [])
+    } catch (error) {
+      console.error('Failed to load prompts:', error)
+    }
+  }
+
+  const handleSelectPrompt = (promptId: string) => {
+    const selectedPrompt = prompts.find(p => p.id === promptId)
+    if (selectedPrompt && selectedPrompt.topic) {
+      setTopic(selectedPrompt.topic)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -91,6 +113,34 @@ export function GenerateVideo() {
                     </p>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Prompt Selector */}
+            {prompts.length > 0 && (
+              <div className="rounded-2xl border border-brand-200/60 bg-brand-50/40 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="h-4 w-4 text-brand-600" />
+                  <p className="text-sm font-semibold text-brand-700">Use a Prompt Template</p>
+                </div>
+                <Select
+                  options={[
+                    { value: '', label: 'Select a prompt to auto-fill topic...' },
+                    ...prompts.map(p => ({ value: p.id, label: p.name }))
+                  ]}
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      handleSelectPrompt(e.target.value)
+                      // Reset select after selection
+                      e.target.value = ''
+                    }
+                  }}
+                  className="w-full"
+                />
+                <p className="mt-2 text-xs text-brand-600">
+                  Select a prompt to auto-fill the topic field. You can still edit it after.
+                </p>
               </div>
             )}
 

@@ -90,11 +90,32 @@ export function QuickCreate() {
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
   const [posting, setPosting] = useState(false)
   const [generateCaption, setGenerateCaption] = useState(true)
+  const [prompts, setPrompts] = useState<Array<{ id: string; name: string; topic: string | null; category: string | null; description: string | null; why_important: string | null; useful_tips: string | null }>>([])
 
   useEffect(() => {
     loadSocialAccounts()
     loadAvatars()
+    loadPrompts()
   }, [])
+
+  const loadPrompts = async () => {
+    try {
+      const response = await api.get('/api/prompts')
+      setPrompts(response.data.prompts || [])
+    } catch (error) {
+      console.error('Failed to load prompts:', error)
+    }
+  }
+
+  const handleSelectPrompt = (promptId: string) => {
+    const selectedPrompt = prompts.find(p => p.id === promptId)
+    if (selectedPrompt) {
+      setTopic(selectedPrompt.topic || topic)
+      setDescription(selectedPrompt.description || description)
+      setWhyImportant(selectedPrompt.why_important || whyImportant)
+      setUsefulTips(selectedPrompt.useful_tips || usefulTips)
+    }
+  }
 
   const fetchAvatars = async (
     params: Record<string, string> = {},
@@ -603,6 +624,34 @@ export function QuickCreate() {
                     )
                   })}
                 </div>
+              </div>
+            )}
+
+            {/* Prompt Selector */}
+            {prompts.length > 0 && (
+              <div className="mb-6 rounded-2xl border border-brand-200/60 bg-brand-50/40 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="h-4 w-4 text-brand-600" />
+                  <p className="text-sm font-semibold text-brand-700">Use a Prompt Template</p>
+                </div>
+                <Select
+                  options={[
+                    { value: '', label: 'Select a prompt to auto-fill fields...' },
+                    ...prompts.map(p => ({ value: p.id, label: p.name }))
+                  ]}
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      handleSelectPrompt(e.target.value)
+                      // Reset select after selection
+                      e.target.value = ''
+                    }
+                  }}
+                  className="w-full"
+                />
+                <p className="mt-2 text-xs text-brand-600">
+                  Select a prompt to auto-fill the fields below. You can still edit them after.
+                </p>
               </div>
             )}
 
