@@ -131,18 +131,20 @@ export class SubscriptionService {
       throw new Error('Failed to create subscription')
     }
 
-    // Update user profile
-    await supabase
-      .from('user_profiles')
-      .update({
-        has_active_subscription: true,
-        current_subscription_id: data.id,
-      })
-      .eq('id', userId)
+    // Update user profile only if payment is completed
+    if (paymentStatus === 'completed') {
+      await supabase
+        .from('user_profiles')
+        .update({
+          has_active_subscription: true,
+          current_subscription_id: data.id,
+        })
+        .eq('id', userId)
 
-    // Add credits to user account
-    const { CreditsService } = await import('./creditsService.js')
-    await CreditsService.addCredits(userId, plan.credits, `subscription_${planId}`, true)
+      // Add credits to user account only after payment is completed
+      const { CreditsService } = await import('./creditsService.js')
+      await CreditsService.addCredits(userId, plan.credits, `subscription_${planId}`, true)
+    }
 
     return data
   }

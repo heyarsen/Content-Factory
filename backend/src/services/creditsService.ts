@@ -21,22 +21,22 @@ export class CreditsService {
 
     if (error) {
       console.error('[Credits] Error fetching user credits:', error)
-      // If profile doesn't exist, create it with default credits
+      // If profile doesn't exist, create it with 0 credits (users must purchase subscription)
       try {
         const { data: newProfile } = await supabase
           .from('user_profiles')
-          .insert({ id: userId, credits: 20 })
+          .insert({ id: userId, credits: 0 })
           .select('credits')
           .single()
-        return newProfile?.credits ?? 20
+        return newProfile?.credits ?? 0
       } catch (createError) {
         console.error('[Credits] Error creating user profile:', createError)
-        return 20
+        return 0
       }
     }
 
     // NULL means unlimited credits
-    return data?.credits ?? 20
+    return data?.credits ?? 0
   }
 
   /**
@@ -197,7 +197,7 @@ export class CreditsService {
       return data.credits
     }
 
-    const currentCredits = currentUser?.credits
+    const currentCredits = currentUser?.credits ?? 0
 
     // NULL means unlimited credits, so no deduction needed
     if (currentCredits === null) {
@@ -259,7 +259,7 @@ export class CreditsService {
       // Try to create profile if it doesn't exist
       const { data: newProfile } = await supabase
         .from('user_profiles')
-        .insert({ id: userId, credits: 20 })
+        .insert({ id: userId, credits: 0 })
         .select('credits')
         .single()
       
@@ -273,7 +273,7 @@ export class CreditsService {
         return null
       }
       
-      const newCredits = currentCredits + amount
+      const newCredits = (currentCredits ?? 0) + amount
       
       const { data, error } = await supabase
         .from('user_profiles')

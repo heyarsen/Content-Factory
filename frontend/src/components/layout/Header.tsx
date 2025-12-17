@@ -2,8 +2,9 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNotifications } from '../../contexts/NotificationContext'
 import { useCredits } from '../../hooks/useCredits'
-import { Bell, Menu, User, X, CheckCircle2, AlertCircle, Info, AlertTriangle, Coins } from 'lucide-react'
+import { Bell, Menu, User, X, CheckCircle2, AlertCircle, Info, AlertTriangle, Coins, Crown, History, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { useMemo, useState, useRef, useEffect } from 'react'
+import api from '../../lib/api'
 
 interface HeaderProps {
   onToggleSidebar: () => void
@@ -13,9 +14,13 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const { notifications, unreadCount, markAsRead, markAllAsRead, removeNotification } = useNotifications()
-  const { credits, unlimited, loading: creditsLoading } = useCredits()
+  const { credits, unlimited, loading: creditsLoading, refreshCredits } = useCredits()
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [creditsOpen, setCreditsOpen] = useState(false)
+  const [hasSubscription, setHasSubscription] = useState(false)
+  const [subscription, setSubscription] = useState<any>(null)
+  const [recentTransactions, setRecentTransactions] = useState<any[]>([])
+  const [loadingSubscription, setLoadingSubscription] = useState(true)
   const notificationRef = useRef<HTMLDivElement>(null)
   const creditsRef = useRef<HTMLDivElement>(null)
 
@@ -24,6 +29,26 @@ export function Header({ onToggleSidebar }: HeaderProps) {
     const [name] = user.email.split('@')
     return name.charAt(0).toUpperCase() + name.slice(1)
   }, [user?.email])
+
+  // Load subscription status and recent transactions
+  useEffect(() => {
+    const loadSubscriptionData = async () => {
+      try {
+        const [subscriptionRes, transactionsRes] = await Promise.all([
+          api.get('/api/credits/subscription-status').catch(() => ({ data: { hasSubscription: false } })),
+          api.get('/api/credits/history', { params: { limit: 5 } }).catch(() => ({ data: { transactions: [] } })),
+        ])
+        setHasSubscription(subscriptionRes.data.hasSubscription || false)
+        setSubscription(subscriptionRes.data.subscription || null)
+        setRecentTransactions(transactionsRes.data.transactions || [])
+      } catch (error) {
+        console.error('Failed to load subscription data:', error)
+      } finally {
+        setLoadingSubscription(false)
+      }
+    }
+    loadSubscriptionData()
+  }, [])
 
   // Close notification dropdown when clicking outside
   useEffect(() => {
@@ -182,41 +207,98 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             </button>
 
             {creditsOpen && (
-              <div className="absolute right-0 mt-2 w-80 rounded-xl border border-slate-200 bg-white shadow-lg z-50">
+              <div className="absolute right-0 mt-2 w-96 rounded-xl border border-slate-200 bg-white shadow-lg z-50 max-h-[80vh] overflow-hidden flex flex-col">
                 <div className="p-4 border-b border-slate-200">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Coins className="h-5 w-5 text-amber-500" />
-                    <div className="text-sm font-semibold text-slate-900">Credits</div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Coins className="h-5 w-5 text-amber-500" />
+                      <div className="text-sm font-semibold text-slate-900">Credits</div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setCreditsOpen(false)
+                        navigate('/credits')
+                      }}
+                      className="text-xs text-brand-600 hover:text-brand-700 font-medium"
+                    >
+                      Manage
+                    </button>
                   </div>
-                  <div className="text-2xl font-bold text-slate-900 mt-1">
+                  <div className="text-2xl font-bold text-slate-900">
                     {creditsLoading ? '...' : unlimited ? 'Unlimited' : credits ?? 0}
+                    {!unlimited && <span className="ml-2 text-sm font-normal text-slate-500">credits</span>}
                   </div>
-                </div>
-                <div className="p-4 space-y-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
-                    Credit Costs
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600">Video Generation</span>
-                      <span className="font-semibold text-slate-900">1 credit</span>
+                  {loadingSubscription ? (
+                    <div className="mt-2 text-xs text-slate-500">Loading subscription...</div>
+                  ) : hasSubscription && subscription ? (
+                    <div className="mt-2 flex items-center gap-2 text-xs text-brand-600">
+                      <Crown className="h-3 w-3" />
+                      <span>Active subscription</span>
                     </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600">Avatar Generation</span>
-                      <span className="font-semibold text-slate-900">5 credits</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600">Look Generation</span>
-                      <span className="font-semibold text-slate-900">1 credit</span>
-                    </div>
-                  </div>
-                  {!unlimited && (
-                    <div className="pt-3 mt-3 border-t border-slate-200">
-                      <div className="text-xs text-slate-500">
-                        New users start with 20 credits. Different tariff plans will be available soon.
-                      </div>
+                  ) : (
+                    <div className="mt-2 flex items-center gap-2 text-xs text-amber-600">
+                      <AlertCircle className="h-3 w-3" />
+                      <span>No active subscription</span>
                     </div>
                   )}
+                </div>
+                <div className="overflow-y-auto">
+                  <div className="p-4 space-y-3">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
+                      Recent Transactions
+                    </div>
+                    {recentTransactions.length === 0 ? (
+                      <div className="text-center py-4">
+                        <History className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                        <div className="text-xs text-slate-500">No transactions yet</div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {recentTransactions.map((transaction) => (
+                          <div key={transaction.id} className="flex items-center justify-between text-sm py-2 border-b border-slate-100 last:border-0">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              {transaction.type === 'topup' || transaction.type === 'refund' ? (
+                                <ArrowUpRight className="h-4 w-4 text-green-600 shrink-0" />
+                              ) : (
+                                <ArrowDownRight className="h-4 w-4 text-red-600 shrink-0" />
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <p className="font-medium text-slate-900 truncate">
+                                  {transaction.description || transaction.operation || transaction.type}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  {new Date(transaction.created_at).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0 ml-2">
+                              <p
+                                className={`font-semibold ${
+                                  transaction.type === 'topup' || transaction.type === 'refund'
+                                    ? 'text-green-600'
+                                    : 'text-red-600'
+                                }`}
+                              >
+                                {transaction.type === 'topup' || transaction.type === 'refund' ? '+' : '-'}
+                                {Math.abs(transaction.amount)}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="pt-3 mt-3 border-t border-slate-200">
+                      <button
+                        onClick={() => {
+                          setCreditsOpen(false)
+                          navigate('/credits')
+                        }}
+                        className="w-full text-xs text-brand-600 hover:text-brand-700 font-medium text-center"
+                      >
+                        View full history →
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

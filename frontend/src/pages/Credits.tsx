@@ -5,11 +5,13 @@ import { Button } from '../components/ui/Button'
 import { Skeleton } from '../components/ui/Skeleton'
 import { useCredits } from '../hooks/useCredits'
 import { useNotifications } from '../contexts/NotificationContext'
-import { Coins, CheckCircle2, XCircle, Clock, ArrowUpRight, ArrowDownRight, History } from 'lucide-react'
+import { Coins, CheckCircle2, XCircle, Clock, ArrowUpRight, ArrowDownRight, History, Crown, AlertCircle } from 'lucide-react'
 import api from '../lib/api'
+import { useNavigate } from 'react-router-dom'
 
-interface CreditPackage {
+interface SubscriptionPlan {
   id: string
+  name: string
   credits: number
   price_usd: number
   display_name: string
@@ -28,19 +30,31 @@ interface CreditTransaction {
   created_at: string
 }
 
+interface UserSubscription {
+  id: string
+  plan_id: string
+  status: string
+  credits_remaining: number
+  started_at: string
+}
+
 export function Credits() {
+  const navigate = useNavigate()
   const { credits, unlimited, loading: creditsLoading, refreshCredits } = useCredits()
   const { addNotification } = useNotifications()
-  const [packages, setPackages] = useState<CreditPackage[]>([])
-  const [loadingPackages, setLoadingPackages] = useState(true)
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([])
+  const [loadingPlans, setLoadingPlans] = useState(true)
   const [purchasing, setPurchasing] = useState<string | null>(null)
   const [transactions, setTransactions] = useState<CreditTransaction[]>([])
   const [loadingTransactions, setLoadingTransactions] = useState(true)
-  const [activeTab, setActiveTab] = useState<'topup' | 'history'>('topup')
+  const [subscription, setSubscription] = useState<UserSubscription | null>(null)
+  const [hasSubscription, setHasSubscription] = useState(false)
+  const [loadingSubscription, setLoadingSubscription] = useState(true)
 
   useEffect(() => {
-    loadPackages()
+    loadPlans()
     loadTransactionHistory()
+    loadSubscriptionStatus()
     
     // Check for payment status in URL params
     const params = new URLSearchParams(window.location.search)
@@ -54,20 +68,33 @@ export function Credits() {
     }
   }, [])
 
-  const loadPackages = async () => {
+  const loadPlans = async () => {
     try {
-      setLoadingPackages(true)
-      const response = await api.get('/api/credits/packages')
-      setPackages(response.data.packages || [])
+      setLoadingPlans(true)
+      const response = await api.get('/api/credits/plans')
+      setPlans(response.data.plans || [])
     } catch (error: any) {
-      console.error('Failed to load packages:', error)
+      console.error('Failed to load plans:', error)
       addNotification({
         type: 'error',
         title: 'Error',
-        message: 'Failed to load credit packages',
+        message: 'Failed to load subscription plans',
       })
     } finally {
-      setLoadingPackages(false)
+      setLoadingPlans(false)
+    }
+  }
+
+  const loadSubscriptionStatus = async () => {
+    try {
+      setLoadingSubscription(true)
+      const response = await api.get('/api/credits/subscription-status')
+      setHasSubscription(response.data.hasSubscription || false)
+      setSubscription(response.data.subscription || null)
+    } catch (error: any) {
+      console.error('Failed to load subscription status:', error)
+    } finally {
+      setLoadingSubscription(false)
     }
   }
 
@@ -85,10 +112,10 @@ export function Credits() {
     }
   }
 
-  const handlePurchase = async (packageId: string) => {
+  const handlePurchase = async (planId: string) => {
     try {
-      setPurchasing(packageId)
-      const response = await api.post('/api/credits/topup', { packageId })
+      setPurchasing(planId)
+      const response = await api.post('/api/credits/subscribe', { planId })
       
       if (response.data.invoiceUrl) {
         // Redirect to WayForPay payment page
@@ -119,10 +146,11 @@ export function Credits() {
         addNotification({
           type: 'success',
           title: 'Payment Successful',
-          message: 'Payment successful! Credits have been added to your account.',
+          message: 'Subscription activated! Credits have been added to your account.',
         })
         refreshCredits()
         loadTransactionHistory()
+        loadSubscriptionStatus()
       } else {
         addNotification({
           type: 'info',
@@ -172,14 +200,16 @@ export function Credits() {
     })
   }
 
+  const currentPlan = plans.find(p => p.id === subscription?.plan_id)
+
   return (
     <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Credits</h1>
-            <p className="mt-2 text-slate-600">Manage your credits and view transaction history</p>
+            <h1 className="text-3xl font-bold text-slate-900">Credits & Subscription</h1>
+            <p className="mt-2 text-slate-600">Manage your subscription and view credit history</p>
           </div>
           <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-6 py-4 shadow-sm">
             <Coins className="h-6 w-6 text-amber-500" />
@@ -193,139 +223,158 @@ export function Credits() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2 border-b border-slate-200">
-          <button
-            onClick={() => setActiveTab('topup')}
-            className={`px-4 py-2 font-medium transition ${
-              activeTab === 'topup'
-                ? 'border-b-2 border-brand-500 text-brand-600'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            Buy Credits
-          </button>
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`px-4 py-2 font-medium transition ${
-              activeTab === 'history'
-                ? 'border-b-2 border-brand-500 text-brand-600'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <History className="h-4 w-4" />
-              Transaction History
-            </div>
-          </button>
-        </div>
-
-        {/* Top-up Tab */}
-        {activeTab === 'topup' && (
-          <div>
-            <h2 className="mb-4 text-xl font-semibold text-slate-900">Choose a Credit Package</h2>
-            {loadingPackages ? (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <Skeleton key={i} className="h-48" />
-                ))}
+        {/* Subscription Status */}
+        {loadingSubscription ? (
+          <Skeleton className="h-24" />
+        ) : hasSubscription && subscription ? (
+          <Card className="p-6 bg-gradient-to-r from-brand-50 to-indigo-50 border-brand-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-500 text-white">
+                  <Crown className="h-6 w-6" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-slate-700">Active Subscription</p>
+                  <p className="text-lg font-bold text-slate-900">{currentPlan?.display_name || 'Subscription'}</p>
+                  <p className="text-xs text-slate-600 mt-1">
+                    {subscription.credits_remaining} credits remaining
+                  </p>
+                </div>
               </div>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {packages.map((pkg) => (
-                  <Card key={pkg.id} className="p-6">
+              <Button
+                onClick={() => navigate('/credits')}
+                variant="primary"
+              >
+                Manage Subscription
+              </Button>
+            </div>
+          </Card>
+        ) : (
+          <Card className="p-6 border-amber-200 bg-amber-50">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="h-5 w-5 text-amber-600" />
+              <div>
+                <p className="font-semibold text-slate-900">No Active Subscription</p>
+                <p className="text-sm text-slate-600 mt-1">
+                  You need an active subscription to use platform features. Choose a plan below to get started.
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Subscription Plans */}
+        <div>
+          <h2 className="mb-4 text-xl font-semibold text-slate-900">
+            {hasSubscription ? 'Change Subscription Plan' : 'Choose a Subscription Plan'}
+          </h2>
+          {loadingPlans ? (
+            <div className="grid gap-4 md:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-64" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-3">
+              {plans.map((plan) => {
+                const isCurrentPlan = subscription?.plan_id === plan.id
+                return (
+                  <Card key={plan.id} className={`p-6 ${isCurrentPlan ? 'border-brand-500 bg-brand-50' : ''}`}>
                     <div className="flex flex-col">
+                      {isCurrentPlan && (
+                        <div className="mb-3 flex items-center gap-2 text-brand-600">
+                          <CheckCircle2 className="h-4 w-4" />
+                          <span className="text-xs font-semibold uppercase">Current Plan</span>
+                        </div>
+                      )}
                       <div className="mb-4">
-                        <h3 className="text-lg font-semibold text-slate-900">{pkg.display_name}</h3>
-                        {pkg.description && (
-                          <p className="mt-1 text-sm text-slate-600">{pkg.description}</p>
+                        <h3 className="text-lg font-semibold text-slate-900">{plan.display_name}</h3>
+                        {plan.description && (
+                          <p className="mt-1 text-sm text-slate-600">{plan.description}</p>
                         )}
                       </div>
                       <div className="mb-4 flex items-baseline gap-2">
-                        <span className="text-3xl font-bold text-slate-900">{pkg.credits}</span>
+                        <span className="text-3xl font-bold text-slate-900">{plan.credits}</span>
                         <span className="text-sm text-slate-500">credits</span>
                       </div>
                       <div className="mb-6 flex items-baseline gap-2">
-                        <span className="text-2xl font-bold text-brand-600">${pkg.price_usd.toFixed(2)}</span>
+                        <span className="text-2xl font-bold text-brand-600">${plan.price_usd.toFixed(2)}</span>
                         <span className="text-sm text-slate-500">USD</span>
                       </div>
                       <Button
-                        onClick={() => handlePurchase(pkg.id)}
-                        disabled={purchasing === pkg.id}
+                        onClick={() => handlePurchase(plan.id)}
+                        disabled={purchasing === plan.id || isCurrentPlan}
                         className="w-full"
-                        variant="primary"
+                        variant={isCurrentPlan ? "ghost" : "primary"}
                       >
-                        {purchasing === pkg.id ? 'Processing...' : 'Buy Now'}
+                        {isCurrentPlan ? 'Current Plan' : purchasing === plan.id ? 'Processing...' : hasSubscription ? 'Switch Plan' : 'Subscribe Now'}
                       </Button>
                     </div>
                   </Card>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+                )
+              })}
+            </div>
+          )}
+        </div>
 
-        {/* History Tab */}
-        {activeTab === 'history' && (
-          <div>
-            <h2 className="mb-4 text-xl font-semibold text-slate-900">Transaction History</h2>
-            {loadingTransactions ? (
-              <div className="space-y-3">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <Skeleton key={i} className="h-20" />
-                ))}
-              </div>
-            ) : transactions.length === 0 ? (
-              <Card className="p-12 text-center">
-                <History className="mx-auto h-12 w-12 text-slate-400" />
-                <p className="mt-4 text-slate-600">No transactions yet</p>
-                <p className="mt-2 text-sm text-slate-500">Your credit transactions will appear here</p>
-              </Card>
-            ) : (
-              <div className="space-y-3">
-                {transactions.map((transaction) => (
-                  <Card key={transaction.id} className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100">
-                          {getTransactionIcon(transaction.type)}
-                        </div>
-                        <div>
-                          <p className="font-medium text-slate-900">
-                            {transaction.description || transaction.operation || transaction.type}
-                          </p>
-                          <p className="text-sm text-slate-500">{formatDate(transaction.created_at)}</p>
-                        </div>
+        {/* Transaction History */}
+        <div>
+          <h2 className="mb-4 text-xl font-semibold text-slate-900">Transaction History</h2>
+          {loadingTransactions ? (
+            <div className="space-y-3">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Skeleton key={i} className="h-20" />
+              ))}
+            </div>
+          ) : transactions.length === 0 ? (
+            <Card className="p-12 text-center">
+              <History className="mx-auto h-12 w-12 text-slate-400" />
+              <p className="mt-4 text-slate-600">No transactions yet</p>
+              <p className="mt-2 text-sm text-slate-500">Your credit transactions will appear here</p>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {transactions.map((transaction) => (
+                <Card key={transaction.id} className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100">
+                        {getTransactionIcon(transaction.type)}
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p
-                            className={`font-semibold ${
-                              transaction.type === 'topup' || transaction.type === 'refund'
-                                ? 'text-green-600'
-                                : 'text-red-600'
-                            }`}
-                          >
-                            {transaction.type === 'topup' || transaction.type === 'refund' ? '+' : '-'}
-                            {Math.abs(transaction.amount)} credits
-                          </p>
-                          {transaction.balance_after !== null && (
-                            <p className="text-xs text-slate-500">
-                              Balance: {transaction.balance_after} credits
-                            </p>
-                          )}
-                        </div>
-                        {transaction.payment_status && getTransactionStatusIcon(transaction.payment_status)}
+                      <div>
+                        <p className="font-medium text-slate-900">
+                          {transaction.description || transaction.operation || transaction.type}
+                        </p>
+                        <p className="text-sm text-slate-500">{formatDate(transaction.created_at)}</p>
                       </div>
                     </div>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <p
+                          className={`font-semibold ${
+                            transaction.type === 'topup' || transaction.type === 'refund'
+                              ? 'text-green-600'
+                              : 'text-red-600'
+                          }`}
+                        >
+                          {transaction.type === 'topup' || transaction.type === 'refund' ? '+' : '-'}
+                          {Math.abs(transaction.amount)} credits
+                        </p>
+                        {transaction.balance_after !== null && (
+                          <p className="text-xs text-slate-500">
+                            Balance: {transaction.balance_after} credits
+                          </p>
+                        )}
+                      </div>
+                      {transaction.payment_status && getTransactionStatusIcon(transaction.payment_status)}
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </Layout>
   )
 }
-

@@ -253,53 +253,82 @@ router.get('/check-status/:orderReference', authenticate, async (req: AuthReques
     const { orderReference } = req.params
     const userId = req.userId!
 
-    // Verify transaction belongs to user
-    const { data: transaction } = await supabase
-      .from('credit_transactions')
-      .select('*')
-      .eq('payment_id', orderReference)
-      .eq('user_id', userId)
-      .single()
-
-    if (!transaction) {
-      return res.status(404).json({ error: 'Transaction not found' })
-    }
-
     // Check status with WayForPay
     const statusResponse = await WayForPayService.checkStatus(orderReference)
 
-    // Update transaction if status changed
-    if (statusResponse.orderStatus === 'Approved' && transaction.payment_status !== 'completed') {
-      const packageId = transaction.operation?.replace('topup_', '') || ''
-      const packageData = await CreditsService.getPackage(packageId)
-      
-      if (packageData) {
-        const balanceBefore = await CreditsService.getUserCredits(userId)
-        const balanceAfter = await CreditsService.addCredits(
-          userId,
-          packageData.credits,
-          `topup_${packageData.id}`,
-          true // Skip transaction log since we already have one
-        )
+    // Check if this is a subscription or top-up
+    const isSubscription = orderReference.startsWith('subscription_')
+    
+    if (isSubscription) {
+      // Handle subscription status check
+      const { data: subscription } = await supabase
+        .from('user_subscriptions')
+        .select('*')
+        .eq('payment_id', orderReference)
+        .eq('user_id', userId)
+        .single()
 
-        await supabase
-          .from('credit_transactions')
-          .update({
-            payment_status: 'completed',
-            balance_after: balanceAfter,
-            balance_before: balanceBefore,
-            amount: packageData.credits,
-          })
-          .eq('id', transaction.id)
+      if (!subscription) {
+        return res.status(404).json({ error: 'Subscription not found' })
       }
-    }
 
-    res.json({
-      orderReference: statusResponse.orderReference,
-      status: statusResponse.orderStatus,
-      amount: statusResponse.amount,
-      currency: statusResponse.currency,
-    })
+      if (statusResponse.orderStatus === 'Approved' && subscription.payment_status !== 'completed') {
+        await SubscriptionService.activateSubscription(userId, orderReference)
+      }
+
+      res.json({
+        orderReference: statusResponse.orderReference,
+        status: statusResponse.orderStatus,
+        amount: statusResponse.amount,
+        currency: statusResponse.currency,
+        type: 'subscription',
+      })
+    } else {
+      // Handle top-up status check
+      const { data: transaction } = await supabase
+        .from('credit_transactions')
+        .select('*')
+        .eq('payment_id', orderReference)
+        .eq('user_id', userId)
+        .single()
+
+      if (!transaction) {
+        return res.status(404).json({ error: 'Transaction not found' })
+      }
+
+      if (statusResponse.orderStatus === 'Approved' && transaction.payment_status !== 'completed') {
+        const packageId = transaction.operation?.replace('topup_', '') || ''
+        const packageData = await CreditsService.getPackage(packageId)
+        
+        if (packageData) {
+          const balanceBefore = await CreditsService.getUserCredits(userId)
+          const balanceAfter = await CreditsService.addCredits(
+            userId,
+            packageData.credits,
+            `topup_${packageData.id}`,
+            true // Skip transaction log since we already have one
+          )
+
+          await supabase
+            .from('credit_transactions')
+            .update({
+              payment_status: 'completed',
+              balance_after: balanceAfter,
+              balance_before: balanceBefore,
+              amount: packageData.credits,
+            })
+            .eq('id', transaction.id)
+        }
+      }
+
+      res.json({
+        orderReference: statusResponse.orderReference,
+        status: statusResponse.orderStatus,
+        amount: statusResponse.amount,
+        currency: statusResponse.currency,
+        type: 'topup',
+      })
+    }
   } catch (error: any) {
     console.error('Check status error:', error)
     res.status(500).json({ error: error.message || 'Failed to check status' })
