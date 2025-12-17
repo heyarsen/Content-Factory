@@ -14,7 +14,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const { notifications, unreadCount, markAsRead, markAllAsRead, removeNotification } = useNotifications()
-  const { credits, unlimited, loading: creditsLoading, refreshCredits } = useCredits()
+  const { credits, unlimited, loading: creditsLoading } = useCredits()
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [creditsOpen, setCreditsOpen] = useState(false)
   const [hasSubscription, setHasSubscription] = useState(false)
