@@ -71,13 +71,27 @@ export class SubscriptionService {
       .select('*')
       .eq('user_id', userId)
       .eq('status', 'active')
+      .eq('payment_status', 'completed') // Only return subscriptions with completed payment
       .order('created_at', { ascending: false })
       .limit(1)
-      .single()
+      .maybeSingle()
 
-    if (error || !data) {
+    if (error) {
+      console.error('[Subscription] Error fetching user subscription:', error)
       return null
     }
+
+    if (!data) {
+      console.log('[Subscription] No active subscription found for user:', userId)
+      return null
+    }
+
+    console.log('[Subscription] Found active subscription:', {
+      userId,
+      subscriptionId: data.id,
+      planId: data.plan_id,
+      creditsRemaining: data.credits_remaining,
+    })
 
     return data
   }
@@ -111,13 +125,25 @@ export class SubscriptionService {
       .eq('user_id', userId)
       .eq('status', 'active')
 
-    // Create new subscription
+    // Create new subscription with status based on payment status
+    // If payment is pending, subscription status should be 'pending' (not 'active')
+    const subscriptionStatus = paymentStatus === 'completed' ? 'active' : 'pending'
+    
+    console.log('[Subscription] Creating subscription:', {
+      userId,
+      planId,
+      orderReference,
+      paymentStatus,
+      subscriptionStatus,
+      credits: plan.credits,
+    })
+
     const { data, error } = await supabase
       .from('user_subscriptions')
       .insert({
         user_id: userId,
         plan_id: planId,
-        status: 'active',
+        status: subscriptionStatus,
         credits_included: plan.credits,
         credits_remaining: plan.credits,
         payment_id: orderReference,
@@ -131,8 +157,10 @@ export class SubscriptionService {
       throw new Error('Failed to create subscription')
     }
 
-    // Update user profile only if payment is completed
+    // Update user profile and add credits only if payment is completed
     if (paymentStatus === 'completed') {
+      console.log('[Subscription] Payment completed, activating subscription and adding credits')
+      
       await supabase
         .from('user_profiles')
         .update({
@@ -141,9 +169,17 @@ export class SubscriptionService {
         })
         .eq('id', userId)
 
-      // Add credits to user account only after payment is completed
+      // Add credits to user account
       const { CreditsService } = await import('./creditsService.js')
-      await CreditsService.addCredits(userId, plan.credits, `subscription_${planId}`, true)
+      const balanceAfter = await CreditsService.addCredits(userId, plan.credits, `subscription_${planId}`, false)
+      
+      console.log('[Subscription] Credits added:', {
+        userId,
+        creditsAdded: plan.credits,
+        balanceAfter,
+      })
+    } else {
+      console.log('[Subscription] Payment pending, subscription created but not activated yet')
     }
 
     return data
@@ -156,19 +192,52 @@ export class SubscriptionService {
     userId: string,
     orderReference: string
   ): Promise<void> {
-    const { data: subscription } = await supabase
+    console.log('[Subscription] Activating subscription:', { userId, orderReference })
+
+    const { data: subscription, error: fetchError } = await supabase
       .from('user_subscriptions')
       .select('*, plan:subscription_plans(*)')
       .eq('payment_id', orderReference)
       .eq('user_id', userId)
       .single()
 
-    if (!subscription) {
+    if (fetchError || !subscription) {
+      console.error('[Subscription] Subscription not found:', { orderReference, error: fetchError })
       throw new Error('Subscription not found')
     }
 
+    const plan = subscription.plan as SubscriptionPlan
+    if (!plan) {
+      console.error('[Subscription] Plan not found for subscription:', subscription.plan_id)
+      throw new Error('Plan not found')
+    }
+
+    console.log('[Subscription] Found subscription:', {
+      subscriptionId: subscription.id,
+      planId: plan.id,
+      credits: plan.credits,
+      currentStatus: subscription.status,
+      currentPaymentStatus: subscription.payment_status,
+    })
+
+    // Check if credits were already added
+    const { data: existingTransaction } = await supabase
+      .from('credit_transactions')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('operation', `subscription_${plan.id}`)
+      .limit(1)
+      .maybeSingle()
+
+    const creditsAlreadyAdded = !!existingTransaction
+
+    console.log('[Subscription] Credits check:', {
+      creditsAlreadyAdded,
+      transactionId: existingTransaction?.id,
+    })
+
     // Update subscription status
-    await supabase
+    const { error: updateError } = await supabase
       .from('user_subscriptions')
       .update({
         status: 'active',
@@ -176,8 +245,13 @@ export class SubscriptionService {
       })
       .eq('id', subscription.id)
 
+    if (updateError) {
+      console.error('[Subscription] Error updating subscription status:', updateError)
+      throw new Error('Failed to update subscription status')
+    }
+
     // Update user profile
-    await supabase
+    const { error: profileError } = await supabase
       .from('user_profiles')
       .update({
         has_active_subscription: true,
@@ -185,23 +259,34 @@ export class SubscriptionService {
       })
       .eq('id', userId)
 
-    // Add credits if not already added
-    const plan = subscription.plan as SubscriptionPlan
-    const { CreditsService } = await import('./creditsService.js')
-    const currentCredits = await CreditsService.getUserCredits(userId)
-    
-    // Only add credits if they haven't been added yet (check transaction history)
-    const { data: existingTransaction } = await supabase
-      .from('credit_transactions')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('operation', `subscription_${plan.id}`)
-      .limit(1)
-      .single()
-
-    if (!existingTransaction) {
-      await CreditsService.addCredits(userId, plan.credits, `subscription_${plan.id}`, false)
+    if (profileError) {
+      console.error('[Subscription] Error updating user profile:', profileError)
+      throw new Error('Failed to update user profile')
     }
+
+    // Add credits if not already added
+    if (!creditsAlreadyAdded) {
+      console.log('[Subscription] Adding credits to user account:', {
+        userId,
+        credits: plan.credits,
+        operation: `subscription_${plan.id}`,
+      })
+
+      const { CreditsService } = await import('./creditsService.js')
+      const balanceBefore = await CreditsService.getUserCredits(userId)
+      const balanceAfter = await CreditsService.addCredits(userId, plan.credits, `subscription_${plan.id}`, false)
+      
+      console.log('[Subscription] Credits added successfully:', {
+        userId,
+        creditsAdded: plan.credits,
+        balanceBefore,
+        balanceAfter,
+      })
+    } else {
+      console.log('[Subscription] Credits already added, skipping')
+    }
+
+    console.log('[Subscription] Subscription activated successfully')
   }
 }
 

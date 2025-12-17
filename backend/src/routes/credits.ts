@@ -53,11 +53,34 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 router.get('/subscription-status', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
+    console.log('[Credits API] Getting subscription status for user:', userId)
+    
     const subscription = await SubscriptionService.getUserSubscription(userId)
     const hasSubscription = subscription !== null
-    res.json({ hasSubscription, subscription })
+    
+    // Also check user profile to ensure consistency
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('has_active_subscription, current_subscription_id, credits')
+      .eq('id', userId)
+      .single()
+    
+    console.log('[Credits API] Subscription status:', {
+      userId,
+      hasSubscription,
+      profileHasSubscription: profile?.has_active_subscription,
+      subscriptionId: subscription?.id,
+      planId: subscription?.plan_id,
+      creditsRemaining: subscription?.credits_remaining,
+      userCredits: profile?.credits,
+    })
+    
+    res.json({ 
+      hasSubscription: hasSubscription && profile?.has_active_subscription === true,
+      subscription 
+    })
   } catch (error: any) {
-    console.error('Get subscription status error:', error)
+    console.error('[Credits API] Get subscription status error:', error)
     res.status(500).json({ error: 'Failed to get subscription status' })
   }
 })
@@ -146,6 +169,13 @@ router.post('/webhook', async (req: Request, res: Response) => {
   try {
     const callbackData = req.body
 
+    console.log('[WayForPay] Webhook received:', {
+      orderReference: callbackData.orderReference,
+      transactionStatus: callbackData.transactionStatus,
+      amount: callbackData.amount,
+      currency: callbackData.currency,
+    })
+
     // Verify signature
     if (!WayForPayService.verifyCallback(callbackData)) {
       console.error('[WayForPay] Invalid callback signature')
@@ -158,13 +188,24 @@ router.post('/webhook', async (req: Request, res: Response) => {
     // Check if this is a subscription or top-up
     const isSubscription = orderReference.startsWith('subscription_')
     
+    console.log('[WayForPay] Processing webhook:', {
+      orderReference,
+      transactionStatus,
+      isSubscription,
+    })
+    
     if (isSubscription) {
       // Handle subscription payment
-      const { data: subscription } = await supabase
+      const { data: subscription, error: subError } = await supabase
         .from('user_subscriptions')
         .select('*, user_id')
         .eq('payment_id', orderReference)
-        .single()
+        .maybeSingle()
+
+      if (subError) {
+        console.error('[WayForPay] Error fetching subscription:', subError)
+        return res.status(500).json({ error: 'Database error' })
+      }
 
       if (!subscription) {
         console.error('[WayForPay] Subscription not found:', orderReference)
@@ -173,17 +214,32 @@ router.post('/webhook', async (req: Request, res: Response) => {
 
       const userId = subscription.user_id
 
-      // Update subscription status
-      await supabase
-        .from('user_subscriptions')
-        .update({
-          payment_status: transactionStatus === 'Approved' ? 'completed' : 'failed',
-        })
-        .eq('id', subscription.id)
+      console.log('[WayForPay] Found subscription:', {
+        subscriptionId: subscription.id,
+        userId,
+        currentStatus: subscription.status,
+        currentPaymentStatus: subscription.payment_status,
+      })
 
-      // If payment approved, activate subscription
+      // If payment approved, activate subscription (this will update status and add credits)
       if (transactionStatus === 'Approved') {
-        await SubscriptionService.activateSubscription(userId, orderReference)
+        console.log('[WayForPay] Payment approved, activating subscription')
+        try {
+          await SubscriptionService.activateSubscription(userId, orderReference)
+          console.log('[WayForPay] Subscription activated successfully')
+        } catch (activateError: any) {
+          console.error('[WayForPay] Error activating subscription:', activateError)
+          // Still return success to WayForPay, but log the error
+        }
+      } else {
+        // Update payment status only
+        await supabase
+          .from('user_subscriptions')
+          .update({
+            payment_status: transactionStatus === 'Approved' ? 'completed' : 'failed',
+          })
+          .eq('id', subscription.id)
+        console.log('[WayForPay] Payment not approved, updated status only')
       }
     } else {
       // Handle top-up payment (legacy support)
@@ -269,11 +325,47 @@ router.get('/check-status/:orderReference', authenticate, async (req: AuthReques
         .single()
 
       if (!subscription) {
+        console.log('[Credits API] Subscription not found for order:', orderReference)
         return res.status(404).json({ error: 'Subscription not found' })
       }
 
+      console.log('[Credits API] Checking subscription status:', {
+        orderReference,
+        orderStatus: statusResponse.orderStatus,
+        currentPaymentStatus: subscription.payment_status,
+        currentSubscriptionStatus: subscription.status,
+      })
+
       if (statusResponse.orderStatus === 'Approved' && subscription.payment_status !== 'completed') {
-        await SubscriptionService.activateSubscription(userId, orderReference)
+        // Payment was approved, activate subscription
+        console.log('[Credits API] Payment approved, activating subscription')
+        try {
+          await SubscriptionService.activateSubscription(userId, orderReference)
+          console.log('[Credits API] Subscription activated successfully')
+          
+          // Fetch updated subscription
+          const { data: updatedSubscription } = await supabase
+            .from('user_subscriptions')
+            .select('*')
+            .eq('payment_id', orderReference)
+            .eq('user_id', userId)
+            .single()
+          
+          return res.json({
+            orderReference: statusResponse.orderReference,
+            status: 'completed',
+            amount: statusResponse.amount,
+            currency: statusResponse.currency,
+            type: 'subscription',
+            subscription: updatedSubscription,
+          })
+        } catch (activateError: any) {
+          console.error('[Credits API] Error activating subscription:', activateError)
+          return res.status(500).json({ 
+            error: 'Failed to activate subscription',
+            details: activateError.message 
+          })
+        }
       }
 
       res.json({
@@ -282,6 +374,7 @@ router.get('/check-status/:orderReference', authenticate, async (req: AuthReques
         amount: statusResponse.amount,
         currency: statusResponse.currency,
         type: 'subscription',
+        subscription,
       })
     } else {
       // Handle top-up status check
