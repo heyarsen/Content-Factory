@@ -9,11 +9,15 @@ dotenv.config()
 
 const router = Router()
 
-// Initialize WayForPay (use test credentials if in development)
+// Initialize WayForPay (use test credentials by default for testing)
+// Test credentials from: https://wiki.wayforpay.com/view/852472
 const initializeWayForPay = () => {
-  const merchantAccount = process.env.WAYFORPAY_MERCHANT_ACCOUNT || 'test_merchant'
+  const merchantAccount = process.env.WAYFORPAY_MERCHANT_ACCOUNT || 'test_merch_n1'
   const merchantSecretKey = process.env.WAYFORPAY_MERCHANT_SECRET_KEY || 'flk3409refn54t54t*FNJRET'
   const merchantDomainName = process.env.WAYFORPAY_MERCHANT_DOMAIN || 'test.merchant.com'
+  
+  console.log('[WayForPay] Initializing with merchant account:', merchantAccount)
+  console.log('[WayForPay] Using test mode:', merchantAccount === 'test_merch_n1')
   
   WayForPayService.initialize({
     merchantAccount,
