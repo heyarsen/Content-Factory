@@ -51,6 +51,61 @@ export class CreditsService {
   }
 
   /**
+   * Create a credit transaction record
+   */
+  static async createTransaction(
+    userId: string,
+    type: 'topup' | 'deduction' | 'refund' | 'adjustment',
+    amount: number,
+    balanceBefore: number | null,
+    balanceAfter: number | null,
+    operation?: string,
+    description?: string,
+    paymentId?: string,
+    paymentStatus?: string
+  ): Promise<void> {
+    try {
+      await supabase.from('credit_transactions').insert({
+        user_id: userId,
+        type,
+        amount,
+        balance_before: balanceBefore,
+        balance_after: balanceAfter,
+        operation,
+        description,
+        payment_id: paymentId,
+        payment_status: paymentStatus,
+      })
+    } catch (error) {
+      console.error('[Credits] Error creating transaction record:', error)
+      // Don't throw - transaction logging shouldn't break the main flow
+    }
+  }
+
+  /**
+   * Get user's credit transaction history
+   */
+  static async getTransactionHistory(
+    userId: string,
+    limit: number = 50,
+    offset: number = 0
+  ): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('credit_transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1)
+
+    if (error) {
+      console.error('[Credits] Error fetching transaction history:', error)
+      return []
+    }
+
+    return data || []
+  }
+
+  /**
    * Deduct credits from user account
    * Returns the new credit balance (null if unlimited)
    * Does nothing if user has unlimited credits (null)
@@ -104,6 +159,17 @@ export class CreditsService {
         throw new Error('Failed to deduct credits')
       }
       
+      // Log transaction
+      await this.createTransaction(
+        userId,
+        'deduction',
+        -cost,
+        currentCredits,
+        newCredits,
+        operation,
+        `Deducted ${cost} credits for ${operation}`
+      )
+      
       console.log(`[Credits] Deducted ${cost} credits from user ${userId} for ${operation}. New balance: ${newCredits}`)
       return data.credits
     }
@@ -134,6 +200,17 @@ export class CreditsService {
       throw new Error('Failed to deduct credits')
     }
 
+    // Log transaction
+    await this.createTransaction(
+      userId,
+      'deduction',
+      -cost,
+      currentCredits,
+      newCredits,
+      operation,
+      `Deducted ${cost} credits for ${operation}`
+    )
+
     console.log(`[Credits] Deducted ${cost} credits from user ${userId} for ${operation}. New balance: ${newCredits}`)
     return data.credits
   }
@@ -141,8 +218,9 @@ export class CreditsService {
   /**
    * Add credits to user account (for admin operations or refunds)
    * Returns the new credit balance (null if unlimited)
+   * @param skipTransactionLog - If true, skips creating a transaction record (useful when transaction already exists)
    */
-  static async addCredits(userId: string, amount: number, reason?: string): Promise<number | null> {
+  static async addCredits(userId: string, amount: number, reason?: string, skipTransactionLog: boolean = false): Promise<number | null> {
     if (amount <= 0) {
       return await this.getUserCredits(userId)
     }
@@ -186,6 +264,19 @@ export class CreditsService {
         throw new Error('Failed to add credits')
       }
       
+      // Log transaction (unless skipped)
+      if (!skipTransactionLog) {
+        await this.createTransaction(
+          userId,
+          reason?.includes('topup') ? 'topup' : 'adjustment',
+          amount,
+          currentCredits,
+          newCredits,
+          reason,
+          reason || `Added ${amount} credits`
+        )
+      }
+      
       console.log(`[Credits] Added ${amount} credits to user ${userId}${reason ? ` (${reason})` : ''}. New balance: ${newCredits}`)
       return data.credits
     }
@@ -210,6 +301,19 @@ export class CreditsService {
       throw new Error('Failed to add credits')
     }
 
+    // Log transaction (unless skipped)
+    if (!skipTransactionLog) {
+      await this.createTransaction(
+        userId,
+        reason?.includes('topup') ? 'topup' : 'adjustment',
+        amount,
+        currentCredits,
+        newCredits,
+        reason,
+        reason || `Added ${amount} credits`
+      )
+    }
+
     console.log(`[Credits] Added ${amount} credits to user ${userId}${reason ? ` (${reason})` : ''}. New balance: ${newCredits}`)
     return data.credits
   }
@@ -228,6 +332,42 @@ export class CreditsService {
     }
 
     return await this.deductCredits(userId, cost, operation)
+  }
+
+  /**
+   * Get available credit packages
+   */
+  static async getCreditPackages(): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('credit_packages')
+      .select('*')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+
+    if (error) {
+      console.error('[Credits] Error fetching packages:', error)
+      return []
+    }
+
+    return data || []
+  }
+
+  /**
+   * Get package by ID
+   */
+  static async getPackage(packageId: string): Promise<any | null> {
+    const { data, error } = await supabase
+      .from('credit_packages')
+      .select('*')
+      .eq('id', packageId)
+      .eq('is_active', true)
+      .single()
+
+    if (error || !data) {
+      return null
+    }
+
+    return data
   }
 }
 

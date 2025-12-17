@@ -17,6 +17,8 @@ interface SidebarProps {
   onClose: () => void
 }
 
+import { Coins } from 'lucide-react'
+
 const navigation = [
   { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
   { label: 'Create Video', to: '/create', icon: Zap },
@@ -25,6 +27,7 @@ const navigation = [
   { label: 'My Videos', to: '/videos', icon: Clapperboard },
   { label: 'Social Accounts', to: '/social', icon: Share2 },
   { label: 'Avatars', to: '/avatars', icon: User },
+  { label: 'Credits', to: '/credits', icon: Coins },
   { label: 'Preferences', to: '/preferences', icon: Settings },
 ]
 

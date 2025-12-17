@@ -27,6 +27,7 @@ import { ProfileSettings } from './pages/ProfileSettings'
 import { Preferences } from './pages/Preferences'
 import Avatars from './pages/Avatars'
 import { VideoPrompts } from './pages/VideoPrompts'
+import { Credits } from './pages/Credits'
 
 function AppContent() {
   const { toasts, removeToast } = useToast()
@@ -174,6 +175,14 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <Avatars />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/credits"
+          element={
+            <ProtectedRoute>
+              <Credits />
             </ProtectedRoute>
           }
         />
