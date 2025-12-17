@@ -14,6 +14,7 @@ export interface WayForPayConfig {
 }
 
 export interface WayForPayPurchaseRequest {
+  transactionType: string
   merchantAccount: string
   merchantDomainName: string
   orderReference: string
@@ -31,6 +32,7 @@ export interface WayForPayPurchaseRequest {
   returnUrl?: string
   serviceUrl?: string // Callback URL for payment status updates
   language?: string
+  apiVersion?: number
 }
 
 export interface WayForPayPurchaseResponse {
@@ -42,9 +44,11 @@ export interface WayForPayPurchaseResponse {
 }
 
 export interface WayForPayStatusRequest {
+  transactionType: string
   merchantAccount: string
   orderReference: string
   merchantSignature: string
+  apiVersion?: number
 }
 
 export interface WayForPayStatusResponse {
@@ -123,6 +127,7 @@ export class WayForPayService {
     const orderDate = Math.floor(Date.now() / 1000)
 
     const purchaseRequest: WayForPayPurchaseRequest = {
+      transactionType: 'PURCHASE',
       merchantAccount: config.merchantAccount,
       merchantDomainName: config.merchantDomainName,
       orderReference: request.orderReference,
@@ -140,6 +145,7 @@ export class WayForPayService {
       returnUrl: request.returnUrl,
       serviceUrl: request.serviceUrl,
       language: 'EN',
+      apiVersion: 1,
     }
 
     // Generate signature
@@ -157,22 +163,66 @@ export class WayForPayService {
     const merchantSignature = this.generateSignature(signatureFields)
 
     try {
+      // WayForPay expects the request body to include apiVersion at the top level
+      const requestBody: any = {
+        transactionType: purchaseRequest.transactionType,
+        merchantAccount: purchaseRequest.merchantAccount,
+        merchantDomainName: purchaseRequest.merchantDomainName,
+        orderReference: purchaseRequest.orderReference,
+        orderDate: purchaseRequest.orderDate,
+        amount: purchaseRequest.amount,
+        currency: purchaseRequest.currency,
+        productName: purchaseRequest.productName,
+        productCount: purchaseRequest.productCount,
+        productPrice: purchaseRequest.productPrice,
+        merchantSignature,
+        apiVersion: 1,
+      }
+      
+      // Add optional fields if they exist
+      if (purchaseRequest.clientAccountId) requestBody.clientAccountId = purchaseRequest.clientAccountId
+      if (purchaseRequest.clientEmail) requestBody.clientEmail = purchaseRequest.clientEmail
+      if (purchaseRequest.clientFirstName) requestBody.clientFirstName = purchaseRequest.clientFirstName
+      if (purchaseRequest.clientLastName) requestBody.clientLastName = purchaseRequest.clientLastName
+      if (purchaseRequest.clientPhone) requestBody.clientPhone = purchaseRequest.clientPhone
+      if (purchaseRequest.returnUrl) requestBody.returnUrl = purchaseRequest.returnUrl
+      if (purchaseRequest.serviceUrl) requestBody.serviceUrl = purchaseRequest.serviceUrl
+      if (purchaseRequest.language) requestBody.language = purchaseRequest.language
+
+      console.log('[WayForPay] Purchase request:', {
+        merchantAccount: config.merchantAccount,
+        orderReference: request.orderReference,
+        amount: request.amount,
+        hasApiVersion: !!requestBody.apiVersion,
+      })
+
+      // WayForPay API endpoint format: /api/purchase (or /api/v1/purchase for versioned API)
+      const apiEndpoint = `${config.apiUrl}/purchase`
+      
       const response = await axios.post<WayForPayPurchaseResponse>(
-        `${config.apiUrl}/purchase`,
-        {
-          ...purchaseRequest,
-          merchantSignature,
-        },
+        apiEndpoint,
+        requestBody,
         {
           headers: {
             'Content-Type': 'application/json',
+            'Accept': 'application/json',
           },
         }
       )
 
+      console.log('[WayForPay] Purchase response:', {
+        reasonCode: response.data.reasonCode,
+        reason: response.data.reason,
+        hasInvoiceUrl: !!response.data.invoiceUrl,
+      })
+
       return response.data
     } catch (error: any) {
-      console.error('[WayForPay] Purchase request error:', error.response?.data || error.message)
+      console.error('[WayForPay] Purchase request error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      })
       throw new Error(`WayForPay purchase failed: ${error.response?.data?.reason || error.message}`)
     }
   }
@@ -184,9 +234,11 @@ export class WayForPayService {
     const config = this.getConfig()
 
     const statusRequest: WayForPayStatusRequest = {
+      transactionType: 'CHECK_STATUS',
       merchantAccount: config.merchantAccount,
       orderReference,
       merchantSignature: '', // Will be set after creation
+      apiVersion: 1,
     }
 
     // Generate signature
