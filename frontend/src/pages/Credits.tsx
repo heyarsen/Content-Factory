@@ -63,6 +63,7 @@ export function Credits() {
       console.error('Failed to load packages:', error)
       addNotification({
         type: 'error',
+        title: 'Error',
         message: 'Failed to load credit packages',
       })
     } finally {
@@ -95,6 +96,7 @@ export function Credits() {
       } else {
         addNotification({
           type: 'error',
+          title: 'Payment Error',
           message: 'Failed to initiate payment',
         })
       }
@@ -102,6 +104,7 @@ export function Credits() {
       console.error('Purchase error:', error)
       addNotification({
         type: 'error',
+        title: 'Purchase Error',
         message: error.response?.data?.error || 'Failed to initiate purchase',
       })
       setPurchasing(null)
@@ -115,6 +118,7 @@ export function Credits() {
       if (response.data.status === 'Approved') {
         addNotification({
           type: 'success',
+          title: 'Payment Successful',
           message: 'Payment successful! Credits have been added to your account.',
         })
         refreshCredits()
@@ -122,6 +126,7 @@ export function Credits() {
       } else {
         addNotification({
           type: 'info',
+          title: 'Payment Processing',
           message: 'Payment is being processed. Please check back in a moment.',
         })
       }

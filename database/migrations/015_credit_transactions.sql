@@ -26,10 +26,12 @@ CREATE INDEX IF NOT EXISTS idx_credit_transactions_payment_id ON credit_transact
 ALTER TABLE credit_transactions ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
+DROP POLICY IF EXISTS "Users can view their own transactions" ON credit_transactions;
 CREATE POLICY "Users can view their own transactions"
   ON credit_transactions FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "System can create transactions" ON credit_transactions;
 CREATE POLICY "System can create transactions"
   ON credit_transactions FOR INSERT
   WITH CHECK (true); -- Will be controlled by backend
@@ -63,6 +65,7 @@ ON CONFLICT (id) DO UPDATE SET
 -- Enable RLS for packages (read-only for all authenticated users)
 ALTER TABLE credit_packages ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Anyone can view active packages" ON credit_packages;
 CREATE POLICY "Anyone can view active packages"
   ON credit_packages FOR SELECT
   USING (is_active = true);
