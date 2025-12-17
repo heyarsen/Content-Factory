@@ -227,12 +227,28 @@ export class AutomationService {
 
         const research = item.research_data
 
+        // Use prompt fields first, then fall back to research data
+        const descriptionToUse = item.description || research?.Description || ''
+        const whyItMattersToUse = item.why_important || research?.WhyItMatters || ''
+        const usefulTipsToUse = item.useful_tips || research?.UsefulTips || ''
+        
+        console.log(`[Script Generation] Using fields for batch script generation:`, {
+          itemId: item.id,
+          topic: item.topic || research?.Idea || '',
+          hasPromptDescription: !!item.description,
+          hasPromptWhyImportant: !!item.why_important,
+          hasPromptUsefulTips: !!item.useful_tips,
+          descriptionSource: item.description ? 'prompt' : (research?.Description ? 'research' : 'empty'),
+          whyImportantSource: item.why_important ? 'prompt' : (research?.WhyItMatters ? 'research' : 'empty'),
+          usefulTipsSource: item.useful_tips ? 'prompt' : (research?.UsefulTips ? 'research' : 'empty'),
+        })
+
         // If no research but has topic, use topic directly
         const script = await ScriptService.generateScriptCustom({
           idea: item.topic || research?.Idea || '',
-          description: item.description || research?.Description || '',
-          whyItMatters: item.why_important || research?.WhyItMatters || '',
-          usefulTips: item.useful_tips || research?.UsefulTips || '',
+          description: descriptionToUse,
+          whyItMatters: whyItMattersToUse,
+          usefulTips: usefulTipsToUse,
           category: item.category || research?.Category || 'general',
         }, userId)
 
@@ -2112,7 +2128,11 @@ export class AutomationService {
       throw new Error('No topic available for script generation')
     }
 
+    // Check if we have all prompt fields filled - if so, we can skip research or use it as fallback only
+    const hasAllPromptFields = !!(item.description && item.why_important && item.useful_tips)
+    
     // Always (re)run research so scripts are based on fresh data and long topics
+    // But if we have prompt fields, they will take priority
     const researchCategory = item.category || existingResearch?.Category || existingResearch?.category || 'Lifestyle'
     let enrichedResearch: any = null
     try {
@@ -2121,6 +2141,10 @@ export class AutomationService {
         topic: topicToUse,
         category: researchCategory,
         planId: item.plan_id,
+        hasPromptFields: hasAllPromptFields,
+        promptDescription: item.description ? 'yes' : 'no',
+        promptWhyImportant: item.why_important ? 'yes' : 'no',
+        promptUsefulTips: item.useful_tips ? 'yes' : 'no',
       })
 
       enrichedResearch = await ResearchService.researchTopic(topicToUse, researchCategory, userId)
@@ -2131,6 +2155,7 @@ export class AutomationService {
         category: enrichedResearch?.category || researchCategory,
         hasDescription: !!enrichedResearch?.description,
         hasTips: !!enrichedResearch?.usefulTips,
+        willUsePromptFields: hasAllPromptFields,
       })
 
       // Only update description, why_important, useful_tips if they're not already set (from prompts)
@@ -2184,15 +2209,31 @@ export class AutomationService {
         ? `Avoid repeating or slightly rephrasing these recent scripts or angles:\n- ${recentScripts.join('\n- ')}`
         : ''
 
+    // Use prompt fields first, then fall back to research data
+    const descriptionToUse = item.description || enrichedResearch?.description || enrichedResearch?.Description || ''
+    const whyItMattersToUse = item.why_important || enrichedResearch?.whyItMatters || enrichedResearch?.WhyItMatters || ''
+    const usefulTipsToUse = item.useful_tips || enrichedResearch?.usefulTips || enrichedResearch?.UsefulTips || ''
+    
+    console.log(`[Script Generation] Using fields for script generation:`, {
+      itemId,
+      topic: topicToUse,
+      hasPromptDescription: !!item.description,
+      hasPromptWhyImportant: !!item.why_important,
+      hasPromptUsefulTips: !!item.useful_tips,
+      descriptionSource: item.description ? 'prompt' : (enrichedResearch?.description ? 'research' : 'empty'),
+      whyImportantSource: item.why_important ? 'prompt' : (enrichedResearch?.whyItMatters ? 'research' : 'empty'),
+      usefulTipsSource: item.useful_tips ? 'prompt' : (enrichedResearch?.usefulTips ? 'research' : 'empty'),
+    })
+    
     const script = await ScriptService.generateScriptCustom(
       {
         idea: topicToUse, // Always use the item's topic first
         description: [
-          item.description || enrichedResearch?.description || enrichedResearch?.Description || '',
+          descriptionToUse,
           antiRepeatHint,
         ].filter(Boolean).join('\n'),
-        whyItMatters: item.why_important || enrichedResearch?.whyItMatters || enrichedResearch?.WhyItMatters || '',
-        usefulTips: item.useful_tips || enrichedResearch?.usefulTips || enrichedResearch?.UsefulTips || '',
+        whyItMatters: whyItMattersToUse,
+        usefulTips: usefulTipsToUse,
         category: item.category || enrichedResearch?.category || enrichedResearch?.Category || 'Lifestyle',
       },
       userId
