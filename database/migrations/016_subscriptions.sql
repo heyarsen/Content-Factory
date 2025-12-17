@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS user_subscriptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   plan_id TEXT NOT NULL REFERENCES subscription_plans(id),
-  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'expired', 'cancelled')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'expired', 'cancelled', 'failed')),
   credits_included INTEGER NOT NULL, -- Credits that came with this subscription
   credits_remaining INTEGER NOT NULL, -- Remaining credits from this subscription
   payment_id TEXT, -- WayForPay transaction ID
