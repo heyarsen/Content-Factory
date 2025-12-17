@@ -80,7 +80,7 @@ router.post('/topup', authenticate, async (req: AuthRequest, res: Response) => {
 
     // Get user info for payment
     const { data: user } = await supabase.auth.admin.getUserById(userId)
-    if (!user) {
+    if (!user || !user.user) {
       return res.status(404).json({ error: 'User not found' })
     }
 
@@ -109,7 +109,7 @@ router.post('/topup', authenticate, async (req: AuthRequest, res: Response) => {
       currency: 'USD',
       productName: `Credit Top-up: ${packageData.display_name}`,
       clientAccountId: userId,
-      clientEmail: user.user.email,
+      clientEmail: user.user.email || undefined,
       returnUrl: `${baseUrl}/credits?status=success&order=${orderReference}`,
       serviceUrl: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/credits/webhook`,
     })
@@ -232,9 +232,6 @@ router.get('/check-status/:orderReference', authenticate, async (req: AuthReques
 
     // Update transaction if status changed
     if (statusResponse.orderStatus === 'Approved' && transaction.payment_status !== 'completed') {
-      const balanceBefore = await CreditsService.getUserCredits(userId)
-      const packageData = await CreditsService.getPackage(transaction.operation?.replace('topup_', '') || '')
-      
       const packageId = transaction.operation?.replace('topup_', '') || ''
       const packageData = await CreditsService.getPackage(packageId)
       
