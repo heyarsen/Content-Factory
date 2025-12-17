@@ -40,14 +40,37 @@ export class CreditsService {
   }
 
   /**
+   * Check if user has active subscription
+   */
+  static async hasActiveSubscription(userId: string): Promise<boolean> {
+    const { data } = await supabase
+      .from('user_profiles')
+      .select('has_active_subscription')
+      .eq('id', userId)
+      .single()
+
+    return data?.has_active_subscription === true
+  }
+
+  /**
    * Check if user has enough credits for an operation
    * Returns true if user has unlimited credits (null)
+   * First checks if user has active subscription
    */
-  static async hasEnoughCredits(userId: string, cost: number): Promise<boolean> {
+  static async hasEnoughCredits(userId: string, cost: number): Promise<{ hasSubscription: boolean; hasCredits: boolean; credits: number | null }> {
+    const hasSubscription = await this.hasActiveSubscription(userId)
     const credits = await this.getUserCredits(userId)
+    
     // NULL means unlimited credits
-    if (credits === null) return true
-    return credits >= cost
+    if (credits === null) {
+      return { hasSubscription, hasCredits: true, credits: null }
+    }
+    
+    return {
+      hasSubscription,
+      hasCredits: credits >= cost,
+      credits,
+    }
   }
 
   /**
@@ -320,15 +343,19 @@ export class CreditsService {
 
   /**
    * Check credits and deduct if sufficient
-   * Throws error if insufficient credits
+   * Throws error if insufficient credits or no subscription
    * Returns null if user has unlimited credits
    */
   static async checkAndDeduct(userId: string, cost: number, operation: string): Promise<number | null> {
-    const hasEnough = await this.hasEnoughCredits(userId, cost)
-    if (!hasEnough) {
-      const credits = await this.getUserCredits(userId)
-      const creditsDisplay = credits === null ? 'unlimited' : credits.toString()
-      throw new Error(`Insufficient credits. You have ${creditsDisplay} credits but need ${cost} credits for ${operation}.`)
+    const checkResult = await this.hasEnoughCredits(userId, cost)
+    
+    if (!checkResult.hasSubscription) {
+      throw new Error('You need an active subscription to use this feature. Please purchase a subscription plan.')
+    }
+    
+    if (!checkResult.hasCredits) {
+      const creditsDisplay = checkResult.credits === null ? 'unlimited' : checkResult.credits.toString()
+      throw new Error(`Insufficient credits. You have ${creditsDisplay} credits but need ${cost} credits for ${operation}. You can top up credits or choose a different subscription plan.`)
     }
 
     return await this.deductCredits(userId, cost, operation)

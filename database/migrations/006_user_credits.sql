@@ -4,7 +4,7 @@
 -- Create user_profiles table if it doesn't exist
 CREATE TABLE IF NOT EXISTS user_profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  credits INTEGER DEFAULT 20,
+  credits INTEGER DEFAULT 0, -- Changed to 0 - users start with no credits
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -33,7 +33,7 @@ CREATE OR REPLACE FUNCTION create_user_profile()
 RETURNS TRIGGER AS $$
 BEGIN
   INSERT INTO user_profiles (id, credits)
-  VALUES (NEW.id, 20)
+  VALUES (NEW.id, 0) -- Users start with 0 credits
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;
@@ -47,5 +47,5 @@ CREATE TRIGGER on_auth_user_created
   EXECUTE FUNCTION create_user_profile();
 
 -- Add comment
-COMMENT ON TABLE user_profiles IS 'User profiles with credits for platform operations. Default: 20 credits. Video generation: 1 credit, Avatar generation: 5 credits, Look generation: 1 credit.';
+COMMENT ON TABLE user_profiles IS 'User profiles with credits for platform operations. Users start with 0 credits and must purchase a subscription. Video generation: 1 credit, Avatar generation: 5 credits, Look generation: 1 credit.';
 

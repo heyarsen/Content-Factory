@@ -1,6 +1,7 @@
 import { Router, Response, Request } from 'express'
 import { authenticate, AuthRequest } from '../middleware/auth.js'
 import { CreditsService } from '../services/creditsService.js'
+import { SubscriptionService } from '../services/subscriptionService.js'
 import { WayForPayService } from '../services/wayforpayService.js'
 import { supabase } from '../lib/supabase.js'
 import dotenv from 'dotenv'
@@ -46,36 +47,52 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 })
 
 /**
- * GET /api/credits/packages
- * Get available credit packages
+ * GET /api/credits/subscription-status
+ * Get user's subscription status
  */
-router.get('/packages', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/subscription-status', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const packages = await CreditsService.getCreditPackages()
-    res.json({ packages })
+    const userId = req.userId!
+    const subscription = await SubscriptionService.getUserSubscription(userId)
+    const hasSubscription = subscription !== null
+    res.json({ hasSubscription, subscription })
   } catch (error: any) {
-    console.error('Get packages error:', error)
-    res.status(500).json({ error: 'Failed to get packages' })
+    console.error('Get subscription status error:', error)
+    res.status(500).json({ error: 'Failed to get subscription status' })
   }
 })
 
 /**
- * POST /api/credits/topup
- * Initiate a credit top-up purchase
+ * GET /api/credits/plans
+ * Get available subscription plans
  */
-router.post('/topup', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/plans', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const plans = await SubscriptionService.getPlans()
+    res.json({ plans })
+  } catch (error: any) {
+    console.error('Get plans error:', error)
+    res.status(500).json({ error: 'Failed to get plans' })
+  }
+})
+
+/**
+ * POST /api/credits/subscribe
+ * Purchase a subscription plan
+ */
+router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
-    const { packageId } = req.body
+    const { planId } = req.body
 
-    if (!packageId) {
-      return res.status(400).json({ error: 'Package ID is required' })
+    if (!planId) {
+      return res.status(400).json({ error: 'Plan ID is required' })
     }
 
-    // Get package details
-    const packageData = await CreditsService.getPackage(packageId)
-    if (!packageData) {
-      return res.status(404).json({ error: 'Package not found' })
+    // Get plan details
+    const plan = await SubscriptionService.getPlan(planId)
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan not found' })
     }
 
     // Get user info for payment
@@ -85,29 +102,18 @@ router.post('/topup', authenticate, async (req: AuthRequest, res: Response) => {
     }
 
     // Create unique order reference
-    const orderReference = `topup_${userId}_${Date.now()}`
+    const orderReference = `subscription_${userId}_${Date.now()}`
 
-    // Create pending transaction record
-    const balanceBefore = await CreditsService.getUserCredits(userId)
-    await CreditsService.createTransaction(
-      userId,
-      'topup',
-      packageData.credits,
-      balanceBefore,
-      balanceBefore, // Will be updated after payment
-      `topup_${packageId}`,
-      `Top-up: ${packageData.display_name} (${packageData.credits} credits)`,
-      orderReference,
-      'pending'
-    )
+    // Create pending subscription
+    await SubscriptionService.createSubscription(userId, planId, orderReference, 'pending')
 
     // Create WayForPay purchase request
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
     const purchaseResponse = await WayForPayService.createPurchase({
       orderReference,
-      amount: parseFloat(packageData.price_usd.toString()),
+      amount: parseFloat(plan.price_usd.toString()),
       currency: 'USD',
-      productName: `Credit Top-up: ${packageData.display_name}`,
+      productName: `Subscription: ${plan.display_name}`,
       clientAccountId: userId,
       clientEmail: user.user.email || undefined,
       returnUrl: `${baseUrl}/credits?status=success&order=${orderReference}`,
@@ -149,53 +155,85 @@ router.post('/webhook', async (req: Request, res: Response) => {
     const orderReference = callbackData.orderReference
     const transactionStatus = callbackData.transactionStatus
 
-    // Find transaction by order reference
-    const { data: transaction } = await supabase
-      .from('credit_transactions')
-      .select('*, user_id')
-      .eq('payment_id', orderReference)
-      .eq('type', 'topup')
-      .single()
+    // Check if this is a subscription or top-up
+    const isSubscription = orderReference.startsWith('subscription_')
+    
+    if (isSubscription) {
+      // Handle subscription payment
+      const { data: subscription } = await supabase
+        .from('user_subscriptions')
+        .select('*, user_id')
+        .eq('payment_id', orderReference)
+        .single()
 
-    if (!transaction) {
-      console.error('[WayForPay] Transaction not found:', orderReference)
-      return res.status(404).json({ error: 'Transaction not found' })
-    }
+      if (!subscription) {
+        console.error('[WayForPay] Subscription not found:', orderReference)
+        return res.status(404).json({ error: 'Subscription not found' })
+      }
 
-    const userId = transaction.user_id
+      const userId = subscription.user_id
 
-    // Update transaction status
-    await supabase
-      .from('credit_transactions')
-      .update({
-        payment_status: transactionStatus === 'Approved' ? 'completed' : 'failed',
-      })
-      .eq('id', transaction.id)
+      // Update subscription status
+      await supabase
+        .from('user_subscriptions')
+        .update({
+          payment_status: transactionStatus === 'Approved' ? 'completed' : 'failed',
+        })
+        .eq('id', subscription.id)
 
-    // If payment approved, add credits
-    if (transactionStatus === 'Approved') {
-      const balanceBefore = await CreditsService.getUserCredits(userId)
-      const packageId = transaction.operation?.replace('topup_', '') || ''
-      const packageData = await CreditsService.getPackage(packageId)
-      
-      if (packageData) {
-        // Add credits (skip transaction log since we already have one)
-        const balanceAfter = await CreditsService.addCredits(
-          userId,
-          packageData.credits,
-          `topup_${packageData.id}`,
-          true // Skip transaction log
-        )
+      // If payment approved, activate subscription
+      if (transactionStatus === 'Approved') {
+        await SubscriptionService.activateSubscription(userId, orderReference)
+      }
+    } else {
+      // Handle top-up payment (legacy support)
+      const { data: transaction } = await supabase
+        .from('credit_transactions')
+        .select('*, user_id')
+        .eq('payment_id', orderReference)
+        .eq('type', 'topup')
+        .single()
 
-        // Update the original transaction with final balance and status
-        await supabase
-          .from('credit_transactions')
-          .update({
-            balance_after: balanceAfter,
-            amount: packageData.credits,
-            payment_status: 'completed',
-          })
-          .eq('id', transaction.id)
+      if (!transaction) {
+        console.error('[WayForPay] Transaction not found:', orderReference)
+        return res.status(404).json({ error: 'Transaction not found' })
+      }
+
+      const userId = transaction.user_id
+
+      // Update transaction status
+      await supabase
+        .from('credit_transactions')
+        .update({
+          payment_status: transactionStatus === 'Approved' ? 'completed' : 'failed',
+        })
+        .eq('id', transaction.id)
+
+      // If payment approved, add credits
+      if (transactionStatus === 'Approved') {
+        const balanceBefore = await CreditsService.getUserCredits(userId)
+        const packageId = transaction.operation?.replace('topup_', '') || ''
+        const packageData = await CreditsService.getPackage(packageId)
+        
+        if (packageData) {
+          // Add credits (skip transaction log since we already have one)
+          const balanceAfter = await CreditsService.addCredits(
+            userId,
+            packageData.credits,
+            `topup_${packageData.id}`,
+            true // Skip transaction log
+          )
+
+          // Update the original transaction with final balance and status
+          await supabase
+            .from('credit_transactions')
+            .update({
+              balance_after: balanceAfter,
+              amount: packageData.credits,
+              payment_status: 'completed',
+            })
+            .eq('id', transaction.id)
+        }
       }
     }
 
