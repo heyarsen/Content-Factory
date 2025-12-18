@@ -171,7 +171,8 @@ router.post('/topup', authenticate, async (req: AuthRequest, res: Response) => {
       productName: `Credits: ${pkg.display_name}`,
       clientAccountId: userId,
       clientEmail: user.user.email || undefined,
-      returnUrl: `${backendBaseUrl}/api/credits/return`,
+      // Include order reference in query so we can redirect even if WayForPay posts multipart/form-data
+      returnUrl: `${backendBaseUrl}/api/credits/return?order=${encodeURIComponent(orderReference)}`,
       serviceUrl: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/credits/webhook`,
     })
 
@@ -250,7 +251,8 @@ router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) 
       clientEmail: user.user.email || undefined,
       // IMPORTANT: WayForPay hosted checkout may POST to returnUrl. A SPA route can't handle POST reliably.
       // Route returnUrl to backend and then 302 redirect to frontend with query params.
-      returnUrl: `${backendBaseUrl}/api/credits/return`,
+      // Include order reference in query so we can redirect even if WayForPay posts multipart/form-data
+      returnUrl: `${backendBaseUrl}/api/credits/return?order=${encodeURIComponent(orderReference)}`,
       serviceUrl: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/credits/webhook`,
     })
 
@@ -416,7 +418,7 @@ router.all('/return', async (req: Request, res: Response) => {
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
     const orderReference =
       (req.body && (req.body.orderReference || req.body.order_reference)) ||
-      (req.query && (req.query.orderReference || req.query.order_reference))
+      (req.query && (req.query.orderReference || req.query.order_reference || req.query.order))
 
     const transactionStatus =
       (req.body && (req.body.transactionStatus || req.body.transaction_status)) ||
