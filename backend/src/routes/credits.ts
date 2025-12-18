@@ -160,6 +160,7 @@ router.post('/topup', authenticate, async (req: AuthRequest, res: Response) => {
 
     // Create hosted payment form
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+    const backendBaseUrl = process.env.BACKEND_URL || 'http://localhost:3001'
     const hostedForm = WayForPayService.createHostedPaymentForm({
       orderReference,
       amount: parseFloat(pkg.price_usd.toString()),
@@ -167,7 +168,7 @@ router.post('/topup', authenticate, async (req: AuthRequest, res: Response) => {
       productName: `Credits: ${pkg.display_name}`,
       clientAccountId: userId,
       clientEmail: user.user.email || undefined,
-      returnUrl: `${baseUrl}/credits?status=success&order=${orderReference}`,
+      returnUrl: `${backendBaseUrl}/api/credits/return`,
       serviceUrl: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/credits/webhook`,
     })
 
@@ -233,6 +234,7 @@ router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) 
       })
     }
 
+    const backendBaseUrl = process.env.BACKEND_URL || 'http://localhost:3001'
     const hostedForm = WayForPayService.createHostedPaymentForm({
       orderReference,
       amount: amountToCharge,
@@ -240,7 +242,9 @@ router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) 
       productName: `Subscription: ${plan.display_name}`,
       clientAccountId: userId,
       clientEmail: user.user.email || undefined,
-      returnUrl: `${baseUrl}/credits?status=success&order=${orderReference}`,
+      // IMPORTANT: WayForPay hosted checkout may POST to returnUrl. A SPA route can't handle POST reliably.
+      // Route returnUrl to backend and then 302 redirect to frontend with query params.
+      returnUrl: `${backendBaseUrl}/api/credits/return`,
       serviceUrl: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/credits/webhook`,
     })
 
@@ -392,6 +396,42 @@ router.post('/webhook', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('[WayForPay] Webhook error:', error)
     res.status(500).json({ error: 'Webhook processing failed' })
+  }
+})
+
+/**
+ * GET/POST /api/credits/return
+ * WayForPay returns the user back to returnUrl. In hosted checkout this can be a POST.
+ * A SPA/static host often cannot handle POST to a route, so we terminate the POST here
+ * and redirect the browser to the frontend with query params (GET).
+ */
+router.all('/return', async (req: Request, res: Response) => {
+  try {
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+    const orderReference =
+      (req.body && (req.body.orderReference || req.body.order_reference)) ||
+      (req.query && (req.query.orderReference || req.query.order_reference))
+
+    const transactionStatus =
+      (req.body && (req.body.transactionStatus || req.body.transaction_status)) ||
+      (req.query && (req.query.transactionStatus || req.query.transaction_status))
+
+    console.log('[WayForPay] ReturnUrl hit:', {
+      method: req.method,
+      orderReference,
+      transactionStatus,
+    })
+
+    if (typeof orderReference === 'string' && orderReference.length > 0) {
+      // We always redirect as GET so frontend can run check-status polling.
+      const redirectUrl = `${baseUrl}/credits?status=success&order=${encodeURIComponent(orderReference)}`
+      return res.redirect(302, redirectUrl)
+    }
+
+    return res.redirect(302, `${baseUrl}/credits?status=success`)
+  } catch (error: any) {
+    console.error('[WayForPay] ReturnUrl handler error:', error)
+    return res.status(500).send('Return handler failed')
   }
 })
 
