@@ -15,11 +15,13 @@ import { Input } from '../components/ui/Input'
 import { LookGenerationModal } from '../components/avatars/LookGenerationModal'
 import { ManageLooksModal } from '../components/avatars/ManageLooksModal'
 import { Modal } from '../components/ui/Modal'
+import { useNavigate } from 'react-router-dom'
 
 // (Motion metadata removed for simplicity; show all looks as-is)
 
 function AvatarsContent() {
   const { toast } = useToast()
+  const navigate = useNavigate()
   const { selectedAvatarId, setSelectedAvatarId } = useAvatarWorkspace()
   const panel = useContextPanel()
   
@@ -56,6 +58,31 @@ function AvatarsContent() {
   const [aiGenerationId, setAiGenerationId] = useState<string | null>(null)
   const [aiConfirmingPhoto, setAiConfirmingPhoto] = useState(false)
   const [aiRequestName, setAiRequestName] = useState<string | null>(null)
+
+  // Billing / credits gate modal (subscription required or out of credits)
+  const [billingModalOpen, setBillingModalOpen] = useState(false)
+  const [billingModalTitle, setBillingModalTitle] = useState('Action required')
+  const [billingModalMessage, setBillingModalMessage] = useState<string>('')
+  const [billingNeedsSubscription, setBillingNeedsSubscription] = useState(false)
+
+  const showBillingGate = useCallback((error: any) => {
+    const message =
+      error?.response?.data?.error ||
+      error?.message ||
+      'You need an active subscription and enough credits to use this feature.'
+
+    const needsSubscription =
+      typeof message === 'string' && message.toLowerCase().includes('subscription')
+
+    setBillingNeedsSubscription(needsSubscription)
+    setBillingModalTitle(needsSubscription ? 'Subscription required' : 'Not enough credits')
+    setBillingModalMessage(
+      typeof message === 'string'
+        ? message
+        : 'You need an active subscription and enough credits to use this feature.'
+    )
+    setBillingModalOpen(true)
+  }, [])
 
   const {
     avatars,
@@ -408,6 +435,11 @@ function AvatarsContent() {
 
       setTimeout(checkStatus, 5000)
     } catch (error: any) {
+      if (error?.response?.status === 402) {
+        showBillingGate(error)
+        setCheckingStatus(false)
+        return
+      }
       const errorMessage = formatSpecificError(error)
       setAiGenerationError(errorMessage)
       handleError(error, {
@@ -484,6 +516,10 @@ function AvatarsContent() {
       setAiGenerationId(null)
       setAiRequestName(null)
     } catch (error: any) {
+      if (error?.response?.status === 402) {
+        showBillingGate(error)
+        return
+      }
       const errorMessage = formatSpecificError(error)
       setAiGenerationError(errorMessage)
       handleError(error, {
@@ -504,6 +540,7 @@ function AvatarsContent() {
     loadAvatars,
     invalidateLooksCache,
     toast,
+    showBillingGate,
   ])
 
   // Handle look generation
@@ -519,11 +556,14 @@ function AvatarsContent() {
       })
       // Only close panel on success
       panel.closePanel()
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.response?.status === 402) {
+        showBillingGate(error)
+      }
       // Error is already handled by useLookGeneration hook
       // Don't close panel so user can see the error and try again
     }
-  }, [generateLook, panel])
+  }, [generateLook, panel, showBillingGate])
 
   const openGenerateLookModal = useCallback((avatar?: Avatar) => {
     if (avatar) {
@@ -571,6 +611,10 @@ function AvatarsContent() {
         setSelectedAvatarId(newAvatar.id)
       }
     } catch (error: any) {
+      if (error?.response?.status === 402) {
+        showBillingGate(error)
+        return
+      }
       const errorMessage = formatSpecificError(error)
       handleError(error, {
         showToast: true,
@@ -666,6 +710,38 @@ function AvatarsContent() {
             ))}
           </div>
         </div>
+
+      {/* Billing / Credits Gate */}
+      <Modal
+        isOpen={billingModalOpen}
+        onClose={() => setBillingModalOpen(false)}
+        title={billingModalTitle}
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-700">{billingModalMessage}</p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setBillingModalOpen(false)
+                navigate('/credits')
+              }}
+            >
+              {billingNeedsSubscription ? 'Buy subscription' : 'Top up credits'}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                setBillingModalOpen(false)
+                navigate('/credits')
+              }}
+            >
+              Manage billing
+            </Button>
+          </div>
+        </div>
+      </Modal>
       </Layout>
     )
   }

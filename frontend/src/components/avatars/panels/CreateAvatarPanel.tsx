@@ -149,6 +149,7 @@ export function CreateAvatarPanel({ onCreate, onGenerateAI }: CreateAvatarPanelP
         {photoFiles.length === 0 ? (
           <div className="flex items-center justify-center h-32 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 text-sm">
             <button
+              type="button"
               onClick={() => createPhotoInputRef.current?.click()}
               className="flex flex-col items-center gap-2 hover:text-slate-600 transition-colors"
             >
@@ -169,6 +170,7 @@ export function CreateAvatarPanel({ onCreate, onGenerateAI }: CreateAvatarPanelP
                 <img src={preview} alt={`Avatar photo ${index + 1}`} className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation()
                       handleRemovePhoto(index)
@@ -185,6 +187,7 @@ export function CreateAvatarPanel({ onCreate, onGenerateAI }: CreateAvatarPanelP
             ))}
             {photoFiles.length < MAX_PHOTOS && (
               <button
+                type="button"
                 onClick={() => createPhotoInputRef.current?.click()}
                 className="aspect-square border-2 border-dashed border-slate-200 rounded-lg flex items-center justify-center text-slate-400 hover:border-slate-300 hover:text-slate-500 transition-colors"
               >

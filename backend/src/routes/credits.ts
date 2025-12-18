@@ -100,6 +100,89 @@ router.get('/plans', authenticate, async (req: AuthRequest, res: Response) => {
 })
 
 /**
+ * GET /api/credits/packages
+ * Get available credit top-up packages
+ */
+router.get('/packages', authenticate, async (_req: AuthRequest, res: Response) => {
+  try {
+    const packages = await CreditsService.getCreditPackages()
+    res.json({ packages })
+  } catch (error: any) {
+    console.error('Get packages error:', error)
+    res.status(500).json({ error: 'Failed to get packages' })
+  }
+})
+
+/**
+ * POST /api/credits/topup
+ * Purchase a credit package (requires active subscription)
+ */
+router.post('/topup', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { packageId } = req.body
+
+    if (!packageId) {
+      return res.status(400).json({ error: 'Package ID is required' })
+    }
+
+    // Require active subscription before allowing topups
+    const hasSub = await SubscriptionService.hasActiveSubscription(userId)
+    if (!hasSub) {
+      return res.status(402).json({ error: 'You need an active subscription before you can top up credits.' })
+    }
+
+    const pkg = await CreditsService.getPackage(packageId)
+    if (!pkg) {
+      return res.status(404).json({ error: 'Package not found' })
+    }
+
+    // Get user info for payment
+    const { data: user } = await supabase.auth.admin.getUserById(userId)
+    if (!user || !user.user) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    const orderReference = `topup_${userId}_${Date.now()}`
+
+    const balanceBefore = await CreditsService.getUserCredits(userId)
+    await CreditsService.createTransaction(
+      userId,
+      'topup',
+      pkg.credits,
+      balanceBefore,
+      balanceBefore,
+      `topup_${pkg.id}`,
+      `Top up ${pkg.credits} credits (${pkg.description || pkg.display_name || ''})`,
+      orderReference,
+      'pending'
+    )
+
+    // Create hosted payment form
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+    const hostedForm = WayForPayService.createHostedPaymentForm({
+      orderReference,
+      amount: parseFloat(pkg.price_usd.toString()),
+      currency: 'USD',
+      productName: `Credits: ${pkg.display_name}`,
+      clientAccountId: userId,
+      clientEmail: user.user.email || undefined,
+      returnUrl: `${baseUrl}/credits?status=success&order=${orderReference}`,
+      serviceUrl: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/credits/webhook`,
+    })
+
+    res.json({
+      orderReference,
+      paymentUrl: hostedForm.paymentUrl,
+      paymentFields: hostedForm.fields,
+    })
+  } catch (error: any) {
+    console.error('Topup error:', error)
+    res.status(500).json({ error: error.message || 'Failed to initiate top-up' })
+  }
+})
+
+/**
  * POST /api/credits/subscribe
  * Purchase a subscription plan
  */

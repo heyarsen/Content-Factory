@@ -30,6 +30,14 @@ interface CreditTransaction {
   created_at: string
 }
 
+interface CreditPackage {
+  id: string
+  credits: number
+  price_usd: number
+  display_name: string
+  description: string | null
+}
+
 interface UserSubscription {
   id: string
   plan_id: string
@@ -50,9 +58,13 @@ export function Credits() {
   const [subscription, setSubscription] = useState<UserSubscription | null>(null)
   const [hasSubscription, setHasSubscription] = useState(false)
   const [loadingSubscription, setLoadingSubscription] = useState(true)
+  const [packages, setPackages] = useState<CreditPackage[]>([])
+  const [loadingPackages, setLoadingPackages] = useState(true)
+  const [toppingUp, setToppingUp] = useState<string | null>(null)
 
   useEffect(() => {
     loadPlans()
+    loadPackages()
     loadTransactionHistory()
     loadSubscriptionStatus()
     
@@ -95,6 +107,18 @@ export function Credits() {
       console.error('Failed to load subscription status:', error)
     } finally {
       setLoadingSubscription(false)
+    }
+  }
+
+  const loadPackages = async () => {
+    try {
+      setLoadingPackages(true)
+      const response = await api.get('/api/credits/packages')
+      setPackages(response.data.packages || [])
+    } catch (error: any) {
+      console.error('Failed to load packages:', error)
+    } finally {
+      setLoadingPackages(false)
     }
   }
 
@@ -153,6 +177,41 @@ export function Credits() {
         message: error.response?.data?.error || 'Failed to initiate purchase',
       })
       setPurchasing(null)
+    }
+  }
+
+  const handleTopUp = async (packageId: string) => {
+    try {
+      if (!hasSubscription) {
+        addNotification({
+          type: 'warning',
+          title: 'Subscription Required',
+          message: 'You need an active subscription before you can top up credits.',
+        })
+        return
+      }
+
+      setToppingUp(packageId)
+      const response = await api.post('/api/credits/topup', { packageId })
+
+      if (response.data.paymentUrl && response.data.paymentFields) {
+        submitWayForPayForm(response.data.paymentUrl, response.data.paymentFields)
+      } else {
+        addNotification({
+          type: 'error',
+          title: 'Payment Error',
+          message: 'Failed to initiate top-up payment',
+        })
+      }
+    } catch (error: any) {
+      console.error('Top up error:', error)
+      addNotification({
+        type: 'error',
+        title: 'Top Up Error',
+        message: error.response?.data?.error || 'Failed to initiate top-up',
+      })
+    } finally {
+      setToppingUp(null)
     }
   }
 
@@ -333,6 +392,44 @@ export function Credits() {
                   </Card>
                 )
               })}
+            </div>
+          )}
+        </div>
+
+        {/* Credit Top-ups */}
+        <div>
+          <h2 className="mb-2 text-xl font-semibold text-slate-900">Top up credits</h2>
+          <p className="mb-4 text-sm text-slate-600">
+            {hasSubscription
+              ? 'Buy additional credits for your active subscription.'
+              : 'Top-ups are available after you purchase a subscription.'}
+          </p>
+
+          {loadingPackages ? (
+            <div className="grid gap-4 md:grid-cols-5">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Skeleton key={i} className="h-36" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-5">
+              {packages.map((pkg) => (
+                <Card key={pkg.id} className={`p-4 ${!hasSubscription ? 'opacity-60' : ''}`}>
+                  <div className="flex flex-col gap-2">
+                    <div className="text-lg font-bold text-slate-900">{pkg.credits} credits</div>
+                    <div className="text-sm text-slate-600">{pkg.description || pkg.display_name}</div>
+                    <div className="text-xl font-bold text-brand-600">${pkg.price_usd.toFixed(2)}</div>
+                    <Button
+                      onClick={() => handleTopUp(pkg.id)}
+                      disabled={!hasSubscription || toppingUp === pkg.id}
+                      variant={!hasSubscription ? 'ghost' : 'secondary'}
+                      className="w-full"
+                    >
+                      {!hasSubscription ? 'Subscribe first' : toppingUp === pkg.id ? 'Processing...' : 'Top up'}
+                    </Button>
+                  </div>
+                </Card>
+              ))}
             </div>
           )}
         </div>
