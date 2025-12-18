@@ -160,7 +160,10 @@ router.post('/topup', authenticate, async (req: AuthRequest, res: Response) => {
 
     // Create hosted payment form
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
-    const backendBaseUrl = process.env.BACKEND_URL || 'http://localhost:3001'
+    // Hosted checkout may POST to returnUrl, so point it to backend and then redirect to frontend.
+    // Auto-detect backend URL from request (works in prod where port may be 8080), but allow env override.
+    const detectedBackendBaseUrl = `${req.protocol}://${req.get('host')}`
+    const backendBaseUrl = process.env.BACKEND_URL || detectedBackendBaseUrl
     const hostedForm = WayForPayService.createHostedPaymentForm({
       orderReference,
       amount: parseFloat(pkg.price_usd.toString()),
@@ -219,6 +222,10 @@ router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) 
     // you can temporarily force the charged amount via env var.
     // Example: WAYFORPAY_FORCE_AMOUNT_USD=1
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+    // Hosted checkout may POST to returnUrl, so point it to backend and then redirect to frontend.
+    // Auto-detect backend URL from request (works in prod where port may be 8080), but allow env override.
+    const detectedBackendBaseUrl = `${req.protocol}://${req.get('host')}`
+    const backendBaseUrl = process.env.BACKEND_URL || detectedBackendBaseUrl
     const forcedAmountUsdRaw = process.env.WAYFORPAY_FORCE_AMOUNT_USD
     const forcedAmountUsd = forcedAmountUsdRaw ? Number(forcedAmountUsdRaw) : null
     const planAmountUsd = parseFloat(plan.price_usd.toString())
@@ -234,7 +241,6 @@ router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) 
       })
     }
 
-    const backendBaseUrl = process.env.BACKEND_URL || 'http://localhost:3001'
     const hostedForm = WayForPayService.createHostedPaymentForm({
       orderReference,
       amount: amountToCharge,
