@@ -58,6 +58,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', closeOnOv
           <h3 className="text-lg font-semibold text-slate-900 truncate pr-2">{title}</h3>
           {showCloseButton && (
       <button
+        type="button"
         onClick={handleClose}
               className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-200 flex-shrink-0"
               aria-label="Close modal"
