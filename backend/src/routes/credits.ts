@@ -173,7 +173,8 @@ router.post('/topup', authenticate, async (req: AuthRequest, res: Response) => {
       clientEmail: user.user.email || undefined,
       // Include order reference in query so we can redirect even if WayForPay posts multipart/form-data
       returnUrl: `${backendBaseUrl}/api/credits/return?order=${encodeURIComponent(orderReference)}`,
-      serviceUrl: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/credits/webhook`,
+      // Webhook must be reachable by WayForPay; prefer env override, otherwise use detected backend URL
+      serviceUrl: `${process.env.BACKEND_URL || backendBaseUrl}/api/credits/webhook`,
     })
 
     res.json({
@@ -253,7 +254,8 @@ router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) 
       // Route returnUrl to backend and then 302 redirect to frontend with query params.
       // Include order reference in query so we can redirect even if WayForPay posts multipart/form-data
       returnUrl: `${backendBaseUrl}/api/credits/return?order=${encodeURIComponent(orderReference)}`,
-      serviceUrl: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/credits/webhook`,
+      // Webhook must be reachable by WayForPay; prefer env override, otherwise use detected backend URL
+      serviceUrl: `${process.env.BACKEND_URL || backendBaseUrl}/api/credits/webhook`,
     })
 
     res.json({
@@ -415,7 +417,10 @@ router.post('/webhook', async (req: Request, res: Response) => {
  */
 router.all('/return', async (req: Request, res: Response) => {
   try {
-    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+    // Redirect back to frontend as a GET. In many deployments, frontend is served by this same server.
+    // Prefer explicit FRONTEND_URL, otherwise use detected origin from this request (host/port).
+    const detectedOrigin = `${req.protocol}://${req.get('host')}`
+    const baseUrl = process.env.FRONTEND_URL || detectedOrigin
     const orderReference =
       (req.body && (req.body.orderReference || req.body.order_reference)) ||
       (req.query && (req.query.orderReference || req.query.order_reference || req.query.order))
