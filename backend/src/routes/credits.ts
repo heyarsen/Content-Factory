@@ -131,10 +131,28 @@ router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) 
     await SubscriptionService.createSubscription(userId, planId, orderReference, 'pending')
 
     // Create WayForPay hosted payment form (redirect checkout)
+    // NOTE: To allow cheap testing without changing plan prices in DB,
+    // you can temporarily force the charged amount via env var.
+    // Example: WAYFORPAY_FORCE_AMOUNT_USD=1
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+    const forcedAmountUsdRaw = process.env.WAYFORPAY_FORCE_AMOUNT_USD
+    const forcedAmountUsd = forcedAmountUsdRaw ? Number(forcedAmountUsdRaw) : null
+    const planAmountUsd = parseFloat(plan.price_usd.toString())
+    const amountToCharge = forcedAmountUsd && Number.isFinite(forcedAmountUsd) && forcedAmountUsd > 0
+      ? forcedAmountUsd
+      : planAmountUsd
+
+    if (forcedAmountUsd && amountToCharge !== planAmountUsd) {
+      console.log('[Credits API] WAYFORPAY_FORCE_AMOUNT_USD override active:', {
+        planId,
+        planAmountUsd,
+        amountToCharge,
+      })
+    }
+
     const hostedForm = WayForPayService.createHostedPaymentForm({
       orderReference,
-      amount: parseFloat(plan.price_usd.toString()),
+      amount: amountToCharge,
       currency: 'USD',
       productName: `Subscription: ${plan.display_name}`,
       clientAccountId: userId,
