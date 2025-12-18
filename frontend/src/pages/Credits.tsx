@@ -112,14 +112,32 @@ export function Credits() {
     }
   }
 
+  const submitWayForPayForm = (paymentUrl: string, fields: Record<string, string>) => {
+    // WayForPay hosted checkout expects a POSTed HTML form
+    const form = document.createElement('form')
+    form.method = 'POST'
+    form.action = paymentUrl
+    form.style.display = 'none'
+
+    Object.entries(fields || {}).forEach(([name, value]) => {
+      const input = document.createElement('input')
+      input.type = 'hidden'
+      input.name = name
+      input.value = value ?? ''
+      form.appendChild(input)
+    })
+
+    document.body.appendChild(form)
+    form.submit()
+  }
+
   const handlePurchase = async (planId: string) => {
     try {
       setPurchasing(planId)
       const response = await api.post('/api/credits/subscribe', { planId })
       
-      if (response.data.invoiceUrl) {
-        // Redirect to WayForPay payment page
-        window.location.href = response.data.invoiceUrl
+      if (response.data.paymentUrl && response.data.paymentFields) {
+        submitWayForPayForm(response.data.paymentUrl, response.data.paymentFields)
       } else {
         addNotification({
           type: 'error',
@@ -142,7 +160,9 @@ export function Credits() {
     try {
       const response = await api.get(`/api/credits/check-status/${orderReference}`)
       
-      if (response.data.status === 'Approved') {
+      // Backend may return either WayForPay orderStatus (e.g. 'Approved') or our normalized 'completed'
+      const status = response.data.status
+      if (status === 'Approved' || status === 'completed') {
         addNotification({
           type: 'success',
           title: 'Payment Successful',
