@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { NotificationProvider } from './contexts/NotificationContext'
+import { BillingGateProvider } from './contexts/BillingGateContext'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import { AuthHashHandler } from './components/auth/AuthHashHandler'
 import { ToastContainer } from './components/ui/Toast'
@@ -200,7 +201,9 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <NotificationProvider>
-          <AppContent />
+          <BillingGateProvider>
+            <AppContent />
+          </BillingGateProvider>
         </NotificationProvider>
       </AuthProvider>
     </BrowserRouter>

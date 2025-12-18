@@ -14,7 +14,6 @@ import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { LookGenerationModal } from '../components/avatars/LookGenerationModal'
 import { ManageLooksModal } from '../components/avatars/ManageLooksModal'
-import { Modal } from '../components/ui/Modal'
 import { useNavigate } from 'react-router-dom'
 
 // (Motion metadata removed for simplicity; show all looks as-is)
@@ -59,30 +58,8 @@ function AvatarsContent() {
   const [aiConfirmingPhoto, setAiConfirmingPhoto] = useState(false)
   const [aiRequestName, setAiRequestName] = useState<string | null>(null)
 
-  // Billing / credits gate modal (subscription required or out of credits)
-  const [billingModalOpen, setBillingModalOpen] = useState(false)
-  const [billingModalTitle, setBillingModalTitle] = useState('Action required')
-  const [billingModalMessage, setBillingModalMessage] = useState<string>('')
-  const [billingNeedsSubscription, setBillingNeedsSubscription] = useState(false)
-
-  const showBillingGate = useCallback((error: any) => {
-    const message =
-      error?.response?.data?.error ||
-      error?.message ||
-      'You need an active subscription and enough credits to use this feature.'
-
-    const needsSubscription =
-      typeof message === 'string' && message.toLowerCase().includes('subscription')
-
-    setBillingNeedsSubscription(needsSubscription)
-    setBillingModalTitle(needsSubscription ? 'Subscription required' : 'Not enough credits')
-    setBillingModalMessage(
-      typeof message === 'string'
-        ? message
-        : 'You need an active subscription and enough credits to use this feature.'
-    )
-    setBillingModalOpen(true)
-  }, [])
+  // Billing gate is handled globally now (BillingGateProvider + axios interceptor),
+  // but we keep local checks to stop spinners/polling immediately on 402.
 
   const {
     avatars,
@@ -436,7 +413,6 @@ function AvatarsContent() {
       setTimeout(checkStatus, 5000)
     } catch (error: any) {
       if (error?.response?.status === 402) {
-        showBillingGate(error)
         setCheckingStatus(false)
         return
       }
@@ -517,7 +493,6 @@ function AvatarsContent() {
       setAiRequestName(null)
     } catch (error: any) {
       if (error?.response?.status === 402) {
-        showBillingGate(error)
         return
       }
       const errorMessage = formatSpecificError(error)
@@ -540,7 +515,6 @@ function AvatarsContent() {
     loadAvatars,
     invalidateLooksCache,
     toast,
-    showBillingGate,
   ])
 
   // Handle look generation
@@ -558,12 +532,12 @@ function AvatarsContent() {
       panel.closePanel()
     } catch (error: any) {
       if (error?.response?.status === 402) {
-        showBillingGate(error)
+        return
       }
       // Error is already handled by useLookGeneration hook
       // Don't close panel so user can see the error and try again
     }
-  }, [generateLook, panel, showBillingGate])
+  }, [generateLook, panel])
 
   const openGenerateLookModal = useCallback((avatar?: Avatar) => {
     if (avatar) {
@@ -612,7 +586,6 @@ function AvatarsContent() {
       }
     } catch (error: any) {
       if (error?.response?.status === 402) {
-        showBillingGate(error)
         return
       }
       const errorMessage = formatSpecificError(error)
@@ -711,37 +684,7 @@ function AvatarsContent() {
           </div>
         </div>
 
-      {/* Billing / Credits Gate */}
-      <Modal
-        isOpen={billingModalOpen}
-        onClose={() => setBillingModalOpen(false)}
-        title={billingModalTitle}
-        size="md"
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-slate-700">{billingModalMessage}</p>
-          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setBillingModalOpen(false)
-                navigate('/credits')
-              }}
-            >
-              {billingNeedsSubscription ? 'Buy subscription' : 'Top up credits'}
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => {
-                setBillingModalOpen(false)
-                navigate('/credits')
-              }}
-            >
-              Manage billing
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      {/* Billing / Credits Gate is handled globally by BillingGateProvider */}
       </Layout>
     )
   }
