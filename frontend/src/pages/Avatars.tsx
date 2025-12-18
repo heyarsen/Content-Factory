@@ -14,13 +14,12 @@ import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { LookGenerationModal } from '../components/avatars/LookGenerationModal'
 import { ManageLooksModal } from '../components/avatars/ManageLooksModal'
-import { useNavigate } from 'react-router-dom'
+import { Modal } from '../components/ui/Modal'
 
 // (Motion metadata removed for simplicity; show all looks as-is)
 
 function AvatarsContent() {
   const { toast } = useToast()
-  const navigate = useNavigate()
   const { selectedAvatarId, setSelectedAvatarId } = useAvatarWorkspace()
   const panel = useContextPanel()
   

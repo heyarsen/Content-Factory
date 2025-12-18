@@ -59,6 +59,13 @@ export function BillingGateProvider({ children }: { children: ReactNode }) {
       <Modal isOpen={state.isOpen} onClose={close} title={state.title} size="md">
         <div className="space-y-4">
           <p className="text-sm text-slate-700">{state.message}</p>
+          <p className="text-xs text-slate-500">
+            If you already paid for a subscription but still see this error, contact us at{' '}
+            <a className="text-brand-600 hover:underline" href="mailto:support@contentfabrica.com">
+              support@contentfabrica.com
+            </a>
+            .
+          </p>
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
             <Button
               variant="secondary"
