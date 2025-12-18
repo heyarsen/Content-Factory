@@ -130,9 +130,9 @@ router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) 
     // Create pending subscription
     await SubscriptionService.createSubscription(userId, planId, orderReference, 'pending')
 
-    // Create WayForPay purchase request
+    // Create WayForPay hosted payment form (redirect checkout)
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
-    const purchaseResponse = await WayForPayService.createPurchase({
+    const hostedForm = WayForPayService.createHostedPaymentForm({
       orderReference,
       amount: parseFloat(plan.price_usd.toString()),
       currency: 'USD',
@@ -143,16 +143,10 @@ router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) 
       serviceUrl: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/credits/webhook`,
     })
 
-    if (purchaseResponse.reasonCode !== 0) {
-      return res.status(400).json({ 
-        error: purchaseResponse.reason || 'Failed to create purchase' 
-      })
-    }
-
     res.json({
       orderReference,
-      invoiceUrl: purchaseResponse.invoiceUrl,
-      qrCode: purchaseResponse.qrCode,
+      paymentUrl: hostedForm.paymentUrl,
+      paymentFields: hostedForm.fields,
     })
   } catch (error: any) {
     console.error('Top-up error:', error)

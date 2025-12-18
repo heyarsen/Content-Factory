@@ -43,6 +43,11 @@ export interface WayForPayPurchaseResponse {
   orderReference?: string
 }
 
+export interface WayForPayHostedPaymentForm {
+  paymentUrl: string
+  fields: Record<string, string>
+}
+
 export interface WayForPayStatusRequest {
   transactionType: string
   merchantAccount: string
@@ -224,6 +229,81 @@ export class WayForPayService {
         status: error.response?.status,
       })
       throw new Error(`WayForPay purchase failed: ${error.response?.data?.reason || error.message}`)
+    }
+  }
+
+  /**
+   * Create hosted payment form payload (WayForPay checkout redirect flow).
+   * Frontend should POST these fields to paymentUrl.
+   */
+  static createHostedPaymentForm(request: {
+    orderReference: string
+    amount: number
+    currency?: string
+    productName: string
+    clientAccountId?: string
+    clientEmail?: string
+    clientFirstName?: string
+    clientLastName?: string
+    clientPhone?: string
+    returnUrl?: string
+    serviceUrl?: string
+    language?: string
+  }): WayForPayHostedPaymentForm {
+    const config = this.getConfig()
+    const orderDate = Math.floor(Date.now() / 1000)
+
+    // Signature fields for hosted checkout flow
+    const signatureFields = [
+      config.merchantAccount,
+      config.merchantDomainName,
+      request.orderReference,
+      orderDate.toString(),
+      request.amount.toString(),
+      request.currency || 'USD',
+      request.productName,
+      '1',
+      request.amount.toString(),
+    ]
+
+    const merchantSignature = this.generateSignature(signatureFields)
+
+    // WayForPay hosted payment page expects form fields (POST)
+    const fields: Record<string, string> = {
+      merchantAccount: config.merchantAccount,
+      merchantAuthType: 'SimpleSignature',
+      merchantDomainName: config.merchantDomainName,
+      orderReference: request.orderReference,
+      orderDate: String(orderDate),
+      amount: String(request.amount),
+      currency: request.currency || 'USD',
+      merchantSignature,
+      language: request.language || 'EN',
+      // arrays in form fields
+      'productName[]': request.productName,
+      'productCount[]': '1',
+      'productPrice[]': String(request.amount),
+    }
+
+    if (request.clientAccountId) fields.clientAccountId = request.clientAccountId
+    if (request.clientEmail) fields.clientEmail = request.clientEmail
+    if (request.clientFirstName) fields.clientFirstName = request.clientFirstName
+    if (request.clientLastName) fields.clientLastName = request.clientLastName
+    if (request.clientPhone) fields.clientPhone = request.clientPhone
+    if (request.returnUrl) fields.returnUrl = request.returnUrl
+    if (request.serviceUrl) fields.serviceUrl = request.serviceUrl
+
+    console.log('[WayForPay] Hosted payment form created:', {
+      orderReference: request.orderReference,
+      amount: request.amount,
+      currency: request.currency || 'USD',
+      hasReturnUrl: !!request.returnUrl,
+      hasServiceUrl: !!request.serviceUrl,
+    })
+
+    return {
+      paymentUrl: 'https://secure.wayforpay.com/pay',
+      fields,
     }
   }
 
