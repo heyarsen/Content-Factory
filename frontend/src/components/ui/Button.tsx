@@ -44,6 +44,9 @@ export function Button({
     <button
       className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${className}`}
       disabled={disabled || loading}
+      // Important: default to type="button" so Buttons inside <form> don't submit/reload pages
+      // Use <Button type="submit"> explicitly where form submission is intended.
+      type={props.type ?? 'button'}
       {...props}
     >
       {loading && (
