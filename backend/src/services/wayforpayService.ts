@@ -326,7 +326,7 @@ export class WayForPayService {
     statusRequest.merchantSignature = this.generateSignature(signatureFields)
 
     try {
-      const response = await axios.post<WayForPayStatusResponse>(
+      const response = await axios.post<any>(
         `${config.apiUrl}/status`,
         statusRequest,
         {
@@ -336,7 +336,19 @@ export class WayForPayService {
         }
       )
 
-      return response.data
+      const data = response.data as any
+
+      // Log raw response for debugging (WayForPay responses can vary)
+      console.log('[WayForPay] Status response:', {
+        orderReference,
+        reasonCode: data?.reasonCode,
+        reason: data?.reason,
+        orderStatus: data?.orderStatus,
+        transactionStatus: data?.transactionStatus,
+        keys: data && typeof data === 'object' ? Object.keys(data) : [],
+      })
+
+      return data as WayForPayStatusResponse
     } catch (error: any) {
       console.error('[WayForPay] Status check error:', error.response?.data || error.message)
       throw new Error(`WayForPay status check failed: ${error.response?.data?.reason || error.message}`)

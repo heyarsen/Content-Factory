@@ -436,7 +436,47 @@ router.all('/return', async (req: Request, res: Response) => {
     })
 
     if (typeof orderReference === 'string' && orderReference.length > 0) {
-      // We always redirect as GET so frontend can run check-status polling.
+      // Best-effort activation right here to avoid relying on webhook (often not reachable) and
+      // to avoid requiring frontend auth for check-status.
+      try {
+        if (orderReference.startsWith('subscription_')) {
+          const { data: sub } = await supabase
+            .from('user_subscriptions')
+            .select('id, user_id, status, payment_status')
+            .eq('payment_id', orderReference)
+            .maybeSingle()
+
+          if (sub) {
+            const statusResp = await WayForPayService.checkStatus(orderReference)
+            const approved =
+              statusResp?.orderStatus === 'Approved' ||
+              statusResp?.transactionStatus === 'Approved' ||
+              statusResp?.transactionStatus === 'approved'
+
+            console.log('[WayForPay] ReturnUrl activation check:', {
+              orderReference,
+              subscriptionId: sub.id,
+              currentStatus: sub.status,
+              currentPaymentStatus: sub.payment_status,
+              approved,
+              orderStatus: (statusResp as any)?.orderStatus,
+              transactionStatus: (statusResp as any)?.transactionStatus,
+            })
+
+            if (approved && sub.payment_status !== 'completed') {
+              await SubscriptionService.activateSubscription(sub.user_id, orderReference)
+              console.log('[WayForPay] Subscription activated via returnUrl:', orderReference)
+            }
+          } else {
+            console.warn('[WayForPay] No subscription found for returnUrl orderReference:', orderReference)
+          }
+        }
+      } catch (activationError: any) {
+        console.error('[WayForPay] ReturnUrl activation error:', activationError)
+        // Continue redirect regardless
+      }
+
+      // We always redirect as GET so frontend can show status and refresh state.
       const redirectUrl = `${baseUrl}/credits?status=success&order=${encodeURIComponent(orderReference)}`
       return res.redirect(302, redirectUrl)
     }
