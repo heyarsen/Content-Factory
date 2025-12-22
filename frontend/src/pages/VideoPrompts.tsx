@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { Layout } from '../components/layout/Layout'
-import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { Textarea } from '../components/ui/Textarea'
@@ -8,11 +7,13 @@ import { Modal } from '../components/ui/Modal'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Skeleton } from '../components/ui/Skeleton'
 import {
-  Sparkles,
+  Search,
   Plus,
   Edit2,
   Trash2,
   Save,
+  FileText,
+  Copy
 } from 'lucide-react'
 import api from '../lib/api'
 import { useNotifications } from '../contexts/NotificationContext'
@@ -38,11 +39,10 @@ export function VideoPrompts() {
   const [deleteModalOpen, setDeleteModalOpen] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [seeding, setSeeding] = useState(false)
 
   const [formData, setFormData] = useState({
     name: '',
-    topic: '',
-    category: '',
     description: '',
     why_important: '',
     useful_tips: '',
@@ -72,8 +72,6 @@ export function VideoPrompts() {
   const handleCreate = () => {
     setFormData({
       name: '',
-      topic: '',
-      category: '',
       description: '',
       why_important: '',
       useful_tips: '',
@@ -85,8 +83,6 @@ export function VideoPrompts() {
   const handleEdit = (prompt: VideoPrompt) => {
     setFormData({
       name: prompt.name,
-      topic: prompt.topic || '',
-      category: prompt.category || '',
       description: prompt.description || '',
       why_important: prompt.why_important || '',
       useful_tips: prompt.useful_tips || '',
@@ -100,7 +96,7 @@ export function VideoPrompts() {
       addNotification({
         type: 'error',
         title: 'Validation Error',
-        message: 'Prompt name is required',
+        message: 'Topic is required',
       })
       return
     }
@@ -108,20 +104,27 @@ export function VideoPrompts() {
     setSaving(true)
     try {
       if (editingPrompt) {
-        // Update existing prompt
-        await api.put(`/api/prompts/${editingPrompt.id}`, formData)
+        await api.put(`/api/prompts/${editingPrompt.id}`, {
+          ...formData,
+          // Preserve other fields or set them to null if not used
+          topic: null,
+          category: 'Research'
+        })
         addNotification({
           type: 'success',
-          title: 'Prompt updated',
-          message: 'Your prompt has been updated successfully',
+          title: 'Research prompt updated',
+          message: 'Your research prompt has been updated successfully',
         })
       } else {
-        // Create new prompt
-        await api.post('/api/prompts', formData)
+        await api.post('/api/prompts', {
+          ...formData,
+          topic: null,
+          category: 'Research'
+        })
         addNotification({
           type: 'success',
-          title: 'Prompt created',
-          message: 'Your new prompt has been created successfully',
+          title: 'Research prompt created',
+          message: 'Your new research prompt has been created successfully',
         })
       }
       setCreateModalOpen(false)
@@ -162,16 +165,63 @@ export function VideoPrompts() {
     }
   }
 
+  const handleSeedDefaults = async () => {
+    setSeeding(true)
+    const defaults = [
+      {
+        name: 'Competitor Analysis',
+        description: 'Analyze top 3 competitors in the niche.',
+        why_important: 'What are they doing well? What are they missing? How can we differentiate?',
+        useful_tips: 'Look at their most popular videos, comments section, and thumbnails.'
+      },
+      {
+        name: 'Audience Pain Points',
+        description: 'Identify core problems the audience is facing.',
+        why_important: 'What questions are they asking in comments? What are their frustrations?',
+        useful_tips: 'Check Reddit, Quora, and YouTube comments.'
+      },
+      {
+        name: 'Trend Research',
+        description: 'Find current trending topics in the industry.',
+        why_important: 'Is this a rising trend or fading? How can we put a unique spin on it?',
+        useful_tips: 'Use Google Trends, Twitter Trending, and TikTok Creative Center.'
+      },
+      {
+        name: 'Product Review',
+        description: 'Deep dive into a specific product or tool.',
+        why_important: 'Pros, cons, pricing, and who is it for?',
+        useful_tips: 'Test the product yourself if possible. Look for hidden features.'
+      }
+    ]
+
+    try {
+      for (const p of defaults) {
+        await api.post('/api/prompts', { ...p, category: 'Research' })
+      }
+      addNotification({
+        type: 'success',
+        title: 'Defaults Added',
+        message: 'Added 4 research templates to your list.'
+      })
+      loadPrompts()
+    } catch (error) {
+      console.error('Failed to seed defaults', error)
+      addNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to add default templates.'
+      })
+    } finally {
+      setSeeding(false)
+    }
+  }
+
   if (loading) {
     return (
       <Layout>
         <div className="space-y-8">
           <Skeleton className="h-32 rounded-[28px]" />
-          <div className="grid gap-6 lg:grid-cols-2">
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-80 rounded-3xl" />
-            ))}
-          </div>
+          <Skeleton className="h-96 rounded-3xl" />
         </div>
       </Layout>
     )
@@ -184,22 +234,21 @@ export function VideoPrompts() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.35em] text-slate-400">
-                prompts
+                RESEARCH
               </p>
               <h1 className="mt-3 text-2xl sm:text-3xl font-semibold text-primary">
-                Video Prompts
+                Research Prompts
               </h1>
               <p className="mt-2 max-w-2xl text-sm text-slate-500">
-                Create and manage reusable prompts for your video planning. These prompts can be
-                used to quickly fill in video details when creating new videos.
+                Manage your research topics and findings. Use these prompts to organize your content research.
               </p>
             </div>
             <div className="flex items-center gap-3">
               <div className="hidden sm:flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-indigo-400 text-white shadow-md">
-                <Sparkles className="h-5 w-5" />
+                <FileText className="h-5 w-5" />
               </div>
               <Button onClick={handleCreate} leftIcon={<Plus className="h-4 w-4" />}>
-                Create Prompt
+                Add Research Topic
               </Button>
             </div>
           </div>
@@ -207,88 +256,71 @@ export function VideoPrompts() {
 
         {prompts.length === 0 ? (
           <EmptyState
-            icon={<Sparkles className="w-16 h-16" />}
-            title="No prompts yet"
-            description="Create your first prompt template to speed up video planning."
+            icon={<Search className="w-16 h-16" />}
+            title="No research prompts yet"
+            description="Start by adding a research topic or use our templates."
             action={
-              <Button onClick={handleCreate} leftIcon={<Plus className="h-4 w-4" />}>
-                Create Your First Prompt
-              </Button>
+              <div className="flex gap-3">
+                <Button onClick={handleCreate} leftIcon={<Plus className="h-4 w-4" />}>
+                  Add Research Topic
+                </Button>
+                <Button variant="secondary" onClick={handleSeedDefaults} loading={seeding} leftIcon={<Copy className="h-4 w-4" />}>
+                  Use Templates
+                </Button>
+              </div>
             }
           />
         ) : (
-          <div className="grid gap-6 lg:grid-cols-2">
-            {prompts.map((prompt) => (
-              <Card key={prompt.id} className="flex h-full flex-col gap-4 p-5 sm:p-6">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 space-y-2">
-                    <h2 className="text-base sm:text-lg font-semibold text-primary">
-                      {prompt.name}
-                    </h2>
-                    {prompt.category && (
-                      <p className="text-xs font-medium text-slate-500">
-                        Category: <span className="text-slate-700">{prompt.category}</span>
-                      </p>
-                    )}
-                    {prompt.topic && (
-                      <p className="text-xs text-slate-600 line-clamp-2">
-                        <span className="font-medium">Topic:</span> {prompt.topic}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEdit(prompt)}
-                      leftIcon={<Edit2 className="h-3.5 w-3.5" />}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setDeleteModalOpen(prompt.id)}
-                      leftIcon={<Trash2 className="h-3.5 w-3.5" />}
-                      className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="flex-1 space-y-3 text-sm">
-                  {prompt.description && (
-                    <div>
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
-                        Description
-                      </p>
-                      <p className="text-slate-600 line-clamp-3">{prompt.description}</p>
-                    </div>
-                  )}
-                  {prompt.why_important && (
-                    <div>
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
-                        Why Important
-                      </p>
-                      <p className="text-slate-600 line-clamp-2">{prompt.why_important}</p>
-                    </div>
-                  )}
-                  {prompt.useful_tips && (
-                    <div>
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
-                        Useful Tips
-                      </p>
-                      <p className="text-slate-600 line-clamp-2">{prompt.useful_tips}</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="pt-3 border-t border-white/60 text-xs text-slate-400">
-                  Created {new Date(prompt.created_at).toLocaleDateString()}
-                </div>
-              </Card>
-            ))}
+          <div className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
+                  <tr>
+                    <th className="px-6 py-4 w-1/4">Topic</th>
+                    <th className="px-6 py-4 w-1/4">Research Goal</th>
+                    <th className="px-6 py-4 w-1/4">Key Questions</th>
+                    <th className="px-6 py-4 w-1/4">Notes / Findings</th>
+                    <th className="px-6 py-4 w-20 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {prompts.map((prompt) => (
+                    <tr key={prompt.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-6 py-4 align-top font-medium text-slate-900">
+                        {prompt.name}
+                      </td>
+                      <td className="px-6 py-4 align-top text-slate-600">
+                        {prompt.description || <span className="text-slate-300 italic">No goal set</span>}
+                      </td>
+                      <td className="px-6 py-4 align-top text-slate-600">
+                        {prompt.why_important || <span className="text-slate-300 italic">-</span>}
+                      </td>
+                      <td className="px-6 py-4 align-top text-slate-600">
+                        {prompt.useful_tips || <span className="text-slate-300 italic">-</span>}
+                      </td>
+                      <td className="px-6 py-4 align-top text-right">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => handleEdit(prompt)}
+                            className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                            title="Edit"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setDeleteModalOpen(prompt.id)}
+                            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
@@ -299,53 +331,38 @@ export function VideoPrompts() {
             setCreateModalOpen(false)
             setEditingPrompt(null)
           }}
-          title={editingPrompt ? 'Edit Prompt' : 'Create New Prompt'}
+          title={editingPrompt ? 'Edit Research Topic' : 'Add Research Topic'}
           size="lg"
         >
           <div className="space-y-6">
             <Input
-              label="Prompt Name *"
-              placeholder="e.g., Trading Tips Template"
+              label="Topic *"
+              placeholder="e.g., Competitor Analysis"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
             />
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Input
-                label="Topic (optional)"
-                placeholder="e.g., Trading mistakes"
-                value={formData.topic}
-                onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
-              />
-              <Input
-                label="Category (optional)"
-                placeholder="e.g., Trading, Lifestyle"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              />
-            </div>
-
             <Textarea
-              label="Description (optional)"
-              placeholder="Describe what this prompt is for..."
-              rows={4}
+              label="Research Goal"
+              placeholder="What are you trying to find out?"
+              rows={3}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             />
 
             <Textarea
-              label="Why Important (optional)"
-              placeholder="Why should viewers care about this topic?"
+              label="Key Questions"
+              placeholder="Specific questions to answer..."
               rows={3}
               value={formData.why_important}
               onChange={(e) => setFormData({ ...formData, why_important: e.target.value })}
             />
 
             <Textarea
-              label="Useful Tips (optional)"
-              placeholder="Any key points or tips to include?"
-              rows={3}
+              label="Notes / Findings"
+              placeholder="Paste your research notes here..."
+              rows={5}
               value={formData.useful_tips}
               onChange={(e) => setFormData({ ...formData, useful_tips: e.target.value })}
             />
@@ -362,7 +379,7 @@ export function VideoPrompts() {
                 Cancel
               </Button>
               <Button onClick={handleSave} loading={saving} leftIcon={<Save className="h-4 w-4" />}>
-                {editingPrompt ? 'Update Prompt' : 'Create Prompt'}
+                {editingPrompt ? 'Save Changes' : 'Add Topic'}
               </Button>
             </div>
           </div>
@@ -372,12 +389,12 @@ export function VideoPrompts() {
         <Modal
           isOpen={deleteModalOpen !== null}
           onClose={() => setDeleteModalOpen(null)}
-          title="Delete Prompt"
+          title="Delete Research Topic"
           size="sm"
         >
           <div className="space-y-4">
             <p className="text-sm text-slate-600">
-              Are you sure you want to delete this prompt? This action cannot be undone.
+              Are you sure you want to delete this research topic? This action cannot be undone.
             </p>
             <div className="flex justify-end gap-3">
               <Button variant="ghost" onClick={() => setDeleteModalOpen(null)} disabled={deleting}>
