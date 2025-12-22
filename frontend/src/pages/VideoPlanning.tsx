@@ -871,14 +871,7 @@ export function VideoPlanning() {
     }
   }
 
-  const loadPrompts = async () => {
-    try {
-      const response = await api.get('/api/prompts')
-      setPrompts(response.data.prompts || [])
-    } catch (error) {
-      console.error('Failed to load prompts:', error)
-    }
-  }
+
 
   const handleEditItem = (item: VideoPlanItem) => {
     setEditingItem(item)
@@ -891,49 +884,11 @@ export function VideoPlanning() {
       caption: item.caption || '',
       platforms: item.platforms || [],
     })
-    setSelectedPromptId('') // Will be set by useEffect when prompts load
-    // Load prompts when opening edit modal
-    loadPrompts()
   }
 
-  // Try to match prompt when editing item and prompts are loaded
-  useEffect(() => {
-    if (editingItem && prompts.length > 0) {
-      // Find prompt that matches the item's fields
-      const matchingPrompt = prompts.find(p =>
-        p.topic === editingItem.topic &&
-        p.description === editingItem.description &&
-        p.why_important === editingItem.why_important &&
-        p.useful_tips === editingItem.useful_tips
-      )
-      if (matchingPrompt) {
-        setSelectedPromptId(matchingPrompt.id)
-      }
-    }
-  }, [prompts, editingItem])
 
-  const handleSelectPrompt = (promptId: string, isDrawer: boolean = false) => {
-    const selectedPrompt = prompts.find(p => p.id === promptId)
-    if (selectedPrompt) {
-      console.log('Selected prompt:', selectedPrompt)
-      setEditForm(prev => {
-        const newForm = { ...prev }
-        // Set values from prompt - use empty string if null/undefined to clear fields
-        newForm.topic = selectedPrompt.topic || ''
-        newForm.description = selectedPrompt.description || ''
-        newForm.why_important = selectedPrompt.why_important || ''
-        newForm.useful_tips = selectedPrompt.useful_tips || ''
-        console.log('Updated form:', newForm)
-        return newForm
-      })
-      // Keep the selection visible - don't reset it
-      if (isDrawer) {
-        setSelectedPromptIdDrawer(promptId)
-      } else {
-        setSelectedPromptId(promptId)
-      }
-    }
-  }
+
+
 
   const handleSaveItem = async () => {
     const targetItem = editingItem || selectedItem

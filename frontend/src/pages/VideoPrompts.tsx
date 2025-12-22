@@ -7,7 +7,6 @@ import { Modal } from '../components/ui/Modal'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Skeleton } from '../components/ui/Skeleton'
 import {
-  Search,
   Plus,
   Edit2,
   Trash2,
@@ -409,8 +408,8 @@ export function VideoPrompts() {
                   key={tab}
                   onClick={() => setActiveTab(tab)}
                   className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative ${isActive
-                      ? 'text-brand-600'
-                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-t-lg'
+                    ? 'text-brand-600'
+                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-t-lg'
                     }`}
                 >
                   <TabIcon className={`w-4 h-4 ${isActive ? 'text-brand-500' : 'text-slate-400'}`} />

@@ -140,7 +140,6 @@ export function LookGenerationModal({
               value={ethnicity}
               onChange={(e) => setEthnicity(e.target.value as (typeof ETHNICITY_OPTIONS)[number])}
               options={ETHNICITY_OPTIONS.map(value => ({ value, label: value }))}
-              helperText="Specifying ethnicity helps the AI maintain consistency with your avatar."
             />
 
             <Textarea
