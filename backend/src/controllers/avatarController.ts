@@ -1030,7 +1030,7 @@ export class AvatarController {
     const { supabase } = await import('../lib/supabase.js')
     const { data: avatar } = await supabase
       .from('avatars')
-      .select('id, default_look_id, heygen_avatar_id')
+      .select('id, default_look_id, heygen_avatar_id, gender, avatar_name')
       .eq('heygen_avatar_id', request.group_id)
       .eq('user_id', userId)
       .single()
@@ -1097,27 +1097,64 @@ export class AvatarController {
     // Fetch looks from the avatar group to use the selected photo as base for generation
     // This ensures generated looks match the original person's appearance
     const { fetchAvatarGroupLooks } = await import('../lib/heygen.js')
-    let photoAvatarId: string | undefined = undefined
+    
+    // Initialize with default look ID if available (optimistic approach)
+    // This ensures we have a base look even if the list fetch fails below
+    let photoAvatarId: string | undefined = avatar?.default_look_id || undefined
     
     try {
       const looks = await fetchAvatarGroupLooks(request.group_id)
       if (looks && looks.length > 0) {
-        // Use the default look if available, otherwise use the first look
-        const defaultLook = avatar?.default_look_id 
-          ? looks.find(look => look.id === avatar.default_look_id)
-          : null
-        const selectedLook = defaultLook || looks[0]
-        photoAvatarId = selectedLook.id
+        // If we have a default look ID, verify it exists in the fetched looks
+        if (photoAvatarId) {
+          const lookExists = looks.some((look: any) => look.id === photoAvatarId)
+          if (!lookExists) {
+            // Default look not found in HeyGen, fall back to first available look
+            console.warn(`[Generate Look] Default look ${photoAvatarId} not found in HeyGen group, falling back to first look`)
+            photoAvatarId = looks[0].id
+          }
+        } else {
+          // No default look set, use first available look
+          photoAvatarId = looks[0].id
+        }
         console.log(`[Generate Look] Using look ${photoAvatarId} as base for generation to ensure consistency`)
+      } else {
+        console.warn(`[Generate Look] No looks found in group ${request.group_id}. Using default look ID ${photoAvatarId} if available.`)
       }
     } catch (looksError: any) {
       console.warn(`[Generate Look] Failed to fetch looks for base reference:`, looksError.message)
-      // Continue without photo_avatar_id - HeyGen will still generate, but may not match as well
+      // If we have a default look ID, keep using it optimistically even if list fetch failed
+      if (photoAvatarId) {
+        console.log(`[Generate Look] Optimistically using default look ${photoAvatarId} despite list fetch failure`)
+      }
+    }
+
+    // Enhance prompt with gender if available and not already present
+    // This helps prevent gender drift in generated looks
+    let enhancedPrompt = request.prompt
+    if (avatar?.gender) {
+      const genderTerm = String(avatar.gender).toLowerCase()
+      const promptLower = enhancedPrompt.toLowerCase()
+      
+      // Check if gender is already mentioned (e.g. "man", "woman", "male", "female", "boy", "girl")
+      const hasGenderContext = 
+        promptLower.includes('man') || 
+        promptLower.includes('woman') || 
+        promptLower.includes('male') || 
+        promptLower.includes('female') ||
+        promptLower.includes('boy') ||
+        promptLower.includes('girl')
+        
+      if (!hasGenderContext) {
+         enhancedPrompt = `${avatar.gender}, ${enhancedPrompt}`
+         console.log(`[Generate Look] Enhanced prompt with gender: "${enhancedPrompt}"`)
+      }
     }
 
     // Include photo_avatar_id in the request to ensure generated looks match the selected avatar photo
     const generateRequest = {
       ...request,
+      prompt: enhancedPrompt,
       photo_avatar_id: photoAvatarId,
     }
 
