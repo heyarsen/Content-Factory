@@ -3,6 +3,7 @@ import { User, CheckCircle2 } from 'lucide-react'
 import { Modal } from '../ui/Modal'
 import { Textarea } from '../ui/Textarea'
 import { Button } from '../ui/Button'
+import { Select } from '../ui/Select'
 import { AvatarImage } from './AvatarImage'
 import { Avatar } from '../../types/avatar'
 
@@ -20,6 +21,19 @@ interface LookGenerationModalProps {
   generating: boolean
 }
 
+const ETHNICITY_OPTIONS = [
+  'Unspecified',
+  'White',
+  'Black',
+  'Asian American',
+  'East Asian',
+  'South East Asian',
+  'South Asian',
+  'Middle Eastern',
+  'Pacific',
+  'Hispanic',
+] as const
+
 export function LookGenerationModal({
   isOpen,
   onClose,
@@ -31,24 +45,32 @@ export function LookGenerationModal({
   generating,
 }: LookGenerationModalProps) {
   const [lookPrompt, setLookPrompt] = useState('')
+  const [ethnicity, setEthnicity] = useState<(typeof ETHNICITY_OPTIONS)[number]>('Unspecified')
 
   const handleGenerate = async () => {
     if (!avatar || !lookPrompt.trim()) {
       return
     }
 
+    // Prepend ethnicity to prompt if specified
+    const finalPrompt = ethnicity !== 'Unspecified'
+      ? `${ethnicity}, ${lookPrompt}`
+      : lookPrompt
+
     await onGenerate({
       avatar,
-      prompt: lookPrompt,
+      prompt: finalPrompt,
     })
 
     // Reset form on success
     setLookPrompt('')
+    setEthnicity('Unspecified')
   }
 
   const handleClose = () => {
     if (!generating) {
       setLookPrompt('')
+      setEthnicity('Unspecified')
       onClose()
     }
   }
@@ -112,14 +134,24 @@ export function LookGenerationModal({
             </div>
           )}
 
-          <Textarea
-            label="Look Description *"
-            value={lookPrompt}
-            onChange={(e) => setLookPrompt(e.target.value)}
-            placeholder="e.g., Professional business suit, formal attire, confident expression"
-            rows={4}
-            disabled={generating}
-          />
+          <div className="space-y-4">
+            <Select
+              label="Ethnicity (Recommended)"
+              value={ethnicity}
+              onChange={(e) => setEthnicity(e.target.value as (typeof ETHNICITY_OPTIONS)[number])}
+              options={ETHNICITY_OPTIONS.map(value => ({ value, label: value }))}
+              helperText="Specifying ethnicity helps the AI maintain consistency with your avatar."
+            />
+
+            <Textarea
+              label="Look Description *"
+              value={lookPrompt}
+              onChange={(e) => setLookPrompt(e.target.value)}
+              placeholder="e.g., Professional business suit, formal attire, confident expression"
+              rows={4}
+              disabled={generating}
+            />
+          </div>
 
           <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
             <Button variant="ghost" onClick={handleClose} disabled={generating}>
@@ -134,4 +166,3 @@ export function LookGenerationModal({
     </Modal>
   )
 }
-
