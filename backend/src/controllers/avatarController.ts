@@ -398,7 +398,7 @@ export class AvatarController {
    */
   static async updateAvatar(userId: string, avatarId: string, updates: { avatar_name?: string; gender?: string }) {
     const { supabase } = await import('../lib/supabase.js')
-    
+
     // Verify ownership
     const { data: avatar, error: avatarError } = await supabase
       .from('avatars')
@@ -631,7 +631,7 @@ export class AvatarController {
 
     const groupId = avatar.heygen_avatar_id
     const { checkTrainingStatus } = await import('../lib/heygen.js')
-    
+
     // Check training status, but handle case where avatar might not be available in HeyGen yet
     let currentStatus: { status: string } | null = null
     try {
@@ -646,14 +646,14 @@ export class AvatarController {
       try {
         const { getPhotoAvatarDetails } = await import('../lib/heygen.js')
         const avatarDetails = await getPhotoAvatarDetails(groupId)
-        
+
         const updatePayload: any = { status: 'active' }
         if (avatarDetails.image_url) {
           updatePayload.avatar_url = avatarDetails.image_url
           updatePayload.preview_url = avatarDetails.preview_url || avatarDetails.image_url
           updatePayload.thumbnail_url = avatarDetails.thumbnail_url || avatarDetails.preview_url || avatarDetails.image_url
         }
-        
+
         await supabase
           .from('avatars')
           .update(updatePayload)
@@ -691,7 +691,7 @@ export class AvatarController {
 
     // Get looks for training - use proper function to fetch looks
     const { fetchAvatarGroupLooks, waitForLooksReady } = await import('../lib/heygen.js')
-    
+
     let allLooks: any[] = []
     try {
       // Fetch all looks from the avatar group
@@ -701,7 +701,7 @@ export class AvatarController {
       console.warn('[Train Avatar] Could not get avatar looks:', detailsError.message)
       // If avatar group doesn't exist yet or looks aren't available, provide helpful error
       // Don't update avatar status - keep it as pending so user can retry
-      const errorMessage = detailsError.response?.status === 404 
+      const errorMessage = detailsError.response?.status === 404
         ? 'Avatar is still being created. Please wait a moment and try again.'
         : 'Failed to fetch avatar looks. The avatar may still be processing. Please try again in a moment.'
       throw new ApiError(errorMessage, ErrorCode.VALIDATION_ERROR, 400)
@@ -764,7 +764,7 @@ export class AvatarController {
             return true
           })
           .map((look: any) => look.id)
-        
+
         if (readyLookIds.length === 0) {
           // Don't update avatar status on error - keep it as pending so user can retry
           throw new ApiError(
@@ -788,31 +788,15 @@ export class AvatarController {
 
     const lookIds = readyLookIds
 
-    const HEYGEN_V2_API_URL = process.env.HEYGEN_V2_API_URL || 'https://api.heygen.com/v2'
-    const apiKey = process.env.HEYGEN_KEY
-    if (!apiKey) {
-      throw new ApiError('HeyGen API key not configured', ErrorCode.INTERNAL_SERVER_ERROR, 500)
-    }
+    const { trainAvatarGroup } = await import('../lib/heygen.js')
 
     let trainResponse: any
     try {
-      trainResponse = await axios.post(
-        `${HEYGEN_V2_API_URL}/photo_avatar/train`,
-        {
-          group_id: groupId,
-          photo_avatar_ids: lookIds,
-        },
-        {
-          headers: {
-            'X-Api-Key': apiKey,
-            'Content-Type': 'application/json',
-          },
-        }
-      )
+      trainResponse = await trainAvatarGroup(groupId, lookIds)
     } catch (trainError: any) {
       console.error('[Train Avatar] Failed to start training:', trainError.response?.data || trainError.message)
       // Don't update avatar status on error - keep it as pending so user can retry
-      const errorMessage = trainError.response?.data?.error?.message 
+      const errorMessage = trainError.response?.data?.error?.message
         || trainError.response?.data?.message
         || 'Failed to start training. Please try again in a moment.'
       throw new ApiError(errorMessage, ErrorCode.INTERNAL_SERVER_ERROR, 500)
@@ -840,12 +824,12 @@ export class AvatarController {
 
     try {
       const { supabase } = await import('../lib/supabase.js')
-      
+
       const updatePayload: any = {
         status: normalizedStatus,
         updated_at: new Date().toISOString(),
       }
-      
+
       if (normalizedStatus === 'active') {
         try {
           const { getPhotoAvatarDetails } = await import('../lib/heygen.js')
@@ -859,7 +843,7 @@ export class AvatarController {
           console.warn('[Training Status] Could not fetch avatar details:', detailsError.message)
         }
       }
-      
+
       await supabase
         .from('avatars')
         .update(updatePayload)
@@ -939,15 +923,15 @@ export class AvatarController {
 
         const looks = Array.isArray(avatarList)
           ? avatarList.map((look: any) => ({
-              id: look.id,
-              name: look.name,
-              status: look.status,
-              image_url: look.image_url,
-              preview_url: look.image_url,
-              thumbnail_url: look.image_url,
-              created_at: look.created_at,
-              updated_at: look.updated_at,
-            }))
+            id: look.id,
+            name: look.name,
+            status: look.status,
+            image_url: look.image_url,
+            preview_url: look.image_url,
+            thumbnail_url: look.image_url,
+            created_at: look.created_at,
+            updated_at: look.updated_at,
+          }))
           : []
 
         lookCache.set(avatar.id, looks)
@@ -1097,11 +1081,11 @@ export class AvatarController {
     // Fetch looks from the avatar group to use the selected photo as base for generation
     // This ensures generated looks match the original person's appearance
     const { fetchAvatarGroupLooks } = await import('../lib/heygen.js')
-    
+
     // Initialize with default look ID if available (optimistic approach)
     // This ensures we have a base look even if the list fetch fails below
     let photoAvatarId: string | undefined = avatar?.default_look_id || undefined
-    
+
     try {
       const looks = await fetchAvatarGroupLooks(request.group_id)
       if (looks && looks.length > 0) {
@@ -1135,19 +1119,19 @@ export class AvatarController {
     if (avatar?.gender) {
       const genderTerm = String(avatar.gender).toLowerCase()
       const promptLower = enhancedPrompt.toLowerCase()
-      
+
       // Check if gender is already mentioned (e.g. "man", "woman", "male", "female", "boy", "girl")
-      const hasGenderContext = 
-        promptLower.includes('man') || 
-        promptLower.includes('woman') || 
-        promptLower.includes('male') || 
+      const hasGenderContext =
+        promptLower.includes('man') ||
+        promptLower.includes('woman') ||
+        promptLower.includes('male') ||
         promptLower.includes('female') ||
         promptLower.includes('boy') ||
         promptLower.includes('girl')
-        
+
       if (!hasGenderContext) {
-         enhancedPrompt = `${avatar.gender}, ${enhancedPrompt}`
-         console.log(`[Generate Look] Enhanced prompt with gender: "${enhancedPrompt}"`)
+        enhancedPrompt = `${avatar.gender}, ${enhancedPrompt}`
+        console.log(`[Generate Look] Enhanced prompt with gender: "${enhancedPrompt}"`)
       }
     }
 

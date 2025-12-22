@@ -312,31 +312,31 @@ export interface AvatarCapabilities {
    * Avatars created from video footage support full gesture control
    */
   supportsHyperRealistic: boolean
-  
+
   /**
    * Gesture Control support
    * Can use gestures array in video_inputs
    */
   supportsGestureControl: boolean
-  
+
   /**
    * Full-body movement support
    * Avatar can perform full-body gestures and movements
    */
   supportsFullBodyMovement: boolean
-  
+
   /**
    * Custom motion prompts (Avatar IV)
    * Can use custom_motion_prompt parameter
    */
   supportsCustomMotionPrompt: boolean
-  
+
   /**
    * Enhanced expressions
    * Avatar supports enhanced facial expressions
    */
   supportsEnhancedExpressions: boolean
-  
+
   /**
    * Natural head movement
    * Avatar supports natural head movements (most avatars support this)
@@ -369,7 +369,7 @@ export interface MotionConfig {
    * ]
    */
   gestures?: GestureDefinition[]
-  
+
   /**
    * Custom motion prompt for Avatar IV or fallback
    * Describes desired movements and expressions in natural language
@@ -380,21 +380,21 @@ export interface MotionConfig {
    * - "Avatar waves with a friendly smile"
    */
   customMotionPrompt?: string
-  
+
   /**
    * Enable AI enhancement of custom motion prompt
    * Allows HeyGen to refine the motion description for better results
    * Recommended for Avatar IV and Photo Avatars
    */
   enhanceCustomMotionPrompt?: boolean
-  
+
   /**
    * Enable natural head movement
    * Most avatars support this automatically
    * This is typically enabled by default for supported avatars
    */
   enableHeadMovement?: boolean
-  
+
   /**
    * Enable enhanced expressions
    * More varied and natural facial expressions
@@ -655,7 +655,7 @@ export async function listPublicAvatars(): Promise<HeyGenAvatarsResponse> {
 
     if (avatars.length > 0) {
       console.log(`[Public Avatars] Raw response: ${avatars.length} items from List All Avatars (V2)`)
-      
+
       // Filter to only show actual avatar groups, not individual looks
       // The /v2/avatars endpoint returns both avatar groups AND individual looks
       // We want to show only avatar groups (which have multiple looks)
@@ -665,18 +665,18 @@ export async function listPublicAvatars(): Promise<HeyGenAvatarsResponse> {
       for (const avatar of avatars) {
         const name = avatar.avatar_name || avatar.name || ''
         if (!name) continue
-        
+
         // Extract base name (e.g., "Silvia" from "Silvia Office Front")
         const baseName = name.split('(')[0].split('-')[0].trim().split(' ')[0]
         if (!baseName) continue
-        
+
         const key = baseName.toLowerCase()
         if (!avatarGroups.has(key)) {
           avatarGroups.set(key, [])
         }
         avatarGroups.get(key)!.push(avatar)
       }
-      
+
       // Only include groups that have multiple variants (actual avatar groups, not single looks)
       // Or include all if we can't determine (some avatars might be standalone)
       const filteredAvatars: any[] = []
@@ -685,9 +685,9 @@ export async function listPublicAvatars(): Promise<HeyGenAvatarsResponse> {
         // If it has only one, it might be a standalone avatar - include it too
         filteredAvatars.push(...variants)
       }
-      
+
       console.log(`[Public Avatars] Filtered to ${filteredAvatars.length} avatars in ${avatarGroups.size} groups`)
-      
+
       // Normalize avatar data structure
       // Note: The endpoint returns all avatars (user's own + public), but we mark them all as potentially public
       // In practice, users can use any avatar ID from this list in video generation
@@ -1004,30 +1004,30 @@ export async function detectAvatarCapabilities(
     // For regular avatars, try to fetch avatar details
     try {
       const avatar = await getAvatar(avatarId)
-      
+
       // Check avatar metadata for capabilities
       // HeyGen may expose avatar type in various fields
       const avatarType = (avatar as any).type || (avatar as any).avatar_type || ''
       const avatarStatus = avatar.status || ''
       const avatarName = avatar.avatar_name || ''
-      
+
       // Heuristics to detect avatar capabilities:
       // 1. Hyper-Realistic avatars are typically created from video footage
       //    They may have specific status or type indicators
       // 2. Avatar IV avatars are generated from photos and support custom motion prompts
       // 3. Regular avatars have basic lip-sync with limited motion
-      
-      const isHyperRealistic = 
+
+      const isHyperRealistic =
         avatarType.toLowerCase().includes('hyper') ||
         avatarType.toLowerCase().includes('realistic') ||
         avatarType.toLowerCase().includes('video') ||
         avatarStatus.toLowerCase().includes('hyper')
-      
-      const isAvatarIV = 
+
+      const isAvatarIV =
         avatarType.toLowerCase().includes('iv') ||
         avatarType.toLowerCase().includes('avatar_iv') ||
         avatarName.toLowerCase().includes('avatar iv')
-      
+
       // Hyper-Realistic avatars support full gesture control
       if (isHyperRealistic) {
         return {
@@ -1039,7 +1039,7 @@ export async function detectAvatarCapabilities(
           supportsHeadMovement: true,
         }
       }
-      
+
       // Avatar IV supports custom motion prompts and enhanced expressions
       if (isAvatarIV) {
         return {
@@ -1051,7 +1051,7 @@ export async function detectAvatarCapabilities(
           supportsHeadMovement: true,
         }
       }
-      
+
       // Default: assume basic capabilities (head movement, expressions)
       // Most avatars support at least basic head movement
       return {
@@ -1123,26 +1123,26 @@ export function buildGestureArray(script: string, duration: number): GestureDefi
   // Enhanced gesture sequence for maximum movement and hand gestures
   // More frequent gestures create more natural, engaging movement
   const gestures: Array<{ time: number; type: string }> = []
-  
+
   // Calculate gesture interval based on duration (aim for gesture every 2-3 seconds)
   const gestureInterval = Math.max(2.0, duration / Math.max(3, Math.floor(duration / 2.5)))
-  
+
   // Generate gestures throughout the video for continuous movement
   const gestureTypes = ['open_hand', 'point_right', 'emphasis', 'wave', 'point_left', 'thumbs_up']
   let currentTime = 0.5 // Start early
-  
+
   while (currentTime < duration - 0.5) {
     // Rotate through gesture types for variety
     const gestureType = gestureTypes[gestures.length % gestureTypes.length]
     gestures.push({ time: currentTime, type: gestureType })
-    
+
     // Move to next gesture time
     currentTime += gestureInterval
-    
+
     // Add some variation to timing (±0.3 seconds) for more natural feel
     currentTime += (Math.random() * 0.6 - 0.3)
   }
-  
+
   // Ensure we have at least a few gestures even for short videos
   if (gestures.length < 2 && duration >= 1) {
     gestures.push({ time: Math.min(0.5, duration * 0.1), type: 'open_hand' })
@@ -1150,7 +1150,7 @@ export function buildGestureArray(script: string, duration: number): GestureDefi
       gestures.push({ time: Math.min(duration * 0.5, duration - 0.5), type: 'emphasis' })
     }
   }
-  
+
   // Sort by time and ensure gestures don't exceed duration
   return gestures
     .filter(g => g.time < duration && g.time >= 0)
@@ -1172,22 +1172,22 @@ export async function generateVideo(
     // Detect avatar capabilities for motion features
     let avatarCapabilities: AvatarCapabilities | null = null
     let motionConfig: MotionConfig | null = null
-    
+
     if (request.motion_config || (request.avatar_id || request.talking_photo_id)) {
       try {
         const avatarId = request.avatar_id || request.talking_photo_id
         const isPhotoAvatar = !!request.talking_photo_id
-        
+
         if (avatarId) {
           avatarCapabilities = await detectAvatarCapabilities(avatarId, isPhotoAvatar)
-          
+
           // Build motion config if not provided
           if (!request.motion_config) {
             // Auto-generate motion config based on capabilities
             const gestures = avatarCapabilities.supportsGestureControl
               ? buildGestureArray(request.script || request.topic, request.duration)
               : undefined
-            
+
             motionConfig = {
               gestures,
               customMotionPrompt: avatarCapabilities.supportsCustomMotionPrompt
@@ -1200,7 +1200,7 @@ export async function generateVideo(
           } else {
             motionConfig = request.motion_config
           }
-          
+
           console.log('[HeyGen Motion] Avatar capabilities detected:', {
             avatarId,
             isPhotoAvatar,
@@ -1395,35 +1395,35 @@ export async function generateVideo(
           gestures: motionConfig.gestures,
         })
       }
-      
+
       // Add custom motion prompt for Avatar IV or fallback
       if (motionConfig.customMotionPrompt && avatarCapabilities.supportsCustomMotionPrompt) {
         payload.video_inputs[0].custom_motion_prompt = motionConfig.customMotionPrompt
-        
+
         if (motionConfig.enhanceCustomMotionPrompt) {
           payload.video_inputs[0].enhance_custom_motion_prompt = true
         }
-        
+
         console.log('[HeyGen Motion] Added custom motion prompt:', {
           prompt: motionConfig.customMotionPrompt,
           enhanced: motionConfig.enhanceCustomMotionPrompt,
         })
       } else if (!avatarCapabilities.supportsGestureControl && avatarCapabilities.supportsCustomMotionPrompt) {
         // Fallback: use custom motion prompt if gestures not supported
-        payload.video_inputs[0].custom_motion_prompt = 
-          motionConfig.customMotionPrompt || 
+        payload.video_inputs[0].custom_motion_prompt =
+          motionConfig.customMotionPrompt ||
           'Enhanced facial expressions with subtle head movements and natural gestures'
         payload.video_inputs[0].enhance_custom_motion_prompt = true
-        
+
         console.log('[HeyGen Motion] Using fallback custom motion prompt (gestures not supported)')
       }
-      
+
       // Note: Head movement and enhanced expressions are typically automatic for most avatars
       // We log them but don't need to set explicit parameters unless HeyGen API requires them
       if (motionConfig.enableHeadMovement && avatarCapabilities.supportsHeadMovement) {
         console.log('[HeyGen Motion] Head movement enabled (automatic for this avatar)')
       }
-      
+
       if (motionConfig.enableEnhancedExpressions && avatarCapabilities.supportsEnhancedExpressions) {
         console.log('[HeyGen Motion] Enhanced expressions enabled (automatic for this avatar)')
       }
@@ -1767,7 +1767,7 @@ export async function getTemplateDetails(templateId: string): Promise<any> {
   try {
     const apiKey = getHeyGenKey()
     const endpoint = `${HEYGEN_V2_API_URL}/template/${encodeURIComponent(templateId.trim())}`
-    
+
     const response = await axios.get(endpoint, {
       headers: {
         'X-Api-Key': apiKey,
@@ -1775,7 +1775,7 @@ export async function getTemplateDetails(templateId: string): Promise<any> {
       },
       timeout: 30000,
     })
-    
+
     return response.data?.data || response.data
   } catch (error: any) {
     console.error('Failed to fetch template details:', error?.response?.data || error?.message)
@@ -2602,7 +2602,7 @@ export async function trainAvatarGroup(
     const apiKey = getHeyGenKey()
 
     const response = await axios.post(
-      `${HEYGEN_V2_API_URL}/photo_avatar/train`,
+      `${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/train`,
       {
         group_id: groupId,
         photo_avatar_ids: lookIds,
@@ -2748,10 +2748,10 @@ export async function getPhotoAvatarDetails(
     return fetchPhotoAvatarDetails(resolved.photoAvatarId)
   } catch (error: any) {
     // If it's a 404 or "not found", it might be a group_id or deleted avatar
-    if (error.response?.status === 404 || 
-        error.message?.includes('not found') || 
-        error.message?.includes('No avatars found') ||
-        (error.response?.data?.error?.message && error.response.data.error.message.includes('not found'))) {
+    if (error.response?.status === 404 ||
+      error.message?.includes('not found') ||
+      error.message?.includes('No avatars found') ||
+      (error.response?.data?.error?.message && error.response.data.error.message.includes('not found'))) {
       // Don't log as error - this is expected for group IDs or deleted avatars
       // Return basic structure with status 'unknown' so it can be marked as deleted
       return {
@@ -2859,11 +2859,11 @@ export async function addMotionToPhotoAvatar(
   try {
     const apiKey = getHeyGenKey()
     const endpoint = `${HEYGEN_V2_API_URL}/photo_avatar/add_motion`
-    
+
     const payload: any = {
       id: id.trim(),
     }
-    
+
     // Add prompt if provided - use enhanced prompt for maximum movement
     if (prompt) {
       payload.prompt = prompt
@@ -2871,17 +2871,17 @@ export async function addMotionToPhotoAvatar(
       // Default enhanced prompt for maximum movement
       payload.prompt = 'Full body motion with expressive hand gestures, natural head movements, engaging body language, waving, pointing, and emphasis gestures throughout'
     }
-    
+
     // Use expressive motion type for maximum movement
     payload.motion_type = motionType
-    
+
     console.log('[Add Motion] Calling HeyGen Add Motion API:', {
       id,
       motionType,
       hasPrompt: !!payload.prompt,
       promptPreview: payload.prompt?.substring(0, 100),
     })
-    
+
     const response = await axios.post(endpoint, payload, {
       headers: {
         'X-Api-Key': apiKey,
@@ -2889,12 +2889,12 @@ export async function addMotionToPhotoAvatar(
       },
       timeout: 30000,
     })
-    
+
     console.log('[Add Motion] Successfully added motion to photo avatar:', {
       id,
       response: response.data,
     })
-    
+
     return response.data?.data || response.data
   } catch (error: any) {
     console.error('[Add Motion] HeyGen API error:', {
@@ -2929,7 +2929,7 @@ export async function generateAvatarLook(
     const apiKey = getHeyGenKey()
 
     const response = await axios.post(
-      `${HEYGEN_V2_API_URL}/photo_avatar/look/generate`,
+      `${HEYGEN_V2_API_URL}/photo_avatar/photo/generate`,
       request,
       {
         headers: {
