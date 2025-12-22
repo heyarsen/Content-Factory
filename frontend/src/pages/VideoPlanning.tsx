@@ -67,16 +67,16 @@ interface VideoPlanItem {
   caption?: string | null
   avatar_id?: string | null
   status:
-    | 'pending'
-    | 'researching'
-    | 'ready'
-    | 'draft'
-    | 'approved'
-    | 'generating'
-    | 'completed'
-    | 'scheduled'
-    | 'posted'
-    | 'failed'
+  | 'pending'
+  | 'researching'
+  | 'ready'
+  | 'draft'
+  | 'approved'
+  | 'generating'
+  | 'completed'
+  | 'scheduled'
+  | 'posted'
+  | 'failed'
   video_id: string | null
   error_message: string | null
   created_at?: string
@@ -169,7 +169,7 @@ export function VideoPlanning() {
   const [videoTopics, setVideoTopics] = useState<string[]>(['', '', '']) // Topics for each video slot
   const [videoAvatars, setVideoAvatars] = useState<string[]>(['', '', '']) // Avatar IDs for each video slot
   const [videoLooks, setVideoLooks] = useState<(string | null)[]>(['', '', '']) // Look IDs for each video slot
-  const [videoPrompts, setVideoPrompts] = useState<string[]>(['', '', '']) // Selected prompt IDs for each video slot
+
   const [avatars, setAvatars] = useState<Array<{ id: string; avatar_name: string; thumbnail_url: string | null; preview_url: string | null; is_default?: boolean; heygen_avatar_id?: string; has_motion?: boolean }>>([])
   const [loadingAvatars, setLoadingAvatars] = useState(false)
   const [defaultAvatarId, setDefaultAvatarId] = useState<string | null>(null)
@@ -192,9 +192,7 @@ export function VideoPlanning() {
   const [createStep, setCreateStep] = useState<1 | 2>(1)
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([])
   const [bulkTime, setBulkTime] = useState('09:00')
-  const [prompts, setPrompts] = useState<Array<{ id: string; name: string; topic: string | null; category: string | null; description: string | null; why_important: string | null; useful_tips: string | null }>>([])
-  const [selectedPromptId, setSelectedPromptId] = useState<string>('')
-  const [selectedPromptIdDrawer, setSelectedPromptIdDrawer] = useState<string>('')
+
 
   // Preset times for quick selection
   const timePresets = [
@@ -204,39 +202,15 @@ export function VideoPlanning() {
     { label: 'Evening (6:00 PM)', value: '18:00' },
   ]
 
-  // Load avatars and prompts when create modal opens
+  // Load avatars when create modal opens
   useEffect(() => {
     if (createModal) {
       loadAvatars()
-      loadPrompts()
       setCreateStep(1)
     }
   }, [createModal])
 
-  // Load prompts when detail drawer opens
-  useEffect(() => {
-    if (isDetailDrawerOpen && selectedItem) {
-      loadPrompts()
-    }
-  }, [isDetailDrawerOpen, selectedItem])
 
-  // Try to match prompt when prompts are loaded and item is selected
-  useEffect(() => {
-    if (isDetailDrawerOpen && selectedItem && prompts.length > 0) {
-      // Try to find matching prompt based on filled fields
-      const matchingPrompt = prompts.find(p => 
-        p.topic === selectedItem.topic && 
-        p.description === selectedItem.description &&
-        p.why_important === selectedItem.why_important &&
-        p.useful_tips === selectedItem.useful_tips
-      )
-      if (matchingPrompt) {
-        setSelectedPromptIdDrawer(matchingPrompt.id)
-      } else {
-        setSelectedPromptIdDrawer('') // Reset if no match
-      }
-    }
-  }, [prompts, isDetailDrawerOpen, selectedItem])
 
   // Persist compact status filter choice
   useEffect(() => {
@@ -252,7 +226,7 @@ export function VideoPlanning() {
       // This shows only avatars the user has created or explicitly added from public library
       const response = await api.get('/api/avatars?all=true')
       const allAvatars = response.data.avatars || []
-      
+
       // Filter to only show:
       // 1. User-created avatars (source: 'user_photo' or 'ai_generated')
       // NOTE: We now exclude synced/public avatars to avoid listing the full HeyGen library.
@@ -280,13 +254,13 @@ export function VideoPlanning() {
         ...a,
         has_motion: motionSet.has(a.id),
       }))
-      
+
       setAvatars(avatarsWithMotion)
       setDefaultAvatarId(response.data.default_avatar_id || null)
       if (!planDefaultAvatarId && response.data.default_avatar_id) {
         setPlanDefaultAvatarId(response.data.default_avatar_id)
       }
-      
+
       // Set default avatar for all video slots that don't have an avatar selected
       if (response.data.default_avatar_id) {
         setVideoAvatars(prev => {
@@ -299,7 +273,7 @@ export function VideoPlanning() {
           return newAvatars
         })
       }
-      
+
       // Pre-load looks for avatars that are already selected (after state is updated)
       setTimeout(() => {
         const selectedAvatarIds = [...new Set(videoAvatars.filter(id => id))]
@@ -312,7 +286,7 @@ export function VideoPlanning() {
                 return prev // Already loaded
               }
               // Load in background
-              loadAvatarLooks(avatarId).catch(() => {})
+              loadAvatarLooks(avatarId).catch(() => { })
               return prev
             })
           }
@@ -331,7 +305,7 @@ export function VideoPlanning() {
       console.log(`[VideoPlanning] Already loading looks for avatar ${avatarId}, skipping duplicate call`)
       return avatarLooks.length > 0 ? avatarLooks : []
     }
-    
+
     loadingLooksRef.current = true
     console.log(`[VideoPlanning] loadAvatarLooks called for avatar ${avatarId}`)
     setLoadingLooks(true)
@@ -340,10 +314,10 @@ export function VideoPlanning() {
       const response = await api.get(`/api/avatars/${avatarId}/details`)
       const looks = response.data?.looks || []
       console.log(`[VideoPlanning] Loaded ${looks.length} looks for avatar ${avatarId}:`, looks)
-      
+
       // Set looks state synchronously
       setAvatarLooks(looks)
-      
+
       // Also store looks by avatar ID for display purposes
       const avatar = avatars.find(a => a.id === avatarId)
       if (avatar && avatar.heygen_avatar_id) {
@@ -353,7 +327,7 @@ export function VideoPlanning() {
           return newMap
         })
       }
-      
+
       return looks // Return looks so we can check them immediately
     } catch (error: any) {
       console.error('[VideoPlanning] Failed to load avatar looks:', error)
@@ -454,14 +428,14 @@ export function VideoPlanning() {
     const interval = setInterval(() => {
       loadScheduledPosts()
     }, 30000) // Poll every 30 seconds (reduced from 10 seconds)
-    
+
     return () => clearInterval(interval)
   }, [])
 
   // Smart polling for plan items - only poll frequently when items are in progress
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const lastPollTimeRef = useRef<number>(0)
-  
+
   useEffect(() => {
     if (!selectedPlan) {
       if (pollingIntervalRef.current) {
@@ -472,14 +446,14 @@ export function VideoPlanning() {
     }
 
     const planId = selectedPlan.id
-    
+
     // Check if there are items in active states that need frequent updates
     const hasActiveItems = () => {
-      return planItems.some(item => 
+      return planItems.some(item =>
         ['pending', 'researching', 'generating', 'ready', 'draft', 'approved'].includes(item.status)
       )
     }
-    
+
     // Determine polling interval based on item states
     // If items are active, poll more frequently; otherwise poll less frequently
     const getPollInterval = () => {
@@ -488,13 +462,13 @@ export function VideoPlanning() {
       }
       return 60000 // Poll every 60 seconds when all items are stable
     }
-    
+
     // Clear existing interval
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current)
       pollingIntervalRef.current = null
     }
-    
+
     const poll = async () => {
       const now = Date.now()
       // Throttle: don't poll more than once every 10 seconds
@@ -502,9 +476,9 @@ export function VideoPlanning() {
         return
       }
       lastPollTimeRef.current = now
-      
+
       await loadPlanItems(planId)
-      
+
       // After loading, check if we need to adjust polling interval
       // Use a timeout to check after state updates
       setTimeout(() => {
@@ -519,11 +493,11 @@ export function VideoPlanning() {
         }
       }, 1000)
     }
-    
+
     // Start polling with initial interval
     const initialInterval = getPollInterval()
     pollingIntervalRef.current = setInterval(poll, initialInterval)
-    
+
     // Initial load
     poll()
 
@@ -535,30 +509,30 @@ export function VideoPlanning() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPlan?.id])
-  
+
   // Update polling interval when planItems change (but don't recreate the effect)
   useEffect(() => {
     if (!selectedPlan || !pollingIntervalRef.current) return
-    
+
     const hasActiveItems = () => {
-      return planItems.some(item => 
+      return planItems.some(item =>
         ['pending', 'researching', 'generating', 'ready', 'draft', 'approved'].includes(item.status)
       )
     }
-    
+
     const getPollInterval = () => {
       if (hasActiveItems()) {
         return 15000
       }
       return 60000
     }
-    
+
     // Debounce the interval update
     const timeoutId = setTimeout(() => {
       const newInterval = getPollInterval()
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current)
-        
+
         const poll = async () => {
           const now = Date.now()
           if (now - lastPollTimeRef.current < 10000) {
@@ -567,11 +541,11 @@ export function VideoPlanning() {
           lastPollTimeRef.current = now
           await loadPlanItems(selectedPlan.id)
         }
-        
+
         pollingIntervalRef.current = setInterval(poll, newInterval)
       }
     }, 2000)
-    
+
     return () => clearTimeout(timeoutId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planItems, selectedPlan?.id])
@@ -654,11 +628,11 @@ export function VideoPlanning() {
       const avatarsForSlots =
         videoAvatars.length === videosPerDay
           ? videoAvatars.map((avatarId) =>
-              avatarId || planDefaultAvatarId || defaultAvatarId || '',
-            )
+            avatarId || planDefaultAvatarId || defaultAvatarId || '',
+          )
           : Array(videosPerDay)
-              .fill(planDefaultAvatarId || defaultAvatarId || '')
-              .map((val, idx) => videoAvatars[idx] || val)
+            .fill(planDefaultAvatarId || defaultAvatarId || '')
+            .map((val, idx) => videoAvatars[idx] || val)
 
       const response = await api.post('/api/plans', {
         name: planName,
@@ -700,7 +674,7 @@ export function VideoPlanning() {
 
       setPlans([response.data.plan, ...plans])
       setSelectedPlan(response.data.plan)
-      
+
       // Navigate to plan start date
       if (response.data.plan.start_date) {
         const planStartDate = new Date(response.data.plan.start_date + 'T00:00:00') // Add time to avoid timezone issues
@@ -710,11 +684,11 @@ export function VideoPlanning() {
         const day = String(planStartDate.getDate()).padStart(2, '0')
         setSelectedDate(`${year}-${month}-${day}`)
       }
-      
+
       // Load plan items - use itemsCount/hasItems from response if available, otherwise check items array
       const itemsCount = response.data.itemsCount ?? response.data.items?.length ?? 0
       const hasItems = response.data.hasItems ?? (response.data.items && Array.isArray(response.data.items) && response.data.items.length > 0)
-      
+
       if (hasItems && response.data.items && Array.isArray(response.data.items) && response.data.items.length > 0) {
         setPlanItems(response.data.items)
         console.log(`[VideoPlanning] ✓ Plan created with ${itemsCount} items`)
@@ -744,7 +718,7 @@ export function VideoPlanning() {
         setPlanDefaultAvatarId(null)
       }
       setVideoLooks([null, null, null])
-      setVideoPrompts(['', '', ''])
+      setVideoLooks([null, null, null])
       setAutoScheduleTrigger('daily')
       setTriggerTime('09:00')
       setDefaultPlatforms([])
@@ -754,7 +728,7 @@ export function VideoPlanning() {
       setVideoTopics(['', '', ''])
       setVideoAvatars(['', '', ''])
       setVideoLooks([null, null, null])
-      setVideoPrompts(['', '', ''])
+      setVideoLooks([null, null, null])
     } catch (error: any) {
       alert(error.response?.data?.error || 'Failed to create plan')
     } finally {
@@ -926,8 +900,8 @@ export function VideoPlanning() {
   useEffect(() => {
     if (editingItem && prompts.length > 0) {
       // Find prompt that matches the item's fields
-      const matchingPrompt = prompts.find(p => 
-        p.topic === editingItem.topic && 
+      const matchingPrompt = prompts.find(p =>
+        p.topic === editingItem.topic &&
         p.description === editingItem.description &&
         p.why_important === editingItem.why_important &&
         p.useful_tips === editingItem.useful_tips
@@ -1023,18 +997,18 @@ export function VideoPlanning() {
     }
     return planItems.filter((item) => item.status === statusFilter)
   }, [planItems, statusFilter])
-  
+
   // Filter scheduled posts by status
-  const filteredPosts = 
+  const filteredPosts =
     statusFilter === 'all'
       ? scheduledPosts
       : statusFilter === 'scheduled' || statusFilter === 'pending'
-      ? scheduledPosts.filter((p) => p.status === 'pending' || p.status === 'scheduled')
-      : statusFilter === 'posted'
-      ? scheduledPosts.filter((p) => p.status === 'posted')
-      : statusFilter === 'failed'
-      ? scheduledPosts.filter((p) => p.status === 'failed')
-      : []
+        ? scheduledPosts.filter((p) => p.status === 'pending' || p.status === 'scheduled')
+        : statusFilter === 'posted'
+          ? scheduledPosts.filter((p) => p.status === 'posted')
+          : statusFilter === 'failed'
+            ? scheduledPosts.filter((p) => p.status === 'failed')
+            : []
 
   // Group plan items by date
   // Normalize date format - database returns DATE type as YYYY-MM-DD string
@@ -1059,24 +1033,24 @@ export function VideoPlanning() {
       return ''
     }
   }
-  
+
   // Use useMemo to avoid recalculating on every render
   const planItemsByDate = useMemo(() => {
     const grouped = filteredItems.reduce(
-    (acc, item) => {
+      (acc, item) => {
         // Database returns scheduled_date as YYYY-MM-DD string, use it directly
         const dateKey = normalizeDate(item.scheduled_date)
         if (!dateKey) {
           console.warn(`[VideoPlanning] Item ${item.id} has invalid scheduled_date:`, item.scheduled_date)
-        return acc
-      }
+          return acc
+        }
         if (!acc[dateKey]) acc[dateKey] = []
         acc[dateKey].push(item)
-      return acc
-    },
-    {} as Record<string, VideoPlanItem[]>,
-  )
-    
+        return acc
+      },
+      {} as Record<string, VideoPlanItem[]>,
+    )
+
     // Debug logging (only log once when items change)
     if (Object.keys(grouped).length > 0 && filteredItems.length > 0) {
       const dateKeys = Object.keys(grouped).sort()
@@ -1086,10 +1060,10 @@ export function VideoPlanning() {
         sampleDates: dateKeys.slice(0, 3).map(d => ({ date: d, count: grouped[d].length }))
       })
     }
-    
+
     return grouped
   }, [filteredItems])
-  
+
   // Debug warning if items exist but none are grouped
   useEffect(() => {
     if (planItems.length > 0 && Object.keys(planItemsByDate).length === 0) {
@@ -1107,45 +1081,45 @@ export function VideoPlanning() {
   // Group scheduled posts by date (using filtered posts)
   const postsByDate = useMemo(() => {
     return filteredPosts.reduce(
-    (acc, post: ScheduledPost) => {
-      if (!post.scheduled_time) return acc
-      const date = new Date(post.scheduled_time)
-      const dateKey = getDateKey(date)
-      if (!dateKey) return acc
-      if (!acc[dateKey]) acc[dateKey] = []
-      acc[dateKey].push(post)
-      return acc
-    },
-    {} as Record<string, ScheduledPost[]>,
-  )
+      (acc, post: ScheduledPost) => {
+        if (!post.scheduled_time) return acc
+        const date = new Date(post.scheduled_time)
+        const dateKey = getDateKey(date)
+        if (!dateKey) return acc
+        if (!acc[dateKey]) acc[dateKey] = []
+        acc[dateKey].push(post)
+        return acc
+      },
+      {} as Record<string, ScheduledPost[]>,
+    )
   }, [filteredPosts])
 
   // Combine plan items and scheduled posts by date
   type CalendarItem = VideoPlanItem | (ScheduledPost & { _isScheduledPost: true; scheduled_date: string; topic: string })
   const itemsByDate = useMemo(() => {
     const combined: Record<string, CalendarItem[]> = {}
-  
-  // Add plan items
-  Object.keys(planItemsByDate).forEach(date => {
+
+    // Add plan items
+    Object.keys(planItemsByDate).forEach(date => {
       combined[date] = [...(planItemsByDate[date] || [])]
-  })
-  
-  // Add scheduled posts
-  Object.keys(postsByDate).forEach(date => {
+    })
+
+    // Add scheduled posts
+    Object.keys(postsByDate).forEach(date => {
       if (!combined[date]) {
         combined[date] = []
-    }
-    // Add scheduled posts to the date, marking them as posts
-    postsByDate[date].forEach((post: ScheduledPost) => {
+      }
+      // Add scheduled posts to the date, marking them as posts
+      postsByDate[date].forEach((post: ScheduledPost) => {
         combined[date].push({
-        ...post,
-        _isScheduledPost: true,
-        scheduled_date: date, // Add scheduled_date for compatibility
-        topic: post.videos?.topic || 'Scheduled Post',
+          ...post,
+          _isScheduledPost: true,
+          scheduled_date: date, // Add scheduled_date for compatibility
+          topic: post.videos?.topic || 'Scheduled Post',
+        })
       })
     })
-  })
-  
+
     return combined
   }, [planItemsByDate, postsByDate])
 
@@ -1259,7 +1233,7 @@ export function VideoPlanning() {
   const getStatusCounts = () => {
     const scheduledCount = scheduledPosts.filter((p) => p.status === 'pending' || p.status === 'scheduled').length
     const postedCount = scheduledPosts.filter((p) => p.status === 'posted').length
-    
+
     return {
       all: planItems.length + scheduledPosts.length,
       pending: planItems.filter((i) => i.status === 'pending').length + scheduledCount,
@@ -1275,14 +1249,14 @@ export function VideoPlanning() {
 
   const getStatusBadge = (status: string, scriptStatus?: string | null, item?: VideoPlanItem) => {
     // Clear, user-friendly status labels that explain what's happening in the workflow
-    
+
     // Handle rejected scripts first (highest priority)
     if (scriptStatus === 'rejected') {
       return <Badge variant="error">Script Rejected</Badge>
     }
 
     // Check if there are pending scheduled posts for this item (indicates publishing in progress)
-    const itemScheduledPosts = item?.video_id 
+    const itemScheduledPosts = item?.video_id
       ? scheduledPosts.filter(p => p.video_id === item.video_id)
       : []
     const hasPendingPosts = itemScheduledPosts.some(p => p.status === 'pending' || p.status === 'scheduled')
@@ -1344,7 +1318,7 @@ export function VideoPlanning() {
         } else if (item?.scheduled_date && item?.scheduled_time) {
           const now = new Date()
           const scheduledDateTime = new Date(`${item.scheduled_date}T${item.scheduled_time}`)
-          
+
           if (scheduledDateTime > now) {
             // Video is ready but waiting for post time
             label = 'Waiting for Post Time'
@@ -1377,7 +1351,7 @@ export function VideoPlanning() {
         label = status
         variant = 'default'
     }
-    
+
     return (
       <Badge variant={variant}>
         {showLoader && <Loader className="h-3 w-3 animate-spin" />}
@@ -1439,11 +1413,10 @@ export function VideoPlanning() {
                 <div key={plan.id} className="flex items-center gap-2">
                   <button
                     onClick={() => setSelectedPlan(plan)}
-                    className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-                      selectedPlan?.id === plan.id
-                        ? 'bg-brand-500 text-white'
-                        : 'bg-white text-slate-600 hover:bg-slate-50'
-                    }`}
+                    className={`rounded-xl px-4 py-2 text-sm font-medium transition ${selectedPlan?.id === plan.id
+                      ? 'bg-brand-500 text-white'
+                      : 'bg-white text-slate-600 hover:bg-slate-50'
+                      }`}
                   >
                     {plan.name} ({plan.videos_per_day}/day)
                   </button>
@@ -1535,11 +1508,10 @@ export function VideoPlanning() {
                     <button
                       key={chip.value}
                       onClick={() => setStatusFilter(chip.value)}
-                      className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition ${
-                        statusFilter === chip.value
-                          ? 'border-brand-500 bg-brand-50 text-brand-700'
-                          : 'border-slate-200 bg-white text-slate-600 hover:border-brand-200'
-                      }`}
+                      className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition ${statusFilter === chip.value
+                        ? 'border-brand-500 bg-brand-50 text-brand-700'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-brand-200'
+                        }`}
                     >
                       <span>{chip.label}</span>
                       {chip.value !== 'all' && (
@@ -1673,27 +1645,26 @@ export function VideoPlanning() {
                         setSelectedDate(dateKey)
                         setIsDetailDrawerOpen(true)
                       }}
-                      className={`min-h-[120px] rounded-lg border p-2 text-left transition relative ${
-                        !date
-                          ? 'border-transparent bg-transparent cursor-default'
-                          : isSelected
-                            ? 'border-brand-500 bg-brand-50 shadow-md'
-                            : isToday
-                              ? 'border-brand-300 bg-brand-50/70 shadow-sm'
-                              : 'border-slate-200 bg-white hover:border-brand-300 hover:bg-slate-50 hover:shadow-sm'
-                      }`}
+                      className={`min-h-[120px] rounded-lg border p-2 text-left transition relative ${!date
+                        ? 'border-transparent bg-transparent cursor-default'
+                        : isSelected
+                          ? 'border-brand-500 bg-brand-50 shadow-md'
+                          : isToday
+                            ? 'border-brand-300 bg-brand-50/70 shadow-sm'
+                            : 'border-slate-200 bg-white hover:border-brand-300 hover:bg-slate-50 hover:shadow-sm'
+                        }`}
                       disabled={!date}
                       title={items.length > 0 ? `${items.length} item(s) scheduled` : ''}
                     >
                       {date && (
                         <>
                           <div className="flex items-center justify-between mb-1">
-                          <div
+                            <div
                               className={`text-sm font-semibold ${isToday ? 'text-brand-600' : 'text-slate-700'}`}
-                          >
-                            {date.getDate()}
-                          </div>
-                          {items.length > 0 && (
+                            >
+                              {date.getDate()}
+                            </div>
+                            {items.length > 0 && (
                               <div className="flex items-center gap-1">
                                 <div className="h-1.5 w-1.5 rounded-full bg-brand-500"></div>
                                 <span className="text-xs font-medium text-slate-600">
@@ -1709,16 +1680,16 @@ export function VideoPlanning() {
                                 let status: string
                                 let displayTopic: string
                                 let displayTime: string
-                                
+
                                 if (isPost) {
                                   status = item.status
                                   displayTopic = item.videos?.topic || `${item.platform} Post`
-                                  displayTime = item.scheduled_time 
-                                    ? new Date(item.scheduled_time).toLocaleTimeString('en-US', { 
-                                        hour: 'numeric', 
-                                        minute: '2-digit',
-                                        hour12: true 
-                                      })
+                                  displayTime = item.scheduled_time
+                                    ? new Date(item.scheduled_time).toLocaleTimeString('en-US', {
+                                      hour: 'numeric',
+                                      minute: '2-digit',
+                                      hour12: true
+                                    })
                                     : ''
                                 } else {
                                   status = item.status
@@ -1732,30 +1703,29 @@ export function VideoPlanning() {
                                   }
                                   displayTime = item.scheduled_time ? formatTime(item.scheduled_time) : ''
                                 }
-                                
+
                                 return (
                                   <div
                                     key={item.id}
-                                    className={`truncate rounded px-1.5 py-1 text-xs border ${
-                                      status === 'completed' ||
+                                    className={`truncate rounded px-1.5 py-1 text-xs border ${status === 'completed' ||
                                       status === 'posted'
-                                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                                        : status === 'scheduled'
-                                          ? 'bg-purple-50 border-purple-200 text-purple-800'
+                                      ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                                      : status === 'scheduled'
+                                        ? 'bg-purple-50 border-purple-200 text-purple-800'
                                         : status === 'ready'
                                           ? 'bg-blue-50 border-blue-200 text-blue-800'
                                           : status === 'generating'
                                             ? 'bg-indigo-50 border-indigo-200 text-indigo-800'
-                                          : status === 'approved'
-                                            ? 'bg-teal-50 border-teal-200 text-teal-800'
-                                          : status === 'failed'
-                                            ? 'bg-red-50 border-red-200 text-red-800'
-                                            : status === 'pending'
-                                              ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
-                                              : status === 'researching'
-                                                ? 'bg-cyan-50 border-cyan-200 text-cyan-800'
-                                              : 'bg-slate-50 border-slate-200 text-slate-700'
-                                    }`}
+                                            : status === 'approved'
+                                              ? 'bg-teal-50 border-teal-200 text-teal-800'
+                                              : status === 'failed'
+                                                ? 'bg-red-50 border-red-200 text-red-800'
+                                                : status === 'pending'
+                                                  ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
+                                                  : status === 'researching'
+                                                    ? 'bg-cyan-50 border-cyan-200 text-cyan-800'
+                                                    : 'bg-slate-50 border-slate-200 text-slate-700'
+                                      }`}
                                     title={`${displayTime ? displayTime + ' - ' : ''}${displayTopic} (${status})`}
                                   >
                                     <div className="flex items-center gap-1">
@@ -1765,7 +1735,7 @@ export function VideoPlanning() {
                                         </span>
                                       )}
                                       <span className="flex-1 truncate font-medium">
-                                    {displayTopic}
+                                        {displayTopic}
                                       </span>
                                     </div>
                                   </div>
@@ -1844,7 +1814,7 @@ export function VideoPlanning() {
                         // Sort by scheduled_time, handling both plan items and scheduled posts
                         let timeA = ''
                         let timeB = ''
-                        
+
                         if (isScheduledPost(a)) {
                           // For scheduled posts, extract time from ISO string
                           timeA = a.scheduled_time ? new Date(a.scheduled_time).toISOString().substring(11, 16) : '00:00'
@@ -1852,13 +1822,13 @@ export function VideoPlanning() {
                           // For plan items, use scheduled_time directly (HH:MM format)
                           timeA = a.scheduled_time || '00:00'
                         }
-                        
+
                         if (isScheduledPost(b)) {
                           timeB = b.scheduled_time ? new Date(b.scheduled_time).toISOString().substring(11, 16) : '00:00'
                         } else {
                           timeB = b.scheduled_time || '00:00'
                         }
-                        
+
                         return timeA.localeCompare(timeB)
                       })
                       .map((item) => {
@@ -1867,8 +1837,8 @@ export function VideoPlanning() {
                           // Render scheduled post differently
                           const scheduledTime = item.scheduled_time
                           return (
-                            <Card 
-                              key={item.id} 
+                            <Card
+                              key={item.id}
                               className="p-5 border-purple-200 bg-purple-50/50"
                             >
                               <div className="flex items-start justify-between gap-4">
@@ -1876,10 +1846,10 @@ export function VideoPlanning() {
                                   <div className="flex items-center gap-3">
                                     <Clock className="h-4 w-4 text-slate-400" />
                                     <span className="text-sm font-medium text-slate-600">
-                                      {scheduledTime ? new Date(scheduledTime).toLocaleTimeString('en-US', { 
-                                        hour: 'numeric', 
+                                      {scheduledTime ? new Date(scheduledTime).toLocaleTimeString('en-US', {
+                                        hour: 'numeric',
                                         minute: '2-digit',
-                                        hour12: true 
+                                        hour12: true
                                       }) : 'No time set'}
                                     </span>
                                     <Badge variant={item.status === 'posted' ? 'success' : item.status === 'pending' ? 'warning' : item.status === 'failed' ? 'error' : 'default'}>
@@ -1918,291 +1888,289 @@ export function VideoPlanning() {
                         }
                         // Render regular plan item (existing code)
                         return (
-                        <Card 
-                          key={item.id} 
-                          className="p-5 cursor-pointer transition hover:shadow-md"
-                          onClick={(e: React.MouseEvent<HTMLDivElement>) => {
-                            // Don't open modal if clicking on buttons or interactive elements
-                            const target = e.target as HTMLElement
-                            if (target.closest('button') || target.closest('a') || editingItem?.id === item.id) {
-                              return
-                            }
-                            openDetailDrawer(item)
-                          }}
-                        >
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 space-y-3">
-                              <div className="flex items-center gap-3">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedItemIds.includes(item.id)}
-                                  onChange={(e) => {
-                                    e.stopPropagation()
-                                    toggleItemSelection(item.id)
-                                  }}
-                                  className="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
-                                />
-                                <Clock className="h-4 w-4 text-slate-400" />
-                                <span className="text-sm font-medium text-slate-600">
-                                  {formatTime(item.scheduled_time)}
-                                </span>
-                                {getStatusBadge(
-                                  item.status,
-                                  item.script_status,
-                                  item,
-                                )}
-                              </div>
-
-                              {editingItem?.id === item.id ? (
-                                <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                                  <div className="flex items-center justify-between">
-                                    <h4 className="font-semibold text-primary">
-                                      Edit Video Details
-                                    </h4>
-                                  </div>
-                                  <Input
-                                    label="Topic *"
-                                    value={editForm.topic}
-                                    onChange={(e) =>
-                                      setEditForm({
-                                        ...editForm,
-                                        topic: e.target.value,
-                                      })
-                                    }
-                                    placeholder="Enter topic (e.g., Best Trading Strategies for 2024)..."
-                                    required
+                          <Card
+                            key={item.id}
+                            className="p-5 cursor-pointer transition hover:shadow-md"
+                            onClick={(e: React.MouseEvent<HTMLDivElement>) => {
+                              // Don't open modal if clicking on buttons or interactive elements
+                              const target = e.target as HTMLElement
+                              if (target.closest('button') || target.closest('a') || editingItem?.id === item.id) {
+                                return
+                              }
+                              openDetailDrawer(item)
+                            }}
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1 space-y-3">
+                                <div className="flex items-center gap-3">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedItemIds.includes(item.id)}
+                                    onChange={(e) => {
+                                      e.stopPropagation()
+                                      toggleItemSelection(item.id)
+                                    }}
+                                    className="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
                                   />
-                                  <div className="space-y-3">
-                                    <div>
-                                      <label className="mb-2 block text-xs font-medium text-slate-700">
-                                        Posting Time
-                                      </label>
-                                      <Input
-                                        type="time"
-                                        value={editForm.scheduled_time}
-                                        onChange={(e) =>
-                                          setEditForm({
-                                            ...editForm,
-                                            scheduled_time: e.target.value,
-                                          })
-                                        }
-                                        className="mb-2"
-                                      />
-                                      <div className="flex flex-wrap gap-2">
-                                        {timePresets.map((preset) => (
-                                          <button
-                                            key={preset.value}
-                                            type="button"
-                                            onClick={() =>
-                                              setEditForm({
-                                                ...editForm,
-                                                scheduled_time: preset.value,
-                                              })
-                                            }
-                                            className={`rounded-lg border px-2 py-1 text-xs font-medium transition ${
-                                              editForm.scheduled_time ===
-                                              preset.value
+                                  <Clock className="h-4 w-4 text-slate-400" />
+                                  <span className="text-sm font-medium text-slate-600">
+                                    {formatTime(item.scheduled_time)}
+                                  </span>
+                                  {getStatusBadge(
+                                    item.status,
+                                    item.script_status,
+                                    item,
+                                  )}
+                                </div>
+
+                                {editingItem?.id === item.id ? (
+                                  <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                    <div className="flex items-center justify-between">
+                                      <h4 className="font-semibold text-primary">
+                                        Edit Video Details
+                                      </h4>
+                                    </div>
+                                    <Input
+                                      label="Topic *"
+                                      value={editForm.topic}
+                                      onChange={(e) =>
+                                        setEditForm({
+                                          ...editForm,
+                                          topic: e.target.value,
+                                        })
+                                      }
+                                      placeholder="Enter topic (e.g., Best Trading Strategies for 2024)..."
+                                      required
+                                    />
+                                    <div className="space-y-3">
+                                      <div>
+                                        <label className="mb-2 block text-xs font-medium text-slate-700">
+                                          Posting Time
+                                        </label>
+                                        <Input
+                                          type="time"
+                                          value={editForm.scheduled_time}
+                                          onChange={(e) =>
+                                            setEditForm({
+                                              ...editForm,
+                                              scheduled_time: e.target.value,
+                                            })
+                                          }
+                                          className="mb-2"
+                                        />
+                                        <div className="flex flex-wrap gap-2">
+                                          {timePresets.map((preset) => (
+                                            <button
+                                              key={preset.value}
+                                              type="button"
+                                              onClick={() =>
+                                                setEditForm({
+                                                  ...editForm,
+                                                  scheduled_time: preset.value,
+                                                })
+                                              }
+                                              className={`rounded-lg border px-2 py-1 text-xs font-medium transition ${editForm.scheduled_time ===
+                                                preset.value
                                                 ? 'border-brand-500 bg-brand-50 text-brand-700'
                                                 : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                                            }`}
-                                          >
-                                            {preset.label.split(' ')[0]}
-                                          </button>
-                                        ))}
+                                                }`}
+                                            >
+                                              {preset.label.split(' ')[0]}
+                                            </button>
+                                          ))}
+                                        </div>
                                       </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                      <label className="block text-xs font-medium text-slate-700">
-                                        Platforms
-                                      </label>
-                                      <div className="flex flex-wrap gap-2">
-                                        {availablePlatforms.map((platform) => (
-                                          <button
-                                            key={platform}
-                                            type="button"
-                                            onClick={() => {
-                                              const newPlatforms =
-                                                editForm.platforms.includes(
-                                                  platform,
-                                                )
-                                                  ? editForm.platforms.filter(
+                                      <div className="space-y-2">
+                                        <label className="block text-xs font-medium text-slate-700">
+                                          Platforms
+                                        </label>
+                                        <div className="flex flex-wrap gap-2">
+                                          {availablePlatforms.map((platform) => (
+                                            <button
+                                              key={platform}
+                                              type="button"
+                                              onClick={() => {
+                                                const newPlatforms =
+                                                  editForm.platforms.includes(
+                                                    platform,
+                                                  )
+                                                    ? editForm.platforms.filter(
                                                       (p) => p !== platform,
                                                     )
-                                                  : [
+                                                    : [
                                                       ...editForm.platforms,
                                                       platform,
                                                     ]
-                                              setEditForm({
-                                                ...editForm,
-                                                platforms: newPlatforms,
-                                              })
-                                            }}
-                                            className={`rounded-lg border px-2 py-1 text-xs font-medium transition ${
-                                              editForm.platforms.includes(
+                                                setEditForm({
+                                                  ...editForm,
+                                                  platforms: newPlatforms,
+                                                })
+                                              }}
+                                              className={`rounded-lg border px-2 py-1 text-xs font-medium transition ${editForm.platforms.includes(
                                                 platform,
                                               )
                                                 ? 'border-brand-500 bg-brand-50 text-brand-700'
                                                 : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                                            }`}
-                                          >
-                                            {platform}
-                                          </button>
-                                        ))}
+                                                }`}
+                                            >
+                                              {platform}
+                                            </button>
+                                          ))}
+                                        </div>
                                       </div>
                                     </div>
+                                    <Textarea
+                                      label="Description"
+                                      value={editForm.description}
+                                      onChange={(e) =>
+                                        setEditForm({
+                                          ...editForm,
+                                          description: e.target.value,
+                                        })
+                                      }
+                                      placeholder="Video description..."
+                                      rows={2}
+                                    />
+                                    <Textarea
+                                      label="Caption (for social posts)"
+                                      value={editForm.caption}
+                                      onChange={(e) =>
+                                        setEditForm({
+                                          ...editForm,
+                                          caption: e.target.value,
+                                        })
+                                      }
+                                      placeholder="Custom caption for social media..."
+                                      rows={2}
+                                    />
                                   </div>
-                                  <Textarea
-                                    label="Description"
-                                    value={editForm.description}
-                                    onChange={(e) =>
-                                      setEditForm({
-                                        ...editForm,
-                                        description: e.target.value,
-                                      })
-                                    }
-                                    placeholder="Video description..."
-                                    rows={2}
-                                  />
-                                  <Textarea
-                                    label="Caption (for social posts)"
-                                    value={editForm.caption}
-                                    onChange={(e) =>
-                                      setEditForm({
-                                        ...editForm,
-                                        caption: e.target.value,
-                                      })
-                                    }
-                                    placeholder="Custom caption for social media..."
-                                    rows={2}
-                                  />
-                                </div>
-                              ) : (
-                                <div>
-                                  {item.topic ? (
-                                    <>
-                                      <h3 className="font-semibold text-primary">
-                                        {item.topic}
-                                      </h3>
-                                      {item.description && (
-                                        <p className="mt-1 text-sm text-slate-600 line-clamp-2">
-                                          {item.description}
-                                        </p>
-                                      )}
-                                      {item.caption && (
-                                        <p className="mt-1 text-xs text-slate-500 italic">
-                                          Caption: {item.caption}
-                                        </p>
-                                      )}
-                                      {item.platforms &&
-                                        item.platforms.length > 0 && (
-                                          <div className="mt-2 flex flex-wrap gap-1">
-                                            {item.platforms.map((platform: string) => (
-                                              <span
-                                                key={platform}
-                                                className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700"
-                                              >
-                                                {platform}
-                                              </span>
-                                            ))}
-                                          </div>
+                                ) : (
+                                  <div>
+                                    {item.topic ? (
+                                      <>
+                                        <h3 className="font-semibold text-primary">
+                                          {item.topic}
+                                        </h3>
+                                        {item.description && (
+                                          <p className="mt-1 text-sm text-slate-600 line-clamp-2">
+                                            {item.description}
+                                          </p>
                                         )}
-                                    </>
-                                  ) : (
-                                    <p className="text-sm text-slate-400">
-                                      No topic yet
-                                    </p>
-                                  )}
-                                </div>
-                              )}
+                                        {item.caption && (
+                                          <p className="mt-1 text-xs text-slate-500 italic">
+                                            Caption: {item.caption}
+                                          </p>
+                                        )}
+                                        {item.platforms &&
+                                          item.platforms.length > 0 && (
+                                            <div className="mt-2 flex flex-wrap gap-1">
+                                              {item.platforms.map((platform: string) => (
+                                                <span
+                                                  key={platform}
+                                                  className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700"
+                                                >
+                                                  {platform}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          )}
+                                      </>
+                                    ) : (
+                                      <p className="text-sm text-slate-400">
+                                        No topic yet
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
 
-                              {item.error_message && (
-                                <p className="text-xs text-rose-600">
-                                  {item.error_message}
-                                </p>
-                              )}
-                            </div>
+                                {item.error_message && (
+                                  <p className="text-xs text-rose-600">
+                                    {item.error_message}
+                                  </p>
+                                )}
+                              </div>
 
-                            <div className="flex flex-wrap gap-2">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleEditItem(item)}
-                                leftIcon={<Edit2 className="h-4 w-4" />}
-                              >
-                                {item.topic ? 'Edit Item' : 'Set Topic'}
-                              </Button>
-                              {item.status === 'pending' && (
+                              <div className="flex flex-wrap gap-2">
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  onClick={() => handleGenerateTopic(item.id)}
-                                  leftIcon={<Sparkles className="h-4 w-4" />}
+                                  onClick={() => handleEditItem(item)}
+                                  leftIcon={<Edit2 className="h-4 w-4" />}
                                 >
-                                  {item.topic ? 'Regenerate' : 'Auto Generate'}
+                                  {item.topic ? 'Edit Item' : 'Set Topic'}
                                 </Button>
-                              )}
-                              {item.script_status === 'draft' &&
-                                item.script && (
+                                {item.status === 'pending' && (
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    onClick={() => setScriptPreviewItem(item)}
-                                    leftIcon={<PenSquare className="h-4 w-4" />}
+                                    onClick={() => handleGenerateTopic(item.id)}
+                                    leftIcon={<Sparkles className="h-4 w-4" />}
                                   >
-                                    Review Script
+                                    {item.topic ? 'Regenerate' : 'Auto Generate'}
                                   </Button>
                                 )}
-                              {item.status === 'ready' && !item.script && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={async () => {
-                                    try {
-                                      await api.post(
-                                        `/api/plans/items/${item.id}/generate-script`,
-                                      )
-                                      if (selectedPlan)
-                                        loadPlanItems(selectedPlan.id)
-                                    } catch (error: any) {
-                                      alert(
-                                        error.response?.data?.error ||
+                                {item.script_status === 'draft' &&
+                                  item.script && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => setScriptPreviewItem(item)}
+                                      leftIcon={<PenSquare className="h-4 w-4" />}
+                                    >
+                                      Review Script
+                                    </Button>
+                                  )}
+                                {item.status === 'ready' && !item.script && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={async () => {
+                                      try {
+                                        await api.post(
+                                          `/api/plans/items/${item.id}/generate-script`,
+                                        )
+                                        if (selectedPlan)
+                                          loadPlanItems(selectedPlan.id)
+                                      } catch (error: any) {
+                                        alert(
+                                          error.response?.data?.error ||
                                           'Failed to generate script',
-                                      )
-                                    }
-                                  }}
-                                  leftIcon={<Sparkles className="h-4 w-4" />}
-                                >
-                                  Generate Script
-                                </Button>
-                              )}
-                              {item.status === 'approved' && (
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleCreateVideo(item)}
-                                  leftIcon={<Video className="h-4 w-4" />}
-                                >
-                                  Create Video
-                                </Button>
-                              )}
-                              {item.status === 'researching' ||
-                              item.status === 'generating' ? (
-                                <Loader className="h-4 w-4 animate-spin text-brand-500" />
-                              ) : null}
-                              {item.video_id && (
-                                <Button
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    navigate(`/videos?videoId=${item.video_id}`)
-                                  }}
-                                  className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-600"
-                                >
-                                  View Video
-                                </Button>
-                              )}
+                                        )
+                                      }
+                                    }}
+                                    leftIcon={<Sparkles className="h-4 w-4" />}
+                                  >
+                                    Generate Script
+                                  </Button>
+                                )}
+                                {item.status === 'approved' && (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleCreateVideo(item)}
+                                    leftIcon={<Video className="h-4 w-4" />}
+                                  >
+                                    Create Video
+                                  </Button>
+                                )}
+                                {item.status === 'researching' ||
+                                  item.status === 'generating' ? (
+                                  <Loader className="h-4 w-4 animate-spin text-brand-500" />
+                                ) : null}
+                                {item.video_id && (
+                                  <Button
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      navigate(`/videos?videoId=${item.video_id}`)
+                                    }}
+                                    className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-600"
+                                  >
+                                    View Video
+                                  </Button>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </Card>
+                          </Card>
                         )
                       })}
                   </div>
@@ -2227,22 +2195,19 @@ export function VideoPlanning() {
 
         {/* Detail Drawer */}
         <div
-          className={`fixed inset-0 z-40 transition ${
-            isDetailDrawerOpen && selectedItem ? 'visible' : 'invisible'
-          }`}
+          className={`fixed inset-0 z-40 transition ${isDetailDrawerOpen && selectedItem ? 'visible' : 'invisible'
+            }`}
         >
           <div
-            className={`absolute inset-0 bg-slate-900/20 transition-opacity ${
-              isDetailDrawerOpen && selectedItem ? 'opacity-100' : 'opacity-0'
-            }`}
+            className={`absolute inset-0 bg-slate-900/20 transition-opacity ${isDetailDrawerOpen && selectedItem ? 'opacity-100' : 'opacity-0'
+              }`}
             onClick={closeDetailDrawer}
           />
           <div
-            className={`absolute right-0 top-0 h-full w-full max-w-xl bg-white shadow-2xl transition-transform duration-300 ${
-              isDetailDrawerOpen && selectedItem
-                ? 'translate-x-0'
-                : 'translate-x-full'
-            }`}
+            className={`absolute right-0 top-0 h-full w-full max-w-xl bg-white shadow-2xl transition-transform duration-300 ${isDetailDrawerOpen && selectedItem
+              ? 'translate-x-0'
+              : 'translate-x-full'
+              }`}
           >
             {selectedItem && (
               <div className="flex h-full flex-col">
@@ -2282,37 +2247,7 @@ export function VideoPlanning() {
                     )}
                   </div>
 
-                  {/* Prompt Selector */}
-                  {prompts.length > 0 && (
-                    <div className="rounded-lg border border-brand-200 bg-brand-50/50 p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Sparkles className="h-4 w-4 text-brand-600" />
-                        <label className="text-sm font-semibold text-slate-700">
-                          Use a Prompt Template
-                        </label>
-                      </div>
-                      <Select
-                        options={[
-                          { value: '', label: 'Select a prompt...' },
-                          ...prompts.map(p => ({ value: p.id, label: p.name }))
-                        ]}
-                        value={selectedPromptIdDrawer}
-                        onChange={(e) => {
-                          const value = e.target.value
-                          if (value) {
-                            handleSelectPrompt(value, true)
-                          } else {
-                            // Allow clearing selection
-                            setSelectedPromptIdDrawer('')
-                          }
-                        }}
-                        className="w-full"
-                      />
-                      <p className="mt-2 text-xs text-slate-500">
-                        Select a prompt to auto-fill the fields below. You can still edit them after.
-                      </p>
-                    </div>
-                  )}
+
 
                   <div className="space-y-3">
                     <Input
@@ -2393,11 +2328,10 @@ export function VideoPlanning() {
                                 platforms: newPlatforms,
                               }))
                             }}
-                            className={`rounded-full border px-3 py-1 text-xs font-semibold capitalize transition ${
-                              editForm.platforms.includes(platform)
-                                ? 'border-brand-500 bg-brand-50 text-brand-700'
-                                : 'border-slate-200 bg-white text-slate-600 hover:border-brand-200'
-                            }`}
+                            className={`rounded-full border px-3 py-1 text-xs font-semibold capitalize transition ${editForm.platforms.includes(platform)
+                              ? 'border-brand-500 bg-brand-50 text-brand-700'
+                              : 'border-slate-200 bg-white text-slate-600 hover:border-brand-200'
+                              }`}
                           >
                             {platform}
                           </button>
@@ -2513,7 +2447,7 @@ export function VideoPlanning() {
           onClose={() => {
             setCreateModal(false)
             setCreateStep(1)
-            setVideoPrompts(['', '', ''])
+
           }}
           title="Create Video Plan"
         >
@@ -2541,45 +2475,45 @@ export function VideoPlanning() {
             </div>
 
             {createStep === 1 ? (
-          <div className="space-y-4">
-            <Input
-              label="Plan Name"
-              placeholder="e.g., Daily Trading Content"
-              value={planName}
-              onChange={(e) => setPlanName(e.target.value)}
-              required
-            />
+              <div className="space-y-4">
+                <Input
+                  label="Plan Name"
+                  placeholder="e.g., Daily Trading Content"
+                  value={planName}
+                  onChange={(e) => setPlanName(e.target.value)}
+                  required
+                />
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <Input
-                label="Start Date"
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                required
-              />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Input
+                    label="Start Date"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    required
+                  />
 
-              <Input
-                label="End Date (optional)"
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                min={startDate}
-              />
-            </div>
+                  <Input
+                    label="End Date (optional)"
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    min={startDate}
+                  />
+                </div>
 
-            <Select
-              label="Videos Per Day"
-              value={videosPerDay.toString()}
-              onChange={(e) => setVideosPerDay(parseInt(e.target.value))}
-              options={[
-                { value: '1', label: '1 video per day' },
-                { value: '2', label: '2 videos per day' },
-                { value: '3', label: '3 videos per day' },
-                { value: '4', label: '4 videos per day' },
-                { value: '5', label: '5 videos per day' },
-              ]}
-            />
+                <Select
+                  label="Videos Per Day"
+                  value={videosPerDay.toString()}
+                  onChange={(e) => setVideosPerDay(parseInt(e.target.value))}
+                  options={[
+                    { value: '1', label: '1 video per day' },
+                    { value: '2', label: '2 videos per day' },
+                    { value: '3', label: '3 videos per day' },
+                    { value: '4', label: '4 videos per day' },
+                    { value: '5', label: '5 videos per day' },
+                  ]}
+                />
 
                 <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
                   <div className="flex items-center justify-between">
@@ -2609,11 +2543,10 @@ export function VideoPlanning() {
                             setPlanDefaultAvatarId(avatar.id)
                             setVideoAvatars(Array(videosPerDay).fill(avatar.id))
                           }}
-                          className={`flex items-center gap-2 rounded-xl border p-3 text-left transition ${
-                            planDefaultAvatarId === avatar.id
-                              ? 'border-brand-500 bg-brand-50 shadow-sm'
-                              : 'border-slate-200 hover:border-brand-300 hover:bg-white'
-                          }`}
+                          className={`flex items-center gap-2 rounded-xl border p-3 text-left transition ${planDefaultAvatarId === avatar.id
+                            ? 'border-brand-500 bg-brand-50 shadow-sm'
+                            : 'border-slate-200 hover:border-brand-300 hover:bg-white'
+                            }`}
                         >
                           {avatar.thumbnail_url || avatar.preview_url ? (
                             <img
@@ -2664,7 +2597,7 @@ export function VideoPlanning() {
                     </p>
                     <span className="text-xs text-slate-500">
                       Defaults from step 1
-                </span>
+                    </span>
                   </div>
                   <div className="mt-4 space-y-4">
                     {Array.from({ length: videosPerDay }).map((_, index) => {
@@ -2676,7 +2609,7 @@ export function VideoPlanning() {
                       )
                       const avatarLooksForDisplay = selectedAvatar?.heygen_avatar_id
                         ? looksByAvatar.get(selectedAvatar.heygen_avatar_id) ||
-                          []
+                        []
                         : []
                       const selectedLook =
                         selectedLookId &&
@@ -2685,82 +2618,45 @@ export function VideoPlanning() {
                         )
 
                       return (
-                  <div
-                    key={index}
+                        <div
+                          key={index}
                           className="rounded-lg border border-slate-200 bg-white p-4 space-y-3"
-                  >
+                        >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-brand-500 px-2 py-1 text-xs font-semibold text-white">
-                        Video {index + 1}
-                      </span>
+                              <span className="rounded-full bg-brand-500 px-2 py-1 text-xs font-semibold text-white">
+                                Video {index + 1}
+                              </span>
                               <span className="text-xs text-slate-500">
                                 Plan default avatar will be used unless
                                 overridden.
                               </span>
-                    </div>
-                      <div className="flex gap-2">
-                          {timePresets.map((preset) => (
-                            <button
-                              key={preset.value}
-                              type="button"
-                              onClick={() => {
-                                const newTimes = [...videoTimes]
-                                newTimes[index] = preset.value
-                                setVideoTimes(newTimes)
-                              }}
-                                  className={`rounded border px-2 py-1 text-[11px] ${
-                                videoTimes[index] === preset.value
-                                  ? 'border-brand-500 bg-brand-50 text-brand-700'
-                                  : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
-                              }`}
-                            >
-                              {preset.label.split('(')[0].trim()}
-                            </button>
-                          ))}
-                      </div>
-                    </div>
-
-                          {/* Prompt Selector for this video slot */}
-                          {prompts.length > 0 && (
-                            <div className="rounded-lg border border-brand-200 bg-brand-50/50 p-3">
-                              <div className="flex items-center gap-2 mb-2">
-                                <Sparkles className="h-3.5 w-3.5 text-brand-600" />
-                                <label className="text-xs font-semibold text-slate-700">
-                                  Use a Prompt Template
-                                </label>
-                              </div>
-                              <Select
-                                options={[
-                                  { value: '', label: 'Select a prompt...' },
-                                  ...prompts.map(p => ({ value: p.id, label: p.name }))
-                                ]}
-                                value={videoPrompts[index] || ''}
-                                onChange={(e) => {
-                                  const value = e.target.value
-                                  const newPrompts = [...videoPrompts]
-                                  if (value) {
-                                    const selectedPrompt = prompts.find(p => p.id === value)
-                                    if (selectedPrompt) {
-                                      const newTopics = [...videoTopics]
-                                      newTopics[index] = selectedPrompt.topic || newTopics[index]
-                                      setVideoTopics(newTopics)
-                                      newPrompts[index] = value
-                                      setVideoPrompts(newPrompts)
-                                    }
-                                  } else {
-                                    // Clear selection
-                                    newPrompts[index] = ''
-                                    setVideoPrompts(newPrompts)
-                                  }
-                                }}
-                                className="w-full text-xs"
-                              />
                             </div>
-                          )}
+                            <div className="flex gap-2">
+                              {timePresets.map((preset) => (
+                                <button
+                                  key={preset.value}
+                                  type="button"
+                                  onClick={() => {
+                                    const newTimes = [...videoTimes]
+                                    newTimes[index] = preset.value
+                                    setVideoTimes(newTimes)
+                                  }}
+                                  className={`rounded border px-2 py-1 text-[11px] ${videoTimes[index] === preset.value
+                                    ? 'border-brand-500 bg-brand-50 text-brand-700'
+                                    : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                                    }`}
+                                >
+                                  {preset.label.split('(')[0].trim()}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+
 
                           <div className="grid gap-3 md:grid-cols-2">
-                      <Input
+                            <Input
                               label="Posting Time"
                               type="time"
                               value={videoTimes[index] || ''}
@@ -2772,21 +2668,21 @@ export function VideoPlanning() {
                             />
                             <Input
                               label="Topic (optional)"
-                        value={videoTopics[index] || ''}
-                        onChange={(e) => {
-                          const newTopics = [...videoTopics]
-                          newTopics[index] = e.target.value
-                          setVideoTopics(newTopics)
-                        }}
+                              value={videoTopics[index] || ''}
+                              onChange={(e) => {
+                                const newTopics = [...videoTopics]
+                                newTopics[index] = e.target.value
+                                setVideoTopics(newTopics)
+                              }}
                               placeholder="Leave blank to auto-generate"
-                      />
-                    </div>
+                            />
+                          </div>
 
                           <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
                             {selectedLook ? (
                               selectedLook.image_url ||
-                              selectedLook.preview_url ||
-                              selectedLook.thumbnail_url ? (
+                                selectedLook.preview_url ||
+                                selectedLook.thumbnail_url ? (
                                 <img
                                   src={
                                     selectedLook.image_url ||
@@ -2826,9 +2722,9 @@ export function VideoPlanning() {
                               <p className="text-sm font-medium text-slate-700 truncate">
                                 {selectedLook
                                   ? selectedLook.name ||
-                                    selectedAvatar?.avatar_name
+                                  selectedAvatar?.avatar_name
                                   : selectedAvatar?.avatar_name ||
-                                    'No avatar selected'}
+                                  'No avatar selected'}
                               </p>
                               <p className="text-xs text-slate-500">
                                 {selectedLook
@@ -2837,38 +2733,38 @@ export function VideoPlanning() {
                               </p>
                             </div>
                             <div className="flex gap-2">
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              size="sm"
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
                                 onClick={() => {
-                                setAvatarModalIndex(index)
-                                setAvatarModalOpen(true)
-                              }}
-                            >
+                                  setAvatarModalIndex(index)
+                                  setAvatarModalOpen(true)
+                                }}
+                              >
                                 Override avatar/look
-                            </Button>
+                              </Button>
                               {videoLooks[index] && (
-                          <Button
-                            type="button"
+                                <Button
+                                  type="button"
                                   variant="ghost"
                                   size="sm"
-                            onClick={() => {
+                                  onClick={() => {
                                     const newLooks = [...videoLooks]
                                     newLooks[index] = null
                                     setVideoLooks(newLooks)
-                            }}
-                          >
+                                  }}
+                                >
                                   Clear
-                          </Button>
+                                </Button>
                               )}
-                    </div>
-                  </div>
+                            </div>
+                          </div>
                         </div>
                       )
                     })}
-              </div>
-            </div>
+                  </div>
+                </div>
 
                 <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-4">
                   <div className="flex items-start justify-between gap-4">
@@ -2881,66 +2777,65 @@ export function VideoPlanning() {
                         one section.
                       </p>
                     </div>
-            <Select
-              label="Schedule Trigger"
-              value={autoScheduleTrigger}
-              onChange={(e) =>
-                setAutoScheduleTrigger(
-                  e.target.value as 'daily' | 'time_based' | 'manual',
-                )
-              }
-              options={[
-                { value: 'daily', label: 'Daily at specific time' },
+                    <Select
+                      label="Schedule Trigger"
+                      value={autoScheduleTrigger}
+                      onChange={(e) =>
+                        setAutoScheduleTrigger(
+                          e.target.value as 'daily' | 'time_based' | 'manual',
+                        )
+                      }
+                      options={[
+                        { value: 'daily', label: 'Daily at specific time' },
                         {
                           value: 'time_based',
                           label: 'Based on scheduled post times',
                         },
-                { value: 'manual', label: 'Manual only' },
-              ]}
-            />
+                        { value: 'manual', label: 'Manual only' },
+                      ]}
+                    />
                   </div>
 
-            {autoScheduleTrigger === 'daily' && (
-              <div className="space-y-3">
-                <label className="block text-sm font-medium text-slate-700">
-                  Trigger Time
-                  <span className="ml-2 text-xs text-slate-500">
-                    (Timezone: {timezone})
-                  </span>
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {timePresets.map((preset) => (
-                    <button
-                      key={preset.value}
-                      type="button"
-                      onClick={() => setTriggerTime(preset.value)}
-                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-                        triggerTime === preset.value
-                          ? 'border-brand-500 bg-brand-50 text-brand-700'
-                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                      }`}
-                    >
-                      {preset.label.split('(')[0].trim()}
-                    </button>
-                  ))}
-                </div>
-                <Input
-                  label="Custom Time"
-                  type="time"
-                  value={triggerTime}
-                  onChange={(e) => setTriggerTime(e.target.value)}
-                  min="00:00"
-                  max="23:59"
-                />
-              </div>
-            )}
+                  {autoScheduleTrigger === 'daily' && (
+                    <div className="space-y-3">
+                      <label className="block text-sm font-medium text-slate-700">
+                        Trigger Time
+                        <span className="ml-2 text-xs text-slate-500">
+                          (Timezone: {timezone})
+                        </span>
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {timePresets.map((preset) => (
+                          <button
+                            key={preset.value}
+                            type="button"
+                            onClick={() => setTriggerTime(preset.value)}
+                            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${triggerTime === preset.value
+                              ? 'border-brand-500 bg-brand-50 text-brand-700'
+                              : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                              }`}
+                          >
+                            {preset.label.split('(')[0].trim()}
+                          </button>
+                        ))}
+                      </div>
+                      <Input
+                        label="Custom Time"
+                        type="time"
+                        value={triggerTime}
+                        onChange={(e) => setTriggerTime(e.target.value)}
+                        min="00:00"
+                        max="23:59"
+                      />
+                    </div>
+                  )}
 
                   <div className="grid gap-3 md:grid-cols-3">
                     <label className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <input
-                  type="checkbox"
-                  checked={autoResearch}
-                  onChange={(e) => setAutoResearch(e.target.checked)}
+                      <input
+                        type="checkbox"
+                        checked={autoResearch}
+                        onChange={(e) => setAutoResearch(e.target.checked)}
                         className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
                       />
                       <div className="space-y-1">
@@ -2949,89 +2844,88 @@ export function VideoPlanning() {
                         </p>
                         <p className="text-xs text-slate-500">
                           Use Perplexity to prep topics automatically.
-                  </p>
-                </div>
+                        </p>
+                      </div>
                     </label>
                     <label className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <input
-                  type="checkbox"
-                  checked={autoApprove}
-                  onChange={(e) => setAutoApprove(e.target.checked)}
+                      <input
+                        type="checkbox"
+                        checked={autoApprove}
+                        onChange={(e) => setAutoApprove(e.target.checked)}
                         className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
                       />
                       <div className="space-y-1">
                         <p className="text-sm font-medium text-slate-700">
-                    Auto-approve scripts
+                          Auto-approve scripts
                         </p>
                         <p className="text-xs text-slate-500">
                           Skip manual review for trusted flows.
-                  </p>
-                </div>
+                        </p>
+                      </div>
                     </label>
                     <label className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <input
-                  type="checkbox"
-                  checked={autoCreate}
-                  onChange={(e) => setAutoCreate(e.target.checked)}
+                      <input
+                        type="checkbox"
+                        checked={autoCreate}
+                        onChange={(e) => setAutoCreate(e.target.checked)}
                         className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
                       />
                       <div className="space-y-1">
                         <p className="text-sm font-medium text-slate-700">
-                    Auto-generate videos
+                          Auto-generate videos
                         </p>
                         <p className="text-xs text-slate-500">
                           Kick off generation as soon as scripts are approved.
-                  </p>
-                </div>
+                        </p>
+                      </div>
                     </label>
-              </div>
-            </div>
+                  </div>
+                </div>
 
                 <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <label className="block text-sm font-medium text-slate-700">
+                  <label className="block text-sm font-medium text-slate-700">
                     Default Platforms (for automated posting)
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {availablePlatforms.map((platform) => (
-                  <button
-                    key={platform}
-                    type="button"
-                    onClick={() => {
-                      if (defaultPlatforms.includes(platform)) {
-                        setDefaultPlatforms(
-                          defaultPlatforms.filter((p) => p !== platform),
-                        )
-                      } else {
-                        setDefaultPlatforms([...defaultPlatforms, platform])
-                      }
-                    }}
-                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition ${
-                      defaultPlatforms.includes(platform)
-                        ? 'border-brand-500 bg-brand-50 text-brand-700'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                    }`}
-                  >
-                    {platform}
-                    {defaultPlatforms.includes(platform) && (
-                      <span className="ml-1">✓</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {availablePlatforms.map((platform) => (
+                      <button
+                        key={platform}
+                        type="button"
+                        onClick={() => {
+                          if (defaultPlatforms.includes(platform)) {
+                            setDefaultPlatforms(
+                              defaultPlatforms.filter((p) => p !== platform),
+                            )
+                          } else {
+                            setDefaultPlatforms([...defaultPlatforms, platform])
+                          }
+                        }}
+                        className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition ${defaultPlatforms.includes(platform)
+                          ? 'border-brand-500 bg-brand-50 text-brand-700'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                          }`}
+                      >
+                        {platform}
+                        {defaultPlatforms.includes(platform) && (
+                          <span className="ml-1">✓</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
                 <div className="flex items-center justify-between pt-2">
                   <Button variant="secondary" onClick={() => setCreateStep(1)}>
                     ← Back to basics
-              </Button>
+                  </Button>
                   <Button
                     onClick={handleCreatePlan}
                     loading={creating}
                     disabled={!planDefaultAvatarId}
                   >
-                Create Plan
-              </Button>
-            </div>
+                    Create Plan
+                  </Button>
+                </div>
               </div>
             )}
           </div>
@@ -3129,11 +3023,10 @@ export function VideoPlanning() {
                       key={preset.value}
                       type="button"
                       onClick={() => setTriggerTime(preset.value)}
-                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-                        triggerTime === preset.value
-                          ? 'border-brand-500 bg-brand-50 text-brand-700'
-                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                      }`}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${triggerTime === preset.value
+                        ? 'border-brand-500 bg-brand-50 text-brand-700'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                        }`}
                     >
                       {preset.label.split('(')[0].trim()}
                     </button>
@@ -3237,11 +3130,10 @@ export function VideoPlanning() {
                         : [...defaultPlatforms, platform]
                       setDefaultPlatforms(newPlatforms)
                     }}
-                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-                      defaultPlatforms.includes(platform)
-                        ? 'border-brand-500 bg-brand-50 text-brand-700'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                    }`}
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${defaultPlatforms.includes(platform)
+                      ? 'border-brand-500 bg-brand-50 text-brand-700'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                      }`}
                   >
                     {platform.charAt(0).toUpperCase() + platform.slice(1)}
                   </button>
@@ -3267,7 +3159,7 @@ export function VideoPlanning() {
                   setVideoTopics(['', '', ''])
                   setVideoAvatars(['', '', ''])
                   setVideoLooks([null, null, null])
-                  setVideoPrompts(['', '', ''])
+
                 }}
               >
                 Cancel
@@ -3362,37 +3254,7 @@ export function VideoPlanning() {
         >
           {editingItem && (
             <div className="space-y-4">
-              {/* Prompt Selector */}
-              {prompts.length > 0 && (
-                <div className="rounded-lg border border-brand-200 bg-brand-50/50 p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="h-4 w-4 text-brand-600" />
-                    <label className="text-sm font-semibold text-slate-700">
-                      Use a Prompt Template
-                    </label>
-                  </div>
-                  <Select
-                    options={[
-                      { value: '', label: 'Select a prompt...' },
-                      ...prompts.map(p => ({ value: p.id, label: p.name }))
-                    ]}
-                    value={selectedPromptId}
-                    onChange={(e) => {
-                      const value = e.target.value
-                      if (value) {
-                        handleSelectPrompt(value, false)
-                      } else {
-                        // Allow clearing selection
-                        setSelectedPromptId('')
-                      }
-                    }}
-                    className="w-full"
-                  />
-                  <p className="mt-2 text-xs text-slate-500">
-                    Select a prompt to auto-fill the fields below. You can still edit them after.
-                  </p>
-                </div>
-              )}
+
 
               <div className="grid gap-4 md:grid-cols-2">
                 <Input
@@ -3489,12 +3351,12 @@ export function VideoPlanning() {
                 const timeB = b.scheduled_time || '00:00'
                 return timeA.localeCompare(timeB)
               })
-            
+
             // Find current item index
             const currentIndex = itemsForDate.findIndex(item => item.id === selectedItem.id)
             const hasPrev = currentIndex > 0
             const hasNext = currentIndex < itemsForDate.length - 1
-            
+
             const navigateToItem = (direction: 'prev' | 'next') => {
               if (direction === 'prev' && hasPrev) {
                 setSelectedItem(itemsForDate[currentIndex - 1])
@@ -3502,359 +3364,359 @@ export function VideoPlanning() {
                 setSelectedItem(itemsForDate[currentIndex + 1])
               }
             }
-            
+
             return (
-            <div className="space-y-6">
-              {/* Pagination Navigation - matching calendar style */}
-              {itemsForDate.length > 1 && (
-                <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-2">
-                  <div className="text-sm text-slate-600">
-                    Item {currentIndex + 1} of {itemsForDate.length}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => navigateToItem('prev')}
-                      disabled={!hasPrev}
-                    >
-                      ← Prev
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => navigateToItem('next')}
-                      disabled={!hasNext}
-                    >
-                      Next →
-                    </Button>
-                  </div>
-                </div>
-              )}
-              
-              {/* Header Info */}
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Scheduled Time
-                  </label>
-                  <p className="mt-1 text-sm font-medium text-primary">
-                    {formatTime(selectedItem.scheduled_time)}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Scheduled Date
-                  </label>
-                  <p className="mt-1 text-sm font-medium text-primary">
-                    {new Date(selectedItem.scheduled_date).toLocaleDateString()}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Status
-                  </label>
-                  <div className="mt-1">
-                    {getStatusBadge(selectedItem.status, selectedItem.script_status, selectedItem)}
-                  </div>
-                </div>
-              </div>
-
-              {/* Topic */}
-              {selectedItem.topic && (
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Topic
-                  </label>
-                  <p className="mt-1 text-lg font-semibold text-primary">
-                    {selectedItem.topic}
-                  </p>
-                </div>
-              )}
-
-              {/* Category */}
-              {selectedItem.category && (
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Category
-                  </label>
-                  <p className="mt-1 text-sm font-medium text-primary">
-                    {selectedItem.category}
-                  </p>
-                </div>
-              )}
-
-              {/* Avatar */}
-              {selectedItem.avatar_id && (() => {
-                const itemAvatar = avatars.find(a => a.id === selectedItem.avatar_id)
-                return itemAvatar ? (
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      Avatar
-                    </label>
-                    <div className="mt-2 flex items-center gap-3">
-                      {itemAvatar.thumbnail_url || itemAvatar.preview_url ? (
-                        <img
-                          src={itemAvatar.thumbnail_url || itemAvatar.preview_url || ''}
-                          alt={itemAvatar.avatar_name}
-                          className="h-16 w-16 rounded-lg object-contain border-2 border-brand-200 bg-slate-50"
-                        />
-                      ) : (
-                        <div className="h-16 w-16 rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">
-                          <User className="h-8 w-8 text-white opacity-50" />
-                        </div>
-                      )}
-                      <p className="text-sm font-medium text-primary">
-                        {itemAvatar.avatar_name}
-                      </p>
+              <div className="space-y-6">
+                {/* Pagination Navigation - matching calendar style */}
+                {itemsForDate.length > 1 && (
+                  <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-2">
+                    <div className="text-sm text-slate-600">
+                      Item {currentIndex + 1} of {itemsForDate.length}
                     </div>
-                  </div>
-                ) : null
-              })()}
-
-              {/* Description */}
-              {selectedItem.description && (
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Description
-                  </label>
-                  <p className="mt-1 text-sm text-slate-700">
-                    {selectedItem.description}
-                  </p>
-                </div>
-              )}
-
-              {/* Why Important */}
-              {selectedItem.why_important && (
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Why It Matters
-                  </label>
-                  <p className="mt-1 text-sm text-slate-700">
-                    {selectedItem.why_important}
-                  </p>
-                </div>
-              )}
-
-              {/* Useful Tips */}
-              {selectedItem.useful_tips && (
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Useful Tips
-                  </label>
-                  <p className="mt-1 text-sm text-slate-700">
-                    {selectedItem.useful_tips}
-                  </p>
-                </div>
-              )}
-
-              {/* Script */}
-              {selectedItem.script && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-slate-400" />
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      Script
-                    </label>
-                    {selectedItem.script_status && (
-                      <Badge variant={selectedItem.script_status === 'approved' ? 'success' : selectedItem.script_status === 'rejected' ? 'error' : 'info'}>
-                        {selectedItem.script_status === 'approved' ? 'Approved' : 
-                         selectedItem.script_status === 'rejected' ? 'Rejected' : 
-                         'Draft'}
-                      </Badge>
-                    )}
-                  </div>
-                  <Textarea
-                    value={selectedItem.script}
-                    readOnly
-                    rows={8}
-                    className="font-mono text-sm"
-                  />
-                  {selectedItem.script_status === 'draft' && (
-                    <div className="flex gap-3 pt-2">
+                    <div className="flex gap-2">
                       <Button
                         variant="ghost"
                         size="sm"
+                        onClick={() => navigateToItem('prev')}
+                        disabled={!hasPrev}
+                      >
+                        ← Prev
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => navigateToItem('next')}
+                        disabled={!hasNext}
+                      >
+                        Next →
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Header Info */}
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Scheduled Time
+                    </label>
+                    <p className="mt-1 text-sm font-medium text-primary">
+                      {formatTime(selectedItem.scheduled_time)}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Scheduled Date
+                    </label>
+                    <p className="mt-1 text-sm font-medium text-primary">
+                      {new Date(selectedItem.scheduled_date).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Status
+                    </label>
+                    <div className="mt-1">
+                      {getStatusBadge(selectedItem.status, selectedItem.script_status, selectedItem)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Topic */}
+                {selectedItem.topic && (
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Topic
+                    </label>
+                    <p className="mt-1 text-lg font-semibold text-primary">
+                      {selectedItem.topic}
+                    </p>
+                  </div>
+                )}
+
+                {/* Category */}
+                {selectedItem.category && (
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Category
+                    </label>
+                    <p className="mt-1 text-sm font-medium text-primary">
+                      {selectedItem.category}
+                    </p>
+                  </div>
+                )}
+
+                {/* Avatar */}
+                {selectedItem.avatar_id && (() => {
+                  const itemAvatar = avatars.find(a => a.id === selectedItem.avatar_id)
+                  return itemAvatar ? (
+                    <div>
+                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Avatar
+                      </label>
+                      <div className="mt-2 flex items-center gap-3">
+                        {itemAvatar.thumbnail_url || itemAvatar.preview_url ? (
+                          <img
+                            src={itemAvatar.thumbnail_url || itemAvatar.preview_url || ''}
+                            alt={itemAvatar.avatar_name}
+                            className="h-16 w-16 rounded-lg object-contain border-2 border-brand-200 bg-slate-50"
+                          />
+                        ) : (
+                          <div className="h-16 w-16 rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">
+                            <User className="h-8 w-8 text-white opacity-50" />
+                          </div>
+                        )}
+                        <p className="text-sm font-medium text-primary">
+                          {itemAvatar.avatar_name}
+                        </p>
+                      </div>
+                    </div>
+                  ) : null
+                })()}
+
+                {/* Description */}
+                {selectedItem.description && (
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Description
+                    </label>
+                    <p className="mt-1 text-sm text-slate-700">
+                      {selectedItem.description}
+                    </p>
+                  </div>
+                )}
+
+                {/* Why Important */}
+                {selectedItem.why_important && (
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Why It Matters
+                    </label>
+                    <p className="mt-1 text-sm text-slate-700">
+                      {selectedItem.why_important}
+                    </p>
+                  </div>
+                )}
+
+                {/* Useful Tips */}
+                {selectedItem.useful_tips && (
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Useful Tips
+                    </label>
+                    <p className="mt-1 text-sm text-slate-700">
+                      {selectedItem.useful_tips}
+                    </p>
+                  </div>
+                )}
+
+                {/* Script */}
+                {selectedItem.script && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-slate-400" />
+                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Script
+                      </label>
+                      {selectedItem.script_status && (
+                        <Badge variant={selectedItem.script_status === 'approved' ? 'success' : selectedItem.script_status === 'rejected' ? 'error' : 'info'}>
+                          {selectedItem.script_status === 'approved' ? 'Approved' :
+                            selectedItem.script_status === 'rejected' ? 'Rejected' :
+                              'Draft'}
+                        </Badge>
+                      )}
+                    </div>
+                    <Textarea
+                      value={selectedItem.script}
+                      readOnly
+                      rows={8}
+                      className="font-mono text-sm"
+                    />
+                    {selectedItem.script_status === 'draft' && (
+                      <div className="flex gap-3 pt-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            handleRejectScript(selectedItem.id)
+                            setSelectedItem(null)
+                          }}
+                          leftIcon={<X className="h-4 w-4" />}
+                        >
+                          Reject
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            handleApproveScript(selectedItem.id)
+                            setSelectedItem(null)
+                          }}
+                          leftIcon={<Check className="h-4 w-4" />}
+                        >
+                          Approve
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Caption */}
+                {selectedItem.caption && (
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Social Media Caption
+                    </label>
+                    <p className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">
+                      {selectedItem.caption}
+                    </p>
+                  </div>
+                )}
+
+                {/* Platforms */}
+                {selectedItem.platforms && selectedItem.platforms.length > 0 && (
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Platforms
+                    </label>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {selectedItem.platforms.map((platform) => (
+                        <Badge key={platform} variant="default">
+                          {platform}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Video Link */}
+                {selectedItem.video_id && (
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Video
+                    </label>
+                    <div className="mt-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => navigate(`/videos?videoId=${selectedItem.video_id}`)}
+                        leftIcon={<ExternalLink className="h-4 w-4" />}
+                      >
+                        View Video
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Error Message */}
+                {selectedItem.error_message && (
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-rose-700">
+                      Error Message
+                    </label>
+                    <p className="mt-1 text-sm text-rose-600">
+                      {selectedItem.error_message}
+                    </p>
+                  </div>
+                )}
+
+                {/* Timestamps */}
+                {(selectedItem.created_at || selectedItem.updated_at) && (
+                  <div className="grid grid-cols-2 gap-4 border-t border-slate-200 pt-4">
+                    {selectedItem.created_at && (
+                      <div>
+                        <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          Created
+                        </label>
+                        <p className="mt-1 text-sm font-medium text-primary">
+                          {new Date(selectedItem.created_at).toLocaleString()}
+                        </p>
+                      </div>
+                    )}
+                    {selectedItem.updated_at && (
+                      <div>
+                        <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          Updated
+                        </label>
+                        <p className="mt-1 text-sm font-medium text-primary">
+                          {new Date(selectedItem.updated_at).toLocaleString()}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex gap-3 border-t border-slate-200 pt-4">
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setEditingItem(selectedItem)
+                      setEditForm({
+                        topic: selectedItem.topic || '',
+                        scheduled_time: selectedItem.scheduled_time || '',
+                        description: selectedItem.description || '',
+                        why_important: selectedItem.why_important || '',
+                        useful_tips: selectedItem.useful_tips || '',
+                        caption: selectedItem.caption || '',
+                        platforms: selectedItem.platforms || [],
+                      })
+                      setSelectedItem(null)
+                    }}
+                    leftIcon={<Edit2 className="h-4 w-4" />}
+                  >
+                    Edit
+                  </Button>
+                  {(selectedItem.status === 'completed' || selectedItem.status === 'scheduled' || selectedItem.status === 'generating') && selectedItem.video_id && (
+                    <Button
+                      variant="ghost"
+                      onClick={async () => {
+                        try {
+                          const response = await api.post(`/api/plans/items/${selectedItem.id}/refresh-status`)
+                          if (response.data.item) {
+                            // Update the item in the planItems array
+                            setPlanItems(prevItems =>
+                              prevItems.map(item =>
+                                item.id === selectedItem.id ? response.data.item : item
+                              )
+                            )
+                            // Update selectedItem
+                            setSelectedItem(response.data.item)
+                            console.log('[VideoPlanning] Status refreshed:', response.data.message)
+                          }
+                        } catch (error: any) {
+                          console.error('[VideoPlanning] Error refreshing status:', error)
+                        }
+                      }}
+                      leftIcon={<RefreshCw className="h-4 w-4" />}
+                    >
+                      Refresh Status
+                    </Button>
+                  )}
+                  {selectedItem.script && selectedItem.script_status === 'draft' && (
+                    <>
+                      <Button
+                        variant="ghost"
                         onClick={() => {
                           handleRejectScript(selectedItem.id)
                           setSelectedItem(null)
                         }}
                         leftIcon={<X className="h-4 w-4" />}
                       >
-                        Reject
+                        Reject Script
                       </Button>
                       <Button
-                        size="sm"
                         onClick={() => {
                           handleApproveScript(selectedItem.id)
                           setSelectedItem(null)
                         }}
                         leftIcon={<Check className="h-4 w-4" />}
                       >
-                        Approve
+                        Approve Script
                       </Button>
-                    </div>
+                    </>
                   )}
                 </div>
-              )}
-
-              {/* Caption */}
-              {selectedItem.caption && (
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Social Media Caption
-                  </label>
-                  <p className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">
-                    {selectedItem.caption}
-                  </p>
-                </div>
-              )}
-
-              {/* Platforms */}
-              {selectedItem.platforms && selectedItem.platforms.length > 0 && (
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Platforms
-                  </label>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {selectedItem.platforms.map((platform) => (
-                      <Badge key={platform} variant="default">
-                        {platform}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Video Link */}
-              {selectedItem.video_id && (
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Video
-                  </label>
-                  <div className="mt-2">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => navigate(`/videos?videoId=${selectedItem.video_id}`)}
-                      leftIcon={<ExternalLink className="h-4 w-4" />}
-                    >
-                      View Video
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Error Message */}
-              {selectedItem.error_message && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-rose-700">
-                    Error Message
-                  </label>
-                  <p className="mt-1 text-sm text-rose-600">
-                    {selectedItem.error_message}
-                  </p>
-                </div>
-              )}
-
-              {/* Timestamps */}
-              {(selectedItem.created_at || selectedItem.updated_at) && (
-                <div className="grid grid-cols-2 gap-4 border-t border-slate-200 pt-4">
-                  {selectedItem.created_at && (
-                    <div>
-                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                        Created
-                      </label>
-                      <p className="mt-1 text-sm font-medium text-primary">
-                        {new Date(selectedItem.created_at).toLocaleString()}
-                      </p>
-                    </div>
-                  )}
-                  {selectedItem.updated_at && (
-                    <div>
-                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                        Updated
-                      </label>
-                      <p className="mt-1 text-sm font-medium text-primary">
-                        {new Date(selectedItem.updated_at).toLocaleString()}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex gap-3 border-t border-slate-200 pt-4">
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setEditingItem(selectedItem)
-                    setEditForm({
-                      topic: selectedItem.topic || '',
-                      scheduled_time: selectedItem.scheduled_time || '',
-                      description: selectedItem.description || '',
-                      why_important: selectedItem.why_important || '',
-                      useful_tips: selectedItem.useful_tips || '',
-                      caption: selectedItem.caption || '',
-                      platforms: selectedItem.platforms || [],
-                    })
-                    setSelectedItem(null)
-                  }}
-                  leftIcon={<Edit2 className="h-4 w-4" />}
-                >
-                  Edit
-                </Button>
-                {(selectedItem.status === 'completed' || selectedItem.status === 'scheduled' || selectedItem.status === 'generating') && selectedItem.video_id && (
-                  <Button
-                    variant="ghost"
-                    onClick={async () => {
-                      try {
-                        const response = await api.post(`/api/plans/items/${selectedItem.id}/refresh-status`)
-                        if (response.data.item) {
-                          // Update the item in the planItems array
-                          setPlanItems(prevItems => 
-                            prevItems.map(item => 
-                              item.id === selectedItem.id ? response.data.item : item
-                            )
-                          )
-                          // Update selectedItem
-                          setSelectedItem(response.data.item)
-                          console.log('[VideoPlanning] Status refreshed:', response.data.message)
-                        }
-                      } catch (error: any) {
-                        console.error('[VideoPlanning] Error refreshing status:', error)
-                      }
-                    }}
-                    leftIcon={<RefreshCw className="h-4 w-4" />}
-                  >
-                    Refresh Status
-                  </Button>
-                )}
-                {selectedItem.script && selectedItem.script_status === 'draft' && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
-                        handleRejectScript(selectedItem.id)
-                        setSelectedItem(null)
-                      }}
-                      leftIcon={<X className="h-4 w-4" />}
-                    >
-                      Reject Script
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        handleApproveScript(selectedItem.id)
-                        setSelectedItem(null)
-                      }}
-                      leftIcon={<Check className="h-4 w-4" />}
-                    >
-                      Approve Script
-                    </Button>
-                  </>
-                )}
               </div>
-            </div>
             )
           })()}
         </Modal>
@@ -3887,10 +3749,10 @@ export function VideoPlanning() {
                         const newAvatars = [...videoAvatars]
                         newAvatars[avatarModalIndex] = avatar.id
                         setVideoAvatars(newAvatars)
-                        
+
                         // Load looks for this avatar
                         const looks = await loadAvatarLooks(avatar.id)
-                        
+
                         // If avatar has looks, show look selection modal, otherwise just close avatar modal
                         if (looks && looks.length > 0) {
                           // Close avatar modal first
@@ -3907,11 +3769,10 @@ export function VideoPlanning() {
                           setAvatarModalOpen(false)
                         }
                       }}
-                      className={`relative rounded-xl border-2 p-3 transition-all hover:scale-105 ${
-                        isSelected
-                          ? 'border-brand-500 bg-brand-50 shadow-lg ring-2 ring-brand-200'
-                          : 'border-slate-200 bg-white hover:border-brand-300 hover:shadow-md'
-                      }`}
+                      className={`relative rounded-xl border-2 p-3 transition-all hover:scale-105 ${isSelected
+                        ? 'border-brand-500 bg-brand-50 shadow-lg ring-2 ring-brand-200'
+                        : 'border-slate-200 bg-white hover:border-brand-300 hover:shadow-md'
+                        }`}
                     >
                       {avatar.has_motion && (
                         <div className="absolute top-2 left-2 z-10">
@@ -3969,77 +3830,76 @@ export function VideoPlanning() {
           title="Select Look"
           size="xl"
         >
-            <div className="space-y-6">
-              <p className="text-sm text-slate-500">
-                Choose a look for video {avatarModalIndex + 1}. You can also use the default avatar by closing this modal.
-              </p>
-              {loadingLooks ? (
-                <div className="text-center py-12">
-                  <div className="inline-block h-8 w-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
-                  <p className="mt-4 text-sm text-slate-500">Loading looks...</p>
-                </div>
-              ) : !avatarLooks || avatarLooks.length === 0 ? (
-                <div className="text-center py-12 text-slate-500">
-                  <Users className="h-12 w-12 mx-auto mb-3 text-slate-300" />
-                  <p>No looks available for this avatar</p>
-                  <p className="text-xs mt-2">The default avatar will be used</p>
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      const newLooks = [...videoLooks]
-                      newLooks[avatarModalIndex] = null
-                      setVideoLooks(newLooks)
-                      setLookModalOpen(false)
-                    }}
-                    className="mt-4"
-                  >
-                    Use Default Avatar
-                  </Button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 max-h-[65vh] overflow-y-auto pr-2 -mr-2">
-                  {avatarLooks.map((look: any) => {
-                    const isSelected = videoLooks[avatarModalIndex] === look.id
-                    const imageUrl = look.image_url || look.preview_url || look.thumbnail_url
-                    return (
-                      <button
-                        key={look.id}
-                        type="button"
-                        onClick={() => handleSelectLook(look.id)}
-                        className={`relative aspect-[3/4] rounded-2xl overflow-hidden border-2 transition-all hover:scale-105 ${
-                          isSelected
-                            ? 'border-brand-500 ring-2 ring-brand-200 shadow-lg'
-                            : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
+          <div className="space-y-6">
+            <p className="text-sm text-slate-500">
+              Choose a look for video {avatarModalIndex + 1}. You can also use the default avatar by closing this modal.
+            </p>
+            {loadingLooks ? (
+              <div className="text-center py-12">
+                <div className="inline-block h-8 w-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+                <p className="mt-4 text-sm text-slate-500">Loading looks...</p>
+              </div>
+            ) : !avatarLooks || avatarLooks.length === 0 ? (
+              <div className="text-center py-12 text-slate-500">
+                <Users className="h-12 w-12 mx-auto mb-3 text-slate-300" />
+                <p>No looks available for this avatar</p>
+                <p className="text-xs mt-2">The default avatar will be used</p>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    const newLooks = [...videoLooks]
+                    newLooks[avatarModalIndex] = null
+                    setVideoLooks(newLooks)
+                    setLookModalOpen(false)
+                  }}
+                  className="mt-4"
+                >
+                  Use Default Avatar
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 max-h-[65vh] overflow-y-auto pr-2 -mr-2">
+                {avatarLooks.map((look: any) => {
+                  const isSelected = videoLooks[avatarModalIndex] === look.id
+                  const imageUrl = look.image_url || look.preview_url || look.thumbnail_url
+                  return (
+                    <button
+                      key={look.id}
+                      type="button"
+                      onClick={() => handleSelectLook(look.id)}
+                      className={`relative aspect-[3/4] rounded-2xl overflow-hidden border-2 transition-all hover:scale-105 ${isSelected
+                        ? 'border-brand-500 ring-2 ring-brand-200 shadow-lg'
+                        : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
                         }`}
-                      >
-                        {imageUrl ? (
-                          <img
-                            src={imageUrl}
-                            alt={look.name || 'Look'}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-purple-400 to-indigo-600 flex items-center justify-center">
-                            <Users className="h-12 w-12 text-white opacity-50" />
-                          </div>
-                        )}
-                        {isSelected && (
-                          <div className="absolute top-2 right-2 bg-brand-500 text-white rounded-full p-1.5 shadow-lg ring-2 ring-white z-10">
-                            <CheckCircle2 className="h-4 w-4" />
-                          </div>
-                        )}
-                        {look.name && (
-                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                            <p className="text-xs font-medium text-white truncate text-center">
-                              {look.name}
-                            </p>
-                          </div>
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
+                    >
+                      {imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt={look.name || 'Look'}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-purple-400 to-indigo-600 flex items-center justify-center">
+                          <Users className="h-12 w-12 text-white opacity-50" />
+                        </div>
+                      )}
+                      {isSelected && (
+                        <div className="absolute top-2 right-2 bg-brand-500 text-white rounded-full p-1.5 shadow-lg ring-2 ring-white z-10">
+                          <CheckCircle2 className="h-4 w-4" />
+                        </div>
+                      )}
+                      {look.name && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                          <p className="text-xs font-medium text-white truncate text-center">
+                            {look.name}
+                          </p>
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
             <div className="flex items-center justify-between pt-4 border-t border-slate-200">
               <p className="text-xs text-slate-400">
                 {avatarLooks.length} look{avatarLooks.length !== 1 ? 's' : ''} available
