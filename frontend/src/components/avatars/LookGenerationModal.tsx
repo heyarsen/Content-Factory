@@ -53,10 +53,6 @@ export function LookGenerationModal({
       return
     }
 
-    // Prepend ethnicity to prompt if specified
-    const finalPrompt = ethnicity !== 'Unspecified'
-      ? `${ethnicity}, ${lookPrompt}`
-      : lookPrompt
 
     await onGenerate({
       avatar,
