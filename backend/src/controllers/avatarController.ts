@@ -1124,10 +1124,10 @@ export class AvatarController {
         promptLower.includes('girl')
 
       if (!hasGenderContext) {
-        // Include ethnicity in the prompt if available to help preserve identity
+        // Include ethnicity and gender in the prompt to strongly reinforce identity preservation
         const ethnicityPrefix = avatar.ethnicity && avatar.ethnicity !== 'Unspecified' ? `${avatar.ethnicity} ` : ''
-        enhancedPrompt = `${ethnicityPrefix}${avatar.gender}, ${enhancedPrompt}`
-        console.log(`[Generate Look] Enhanced prompt with identity context: "${enhancedPrompt}"`)
+        enhancedPrompt = `A photo of the same ${ethnicityPrefix}${avatar.gender}, ${enhancedPrompt}, maintaining exact facial features and identity.`
+        console.log(`[Generate Look] Enhanced prompt for identity preservation: "${enhancedPrompt}"`)
       }
     }
 

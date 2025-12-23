@@ -58,13 +58,15 @@ const buildAutoLookPrompt = (avatarName?: string, gender?: string, ethnicity?: s
 
   // Combine identity context
   const identityContext = `${ethnicityTerm} ${genderTerm}`.trim()
-  const nameWithContext = identityContext ? `${safeName} (${identityContext})` : safeName
 
-  const replaced = AUTO_LOOK_PROMPT_TEMPLATE.replace(/{{\s*name\s*}}/gi, nameWithContext)
-  if (replaced !== AUTO_LOOK_PROMPT_TEMPLATE) {
-    return replaced
-  }
-  return `${AUTO_LOOK_PROMPT_TEMPLATE} ${nameWithContext}`.trim()
+  // Use a more descriptive prompt that reinforces identity
+  const identityReinforcement = identityContext
+    ? `A photo of the same ${identityContext}, maintaining exact facial features and identity.`
+    : 'A photo of the same person, maintaining exact facial features and identity.'
+
+  const replaced = AUTO_LOOK_PROMPT_TEMPLATE.replace(/{{\s*name\s*}}/gi, safeName)
+
+  return `${identityReinforcement} ${replaced}`.trim()
 }
 
 export interface Avatar {

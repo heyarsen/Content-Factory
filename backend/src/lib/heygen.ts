@@ -2932,29 +2932,21 @@ export async function generateAvatarLook(
     const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
     const apiKey = getHeyGenKey()
 
-    // Map GenerateLookRequest to the format expected by HeyGen v2 /photo_avatar/photo/generate
-    // Required fields: name, age, gender, ethnicity, orientation, pose, appearance
+    // Map GenerateLookRequest to the format expected by HeyGen v2 /photo_avatar/look/generate
+    // This endpoint is specialized for generating looks for TRAINED avatar groups
+    // and provides much better identity preservation than the generic /photo/generate.
     const payload: any = {
-      group_id: request.group_id, // CRITICAL: Tie to existing avatar group to maintain identity
-      name: request.name || `Look ${new Date().toISOString().split('T')[0]}`,
-      age: request.age || 'Young Adult', // Default if missing
-      gender: request.gender || 'Man', // Default if missing
-      ethnicity: request.ethnicity || 'White', // Default if missing
+      group_id: request.group_id,
+      prompt: request.prompt,
       orientation: request.orientation,
       pose: request.pose,
       style: request.style,
-      appearance: request.prompt, // Map prompt to appearance
     }
 
-    // Optional fields
-    if (request.photo_avatar_id) {
-      payload.photo_avatar_id = request.photo_avatar_id
-    }
-
-    console.log('[HeyGen] Generating look with payload:', JSON.stringify(payload, null, 2))
+    console.log('[HeyGen] Generating look with payload (using /look/generate):', JSON.stringify(payload, null, 2))
 
     const response = await axios.post(
-      `${HEYGEN_V2_API_URL}/photo_avatar/photo/generate`,
+      `${HEYGEN_V2_API_URL}/photo_avatar/look/generate`,
       payload,
       {
         headers: {
