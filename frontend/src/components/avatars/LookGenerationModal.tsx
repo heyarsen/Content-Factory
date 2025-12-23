@@ -3,7 +3,6 @@ import { User, CheckCircle2 } from 'lucide-react'
 import { Modal } from '../ui/Modal'
 import { Textarea } from '../ui/Textarea'
 import { Button } from '../ui/Button'
-import { Select } from '../ui/Select'
 import { AvatarImage } from './AvatarImage'
 import { Avatar } from '../../types/avatar'
 
@@ -21,18 +20,6 @@ interface LookGenerationModalProps {
   generating: boolean
 }
 
-const ETHNICITY_OPTIONS = [
-  'Unspecified',
-  'White',
-  'Black',
-  'Asian American',
-  'East Asian',
-  'South East Asian',
-  'South Asian',
-  'Middle Eastern',
-  'Pacific',
-  'Hispanic',
-] as const
 
 export function LookGenerationModal({
   isOpen,
@@ -45,8 +32,6 @@ export function LookGenerationModal({
   generating,
 }: LookGenerationModalProps) {
   const [lookPrompt, setLookPrompt] = useState('')
-  const [age, setAge] = useState<string>(avatar?.age || 'Young Adult')
-  const [ethnicity, setEthnicity] = useState<string>(avatar?.ethnicity || 'Unspecified')
 
   const handleGenerate = async () => {
     if (!avatar || !lookPrompt.trim()) {
@@ -57,19 +42,17 @@ export function LookGenerationModal({
     await onGenerate({
       avatar,
       prompt: lookPrompt,
-      age,
-      ethnicity: ethnicity !== 'Unspecified' ? ethnicity : undefined,
+      age: avatar.age || 'Young Adult',
+      ethnicity: avatar.ethnicity !== 'Unspecified' ? avatar.ethnicity : undefined,
     } as any)
 
     // Reset form on success
     setLookPrompt('')
-    setEthnicity('Unspecified')
   }
 
   const handleClose = () => {
     if (!generating) {
       setLookPrompt('')
-      setEthnicity('Unspecified')
       onClose()
     }
   }
@@ -134,27 +117,6 @@ export function LookGenerationModal({
           )}
 
           <div className="space-y-4">
-            <Select
-              label="Age *"
-              value={age}
-              onChange={(e) => setAge(e.target.value)}
-              options={[
-                { value: 'Young Adult', label: 'Young Adult' },
-                { value: 'Early Middle Age', label: 'Early Middle Age' },
-                { value: 'Late Middle Age', label: 'Late Middle Age' },
-                { value: 'Senior', label: 'Senior' },
-                { value: 'Unspecified', label: 'Unspecified' },
-              ]}
-              disabled={generating}
-            />
-
-            <Select
-              label="Ethnicity (Recommended)"
-              value={ethnicity}
-              onChange={(e) => setEthnicity(e.target.value)}
-              options={ETHNICITY_OPTIONS.map(value => ({ value, label: value }))}
-              disabled={generating}
-            />
 
             <Textarea
               label="Look Description *"

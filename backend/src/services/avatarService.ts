@@ -792,7 +792,7 @@ export class AvatarService {
         photo_avatar_id: photoAvatarId, // Use first look as base to preserve identity
         age: 'Young Adult',
         gender: 'Man',
-        ethnicity: 'Caucasian',
+        ethnicity: 'White',
       })
 
       console.log('[Auto Look] ✅ AI look generation started (9:16 format)', {

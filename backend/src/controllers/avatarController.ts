@@ -1145,7 +1145,7 @@ export class AvatarController {
       name: request.prompt ? request.prompt.substring(0, 50) : `Look ${new Date().toISOString().split('T')[0]}`,
       age: avatar?.age || 'Young Adult',
       gender: avatar?.gender || 'Man',
-      ethnicity: avatar?.ethnicity || 'Caucasian',
+      ethnicity: avatar?.ethnicity || 'White',
     }
 
     const result = await generateAvatarLook(generateRequest)

@@ -2938,7 +2938,7 @@ export async function generateAvatarLook(
       name: request.name || `Look ${new Date().toISOString().split('T')[0]}`,
       age: request.age || 'Young Adult', // Default if missing
       gender: request.gender || 'Man', // Default if missing
-      ethnicity: request.ethnicity || 'Caucasian', // Default if missing
+      ethnicity: request.ethnicity || 'White', // Default if missing
       orientation: request.orientation,
       pose: request.pose,
       style: request.style,
