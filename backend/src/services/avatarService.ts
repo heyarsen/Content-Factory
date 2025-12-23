@@ -51,13 +51,20 @@ const AUTO_LOOK_GENERATION_POLL_INTERVAL_MS =
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-const buildAutoLookPrompt = (avatarName?: string): string => {
+const buildAutoLookPrompt = (avatarName?: string, gender?: string, ethnicity?: string): string => {
   const safeName = avatarName?.trim() || 'the speaker'
-  const replaced = AUTO_LOOK_PROMPT_TEMPLATE.replace(/{{\s*name\s*}}/gi, safeName)
+  const genderTerm = gender ? gender.toLowerCase() : ''
+  const ethnicityTerm = ethnicity && ethnicity !== 'Unspecified' ? ethnicity.toLowerCase() : ''
+
+  // Combine identity context
+  const identityContext = `${ethnicityTerm} ${genderTerm}`.trim()
+  const nameWithContext = identityContext ? `${safeName} (${identityContext})` : safeName
+
+  const replaced = AUTO_LOOK_PROMPT_TEMPLATE.replace(/{{\s*name\s*}}/gi, nameWithContext)
   if (replaced !== AUTO_LOOK_PROMPT_TEMPLATE) {
     return replaced
   }
-  return `${AUTO_LOOK_PROMPT_TEMPLATE} ${safeName}`.trim()
+  return `${AUTO_LOOK_PROMPT_TEMPLATE} ${nameWithContext}`.trim()
 }
 
 export interface Avatar {
@@ -761,7 +768,14 @@ export class AvatarService {
     }
 
     // Step 2: Generate AI look (training is ready)
-    const prompt = buildAutoLookPrompt(avatarName)
+    // Fetch avatar details to get correct gender, age, and ethnicity
+    const { data: avatar } = await supabase
+      .from('avatars')
+      .select('gender, age, ethnicity')
+      .eq('heygen_avatar_id', groupId)
+      .single()
+
+    const prompt = buildAutoLookPrompt(avatarName, avatar?.gender, avatar?.ethnicity)
     try {
       console.log('[Auto Look] Training is ready. Generating AI look (9:16 format)...', {
         groupId,
@@ -790,9 +804,9 @@ export class AvatarService {
         pose: AUTO_LOOK_POSE,
         style: AUTO_LOOK_STYLE,
         photo_avatar_id: photoAvatarId, // Use first look as base to preserve identity
-        age: 'Young Adult',
-        gender: 'Man',
-        ethnicity: 'White',
+        age: avatar?.age || 'Young Adult',
+        gender: avatar?.gender || 'Man',
+        ethnicity: avatar?.ethnicity || 'White',
       })
 
       console.log('[Auto Look] ✅ AI look generation started (9:16 format)', {

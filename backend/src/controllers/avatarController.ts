@@ -1091,19 +1091,11 @@ export class AvatarController {
     try {
       const looks = await fetchAvatarGroupLooks(request.group_id)
       if (looks && looks.length > 0) {
-        // If we have a default look ID, verify it exists in the fetched looks
-        if (photoAvatarId) {
-          const lookExists = looks.some((look: any) => look.id === photoAvatarId)
-          if (!lookExists) {
-            // Default look not found in HeyGen, fall back to first available look
-            console.warn(`[Generate Look] Default look ${photoAvatarId} not found in HeyGen group, falling back to first look`)
-            photoAvatarId = looks[0].id
-          }
-        } else {
-          // No default look set, use first available look
-          photoAvatarId = looks[0].id
-        }
-        console.log(`[Generate Look] Using look ${photoAvatarId} as base for generation to ensure consistency`)
+        // ALWAYS use the first look in the group as the base for generation.
+        // The first look is the "ground truth" identity. Using subsequent looks
+        // as a base can lead to identity drift and "mismatch" errors from HeyGen.
+        photoAvatarId = looks[0].id
+        console.log(`[Generate Look] Using the first look ${photoAvatarId} as base for generation to ensure maximum identity consistency`)
       } else {
         console.warn(`[Generate Look] No looks found in group ${request.group_id}. Using default look ID ${photoAvatarId} if available.`)
       }
@@ -1132,8 +1124,10 @@ export class AvatarController {
         promptLower.includes('girl')
 
       if (!hasGenderContext) {
-        enhancedPrompt = `${avatar.gender}, ${enhancedPrompt}`
-        console.log(`[Generate Look] Enhanced prompt with gender: "${enhancedPrompt}"`)
+        // Include ethnicity in the prompt if available to help preserve identity
+        const ethnicityPrefix = avatar.ethnicity && avatar.ethnicity !== 'Unspecified' ? `${avatar.ethnicity} ` : ''
+        enhancedPrompt = `${ethnicityPrefix}${avatar.gender}, ${enhancedPrompt}`
+        console.log(`[Generate Look] Enhanced prompt with identity context: "${enhancedPrompt}"`)
       }
     }
 
