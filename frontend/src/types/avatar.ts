@@ -7,6 +7,8 @@ export interface Avatar {
   preview_url: string | null
   thumbnail_url: string | null
   gender: string | null
+  age?: string | null
+  ethnicity?: string | null
   status: string
   is_default: boolean
   created_at: string

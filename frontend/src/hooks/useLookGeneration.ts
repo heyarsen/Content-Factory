@@ -109,8 +109,10 @@ export function useLookGeneration({ onSuccess, onError }: UseLookGenerationOptio
       prompt: string
       pose: 'half_body' | 'full_body' | 'close_up'
       style: 'Realistic' | 'Cartoon' | 'Anime'
+      age?: string
+      ethnicity?: string
     }) => {
-      const { avatar, prompt, pose, style } = data
+      const { avatar, prompt, pose, style, age, ethnicity } = data
 
       if (avatar.status !== 'active' && avatar.status !== 'ready') {
         toast.error('Avatar must be trained before generating looks. Please train the avatar first.')
@@ -125,6 +127,8 @@ export function useLookGeneration({ onSuccess, onError }: UseLookGenerationOptio
           orientation: 'vertical',
           pose,
           style,
+          age,
+          ethnicity,
         })
 
         const generationId = response.data?.generation_id
@@ -151,12 +155,12 @@ export function useLookGeneration({ onSuccess, onError }: UseLookGenerationOptio
         })
         toast.error(errorMessage)
         onError?.(errorMessage)
-        
+
         // Refresh credits if it's a credit-related error (402 status)
         if (error?.response?.status === 402) {
           refreshCredits()
         }
-        
+
         // Re-throw error so caller can handle it
         throw error
       } finally {

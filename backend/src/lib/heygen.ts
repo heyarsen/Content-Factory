@@ -2914,12 +2914,15 @@ export async function addMotionToPhotoAvatar(
  */
 export interface GenerateLookRequest {
   group_id: string
-  prompt: string
+  prompt: string // Will be mapped to 'appearance' in the API call
   orientation: 'horizontal' | 'vertical' | 'square'
   pose: 'half_body' | 'full_body' | 'close_up'
   style: 'Realistic' | 'Pixar' | 'Cinematic' | 'Vintage' | 'Noir' | 'Cyberpunk' | 'Unspecified' | 'Cartoon' | 'Anime'
   photo_avatar_id?: string // Optional: use selected look as base for generation
   name?: string // Optional: name for the generated look
+  age?: string
+  gender?: string
+  ethnicity?: string
 }
 
 export async function generateAvatarLook(
@@ -2929,9 +2932,29 @@ export async function generateAvatarLook(
     const HEYGEN_V2_API_URL = 'https://api.heygen.com/v2'
     const apiKey = getHeyGenKey()
 
+    // Map GenerateLookRequest to the format expected by HeyGen v2 /photo_avatar/photo/generate
+    // Required fields: name, age, gender, ethnicity, orientation, pose, appearance
+    const payload: any = {
+      name: request.name || `Look ${new Date().toISOString().split('T')[0]}`,
+      age: request.age || 'Young Adult', // Default if missing
+      gender: request.gender || 'Man', // Default if missing
+      ethnicity: request.ethnicity || 'Caucasian', // Default if missing
+      orientation: request.orientation,
+      pose: request.pose,
+      style: request.style,
+      appearance: request.prompt, // Map prompt to appearance
+    }
+
+    // Optional fields
+    if (request.photo_avatar_id) {
+      payload.photo_avatar_id = request.photo_avatar_id
+    }
+
+    console.log('[HeyGen] Generating look with payload:', JSON.stringify(payload, null, 2))
+
     const response = await axios.post(
       `${HEYGEN_V2_API_URL}/photo_avatar/photo/generate`,
-      request,
+      payload,
       {
         headers: {
           'X-Api-Key': apiKey,

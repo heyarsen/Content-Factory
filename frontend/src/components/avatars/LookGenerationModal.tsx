@@ -45,7 +45,8 @@ export function LookGenerationModal({
   generating,
 }: LookGenerationModalProps) {
   const [lookPrompt, setLookPrompt] = useState('')
-  const [ethnicity, setEthnicity] = useState<(typeof ETHNICITY_OPTIONS)[number]>('Unspecified')
+  const [age, setAge] = useState<string>(avatar?.age || 'Young Adult')
+  const [ethnicity, setEthnicity] = useState<string>(avatar?.ethnicity || 'Unspecified')
 
   const handleGenerate = async () => {
     if (!avatar || !lookPrompt.trim()) {
@@ -59,8 +60,10 @@ export function LookGenerationModal({
 
     await onGenerate({
       avatar,
-      prompt: finalPrompt,
-    })
+      prompt: lookPrompt,
+      age,
+      ethnicity: ethnicity !== 'Unspecified' ? ethnicity : undefined,
+    } as any)
 
     // Reset form on success
     setLookPrompt('')
@@ -136,10 +139,25 @@ export function LookGenerationModal({
 
           <div className="space-y-4">
             <Select
+              label="Age *"
+              value={age}
+              onChange={(e) => setAge(e.target.value)}
+              options={[
+                { value: 'Young Adult', label: 'Young Adult' },
+                { value: 'Early Middle Age', label: 'Early Middle Age' },
+                { value: 'Late Middle Age', label: 'Late Middle Age' },
+                { value: 'Senior', label: 'Senior' },
+                { value: 'Unspecified', label: 'Unspecified' },
+              ]}
+              disabled={generating}
+            />
+
+            <Select
               label="Ethnicity (Recommended)"
               value={ethnicity}
-              onChange={(e) => setEthnicity(e.target.value as (typeof ETHNICITY_OPTIONS)[number])}
+              onChange={(e) => setEthnicity(e.target.value)}
               options={ETHNICITY_OPTIONS.map(value => ({ value, label: value }))}
+              disabled={generating}
             />
 
             <Textarea

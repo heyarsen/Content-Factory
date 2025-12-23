@@ -22,7 +22,7 @@ function AvatarsContent() {
   const { toast } = useToast()
   const { selectedAvatarId, setSelectedAvatarId } = useAvatarWorkspace()
   const panel = useContextPanel()
-  
+
   // Tab state: 'my-avatars' or 'public-avatars'
   const [activeTab, setActiveTab] = useState<'my-avatars' | 'public-avatars'>('my-avatars')
   const [publicAvatars, setPublicAvatars] = useState<Avatar[]>([])
@@ -45,7 +45,7 @@ function AvatarsContent() {
   const [renameTarget, setRenameTarget] = useState<Avatar | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<Avatar | null>(null)
-  
+
   // AI Generation state (kept as modal for now)
   const [showGenerateAIModal, setShowGenerateAIModal] = useState(false)
   const [checkingStatus, setCheckingStatus] = useState(false)
@@ -105,10 +105,10 @@ function AvatarsContent() {
     } else if (dashIndex >= 0) {
       endIndex = dashIndex
     }
-    
+
     let raw = endIndex > 0 ? name.slice(0, endIndex) : name
     raw = raw.trim()
-    
+
     // If the name is simple (one or two words), use it as-is
     const words = raw.split(' ')
     if (words.length <= 2) {
@@ -119,7 +119,7 @@ function AvatarsContent() {
       }
       return raw // Use both words for names like "Santa Claus"
     }
-    
+
     // For longer names, use first word
     return words[0] || raw || 'Unknown'
   }
@@ -130,7 +130,7 @@ function AvatarsContent() {
       setLoadingPublicAvatars(true)
       const response = await api.get('/api/avatars?public=true')
       const publicAvatarsList = response.data?.avatars || []
-      
+
       // Convert HeyGen avatar format to our Avatar format
       const normalizedAvatars: Avatar[] = publicAvatarsList.map((avatar: any) => {
         // Use tags from HeyGen API (backend extracts tags and puts them in both tags and categories fields)
@@ -138,7 +138,7 @@ function AvatarsContent() {
         const tags = Array.isArray(avatar.tags) && avatar.tags.length > 0
           ? avatar.tags
           : (Array.isArray(avatar.categories) && avatar.categories.length > 0 ? avatar.categories : [])
-        
+
         const base: Avatar = {
           id: avatar.avatar_id, // Use HeyGen avatar_id as our id
           heygen_avatar_id: avatar.avatar_id,
@@ -155,12 +155,12 @@ function AvatarsContent() {
         }
         return base
       })
-      
+
       console.log('[Public Avatars] Sample avatar tags:', normalizedAvatars.slice(0, 3).map(a => ({
         name: a.avatar_name,
         tags: a.categories,
       })))
-      
+
       setPublicAvatars(normalizedAvatars)
 
       // Group public avatars by base name so grid shows one tile per character, with all variants
@@ -194,7 +194,7 @@ function AvatarsContent() {
         'COMMUNITY': 'Community',
         // Add more mappings as needed based on actual HeyGen tags
       }
-      
+
       // Ensure each group has exactly ONE category for filtering
       const fallbackCategories = ['Professional', 'Lifestyle', 'UGC', 'Community', 'Favorites']
       const groupsArray = Array.from(groupMap.values())
@@ -219,7 +219,7 @@ function AvatarsContent() {
               break
             }
           }
-          
+
           // If no mapping found, use the first tag as category name (capitalize it nicely)
           if (!primaryCategory) {
             const firstTag = group.categories[0]
@@ -229,7 +229,7 @@ function AvatarsContent() {
               .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
               .join(' ')
           }
-          
+
           group.categories = [primaryCategory]
         }
       })
@@ -334,14 +334,14 @@ function AvatarsContent() {
       }
 
       setAiGenerationId(generationId)
-      
+
       // Poll for completion with timeout and better error handling
       let attempts = 0
       const maxAttempts = 120 // 10 minutes (120 * 5 seconds = 600 seconds)
-      
+
       const checkStatus = async () => {
         attempts++
-        
+
         try {
           const statusResponse = await api.get(`/api/avatars/generation-status/${generationId}`)
           const status = statusResponse.data?.status
@@ -377,7 +377,7 @@ function AvatarsContent() {
             })
             return
           }
-          
+
           // Continue polling if still in progress and under max attempts
           if (attempts < maxAttempts) {
             setTimeout(checkStatus, 5000)
@@ -389,7 +389,7 @@ function AvatarsContent() {
         } catch (error: any) {
           // On error, continue polling unless it's a permanent failure
           console.error('[AI Generation] Status check error:', error)
-          
+
           // If it's a 404 or we've tried many times, stop polling
           if (error.response?.status === 404 || attempts >= 10) {
             setCheckingStatus(false)
@@ -397,7 +397,7 @@ function AvatarsContent() {
             handleError(error, { showToast: true, logError: true })
             return
           }
-          
+
           // Temporary error - continue polling (but don't poll forever)
           if (attempts < maxAttempts) {
             setTimeout(checkStatus, 5000)
@@ -455,7 +455,7 @@ function AvatarsContent() {
       if (newAvatar) {
         // Add to state immediately so it shows up right away
         addAvatar(newAvatar)
-        
+
         // Start training automatically (user requested this)
         try {
           await api.post(`/api/avatars/${newAvatar.id}/train`)
@@ -468,7 +468,7 @@ function AvatarsContent() {
         // Refresh immediately and again after a delay to ensure it shows up
         await loadAvatars()
         invalidateLooksCache()
-        
+
         // Also refresh after a short delay to catch any backend processing
         setTimeout(async () => {
           await loadAvatars()
@@ -477,7 +477,7 @@ function AvatarsContent() {
         // If no avatar in response, refresh to see if it appears
         await loadAvatars()
         invalidateLooksCache()
-        
+
         // Try again after delay
         setTimeout(async () => {
           await loadAvatars()
@@ -520,6 +520,8 @@ function AvatarsContent() {
   const handleGenerateLook = useCallback(async (data: {
     avatar: Avatar
     prompt: string
+    age?: string
+    ethnicity?: string
   }) => {
     try {
       await generateLook({
@@ -683,7 +685,7 @@ function AvatarsContent() {
           </div>
         </div>
 
-      {/* Billing / Credits Gate is handled globally by BillingGateProvider */}
+        {/* Billing / Credits Gate is handled globally by BillingGateProvider */}
       </Layout>
     )
   }
@@ -696,21 +698,19 @@ function AvatarsContent() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => handleTabChange('my-avatars')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'my-avatars'
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'my-avatars'
                   ? 'bg-slate-900 text-white'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
+                }`}
             >
               My Avatars
             </button>
             <button
               onClick={() => handleTabChange('public-avatars')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'public-avatars'
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'public-avatars'
                   ? 'bg-slate-900 text-white'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
+                }`}
             >
               Public Avatars
             </button>
@@ -862,11 +862,10 @@ function AvatarsContent() {
                   <button
                     key={cat}
                     onClick={() => setSelectedPublicCategory(cat)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                      selectedPublicCategory === cat
+                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${selectedPublicCategory === cat
                         ? 'bg-slate-900 text-white border-slate-900'
                         : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-                    }`}
+                      }`}
                   >
                     {cat}
                   </button>

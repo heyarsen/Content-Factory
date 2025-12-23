@@ -482,6 +482,8 @@ export class AvatarController {
       preview_url: null,
       thumbnail_url: null,
       gender: request.gender,
+      age: request.age,
+      ethnicity: request.ethnicity,
       status: 'generating',
       is_default: false,
     }
@@ -1014,7 +1016,7 @@ export class AvatarController {
     const { supabase } = await import('../lib/supabase.js')
     const { data: avatar } = await supabase
       .from('avatars')
-      .select('id, default_look_id, heygen_avatar_id, gender, avatar_name')
+      .select('id, default_look_id, heygen_avatar_id, gender, avatar_name, age, ethnicity')
       .eq('heygen_avatar_id', request.group_id)
       .eq('user_id', userId)
       .single()
@@ -1141,6 +1143,9 @@ export class AvatarController {
       prompt: enhancedPrompt,
       photo_avatar_id: photoAvatarId,
       name: request.prompt ? request.prompt.substring(0, 50) : `Look ${new Date().toISOString().split('T')[0]}`,
+      age: avatar?.age || 'Young Adult',
+      gender: avatar?.gender || 'Man',
+      ethnicity: avatar?.ethnicity || 'Caucasian',
     }
 
     const result = await generateAvatarLook(generateRequest)

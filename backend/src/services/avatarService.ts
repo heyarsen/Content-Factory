@@ -69,6 +69,8 @@ export interface Avatar {
   preview_url: string | null
   thumbnail_url: string | null
   gender: string | null
+  age: string | null
+  ethnicity: string | null
   status: string
   is_default: boolean
   created_at: string
@@ -450,24 +452,24 @@ export class AvatarService {
         // we'll still fetch looks from the group directly below
         console.log(`[Avatar Details] getPhotoAvatarDetails failed for ${avatar.heygen_avatar_id}, will fetch looks from group directly:`, detailsError.message)
         const isUserCreated = this.isUserCreatedAvatar(avatar)
-        
+
         if (!isUserCreated && avatar.source === 'synced') {
           // Synced avatars that aren't found should be marked as deleted
           console.warn(`[Avatar Details] Synced avatar ${avatarId} (${avatar.avatar_name}) not found in HeyGen - marking as deleted`)
-          
+
           if (avatar.status !== 'deleted') {
             const { error: updateError } = await supabase
               .from('avatars')
               .update({ status: 'deleted' })
               .eq('id', avatarId)
-            
+
             if (updateError) {
               console.error(`[Avatar Details] Failed to mark avatar ${avatarId} as deleted:`, updateError)
             } else {
               console.log(`[Avatar Details] Successfully marked avatar ${avatarId} (${avatar.avatar_name}) as deleted`)
             }
           }
-          
+
           return {
             id: avatar.heygen_avatar_id,
             group_id: avatar.heygen_avatar_id,
@@ -480,7 +482,7 @@ export class AvatarService {
             looks: [],
           }
         }
-        
+
         // For user-created avatars, create a basic details object and continue to fetch looks
         details = {
           id: avatar.heygen_avatar_id,
@@ -497,24 +499,24 @@ export class AvatarService {
       // If avatar doesn't exist in HeyGen (status is 'unknown'), handle based on avatar type
       if (details.status === 'unknown') {
         const isUserCreated = this.isUserCreatedAvatar(avatar)
-        
+
         // Only mark synced avatars as deleted if they're not found in HeyGen
         if (!isUserCreated && avatar.source === 'synced') {
           console.warn(`[Avatar Details] Synced avatar ${avatarId} (${avatar.avatar_name}) not found in HeyGen - marking as deleted`)
-          
+
           if (avatar.status !== 'deleted') {
             const { error: updateError } = await supabase
               .from('avatars')
               .update({ status: 'deleted' })
               .eq('id', avatarId)
-            
+
             if (updateError) {
               console.error(`[Avatar Details] Failed to mark avatar ${avatarId} as deleted:`, updateError)
             } else {
               console.log(`[Avatar Details] Successfully marked avatar ${avatarId} (${avatar.avatar_name}) as deleted`)
             }
           }
-          
+
           return {
             id: avatar.heygen_avatar_id,
             group_id: avatar.heygen_avatar_id,
@@ -527,7 +529,7 @@ export class AvatarService {
             looks: [],
           }
         }
-        
+
         // For user-created avatars with 'unknown' status, update details but continue to fetch looks
         console.log(`[Avatar Details] User-created avatar ${avatarId} (${avatar.avatar_name}) has unknown status, will still fetch looks from group`)
         details = {
@@ -554,7 +556,7 @@ export class AvatarService {
           // Update database if status differs
           if (avatar.status !== trainingStatus) {
             console.log(`[Avatar Details] Updating avatar ${avatarId} status from ${avatar.status} to ${trainingStatus}`)
-            
+
             // If training is complete (status is 'active'), also update image URLs from HeyGen
             const updatePayload: any = { status: trainingStatus }
             if (trainingStatus === 'active' && details.image_url) {
@@ -562,7 +564,7 @@ export class AvatarService {
               updatePayload.preview_url = details.preview_url || details.image_url
               updatePayload.thumbnail_url = details.thumbnail_url || details.preview_url || details.image_url
             }
-            
+
             await supabase
               .from('avatars')
               .update(updatePayload)
@@ -594,7 +596,7 @@ export class AvatarService {
           try {
             const { fetchAvatarGroupLooks } = await import('../lib/heygen.js')
             const groupLooks = await fetchAvatarGroupLooks(avatar.heygen_avatar_id)
-            
+
             if (Array.isArray(groupLooks) && groupLooks.length > 0) {
               looks = groupLooks.map((look: any) => ({
                 id: look.id,
@@ -788,6 +790,9 @@ export class AvatarService {
         pose: AUTO_LOOK_POSE,
         style: AUTO_LOOK_STYLE,
         photo_avatar_id: photoAvatarId, // Use first look as base to preserve identity
+        age: 'Young Adult',
+        gender: 'Man',
+        ethnicity: 'Caucasian',
       })
 
       console.log('[Auto Look] ✅ AI look generation started (9:16 format)', {
