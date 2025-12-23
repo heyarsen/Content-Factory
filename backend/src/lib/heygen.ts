@@ -2935,6 +2935,7 @@ export async function generateAvatarLook(
     // Map GenerateLookRequest to the format expected by HeyGen v2 /photo_avatar/photo/generate
     // Required fields: name, age, gender, ethnicity, orientation, pose, appearance
     const payload: any = {
+      group_id: request.group_id, // CRITICAL: Tie to existing avatar group to maintain identity
       name: request.name || `Look ${new Date().toISOString().split('T')[0]}`,
       age: request.age || 'Young Adult', // Default if missing
       gender: request.gender || 'Man', // Default if missing
