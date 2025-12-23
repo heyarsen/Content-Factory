@@ -1140,6 +1140,7 @@ export class AvatarController {
       ...request,
       prompt: enhancedPrompt,
       photo_avatar_id: photoAvatarId,
+      name: request.prompt ? request.prompt.substring(0, 50) : `Look ${new Date().toISOString().split('T')[0]}`,
     }
 
     const result = await generateAvatarLook(generateRequest)

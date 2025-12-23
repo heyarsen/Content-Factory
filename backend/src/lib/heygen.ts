@@ -2919,6 +2919,7 @@ export interface GenerateLookRequest {
   pose: 'half_body' | 'full_body' | 'close_up'
   style: 'Realistic' | 'Pixar' | 'Cinematic' | 'Vintage' | 'Noir' | 'Cyberpunk' | 'Unspecified' | 'Cartoon' | 'Anime'
   photo_avatar_id?: string // Optional: use selected look as base for generation
+  name?: string // Optional: name for the generated look
 }
 
 export async function generateAvatarLook(
