@@ -135,27 +135,63 @@ const isLookReadyForTraining = (look?: PhotoAvatarLook | null): boolean => {
 
 export async function fetchAvatarGroupLooks(groupId: string): Promise<PhotoAvatarLook[]> {
   const apiKey = getHeyGenKey()
-  const response = await axios.get(
-    `${HEYGEN_V2_API_URL}/avatar_group/${groupId}/avatars`,
-    {
-      headers: {
-        'X-Api-Key': apiKey,
-        'Content-Type': 'application/json',
-      },
+
+  // Try standard avatar group endpoint first
+  try {
+    const response = await axios.get(
+      `${HEYGEN_V2_API_URL}/avatar_group/${groupId}/avatars`,
+      {
+        headers: {
+          'X-Api-Key': apiKey,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
+
+    const avatarList =
+      response.data?.data?.avatar_list ||
+      response.data?.avatar_list ||
+      response.data?.data ||
+      []
+
+    if (Array.isArray(avatarList)) {
+      return avatarList.filter((look: any) => look && typeof look === 'object')
     }
-  )
+  } catch (error: any) {
+    // If it's a 400 or 404, it might be a photo avatar group which uses a different endpoint
+    if (error.response?.status === 400 || error.response?.status === 404) {
+      try {
+        console.log(`[HeyGen] Standard avatar group fetch failed (${error.response.status}), trying photo_avatar endpoint for group ${groupId}`)
+        const response = await axios.get(
+          `${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/${groupId}/avatars`,
+          {
+            headers: {
+              'X-Api-Key': apiKey,
+              'Content-Type': 'application/json',
+            },
+          }
+        )
 
-  const avatarList =
-    response.data?.data?.avatar_list ||
-    response.data?.avatar_list ||
-    response.data?.data ||
-    []
+        const avatarList =
+          response.data?.data?.avatar_list ||
+          response.data?.avatar_list ||
+          response.data?.data ||
+          []
 
-  if (!Array.isArray(avatarList)) {
-    return []
+        if (Array.isArray(avatarList)) {
+          return avatarList.filter((look: any) => look && typeof look === 'object')
+        }
+      } catch (photoError: any) {
+        console.error(`[HeyGen] Photo avatar group fetch also failed for ${groupId}:`, photoError.response?.data || photoError.message)
+        throw photoError
+      }
+    } else {
+      console.error(`[HeyGen] Failed to fetch avatar group looks for ${groupId}:`, error.response?.data || error.message)
+      throw error
+    }
   }
 
-  return avatarList.filter((look: any) => look && typeof look === 'object')
+  return []
 }
 
 export interface WaitForLooksReadyOptions {
@@ -774,7 +810,14 @@ export async function listAvatars(): Promise<HeyGenAvatarsResponse> {
     // Try v2 API first (photo avatars) - based on official docs
     // https://docs.heygen.com/docs/create-videos-with-photo-avatars
     const endpoints = [
-      // v2 API - List avatar groups, then get avatars from each group
+      // v2 API - List photo avatar groups
+      {
+        type: 'v2-photo-groups',
+        method: 'GET' as const,
+        url: `${HEYGEN_V2_API_URL}/photo_avatar/avatar_group.list`,
+        useXApiKey: true,
+      },
+      // v2 API - List standard avatar groups
       {
         type: 'v2-groups',
         method: 'GET' as const,
@@ -824,21 +867,31 @@ export async function listAvatars(): Promise<HeyGenAvatarsResponse> {
         })
 
         // Handle v2 API response structure (avatar groups)
-        if (endpoint.type === 'v2-groups' && response.data?.data?.avatar_group_list) {
+        if ((endpoint.type === 'v2-groups' || endpoint.type === 'v2-photo-groups') && response.data?.data?.avatar_group_list) {
           const groups = response.data.data.avatar_group_list
-          console.log(`Found ${groups.length} avatar groups`)
+          const isPhotoGroup = endpoint.type === 'v2-photo-groups'
+          console.log(`Found ${groups.length} ${isPhotoGroup ? 'photo ' : ''}avatar groups`)
 
           // Fetch avatars from each group
           const allAvatars: any[] = []
           for (const group of groups) {
             try {
+              const groupUrl = isPhotoGroup
+                ? `${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/${group.id}/avatars`
+                : `${HEYGEN_V2_API_URL}/avatar_group/${group.id}/avatars`
+
               const avatarsResponse = await axios.get(
-                `${HEYGEN_V2_API_URL}/avatar_group/${group.id}/avatars`,
+                groupUrl,
                 { headers: { 'X-Api-Key': apiKey, 'Content-Type': 'application/json' } }
               )
 
-              if (avatarsResponse.data?.data?.avatar_list) {
-                const groupAvatars = avatarsResponse.data.data.avatar_list.map((avatar: any) => ({
+              const avatarList =
+                avatarsResponse.data?.data?.avatar_list ||
+                avatarsResponse.data?.avatar_list ||
+                []
+
+              if (Array.isArray(avatarList)) {
+                const groupAvatars = avatarList.map((avatar: any) => ({
                   avatar_id: avatar.id,
                   avatar_name: avatar.name || group.name || 'Unnamed Avatar',
                   avatar_url: avatar.image_url,
@@ -852,7 +905,7 @@ export async function listAvatars(): Promise<HeyGenAvatarsResponse> {
                 allAvatars.push(...groupAvatars)
               }
             } catch (groupErr: any) {
-              console.log(`Failed to fetch avatars from group ${group.id}:`, groupErr.response?.status)
+              console.log(`Failed to fetch avatars from ${isPhotoGroup ? 'photo ' : ''}group ${group.id}:`, groupErr.response?.status)
             }
           }
 
@@ -2560,15 +2613,35 @@ const resolvePhotoAvatarTarget = async (
 
   // Otherwise, treat it as a group_id and fetch the first look
   const apiKey = getHeyGenKey()
-  const groupResponse = await retryWithBackoff(async () => {
-    return axios.get(`${HEYGEN_V2_API_URL}/avatar_group/${identifier}/avatars`, {
-      headers: {
-        'X-Api-Key': apiKey,
-        'Content-Type': 'application/json',
-      },
-      timeout: 20000, // increase timeout to 20s
-    })
-  }, 2, 750)
+  let groupResponse: any
+
+  try {
+    groupResponse = await retryWithBackoff(async () => {
+      return axios.get(`${HEYGEN_V2_API_URL}/avatar_group/${identifier}/avatars`, {
+        headers: {
+          'X-Api-Key': apiKey,
+          'Content-Type': 'application/json',
+        },
+        timeout: 20000, // increase timeout to 20s
+      })
+    }, 2, 750)
+  } catch (error: any) {
+    // If it's a 400 or 404, it might be a photo avatar group
+    if (error.response?.status === 400 || error.response?.status === 404) {
+      console.log(`[HeyGen] resolvePhotoAvatarTarget: Standard avatar group fetch failed (${error.response.status}), trying photo_avatar endpoint for group ${identifier}`)
+      groupResponse = await retryWithBackoff(async () => {
+        return axios.get(`${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/${identifier}/avatars`, {
+          headers: {
+            'X-Api-Key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          timeout: 20000,
+        })
+      }, 2, 750)
+    } else {
+      throw error
+    }
+  }
 
   const avatarList =
     groupResponse.data?.data?.avatar_list ||
