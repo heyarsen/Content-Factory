@@ -2941,10 +2941,6 @@ export async function generateAvatarLook(
       orientation: request.orientation,
       pose: request.pose,
       style: request.style,
-      photo_avatar_id: request.photo_avatar_id,
-      age: request.age,
-      gender: request.gender,
-      ethnicity: request.ethnicity,
     }
 
     console.log('[HeyGen] Generating look with payload (using /look/generate):', JSON.stringify(payload, null, 2))

@@ -1107,13 +1107,9 @@ export class AvatarController {
       }
     }
 
-    // Enhance prompt with identity context to strongly reinforce identity preservation
-    let enhancedPrompt = request.prompt
-    const genderTerm = avatar?.gender ? String(avatar.gender).toLowerCase() : 'person'
-    const ethnicityTerm = avatar?.ethnicity && avatar?.ethnicity !== 'Unspecified' ? `${avatar.ethnicity} ` : ''
-
-    // Use a more descriptive prompt that reinforces identity while incorporating the user's prompt
-    enhancedPrompt = `A photo of the same ${ethnicityTerm}${genderTerm}, ${request.prompt}, maintaining exact facial features and identity.`
+    // Enhance prompt with simple identity reinforcement
+    // Using "same person" is the most reliable way to maintain identity without triggering mismatch errors
+    const enhancedPrompt = `A photo of the same person, ${request.prompt}`
     console.log(`[Generate Look] Enhanced prompt for identity preservation: "${enhancedPrompt}"`)
 
     // Include photo_avatar_id in the request to ensure generated looks match the selected avatar photo
