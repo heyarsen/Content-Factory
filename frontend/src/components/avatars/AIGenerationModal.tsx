@@ -107,14 +107,15 @@ export function AIGenerationModal({
   }
 
   const handleClose = () => {
-    if (!checkingStatus) {
+    // Always allow closing, but only reset form if not in the middle of generation
+    if (!checkingStatus && !confirmingPhoto) {
       setAiName('')
       setAiAge('Unspecified')
       setAiGender('Man')
       setAiEthnicity('Unspecified')
       setAiAppearance('')
-      onClose()
     }
+    onClose()
   }
 
   const isPhotoSelectionStage = !checkingStatus && stage === 'photosReady' && photos.length > 0
@@ -166,9 +167,14 @@ export function AIGenerationModal({
               <p className="text-xs text-slate-600">
                 We generated several options. Pick the one you like best — we&apos;ll create and train your avatar from that photo.
               </p>
+              <div className="rounded-lg bg-amber-50 border border-amber-100 p-3">
+                <p className="text-xs font-medium text-amber-800">
+                  Important: You must choose one of these options to proceed. This selection is final and cannot be changed later.
+                </p>
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-4 gap-3 max-w-2xl mx-auto">
               {photos.slice(0, 4).map((photo, index) => {
                 const isSelected = selectedIndex === index
                 return (
@@ -176,11 +182,10 @@ export function AIGenerationModal({
                     key={photo.key || index}
                     type="button"
                     onClick={() => onSelectPhoto?.(index)}
-                    className={`relative aspect-[3/4] rounded-2xl overflow-hidden border-2 transition-all ${
-                      isSelected
-                        ? 'border-brand-500 ring-2 ring-brand-200 shadow-lg'
-                        : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
-                    }`}
+                    className={`relative aspect-[3/4] rounded-2xl overflow-hidden border-2 transition-all ${isSelected
+                      ? 'border-brand-500 ring-2 ring-brand-200 shadow-lg'
+                      : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
+                      }`}
                   >
                     <img
                       src={photo.url}
@@ -195,7 +200,7 @@ export function AIGenerationModal({
             {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
 
             <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
-              <Button variant="ghost" onClick={handleClose} type="button" disabled={confirmingPhoto}>
+              <Button variant="ghost" onClick={handleClose} type="button">
                 Cancel
               </Button>
               <Button
@@ -284,7 +289,7 @@ export function AIGenerationModal({
             </p>
 
             <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
-              <Button variant="ghost" onClick={handleClose} disabled={checkingStatus} type="button">
+              <Button variant="ghost" onClick={handleClose} type="button">
                 Cancel
               </Button>
               <Button
