@@ -26,6 +26,87 @@ const TRAINING_STATUS_CHECK_TIMEOUT = parseInt(process.env.TRAINING_STATUS_CHECK
 const TRAINING_STATUS_CHECK_RETRIES = parseInt(process.env.TRAINING_STATUS_CHECK_RETRIES || '3', 10)
 
 /**
+ * Background polling for AI generation status
+ */
+async function pollAIGenerationStatus(
+  generationId: string,
+  userId: string,
+  avatarName: string
+): Promise<void> {
+  const maxAttempts = 120 // 10 minutes
+  const pollInterval = 5000 // 5 seconds
+
+  const jobId = jobManager.createJob('ai_generation', generationId, {
+    userId,
+    metadata: { avatarName },
+  })
+
+  jobManager.updateJob(jobId, { status: 'in_progress' })
+  const cancellationToken = jobManager.getCancellationToken(jobId)
+
+  console.log(`[AI Generation] Starting background polling for generation ${generationId} (job: ${jobId})`)
+
+  try {
+    const { supabase } = await import('../lib/supabase.js')
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      if (cancellationToken?.signal.aborted || jobManager.isCancelled(jobId)) {
+        console.log(`[AI Generation] Job ${jobId} was cancelled`)
+        jobManager.updateJob(jobId, { status: 'cancelled' })
+        return
+      }
+
+      await new Promise<void>((resolve) => setTimeout(resolve, pollInterval))
+
+      try {
+        const status = await checkGenerationStatus(generationId)
+        console.log(`[AI Generation] Poll attempt ${attempt}/${maxAttempts} - Status:`, status.status)
+
+        if (status.status === 'success') {
+          console.log(`[AI Generation] ✅ Generation completed successfully!`)
+
+          // Update status to awaiting_selection so frontend knows it's ready for photo choice
+          await supabase
+            .from('avatars')
+            .update({ status: 'awaiting_selection' })
+            .eq('user_id', userId)
+            .eq('heygen_avatar_id', generationId)
+
+          jobManager.updateJob(jobId, { status: 'completed' })
+          return
+        } else if (status.status === 'failed') {
+          console.error(`[AI Generation] ❌ Generation failed:`, status.msg)
+
+          await supabase
+            .from('avatars')
+            .update({ status: 'failed' })
+            .eq('user_id', userId)
+            .eq('heygen_avatar_id', generationId)
+
+          jobManager.updateJob(jobId, { status: 'failed', error: status.msg || 'Generation failed' })
+          return
+        }
+      } catch (pollError: any) {
+        console.warn(`[AI Generation] Error during poll attempt ${attempt}:`, pollError.message)
+      }
+    }
+
+    console.error(`[AI Generation] ❌ Polling timed out after ${maxAttempts} attempts`)
+    jobManager.updateJob(jobId, { status: 'failed', error: 'Polling timed out' })
+
+    await supabase
+      .from('avatars')
+      .update({ status: 'failed' })
+      .eq('user_id', userId)
+      .eq('heygen_avatar_id', generationId)
+
+  } catch (error: any) {
+    console.error(`[AI Generation] Fatal error in background polling:`, error.message)
+    jobManager.updateJob(jobId, { status: 'failed', error: error.message })
+  }
+}
+
+/**
  * Background polling for look generation status
  */
 async function pollLookGenerationStatus(
@@ -504,8 +585,13 @@ export class AvatarController {
       throw new ApiError(`Failed to save avatar generation: ${error.message}`, ErrorCode.INTERNAL_SERVER_ERROR, 500)
     }
 
+    // Start background polling
+    pollAIGenerationStatus(result.generation_id, userId, request.name).catch(err => {
+      console.error('[AI Generation] Background polling failed to start:', err.message)
+    })
+
     return {
-      message: 'AI avatar generation started. Once generation completes, you will need to manually start training.',
+      message: 'AI avatar generation started. You can close this window; the progress will be visible in your avatars list.',
       generation_id: result.generation_id,
     }
   }

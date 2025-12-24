@@ -24,15 +24,28 @@ export function useAvatarPolling({ avatars, onStatusUpdate, onTrainingComplete }
     async (avatar: Avatar, options: { silent?: boolean } = {}) => {
       if (!avatar) return
       try {
-        const response = await api.get(`/api/avatars/training-status/${avatar.heygen_avatar_id}`, {
-          timeout: 300000, // 5 minutes timeout for status checks
-        })
-        const status = response.data?.status
-        const normalizedStatus = status === 'ready' ? 'active' : status || avatar.status
+        let normalizedStatus = avatar.status
+        let statusChanged = false
 
-        // Only update if status actually changed
-        const previousStatus = avatar.status
-        const statusChanged = normalizedStatus !== previousStatus
+        if (avatar.status === 'generating') {
+          const response = await api.get(`/api/avatars/generation-status/${avatar.heygen_avatar_id}`)
+          const status = response.data?.status
+
+          if (status === 'success') {
+            normalizedStatus = 'awaiting_selection'
+            statusChanged = true
+          } else if (status === 'failed') {
+            normalizedStatus = 'failed'
+            statusChanged = true
+          }
+        } else {
+          const response = await api.get(`/api/avatars/training-status/${avatar.heygen_avatar_id}`, {
+            timeout: 300000, // 5 minutes timeout for status checks
+          })
+          const status = response.data?.status
+          normalizedStatus = status === 'ready' ? 'active' : status || avatar.status
+          statusChanged = normalizedStatus !== avatar.status
+        }
 
         // Update the stored avatar status
         if (avatarsToPollRef.current.has(avatar.id)) {

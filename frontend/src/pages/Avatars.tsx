@@ -1,5 +1,5 @@
 import { useCallback, useState, useMemo } from 'react'
-import { MoreVertical, Star, Pencil, Trash2 } from 'lucide-react'
+import { MoreVertical, Star, Pencil, Trash2, RefreshCw } from 'lucide-react'
 import { Layout } from '../components/layout/Layout'
 import { AvatarWorkspaceProvider, useAvatarWorkspace } from '../contexts/AvatarWorkspaceContext'
 import { useAvatarWorkspaceState } from '../hooks/avatars/useAvatarWorkspace'
@@ -516,6 +516,78 @@ function AvatarsContent() {
     toast,
   ])
 
+  const handleResumeAIGeneration = useCallback(async (avatar: Avatar) => {
+    setAiGenerationId(avatar.heygen_avatar_id)
+    setAiRequestName(avatar.avatar_name)
+    setCheckingStatus(true)
+    setShowGenerateAIModal(true)
+    setAiGenerationStage('creating')
+    setAiGenerationError(null)
+
+    try {
+      const response = await api.get(`/api/avatars/generation-status/${avatar.heygen_avatar_id}`)
+      const status = response.data?.status
+      const imageUrls: string[] = response.data?.image_url_list || []
+      const imageKeys: string[] = response.data?.image_key_list || []
+
+      if (status === 'success') {
+        const photos = imageUrls
+          .slice(0, 4)
+          .map((url, index) => ({
+            url,
+            key: imageKeys[index] || '',
+          }))
+          .filter(photo => photo.url && photo.key)
+
+        setAiGenerationPhotos(photos)
+        setAiSelectedPhotoIndex(0)
+        setAiGenerationStage('photosReady')
+        setCheckingStatus(false)
+      } else if (status === 'failed') {
+        setAiGenerationError(response.data?.msg || 'AI generation failed')
+        setCheckingStatus(false)
+      } else {
+        // Still generating - start polling
+        let attempts = 0
+        const maxAttempts = 120
+        const checkStatus = async () => {
+          attempts++
+          try {
+            const statusResponse = await api.get(`/api/avatars/generation-status/${avatar.heygen_avatar_id}`)
+            const s = statusResponse.data?.status
+            if (s === 'success') {
+              setCheckingStatus(false)
+              const p = (statusResponse.data?.image_url_list || [])
+                .slice(0, 4)
+                .map((url: string, index: number) => ({
+                  url,
+                  key: (statusResponse.data?.image_key_list || [])[index] || '',
+                }))
+              setAiGenerationPhotos(p)
+              setAiSelectedPhotoIndex(0)
+              setAiGenerationStage('photosReady')
+            } else if (s === 'failed') {
+              setCheckingStatus(false)
+              setAiGenerationError(statusResponse.data?.msg || 'AI generation failed')
+            } else if (attempts < maxAttempts) {
+              setTimeout(checkStatus, 5000)
+            } else {
+              setCheckingStatus(false)
+              setAiGenerationError('Generation is taking longer than expected.')
+            }
+          } catch (err: any) {
+            if (attempts < maxAttempts) setTimeout(checkStatus, 5000)
+            else setCheckingStatus(false)
+          }
+        }
+        setTimeout(checkStatus, 5000)
+      }
+    } catch (error: any) {
+      setAiGenerationError(error.message || 'Failed to check status')
+      setCheckingStatus(false)
+    }
+  }, [])
+
   // Handle look generation
   const handleGenerateLook = useCallback(async (data: {
     avatar: Avatar
@@ -699,8 +771,8 @@ function AvatarsContent() {
             <button
               onClick={() => handleTabChange('my-avatars')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'my-avatars'
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                ? 'bg-slate-900 text-white'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
             >
               My Avatars
@@ -708,8 +780,8 @@ function AvatarsContent() {
             <button
               onClick={() => handleTabChange('public-avatars')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'public-avatars'
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                ? 'bg-slate-900 text-white'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
             >
               Public Avatars
@@ -748,6 +820,8 @@ function AvatarsContent() {
                   const lookCount = getAvatarLooks(avatar.id).length
                   const status = (avatar.status || '').toLowerCase()
                   const isTraining = status === 'training' || status === 'pending'
+                  const isGenerating = status === 'generating'
+                  const isAwaitingSelection = status === 'awaiting_selection'
                   const isFailed = status === 'failed'
                   return (
                     <div
@@ -761,9 +835,15 @@ function AvatarsContent() {
                             Default
                           </span>
                         )}
-                        {isTraining && (
-                          <span className="absolute top-3 right-3 rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700">
-                            Training
+                        {(isTraining || isGenerating) && (
+                          <span className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700">
+                            {isGenerating && <RefreshCw className="h-3 w-3 animate-spin" />}
+                            {isGenerating ? 'Generating' : 'Training'}
+                          </span>
+                        )}
+                        {isAwaitingSelection && (
+                          <span className="absolute top-3 right-3 rounded-full bg-brand-100 px-2 py-1 text-xs font-medium text-brand-700">
+                            Ready to Pick
                           </span>
                         )}
                         {isFailed && (
@@ -824,21 +904,42 @@ function AvatarsContent() {
                           </div>
                         </div>
                         <div className="mt-auto flex gap-2">
-                          <Button
-                            size="sm"
-                            className="flex-1"
-                            onClick={() => openGenerateLookModal(avatar)}
-                          >
-                            Generate Look
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            className="flex-1"
-                            onClick={() => openManageLooks(avatar)}
-                          >
-                            Manage Looks
-                          </Button>
+                          {isAwaitingSelection ? (
+                            <Button
+                              size="sm"
+                              className="flex-1 bg-brand-600 hover:bg-brand-700"
+                              onClick={() => handleResumeAIGeneration(avatar)}
+                            >
+                              Finish Setup
+                            </Button>
+                          ) : isGenerating ? (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="flex-1"
+                              onClick={() => handleResumeAIGeneration(avatar)}
+                            >
+                              Check Status
+                            </Button>
+                          ) : (
+                            <>
+                              <Button
+                                size="sm"
+                                className="flex-1"
+                                onClick={() => openGenerateLookModal(avatar)}
+                              >
+                                Generate Look
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="flex-1"
+                                onClick={() => openManageLooks(avatar)}
+                              >
+                                Manage Looks
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -863,8 +964,8 @@ function AvatarsContent() {
                     key={cat}
                     onClick={() => setSelectedPublicCategory(cat)}
                     className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${selectedPublicCategory === cat
-                        ? 'bg-slate-900 text-white border-slate-900'
-                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                      ? 'bg-slate-900 text-white border-slate-900'
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
                       }`}
                   >
                     {cat}
