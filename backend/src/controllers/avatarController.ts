@@ -1107,10 +1107,10 @@ export class AvatarController {
       }
     }
 
-    // Enhance prompt with simple identity reinforcement
-    // Using "same person" is the most reliable way to maintain identity without triggering mismatch errors
-    const enhancedPrompt = `A photo of the same person, ${request.prompt}`
-    console.log(`[Generate Look] Enhanced prompt for identity preservation: "${enhancedPrompt}"`)
+    // Use the prompt directly. For trained avatar groups, the identity is handled by the group_id.
+    // Adding descriptors like "same person" can actually interfere with the trained model.
+    const enhancedPrompt = request.prompt
+    console.log(`[Generate Look] Using original prompt for trained model: "${enhancedPrompt}"`)
 
     // Include photo_avatar_id in the request to ensure generated looks match the selected avatar photo
     const generateRequest = {

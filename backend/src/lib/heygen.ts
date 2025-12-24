@@ -2602,10 +2602,9 @@ export async function trainAvatarGroup(
     const apiKey = getHeyGenKey()
 
     const response = await axios.post(
-      `${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/train`,
+      `${HEYGEN_V2_API_URL}/photo_avatar/train`,
       {
         group_id: groupId,
-        photo_avatar_ids: lookIds,
       },
       {
         headers: {

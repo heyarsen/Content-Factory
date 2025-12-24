@@ -56,12 +56,9 @@ const buildAutoLookPrompt = (avatarName?: string, gender?: string, ethnicity?: s
   const genderTerm = gender ? gender.toLowerCase() : 'person'
   const ethnicityTerm = ethnicity && ethnicity !== 'Unspecified' ? `${ethnicity} ` : ''
 
-  // Use a simple prompt that reinforces identity
-  const identityReinforcement = 'A photo of the same person,'
-
   const replaced = AUTO_LOOK_PROMPT_TEMPLATE.replace(/{{\s*name\s*}}/gi, safeName)
 
-  return `${identityReinforcement} ${replaced}`.trim()
+  return replaced.trim()
 }
 
 export interface Avatar {
