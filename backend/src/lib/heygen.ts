@@ -162,20 +162,35 @@ export async function fetchAvatarGroupLooks(groupId: string): Promise<PhotoAvata
     if (error.response?.status === 400 || error.response?.status === 404) {
       try {
         console.log(`[HeyGen] Standard avatar group fetch failed (${error.response.status}), trying photo_avatar endpoint for group ${groupId}`)
-        const response = await axios.get(
+        const photoEndpoints = [
           `${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/${groupId}/avatars`,
-          {
-            headers: {
-              'X-Api-Key': apiKey,
-              'Content-Type': 'application/json',
-            },
+          `${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/${groupId}`
+        ]
+
+        let photoResponse: any
+        let photoError: any
+
+        for (const url of photoEndpoints) {
+          try {
+            photoResponse = await axios.get(url, {
+              headers: {
+                'X-Api-Key': apiKey,
+                'Content-Type': 'application/json',
+              },
+            })
+            break // Success
+          } catch (err: any) {
+            photoError = err
+            if (err.response?.status !== 404) break // If not 404, don't try other URLs
           }
-        )
+        }
+
+        if (!photoResponse && photoError) throw photoError
 
         const avatarList =
-          response.data?.data?.avatar_list ||
-          response.data?.avatar_list ||
-          response.data?.data ||
+          photoResponse.data?.data?.avatar_list ||
+          photoResponse.data?.avatar_list ||
+          photoResponse.data?.data ||
           []
 
         if (Array.isArray(avatarList)) {
@@ -876,18 +891,37 @@ export async function listAvatars(): Promise<HeyGenAvatarsResponse> {
           const allAvatars: any[] = []
           for (const group of groups) {
             try {
-              const groupUrl = isPhotoGroup
-                ? `${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/${group.id}/avatars`
-                : `${HEYGEN_V2_API_URL}/avatar_group/${group.id}/avatars`
+              const urlsToTry = isPhotoGroup
+                ? [
+                  `${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/${group.id}/avatars`,
+                  `${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/${group.id}`
+                ]
+                : [`${HEYGEN_V2_API_URL}/avatar_group/${group.id}/avatars`]
 
-              const avatarsResponse = await axios.get(
-                groupUrl,
-                { headers: { 'X-Api-Key': apiKey, 'Content-Type': 'application/json' } }
-              )
+              let avatarsResponse: any
+              let lastErr: any
+
+              for (const url of urlsToTry) {
+                try {
+                  avatarsResponse = await axios.get(
+                    url,
+                    { headers: { 'X-Api-Key': apiKey, 'Content-Type': 'application/json' } }
+                  )
+                  break // Success, break out of the inner loop
+                } catch (err: any) {
+                  lastErr = err
+                  // If it's not a 404, it's a different error, so stop trying other URLs for this group
+                  if (err.response?.status !== 404) break
+                }
+              }
+
+              // If no successful response and there was an error, rethrow it
+              if (!avatarsResponse && lastErr) throw lastErr
 
               const avatarList =
                 avatarsResponse.data?.data?.avatar_list ||
                 avatarsResponse.data?.avatar_list ||
+                avatarsResponse.data?.data || // Added to handle cases where the group endpoint directly returns the list
                 []
 
               if (Array.isArray(avatarList)) {
@@ -2630,13 +2664,27 @@ const resolvePhotoAvatarTarget = async (
     if (error.response?.status === 400 || error.response?.status === 404) {
       console.log(`[HeyGen] resolvePhotoAvatarTarget: Standard avatar group fetch failed (${error.response.status}), trying photo_avatar endpoint for group ${identifier}`)
       groupResponse = await retryWithBackoff(async () => {
-        return axios.get(`${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/${identifier}/avatars`, {
-          headers: {
-            'X-Api-Key': apiKey,
-            'Content-Type': 'application/json',
-          },
-          timeout: 20000,
-        })
+        const photoEndpoints = [
+          `${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/${identifier}/avatars`,
+          `${HEYGEN_V2_API_URL}/photo_avatar/avatar_group/${identifier}`
+        ]
+
+        let lastErr: any
+        for (const url of photoEndpoints) {
+          try {
+            return await axios.get(url, {
+              headers: {
+                'X-Api-Key': apiKey,
+                'Content-Type': 'application/json',
+              },
+              timeout: 20000,
+            })
+          } catch (err: any) {
+            lastErr = err
+            if (err.response?.status !== 404) throw err
+          }
+        }
+        throw lastErr
       }, 2, 750)
     } else {
       throw error

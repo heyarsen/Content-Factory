@@ -46,15 +46,19 @@ export async function executeWithAvatarSourceFallback<T>(
   const executeOnce = (): PromiseLike<PostgrestSingleResponse<T>> =>
     executor().then((response) => response as PostgrestSingleResponse<T>)
 
-  const result = await executeOnce()
+  let result = await executeOnce()
 
-  if (result.error) {
+  // Loop to handle multiple missing columns (e.g., both 'age' and 'ethnicity')
+  while (result.error) {
     const missingColumn = getMissingColumn(result.error)
-    if (missingColumn && enabledColumns[missingColumn] !== undefined) {
+    if (missingColumn && enabledColumns[missingColumn] !== undefined && enabledColumns[missingColumn] === true) {
       console.warn(`[Supabase Fallback] Column '${missingColumn}' is missing from database. Disabling it for this session.`)
       enabledColumns[missingColumn] = false
       delete payload[missingColumn]
-      return executeOnce()
+      result = await executeOnce()
+    } else {
+      // If it's not a missing column error we can handle, or we already disabled it, break
+      break
     }
   }
 
