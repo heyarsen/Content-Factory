@@ -19,6 +19,9 @@ interface UseLookGenerationOptions {
 
 export function useLookGeneration({ onSuccess, onError }: UseLookGenerationOptions = {}) {
   const [generating, setGenerating] = useState(false)
+  const [checkingStatus, setCheckingStatus] = useState(false)
+  const [stage, setStage] = useState<'idle' | 'generating' | 'saving' | 'completed'>('idle')
+  const [error, setError] = useState<string | null>(null)
   const [generatingLookIds, setGeneratingLookIds] = useState<Set<string>>(new Set())
   const pollingCleanupsRef = useState<Map<string, () => void>>(new Map())[0]
   const { toast } = useToast()
@@ -42,12 +45,18 @@ export function useLookGeneration({ onSuccess, onError }: UseLookGenerationOptio
           const status = response.data?.status
 
           if (status === 'success') {
+            setStage('saving')
+            // Wait a bit to show the "saving" stage
+            await new Promise(resolve => setTimeout(resolve, 2000))
+
             setGeneratingLookIds(prev => {
               const next = new Set(prev)
               next.delete(avatarId)
               return next
             })
             toast.success('Look generation completed!')
+            setStage('completed')
+            setCheckingStatus(false)
             onSuccess?.()
             return { status: 'complete' }
           } else if (status === 'failed') {
@@ -61,6 +70,8 @@ export function useLookGeneration({ onSuccess, onError }: UseLookGenerationOptio
               logError: true,
             })
             toast.error(errorMessage)
+            setError(errorMessage)
+            setCheckingStatus(false)
             onError?.(errorMessage)
             return { status: 'complete' }
           }
@@ -135,6 +146,9 @@ export function useLookGeneration({ onSuccess, onError }: UseLookGenerationOptio
 
         if (generationId) {
           setGeneratingLookIds(prev => new Set(prev).add(avatar.id))
+          setCheckingStatus(true)
+          setStage('generating')
+          setError(null)
           pollLookGenerationStatus(generationId, avatar.id)
           toast.success('Look generation started! This may take a few minutes.')
         } else {
@@ -172,8 +186,14 @@ export function useLookGeneration({ onSuccess, onError }: UseLookGenerationOptio
 
   return {
     generating,
+    checkingStatus,
+    stage,
+    error,
     generatingLookIds,
     generateLook,
+    setCheckingStatus,
+    setStage,
+    setError,
   }
 }
 

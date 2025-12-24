@@ -69,6 +69,10 @@ function AvatarsContent() {
     addAvatar,
     generateLook,
     generating,
+    generatingLookIds,
+    lookGenCheckingStatus,
+    lookGenStage,
+    lookGenError,
   } = useAvatarWorkspaceState(selectedAvatarId)
 
   const filteredAllLooks = allLooks
@@ -601,16 +605,19 @@ function AvatarsContent() {
         pose: 'close_up',
         style: 'Realistic',
       })
-      // Only close panel on success
-      panel.closePanel()
+      // Modal stays open and shows progress via lookGenCheckingStatus
     } catch (error: any) {
       if (error?.response?.status === 402) {
         return
       }
-      // Error is already handled by useLookGeneration hook
-      // Don't close panel so user can see the error and try again
     }
-  }, [generateLook, panel])
+  }, [generateLook])
+
+  const handleResumeLookGeneration = useCallback((avatar: Avatar) => {
+    setLookGenAvatar(avatar)
+    setLookGenStep('generate')
+    setLookGenModalOpen(true)
+  }, [])
 
   const openGenerateLookModal = useCallback((avatar?: Avatar) => {
     if (avatar) {
@@ -835,10 +842,10 @@ function AvatarsContent() {
                             Default
                           </span>
                         )}
-                        {(isTraining || isGenerating) && (
+                        {(isTraining || isGenerating || generatingLookIds.has(avatar.id)) && (
                           <span className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700">
-                            {isGenerating && <RefreshCw className="h-3 w-3 animate-spin" />}
-                            {isGenerating ? 'Generating' : 'Training'}
+                            {(isGenerating || generatingLookIds.has(avatar.id)) && <RefreshCw className="h-3 w-3 animate-spin" />}
+                            {isGenerating || generatingLookIds.has(avatar.id) ? 'Generating' : 'Training'}
                           </span>
                         )}
                         {isAwaitingSelection && (
@@ -912,12 +919,18 @@ function AvatarsContent() {
                             >
                               Finish Setup
                             </Button>
-                          ) : isGenerating ? (
+                          ) : isGenerating || generatingLookIds.has(avatar.id) ? (
                             <Button
                               size="sm"
                               variant="secondary"
                               className="flex-1"
-                              onClick={() => handleResumeAIGeneration(avatar)}
+                              onClick={() => {
+                                if (isGenerating) {
+                                  handleResumeAIGeneration(avatar)
+                                } else {
+                                  handleResumeLookGeneration(avatar)
+                                }
+                              }}
                             >
                               Check Status
                             </Button>
@@ -1136,11 +1149,11 @@ function AvatarsContent() {
           setLookGenAvatar(avatar)
           setLookGenStep('generate')
         }}
-        onGenerate={async (data) => {
-          await handleGenerateLook(data)
-          closeGenerateLookModal()
-        }}
+        onGenerate={handleGenerateLook}
         generating={generating}
+        checkingStatus={lookGenCheckingStatus}
+        stage={lookGenStage}
+        error={lookGenError}
       />
 
       {/* Manage Looks Modal */}

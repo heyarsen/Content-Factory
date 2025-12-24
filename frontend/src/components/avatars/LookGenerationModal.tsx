@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { User, CheckCircle2 } from 'lucide-react'
+import { User, CheckCircle2, RefreshCw, Loader2, Circle } from 'lucide-react'
 import { Modal } from '../ui/Modal'
 import { Textarea } from '../ui/Textarea'
 import { Button } from '../ui/Button'
@@ -18,6 +18,30 @@ interface LookGenerationModalProps {
     prompt: string
   }) => Promise<void>
   generating: boolean
+  checkingStatus?: boolean
+  stage?: 'idle' | 'generating' | 'saving' | 'completed'
+  error?: string | null
+}
+
+const lookStageFlow = [
+  { key: 'generating', title: 'Generating new look', description: 'HeyGen is creating a new look for your avatar' },
+  { key: 'saving', title: 'Saving to workspace', description: 'Adding the new look to your avatar group' },
+]
+
+const lookStageOrder: Array<'generating' | 'saving'> = ['generating', 'saving']
+const lookStageWeights: Record<string, number> = {
+  idle: -1,
+  generating: 0,
+  saving: 1,
+  completed: 2,
+}
+
+function getLookStageState(stage: string, stageKey: string): 'done' | 'current' | 'pending' {
+  const currentWeight = lookStageWeights[stage] || -1
+  const targetIndex = lookStageOrder.indexOf(stageKey as any)
+  if (currentWeight > targetIndex) return 'done'
+  if (currentWeight === targetIndex) return 'current'
+  return 'pending'
 }
 
 
@@ -30,6 +54,9 @@ export function LookGenerationModal({
   onSelectAvatar,
   onGenerate,
   generating,
+  checkingStatus = false,
+  stage = 'idle',
+  error = null,
 }: LookGenerationModalProps) {
   const [lookPrompt, setLookPrompt] = useState('')
 
@@ -51,8 +78,11 @@ export function LookGenerationModal({
   }
 
   const handleClose = () => {
-    if (!generating) {
+    if (!generating && !checkingStatus) {
       setLookPrompt('')
+      onClose()
+    } else {
+      // Allow closing during generation, just like AI avatar generation
       onClose()
     }
   }
@@ -66,7 +96,47 @@ export function LookGenerationModal({
       title={step === 'select-avatar' ? 'Select Avatar' : 'Generate AI Look'}
       size={step === 'select-avatar' ? 'xl' : 'md'}
     >
-      {step === 'select-avatar' ? (
+      {checkingStatus ? (
+        <div className="space-y-6">
+          <div className="text-center py-4">
+            <RefreshCw className="h-10 w-10 mx-auto text-brand-500 animate-spin mb-3" />
+            <p className="text-lg font-semibold text-slate-900 mb-1">Generating your look...</p>
+            <p className="text-sm text-slate-600">
+              This runs in the background—you can close this window and we&apos;ll keep working.
+            </p>
+            {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+          </div>
+          <div className="space-y-3">
+            {lookStageFlow.map(({ key, title, description }) => {
+              const state = getLookStageState(stage, key)
+              const colorClasses =
+                state === 'done'
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                  : state === 'current'
+                    ? 'border-brand-200 bg-brand-50 text-brand-900'
+                    : 'border-slate-200 bg-white text-slate-600'
+              return (
+                <div key={key} className={`flex items-start gap-3 rounded-lg border p-3 text-sm ${colorClasses}`}>
+                  <div className="mt-0.5">
+                    {state === 'done' && <CheckCircle2 className="h-4 w-4" />}
+                    {state === 'current' && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {state === 'pending' && <Circle className="h-4 w-4 text-slate-300" />}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-slate-900">{title}</p>
+                    <p className="mt-1 text-xs text-slate-600">{description}</p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <div className="flex justify-center pt-4">
+            <Button variant="ghost" onClick={handleClose}>
+              Close & Continue in Background
+            </Button>
+          </div>
+        </div>
+      ) : step === 'select-avatar' ? (
         <div className="space-y-4">
           <p className="text-sm text-slate-600">
             Choose an avatar to generate a new look for. Only trained avatars can have new looks generated.

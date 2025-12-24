@@ -56,10 +56,10 @@ export function useAvatarWorkspaceState(selectedAvatarId: string | null) {
       } else {
         invalidateLooksCache()
       }
-      
+
       // Reload avatars to ensure we have the latest avatar data
       loadAvatars()
-      
+
       // Also refresh after a short delay to ensure backend has fully processed the new looks
       setTimeout(() => {
         console.log('[useAvatarWorkspace] Delayed refresh of looks...')
@@ -85,7 +85,7 @@ export function useAvatarWorkspaceState(selectedAvatarId: string | null) {
     allLooks,
     loading,
     loadingLooks,
-    
+
     // Operations
     loadAvatars,
     invalidateLooksCache,
@@ -94,6 +94,9 @@ export function useAvatarWorkspaceState(selectedAvatarId: string | null) {
     generateLook,
     generating,
     generatingLookIds,
+    lookGenCheckingStatus: checkingStatus,
+    lookGenStage: stage,
+    lookGenError: error,
   }
 }
 
