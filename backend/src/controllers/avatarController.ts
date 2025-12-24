@@ -1107,29 +1107,14 @@ export class AvatarController {
       }
     }
 
-    // Enhance prompt with gender if available and not already present
-    // This helps prevent gender drift in generated looks
+    // Enhance prompt with identity context to strongly reinforce identity preservation
     let enhancedPrompt = request.prompt
-    if (avatar?.gender) {
-      const genderTerm = String(avatar.gender).toLowerCase()
-      const promptLower = enhancedPrompt.toLowerCase()
+    const genderTerm = avatar?.gender ? String(avatar.gender).toLowerCase() : 'person'
+    const ethnicityTerm = avatar?.ethnicity && avatar?.ethnicity !== 'Unspecified' ? `${avatar.ethnicity} ` : ''
 
-      // Check if gender is already mentioned (e.g. "man", "woman", "male", "female", "boy", "girl")
-      const hasGenderContext =
-        promptLower.includes('man') ||
-        promptLower.includes('woman') ||
-        promptLower.includes('male') ||
-        promptLower.includes('female') ||
-        promptLower.includes('boy') ||
-        promptLower.includes('girl')
-
-      if (!hasGenderContext) {
-        // Include ethnicity and gender in the prompt to strongly reinforce identity preservation
-        const ethnicityPrefix = avatar.ethnicity && avatar.ethnicity !== 'Unspecified' ? `${avatar.ethnicity} ` : ''
-        enhancedPrompt = `A photo of the same ${ethnicityPrefix}${avatar.gender}, ${enhancedPrompt}, maintaining exact facial features and identity.`
-        console.log(`[Generate Look] Enhanced prompt for identity preservation: "${enhancedPrompt}"`)
-      }
-    }
+    // Use a more descriptive prompt that reinforces identity while incorporating the user's prompt
+    enhancedPrompt = `A photo of the same ${ethnicityTerm}${genderTerm}, ${request.prompt}, maintaining exact facial features and identity.`
+    console.log(`[Generate Look] Enhanced prompt for identity preservation: "${enhancedPrompt}"`)
 
     // Include photo_avatar_id in the request to ensure generated looks match the selected avatar photo
     const generateRequest = {

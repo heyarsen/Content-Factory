@@ -53,16 +53,11 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const buildAutoLookPrompt = (avatarName?: string, gender?: string, ethnicity?: string): string => {
   const safeName = avatarName?.trim() || 'the speaker'
-  const genderTerm = gender ? gender.toLowerCase() : ''
-  const ethnicityTerm = ethnicity && ethnicity !== 'Unspecified' ? ethnicity.toLowerCase() : ''
-
-  // Combine identity context
-  const identityContext = `${ethnicityTerm} ${genderTerm}`.trim()
+  const genderTerm = gender ? gender.toLowerCase() : 'person'
+  const ethnicityTerm = ethnicity && ethnicity !== 'Unspecified' ? `${ethnicity} ` : ''
 
   // Use a more descriptive prompt that reinforces identity
-  const identityReinforcement = identityContext
-    ? `A photo of the same ${identityContext}, maintaining exact facial features and identity.`
-    : 'A photo of the same person, maintaining exact facial features and identity.'
+  const identityReinforcement = `A photo of the same ${ethnicityTerm}${genderTerm}, maintaining exact facial features and identity.`
 
   const replaced = AUTO_LOOK_PROMPT_TEMPLATE.replace(/{{\s*name\s*}}/gi, safeName)
 
