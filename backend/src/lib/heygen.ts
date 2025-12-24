@@ -3063,6 +3063,12 @@ export async function generateAvatarLook(
       style: request.style,
     }
 
+    // CRITICAL: Include photo_avatar_id to ensure the generated looks match the base avatar's identity
+    // Without this, HeyGen will generate looks that may look like different people
+    if (request.photo_avatar_id) {
+      payload.photo_avatar_id = request.photo_avatar_id
+    }
+
     console.log('[HeyGen] Generating look with payload (using /look/generate):', JSON.stringify(payload, null, 2))
 
     const response = await axios.post(
