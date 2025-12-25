@@ -1166,47 +1166,31 @@ export class AvatarController {
       }
     }
 
-    // Fetch looks from the avatar group to use the selected photo as base for generation
-    // This ensures generated looks match the original person's appearance
-    const { fetchAvatarGroupLooks } = await import('../lib/heygen.js')
+    // According to HeyGen support: photo_avatar_id is NOT supported for look generation.
+    // Instead, the prompt must explicitly describe the trained subject's features.
+    // The trained model is automatically referenced via group_id.
 
-    // Initialize with default look ID if available (optimistic approach)
-    // This ensures we have a base look even if the list fetch fails below
-    let photoAvatarId: string | undefined = avatar?.default_look_id || undefined
+    // Build a descriptive prefix with the avatar's features
+    const avatarAge = avatar?.age || 'Young Adult'
+    const avatarGender = avatar?.gender || 'Man'
+    const avatarEthnicity = avatar?.ethnicity || 'White'
 
-    try {
-      const looks = await fetchAvatarGroupLooks(request.group_id)
-      if (looks && looks.length > 0) {
-        // ALWAYS use the first look in the group as the base for generation.
-        // The first look is the "ground truth" identity. Using subsequent looks
-        // as a base can lead to identity drift and "mismatch" errors from HeyGen.
-        photoAvatarId = looks[0].id
-        console.log(`[Generate Look] Using the first look ${photoAvatarId} as base for generation to ensure maximum identity consistency`)
-      } else {
-        console.warn(`[Generate Look] No looks found in group ${request.group_id}. Using default look ID ${photoAvatarId} if available.`)
-      }
-    } catch (looksError: any) {
-      console.warn(`[Generate Look] Failed to fetch looks for base reference:`, looksError.message)
-      // If we have a default look ID, keep using it optimistically even if list fetch failed
-      if (photoAvatarId) {
-        console.log(`[Generate Look] Optimistically using default look ${photoAvatarId} despite list fetch failure`)
-      }
-    }
-
-    // Use the prompt directly. For trained avatar groups, the identity is handled by the group_id.
-    // Adding descriptors like "same person" can actually interfere with the trained model.
+    // Enhance the prompt with avatar features for identity consistency
+    // Format: "A [age] [ethnicity] [gender], [user's prompt]"
+    const featurePrefix = `A ${avatarAge} ${avatarEthnicity} ${avatarGender}`
     const enhancedPrompt = request.prompt
-    console.log(`[Generate Look] Using original prompt for trained model: "${enhancedPrompt}"`)
+      ? `${featurePrefix}, ${request.prompt}`
+      : `${featurePrefix}, professional portrait, high resolution, natural lighting`
 
-    // Include photo_avatar_id in the request to ensure generated looks match the selected avatar photo
+    console.log(`[Generate Look] Enhanced prompt with avatar features: "${enhancedPrompt}"`)
+
+    // Send only the supported parameters to HeyGen
     const generateRequest = {
-      ...request,
+      group_id: request.group_id,
       prompt: enhancedPrompt,
-      photo_avatar_id: photoAvatarId,
-      name: request.prompt ? request.prompt.substring(0, 50) : `Look ${new Date().toISOString().split('T')[0]}`,
-      age: avatar?.age || 'Young Adult',
-      gender: avatar?.gender || 'Man',
-      ethnicity: avatar?.ethnicity || 'White',
+      orientation: request.orientation,
+      pose: request.pose,
+      style: request.style,
     }
 
     const result = await generateAvatarLook(generateRequest)

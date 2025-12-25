@@ -3053,20 +3053,17 @@ export async function generateAvatarLook(
     const apiKey = getHeyGenKey()
 
     // Map GenerateLookRequest to the format expected by HeyGen v2 /photo_avatar/look/generate
-    // This endpoint is specialized for generating looks for TRAINED avatar groups
-    // and provides much better identity preservation than the generic /photo/generate.
+    // This endpoint is specialized for generating looks for TRAINED avatar groups.
+    // 
+    // IMPORTANT: photo_avatar_id is NOT supported for look generation (only for video generation).
+    // The trained model is automatically referenced via group_id, but the PROMPT must explicitly
+    // describe the trained subject's ethnicity, age, and key facial features for consistency.
     const payload: any = {
       group_id: request.group_id,
       prompt: request.prompt,
       orientation: request.orientation,
       pose: request.pose,
       style: request.style,
-    }
-
-    // CRITICAL: Include photo_avatar_id to ensure the generated looks match the base avatar's identity
-    // Without this, HeyGen will generate looks that may look like different people
-    if (request.photo_avatar_id) {
-      payload.photo_avatar_id = request.photo_avatar_id
     }
 
     console.log('[HeyGen] Generating look with payload (using /look/generate):', JSON.stringify(payload, null, 2))
