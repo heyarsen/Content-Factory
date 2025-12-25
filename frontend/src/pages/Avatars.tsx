@@ -3,7 +3,6 @@ import { MoreVertical, Star, Pencil, Trash2, RefreshCw } from 'lucide-react'
 import { Layout } from '../components/layout/Layout'
 import { AvatarWorkspaceProvider, useAvatarWorkspace } from '../contexts/AvatarWorkspaceContext'
 import { useAvatarWorkspaceState } from '../hooks/avatars/useAvatarWorkspace'
-import { useContextPanel } from '../hooks/avatars/useContextPanel'
 import { useToast } from '../hooks/useToast'
 import api from '../lib/api'
 import { handleError, formatSpecificError } from '../lib/errorHandler'
@@ -21,7 +20,6 @@ import { Modal } from '../components/ui/Modal'
 function AvatarsContent() {
   const { toast } = useToast()
   const { selectedAvatarId, setSelectedAvatarId } = useAvatarWorkspace()
-  const panel = useContextPanel()
 
   // Tab state: 'my-avatars' or 'public-avatars'
   const [activeTab, setActiveTab] = useState<'my-avatars' | 'public-avatars'>('my-avatars')

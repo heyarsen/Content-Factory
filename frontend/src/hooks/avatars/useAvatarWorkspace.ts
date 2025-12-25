@@ -42,7 +42,7 @@ export function useAvatarWorkspaceState(selectedAvatarId: string | null) {
   })
 
   // Look generation
-  const { generating, generatingLookIds, generateLook } = useLookGeneration({
+  const { generating, generatingLookIds, generateLook, checkingStatus, stage, error } = useLookGeneration({
     onSuccess: () => {
       console.log('[useAvatarWorkspace] Look generation successful, reloading looks...')
       // Invalidate cache and refresh looks for the selected avatar
