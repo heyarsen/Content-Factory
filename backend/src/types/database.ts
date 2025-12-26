@@ -6,7 +6,9 @@ export interface Video {
   style: 'casual' | 'professional' | 'energetic' | 'educational'
   duration: number
   status: 'pending' | 'generating' | 'completed' | 'failed'
+  provider?: 'heygen' | 'sora'
   heygen_video_id: string | null
+  sora_task_id?: string | null
   video_url: string | null
   avatar_id: string | null
   error_message: string | null

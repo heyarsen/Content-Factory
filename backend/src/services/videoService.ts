@@ -147,14 +147,14 @@ interface AvatarContext {
 async function resolveAvatarContext(
   userId: string,
   requestedAvatarId?: string | null
-  ): Promise<AvatarContext> {
-    const { AvatarService } = await import('./avatarService.js')
+): Promise<AvatarContext> {
+  const { AvatarService } = await import('./avatarService.js')
 
-    const mapAvatarRecord = (avatar: AvatarRecord): AvatarContext => ({
-      avatarId: avatar.heygen_avatar_id,
-      avatarRecordId: avatar.id,
-      isPhotoAvatar: isPhotoAvatarRecord(avatar),
-    })
+  const mapAvatarRecord = (avatar: AvatarRecord): AvatarContext => ({
+    avatarId: avatar.heygen_avatar_id,
+    avatarRecordId: avatar.id,
+    isPhotoAvatar: isPhotoAvatarRecord(avatar),
+  })
 
   if (!requestedAvatarId) {
     const defaultAvatar = await AvatarService.getDefaultAvatar(userId)
@@ -204,6 +204,7 @@ export interface ManualVideoInput {
   generate_caption?: boolean
   aspect_ratio?: string | null
   dimension?: HeyGenDimensionInput
+  provider?: 'heygen' | 'sora'
 }
 
 type ServiceError = Error & { status?: number }
@@ -366,7 +367,7 @@ async function runHeygenGeneration(
       })
       return
     }
-    
+
     if (!avatarId) {
       throw new Error('No avatar available. Please configure an avatar in your settings.')
     }
@@ -384,7 +385,7 @@ async function runHeygenGeneration(
       aspectRatio,
       dimension
     )
-    
+
     console.log('Calling HeyGen API with payload:', {
       videoId: video.id,
       avatarId,
@@ -396,7 +397,7 @@ async function runHeygenGeneration(
       outputResolution: payload.output_resolution,
       aspectRatio: payload.aspect_ratio,
     })
-    
+
     const response = await requestHeygenVideo(payload)
     await applyManualGenerationSuccess(video.id, response)
     await updatePlanItemStatus(planItemId, response.status)
@@ -448,17 +449,17 @@ async function runHeygenGeneration(
     }
 
     console.error('HeyGen generation error:', error)
-    
+
     // Extract detailed error message
     let errorMessage = error?.message || 'Failed to generate video'
-    
+
     if (error?.response?.data?.message) {
       errorMessage = error.response.data.message
     } else if (error?.response?.data?.error?.message) {
       errorMessage = error.response.data.error.message
     } else if (error?.response?.data?.error) {
-      errorMessage = typeof error.response.data.error === 'string' 
-        ? error.response.data.error 
+      errorMessage = typeof error.response.data.error === 'string'
+        ? error.response.data.error
         : JSON.stringify(error.response.data.error)
     } else if (error?.response?.status === 401) {
       errorMessage = 'HeyGen API authentication failed. Please check your API key configuration.'
@@ -467,7 +468,7 @@ async function runHeygenGeneration(
     } else if (error?.response?.status >= 500) {
       errorMessage = 'HeyGen API server error. Please try again later.'
     }
-    
+
     const enhancedError = new Error(errorMessage)
     await applyManualGenerationFailure(video.id, enhancedError)
     if (planItemId) {
@@ -493,7 +494,7 @@ type TemplatePreference = {
 async function fetchUserTemplatePreference(userId: string): Promise<TemplatePreference | null> {
   // Always use the default template for everyone
   const DEFAULT_TEMPLATE_ID = 'baf2ab03a4354aebac815fd42c10895b'
-  
+
   return {
     templateId: DEFAULT_TEMPLATE_ID,
     scriptKey: 'script', // Default script variable key
@@ -520,7 +521,7 @@ async function runTemplateGeneration(
       scriptLength: scriptText?.length || 0,
       topic: video.topic,
     })
-    
+
     const variables: Record<string, any> = {
       ...preference.variables,
     }
@@ -533,29 +534,29 @@ async function runTemplateGeneration(
 
     // Build overrides to set avatar in template nodes
     let overrides: Record<string, any> = { ...preference.overrides }
-    
+
     // Detect avatar capabilities for motion features in templates
     let avatarCapabilities: import('../lib/heygen.js').AvatarCapabilities | null = null
     let motionConfig: import('../lib/heygen.js').MotionConfig | null = null
-    
+
     if (avatarId) {
       try {
         const { detectAvatarCapabilities, buildGestureArray } = await import('../lib/heygen.js')
         avatarCapabilities = await detectAvatarCapabilities(avatarId, !!isPhotoAvatar)
-        
+
         // Auto-generate motion config for templates
         const gestures = avatarCapabilities.supportsGestureControl
           ? buildGestureArray(scriptText || video.topic || '', video.duration)
           : undefined
-        
+
         // Create enhanced motion config for maximum movement
         // Use more explicit prompts for full body motion, hand gestures, and head movement
         const enhancedMotionPrompt = avatarCapabilities.supportsFullBodyMovement
           ? 'Full body motion with expressive hand gestures, natural head movements, and engaging body language. Include waving, pointing, and emphasis gestures throughout the video.'
           : avatarCapabilities.supportsCustomMotionPrompt
-          ? 'Expressive head movements with natural hand gestures, friendly facial expressions, and engaging body language. Include waving, pointing, and emphasis gestures.'
-          : 'Natural head movement with friendly expressions, engaging gestures, and expressive body language'
-        
+            ? 'Expressive head movements with natural hand gestures, friendly facial expressions, and engaging body language. Include waving, pointing, and emphasis gestures.'
+            : 'Natural head movement with friendly expressions, engaging gestures, and expressive body language'
+
         motionConfig = {
           gestures,
           customMotionPrompt: avatarCapabilities.supportsCustomMotionPrompt || avatarCapabilities.supportsFullBodyMovement
@@ -565,7 +566,7 @@ async function runTemplateGeneration(
           enableHeadMovement: avatarCapabilities.supportsHeadMovement,
           enableEnhancedExpressions: avatarCapabilities.supportsEnhancedExpressions,
         }
-        
+
         console.log('[Template Motion] Avatar capabilities detected:', {
           avatarId,
           isPhotoAvatar,
@@ -580,7 +581,7 @@ async function runTemplateGeneration(
         console.warn('[Template Motion] Could not detect avatar capabilities, proceeding without motion features:', capabilityError.message)
       }
     }
-    
+
     if (avatarId) {
       // Try to fetch template details to see if it has an avatar_id variable
       let hasAvatarIdVariable = false
@@ -588,7 +589,7 @@ async function runTemplateGeneration(
       try {
         const { getTemplateDetails } = await import('../lib/heygen.js')
         const templateDetails = await getTemplateDetails(preference.templateId)
-        
+
         // Log full template details to understand structure
         console.log('[Template Generation] Full template details response:', {
           templateId: preference.templateId,
@@ -597,14 +598,14 @@ async function runTemplateGeneration(
           keys: Object.keys(templateDetails || {}),
           fullResponse: JSON.stringify(templateDetails, null, 2).substring(0, 1000), // First 1000 chars
         })
-        
+
         // Check if template has avatar_id variable
         const templateVariables = templateDetails?.variables || templateDetails?.data?.variables || {}
         hasAvatarIdVariable = 'avatar_id' in templateVariables
-        
+
         if (hasAvatarIdVariable) {
           console.log('[Template Generation] Template has avatar_id variable, will replace character_id with selected avatar and also override via nodes_override')
-          
+
           // Use a sanitized avatar_id variable so type matches the avatar we pass
           const targetType = isPhotoAvatar ? 'talking_photo' : 'avatar'
           variables['avatar_id'] = {
@@ -623,7 +624,7 @@ async function runTemplateGeneration(
             newCharacterId: avatarId,
             finalVariable: JSON.stringify(variables['avatar_id'], null, 2),
           })
-          
+
           // Still use nodes_override to ensure avatar is actually set in all character nodes
           if (!overrides.nodes_override) {
             overrides.nodes_override = []
@@ -631,37 +632,37 @@ async function runTemplateGeneration(
           if (!Array.isArray(overrides.nodes_override)) {
             overrides.nodes_override = [overrides.nodes_override]
           }
-          
+
           const characterOverride = isPhotoAvatar
             ? {
-                type: 'talking_photo',
-                talking_photo_id: avatarId,
-              }
+              type: 'talking_photo',
+              talking_photo_id: avatarId,
+            }
             : {
-                type: 'avatar',
-                avatar_id: avatarId,
-              }
-          
+              type: 'avatar',
+              avatar_id: avatarId,
+            }
+
           const nodesToOverride = Array.from({ length: 6 }, (_, i) => ({ index: i }))
           for (const nodeInfo of nodesToOverride) {
             const nodeIndex = nodeInfo.index
             while (overrides.nodes_override.length <= nodeIndex) {
               overrides.nodes_override.push({})
             }
-            
+
             // Get the existing template node to preserve its motion settings
             const existingNode = templateNodes[nodeIndex] || {}
-            
+
             // Preserve ALL node properties except the old character, then override with new character
             // This ensures motion settings and all other template configurations are preserved
             const { character: oldCharacter, ...restOfNode } = existingNode
-            
+
             // Build the override object - preserve all node properties, only override character
             const nodeOverride: any = {
               ...restOfNode, // Preserve ALL existing node properties (motion settings, configs, etc.)
               character: characterOverride, // Override only the character
             }
-            
+
             // Also preserve motion settings that might be nested in the old character object
             if (oldCharacter && typeof oldCharacter === 'object') {
               const charMotionFields = ['motion_engine', 'generation_mode', 'full_body_motion', 'generation_mode']
@@ -676,17 +677,17 @@ async function runTemplateGeneration(
                 }
               }
             }
-            
+
             // Log what we're preserving for debugging
-            const preservedFields = Object.keys(restOfNode).filter(k => 
-              k.toLowerCase().includes('motion') || 
+            const preservedFields = Object.keys(restOfNode).filter(k =>
+              k.toLowerCase().includes('motion') ||
               k.toLowerCase().includes('generation') ||
               k.toLowerCase().includes('engine')
             )
             if (preservedFields.length > 0) {
               console.log(`[Template Generation] Preserving fields from template node[${nodeIndex}]:`, preservedFields)
             }
-            
+
             // ALWAYS add motion features to ensure maximum movement, even if template has some motion settings
             // This ensures we get full body motion, hand gestures, and head movement
             if (motionConfig && avatarCapabilities) {
@@ -695,29 +696,29 @@ async function runTemplateGeneration(
                 nodeOverride.gestures = motionConfig.gestures
                 console.log(`[Template Generation] Added gestures to node[${nodeIndex}]:`, motionConfig.gestures.length, 'gestures')
               }
-              
+
               // Always add enhanced custom motion prompt for maximum movement
               if (motionConfig.customMotionPrompt) {
                 // Override template's motion prompt with our enhanced one for maximum motion
                 nodeOverride.custom_motion_prompt = motionConfig.customMotionPrompt
-                
+
                 if (motionConfig.enhanceCustomMotionPrompt) {
                   nodeOverride.enhance_custom_motion_prompt = true
                 }
                 console.log(`[Template Generation] Added enhanced motion prompt to node[${nodeIndex}]:`, motionConfig.customMotionPrompt.substring(0, 100))
               } else if (!avatarCapabilities.supportsGestureControl && avatarCapabilities.supportsCustomMotionPrompt) {
                 // Fallback: use enhanced motion prompt if gestures not supported
-              const fallbackPrompt = 'Expressive head movements with natural hand gestures, friendly facial expressions, and engaging body language. Include waving, pointing, and emphasis gestures throughout.'
-              nodeOverride.custom_motion_prompt = fallbackPrompt
-              nodeOverride.enhance_custom_motion_prompt = true
-              console.log(`[Template Generation] Added fallback motion prompt to node[${nodeIndex}]`)
+                const fallbackPrompt = 'Expressive head movements with natural hand gestures, friendly facial expressions, and engaging body language. Include waving, pointing, and emphasis gestures throughout.'
+                nodeOverride.custom_motion_prompt = fallbackPrompt
+                nodeOverride.enhance_custom_motion_prompt = true
+                console.log(`[Template Generation] Added fallback motion prompt to node[${nodeIndex}]`)
+              }
+
+              // Note: head_movement and enhanced_expressions are typically automatic
+              // for photo avatars when custom_motion_prompt is used with enhance_custom_motion_prompt
+              // We don't need to set these explicitly as they might not be valid fields for template API
             }
-            
-            // Note: head_movement and enhanced_expressions are typically automatic
-            // for photo avatars when custom_motion_prompt is used with enhance_custom_motion_prompt
-            // We don't need to set these explicitly as they might not be valid fields for template API
-            }
-            
+
             overrides.nodes_override[nodeIndex] = nodeOverride
           }
           console.log('[Template Generation] Also set nodes_override as backup:', {
@@ -725,17 +726,17 @@ async function runTemplateGeneration(
             hasMotionFeatures: !!(motionConfig && avatarCapabilities),
           })
         }
-        
+
         // Try multiple possible paths for nodes
         // HeyGen template structure can vary, so check multiple locations
-        templateNodes = 
-          templateDetails?.nodes || 
-          templateDetails?.data?.nodes || 
+        templateNodes =
+          templateDetails?.nodes ||
+          templateDetails?.data?.nodes ||
           templateDetails?.data?.template?.nodes ||
           templateDetails?.template?.nodes ||
           templateDetails?.structure?.nodes ||
           (Array.isArray(templateDetails) ? templateDetails : [])
-        
+
         // If still no nodes, check if there's a scenes or timeline structure
         if (templateNodes.length === 0) {
           const scenes = templateDetails?.scenes || templateDetails?.data?.scenes || templateDetails?.data?.template?.scenes
@@ -746,7 +747,7 @@ async function runTemplateGeneration(
             templateNodes = timeline
           }
         }
-        
+
         // Log template structure for debugging motion settings
         console.log('[Template Generation] Template structure:', {
           templateId: preference.templateId,
@@ -755,7 +756,7 @@ async function runTemplateGeneration(
           templateKeys: Object.keys(templateDetails || {}),
           sampleNode: templateNodes[0] ? JSON.stringify(templateNodes[0], null, 2).substring(0, 1000) : 'none',
         })
-        
+
         console.log('[Template Generation] Fetched template details:', {
           templateId: preference.templateId,
           hasAvatarIdVariable,
@@ -772,7 +773,7 @@ async function runTemplateGeneration(
       } catch (templateError: any) {
         console.warn('[Template Generation] Could not fetch template details, using nodes_override fallback:', templateError.message)
       }
-      
+
       // Only use nodes_override if template doesn't have avatar_id variable
       if (!hasAvatarIdVariable) {
         // Initialize nodes_override array
@@ -782,25 +783,25 @@ async function runTemplateGeneration(
         if (!Array.isArray(overrides.nodes_override)) {
           overrides.nodes_override = [overrides.nodes_override]
         }
-        
+
         // Create the character override
         const characterOverride = isPhotoAvatar
           ? {
-              type: 'talking_photo',
-              talking_photo_id: avatarId,
-            }
+            type: 'talking_photo',
+            talking_photo_id: avatarId,
+          }
           : {
-              type: 'avatar',
-              avatar_id: avatarId,
-            }
-        
+            type: 'avatar',
+            avatar_id: avatarId,
+          }
+
         // Override strategy: Since template details may not expose nodes correctly,
         // we'll override multiple nodes to ensure the character is set
         // If we have template nodes, use them; otherwise override nodes 0-5 to catch the character
-        const nodesToOverride: Array<{ index: number; id?: string; hasCharacter?: boolean }> = templateNodes.length > 0 
+        const nodesToOverride: Array<{ index: number; id?: string; hasCharacter?: boolean }> = templateNodes.length > 0
           ? templateNodes.map((n: any, i: number) => ({ index: i, id: n.id || n.node_id, hasCharacter: !!n.character }))
           : Array.from({ length: 6 }, (_, i) => ({ index: i })) // Fallback: override nodes 0-5 to ensure we catch the character
-        
+
         // Override all identified nodes (or first 3 as fallback)
         for (const nodeInfo of nodesToOverride) {
           const nodeIndex = nodeInfo.index
@@ -808,20 +809,20 @@ async function runTemplateGeneration(
           while (overrides.nodes_override.length <= nodeIndex) {
             overrides.nodes_override.push({})
           }
-          
+
           // Get the existing template node to preserve its motion settings
           const existingNode = templateNodes[nodeIndex] || {}
-          
+
           // Preserve ALL node properties except the old character, then override with new character
           // This ensures motion settings and all other template configurations are preserved
           const { character: oldCharacter, ...restOfNode } = existingNode
-          
+
           // Build the override object - preserve all node properties, only override character
           const nodeOverride: any = {
             ...restOfNode, // Preserve ALL existing node properties (motion settings, configs, etc.)
             character: characterOverride, // Override only the character
           }
-          
+
           // Also preserve motion settings that might be nested in the old character object
           if (oldCharacter && typeof oldCharacter === 'object') {
             const charMotionFields = ['motion_engine', 'generation_mode', 'full_body_motion', 'generation_mode']
@@ -836,17 +837,17 @@ async function runTemplateGeneration(
               }
             }
           }
-          
+
           // Log what we're preserving for debugging
-          const preservedFields = Object.keys(restOfNode).filter(k => 
-            k.toLowerCase().includes('motion') || 
+          const preservedFields = Object.keys(restOfNode).filter(k =>
+            k.toLowerCase().includes('motion') ||
             k.toLowerCase().includes('generation') ||
             k.toLowerCase().includes('engine')
           )
           if (preservedFields.length > 0) {
             console.log(`[Template Generation] Preserving fields from template node[${nodeIndex}]:`, preservedFields)
           }
-          
+
           // ALWAYS add motion features to ensure maximum movement, even if template has some motion settings
           // This ensures we get full body motion, hand gestures, and head movement
           if (motionConfig && avatarCapabilities && nodeInfo.hasCharacter) {
@@ -855,12 +856,12 @@ async function runTemplateGeneration(
               nodeOverride.gestures = motionConfig.gestures
               console.log(`[Template Generation] Added gestures to node[${nodeIndex}]:`, motionConfig.gestures.length, 'gestures')
             }
-            
+
             // Always add enhanced custom motion prompt for maximum movement
             if (motionConfig.customMotionPrompt) {
               // Override template's motion prompt with our enhanced one for maximum motion
               nodeOverride.custom_motion_prompt = motionConfig.customMotionPrompt
-              
+
               if (motionConfig.enhanceCustomMotionPrompt) {
                 nodeOverride.enhance_custom_motion_prompt = true
               }
@@ -872,19 +873,19 @@ async function runTemplateGeneration(
               nodeOverride.enhance_custom_motion_prompt = true
               console.log(`[Template Generation] Added fallback motion prompt to node[${nodeIndex}]`)
             }
-            
+
             // Note: head_movement and enhanced_expressions are typically automatic
             // for photo avatars when custom_motion_prompt is used with enhance_custom_motion_prompt
             // We don't need to set these explicitly as they might not be valid fields
           }
-          
+
           // Add node_id if available
           if (nodeInfo.id) {
             nodeOverride.node_id = nodeInfo.id
           }
-          
+
           overrides.nodes_override[nodeIndex] = nodeOverride
-          
+
           console.log(`[Template Generation] Overriding node[${nodeIndex}]:`, {
             nodeId: nodeInfo.id || 'no-id',
             characterType: isPhotoAvatar ? 'talking_photo' : 'avatar',
@@ -892,7 +893,7 @@ async function runTemplateGeneration(
             avatarId: !isPhotoAvatar ? avatarId : undefined,
           })
         }
-        
+
         console.log('[Template Generation] Final nodes_override:', {
           avatarId,
           isPhotoAvatar,
@@ -921,13 +922,13 @@ async function runTemplateGeneration(
     })
 
     const response = await generateVideoFromTemplate(payload)
-    
+
     console.log('[Template Generation] Template video generation successful:', {
       videoId: video.id,
       heygenVideoId: response.video_id,
       status: response.status,
     })
-    
+
     await applyManualGenerationSuccess(video.id, response)
     await updatePlanItemStatus(planItemId, response.status)
   } catch (error: any) {
@@ -998,7 +999,7 @@ export class VideoService {
     let avatarId: string | undefined
     let avatarRecordId: string | undefined
     let isPhotoAvatar = false
-    
+
     if (input.talking_photo_id) {
       // Direct look ID provided - use it as talking_photo_id
       avatarId = input.talking_photo_id
@@ -1026,7 +1027,7 @@ export class VideoService {
     }
     // Always use the hardcoded template for everyone
     const templatePreference = await fetchUserTemplatePreference(userId)
-    
+
     // Idempotency 1: If tied to a plan item, and it already has a video_id, reuse that video
     if (input.plan_item_id) {
       const { data: existingItem } = await supabase
@@ -1049,7 +1050,7 @@ export class VideoService {
         }
       }
     }
-    
+
     // Idempotency 2: Reuse a very recent, equivalent request by same user to avoid duplicates
     const recentWindowMs = 6 * 60 * 60 * 1000 // 6 hours
     const sinceIso = new Date(Date.now() - recentWindowMs).toISOString()
@@ -1064,7 +1065,7 @@ export class VideoService {
       .in('status', ['pending', 'generating', 'completed'] as any)
       .order('created_at', { ascending: false })
       .limit(1)
-    
+
     const { data: maybeDuplicate } = await equivalentQuery
     if (maybeDuplicate && maybeDuplicate.length > 0) {
       const candidate = maybeDuplicate[0] as Video
@@ -1080,7 +1081,7 @@ export class VideoService {
         return candidate
       }
     }
-    
+
     const video = await this.createVideoRecord(userId, input, avatarRecordId)
     const outputResolution = input.output_resolution || DEFAULT_HEYGEN_RESOLUTION
     const aspectRatio = input.aspect_ratio || DEFAULT_VERTICAL_ASPECT_RATIO
@@ -1089,6 +1090,27 @@ export class VideoService {
       (aspectRatio === DEFAULT_VERTICAL_ASPECT_RATIO ? { ...DEFAULT_VERTICAL_DIMENSION } : undefined)
     const scriptText = (input.script || '').trim() || input.topic
 
+    // Route to Sora if provider is 'sora'
+    if (video.provider === 'sora') {
+      console.log('[Video Generation] Using Sora provider:', {
+        videoId: video.id,
+        topic: video.topic,
+        aspectRatio,
+      })
+
+      // Import and use Sora service
+      const { generateVideoWithSora } = await import('./soraService.js')
+      void generateVideoWithSora(video, { aspectRatio }).catch((error: any) => {
+        console.error('[Video Generation] Sora generation failed:', {
+          error: error?.message || error,
+          videoId: video.id,
+        })
+      })
+
+      return video
+    }
+
+    // Default to HeyGen generation
     const scheduleManualGeneration = () =>
       runHeygenGeneration(
         video,
@@ -1112,7 +1134,7 @@ export class VideoService {
         isPhotoAvatar: isPhotoAvatar,
         hasAvatarId: !!avatarId,
       })
-      
+
       // Try template generation (async, fire-and-forget with error handling)
       void runTemplateGeneration(video, templatePreference, scriptText, input.plan_item_id || null, avatarId, isPhotoAvatar, input.generate_caption).catch(
         (error: any) => {
@@ -1306,7 +1328,7 @@ export class VideoService {
         video_url: reel.video_url ?? null,
       }
     }
-    
+
     if (!reel.script) {
       throw new Error('Reel must have a script to generate video')
     }
@@ -1353,7 +1375,9 @@ export class VideoService {
         style: input.style || DEFAULT_REEL_STYLE,
         duration: input.duration || DEFAULT_REEL_DURATION,
         status: 'pending',
+        provider: input.provider || 'heygen',
         heygen_video_id: null,
+        sora_task_id: null,
         video_url: null,
         avatar_id: avatarRecordId || null,
         error_message: null,
@@ -1369,6 +1393,7 @@ export class VideoService {
         hasScript: !!input.script,
         style: input.style,
         duration: input.duration,
+        provider: input.provider,
         avatarRecordId,
       })
       const errorMessage = error?.message || 'Failed to create video record'
