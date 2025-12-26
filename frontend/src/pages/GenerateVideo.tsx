@@ -18,6 +18,7 @@ export function GenerateVideo() {
   const [script, setScript] = useState('')
   const [style, setStyle] = useState<'casual' | 'professional' | 'energetic' | 'educational'>('professional')
   const [duration, setDuration] = useState(60)
+  const [provider, setProvider] = useState<'heygen' | 'sora'>('heygen')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
@@ -58,16 +59,18 @@ export function GenerateVideo() {
         script: script || undefined,
         style,
         duration,
+        provider, // Include provider selection
       })
-      
+
       // Show success immediately
       setSuccess(true)
+      const providerName = provider === 'sora' ? 'Sora' : 'HeyGen'
       addNotification({
         type: 'info',
         title: 'Video Generation Started!',
-        message: `"${topic}" is now being generated. This typically takes 1-3 minutes. You'll be notified when it's ready!`,
+        message: `"${topic}" is now being generated with ${providerName}. This typically takes 1-3 minutes. You'll be notified when it's ready!`,
       })
-      
+
       // Navigate after showing success message
       setTimeout(() => {
         navigate('/videos')
@@ -148,6 +151,74 @@ export function GenerateVideo() {
                 </p>
               </div>
             )}
+
+            {/* Provider Selection */}
+            <div className="rounded-2xl border border-purple-200/60 bg-purple-50/40 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Video className="h-4 w-4 text-purple-600" />
+                <p className="text-sm font-semibold text-purple-700">Video Generation Provider</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {/* HeyGen Option */}
+                <button
+                  type="button"
+                  onClick={() => setProvider('heygen')}
+                  className={`relative rounded-xl border-2 p-4 text-left transition-all ${provider === 'heygen'
+                      ? 'border-purple-500 bg-purple-100/60 shadow-sm'
+                      : 'border-purple-200/40 bg-white/50 hover:border-purple-300 hover:bg-purple-50/30'
+                    }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${provider === 'heygen' ? 'border-purple-500 bg-purple-500' : 'border-gray-300'
+                          }`}>
+                          {provider === 'heygen' && (
+                            <div className="h-2 w-2 rounded-full bg-white" />
+                          )}
+                        </div>
+                        <p className="text-sm font-semibold text-gray-900">HeyGen</p>
+                      </div>
+                      <p className="mt-2 text-xs text-gray-600">
+                        AI avatars with templates and motion
+                      </p>
+                    </div>
+                  </div>
+                </button>
+
+                {/* Sora Option */}
+                <button
+                  type="button"
+                  onClick={() => setProvider('sora')}
+                  className={`relative rounded-xl border-2 p-4 text-left transition-all ${provider === 'sora'
+                      ? 'border-purple-500 bg-purple-100/60 shadow-sm'
+                      : 'border-purple-200/40 bg-white/50 hover:border-purple-300 hover:bg-purple-50/30'
+                    }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${provider === 'sora' ? 'border-purple-500 bg-purple-500' : 'border-gray-300'
+                          }`}>
+                          {provider === 'sora' && (
+                            <div className="h-2 w-2 rounded-full bg-white" />
+                          )}
+                        </div>
+                        <p className="text-sm font-semibold text-gray-900">Sora</p>
+                      </div>
+                      <p className="mt-2 text-xs text-gray-600">
+                        Text-to-video AI generation
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              </div>
+              <p className="mt-3 text-xs text-purple-600">
+                {provider === 'heygen'
+                  ? '✨ Uses your custom avatars and templates for personalized videos'
+                  : '🎬 Generates videos directly from your text description'}
+              </p>
+            </div>
 
             <div className="grid gap-6 lg:grid-cols-2">
               <Input

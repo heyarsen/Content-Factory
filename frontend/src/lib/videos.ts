@@ -9,9 +9,11 @@ export interface VideoRecord {
   style: 'casual' | 'professional' | 'energetic' | 'educational'
   duration: number
   status: VideoStatus
+  provider?: 'heygen' | 'sora'
   video_url: string | null
   error_message: string | null
   heygen_video_id: string | null
+  sora_task_id?: string | null
   created_at: string
   updated_at: string
   progress?: number
@@ -22,6 +24,7 @@ export interface CreateVideoPayload {
   script?: string
   style: VideoRecord['style']
   duration: number
+  provider?: 'heygen' | 'sora'
   aspect_ratio?: string
   dimension?: {
     width: number
