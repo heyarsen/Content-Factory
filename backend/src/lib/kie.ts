@@ -140,11 +140,8 @@ export async function createSoraTask(
                     }
                 )
             },
-            {
-                maxRetries: 3,
-                initialDelay: 1000,
-                maxDelay: 5000,
-            }
+            3, // maxRetries
+            1000 // initialDelay
         )
 
         if (response.data.code !== 200) {
