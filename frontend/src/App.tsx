@@ -26,7 +26,6 @@ import { AdminPanel } from './pages/AdminPanel'
 import { VideoPlanning } from './pages/VideoPlanning'
 import { ProfileSettings } from './pages/ProfileSettings'
 import { Preferences } from './pages/Preferences'
-import { VideoPrompts } from './pages/VideoPrompts'
 import { Credits } from './pages/Credits'
 
 function AppContent() {
@@ -55,14 +54,6 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <Videos />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/prompts"
-          element={
-            <ProtectedRoute>
-              <VideoPrompts />
             </ProtectedRoute>
           }
         />

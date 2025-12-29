@@ -65,7 +65,7 @@ interface VideoPlanItem {
   script_status?: 'draft' | 'approved' | 'rejected' | null
   platforms?: string[] | null
   caption?: string | null
-  // avatar_id removed - using Sora for video generation
+  avatar_id?: string | null
   status:
   | 'pending'
   | 'researching'
@@ -167,7 +167,21 @@ export function VideoPlanning() {
     '19:00',
   ]) // Default times for 3 videos
   const [videoTopics, setVideoTopics] = useState<string[]>(['', '', '']) // Topics for each video slot
-  // Avatar-related state removed - using Sora for video generation
+  const [videoAvatars, setVideoAvatars] = useState<string[]>(['', '', '']) // Avatar IDs for each video slot
+  const [videoLooks, setVideoLooks] = useState<(string | null)[]>(['', '', '']) // Look IDs for each video slot
+
+  const [avatars, setAvatars] = useState<Array<{ id: string; avatar_name: string; thumbnail_url: string | null; preview_url: string | null; is_default?: boolean; heygen_avatar_id?: string; has_motion?: boolean }>>([])
+  const [loadingAvatars, setLoadingAvatars] = useState(false)
+  const [defaultAvatarId, setDefaultAvatarId] = useState<string | null>(null)
+  const [planDefaultAvatarId, setPlanDefaultAvatarId] = useState<string | null>(null)
+  const [avatarModalOpen, setAvatarModalOpen] = useState(false)
+  const [avatarModalIndex, setAvatarModalIndex] = useState<number>(0) // Track which video slot is selecting avatar
+  const [lookModalOpen, setLookModalOpen] = useState(false)
+  const [avatarLooks, setAvatarLooks] = useState<any[]>([])
+  const [loadingLooks, setLoadingLooks] = useState(false)
+  const loadingLooksRef = useRef(false) // Prevent multiple simultaneous API calls
+  // Store looks by avatar ID so we can display selected looks
+  const [looksByAvatar, setLooksByAvatar] = useState<Map<string, any[]>>(new Map())
   const [deleteModal, setDeleteModal] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [editPlanModal, setEditPlanModal] = useState<VideoPlan | null>(null)
@@ -188,9 +202,10 @@ export function VideoPlanning() {
     { label: 'Evening (6:00 PM)', value: '18:00' },
   ]
 
-  // Avatar loading removed - using Sora for video generation
+  // Load avatars when create modal opens
   useEffect(() => {
     if (createModal) {
+      loadAvatars()
       setCreateStep(1)
     }
   }, [createModal])
@@ -204,18 +219,166 @@ export function VideoPlanning() {
     }
   }, [statusFilter])
 
-  // Avatar-related functions removed - using Sora for video generation
+  const loadAvatars = async () => {
+    try {
+      setLoadingAvatars(true)
+      // Fetch user's avatars (including synced/public ones they've added, but NOT all public avatars)
+      // This shows only avatars the user has created or explicitly added from public library
+      const response = await api.get('/api/avatars?all=true')
+      const allAvatars = response.data.avatars || []
 
-  // Update videoTimes and videoTopics when videosPerDay changes
+      // Filter to only show:
+      // 1. User-created avatars (source: 'user_photo' or 'ai_generated')
+      // NOTE: We now exclude synced/public avatars to avoid listing the full HeyGen library.
+      // If public avatars are needed, they must be explicitly added later with a clear flag.
+      const loadedAvatars = allAvatars.filter((avatar: any) => {
+        // Include user-created avatars
+        if (avatar.source === 'user_photo' || avatar.source === 'ai_generated') {
+          return true
+        }
+        // Exclude everything else
+        return false
+      })
+
+      // Merge in local motion flags (from Add Motion success)
+      let motionSet = new Set<string>()
+      try {
+        const raw = typeof window !== 'undefined' ? window.localStorage.getItem('motion_applied_avatar_ids') : null
+        const arr: string[] = raw ? JSON.parse(raw) : []
+        motionSet = new Set(arr)
+      } catch (e) {
+        console.warn('[Motion] Could not read motion flags from localStorage')
+      }
+
+      const avatarsWithMotion = loadedAvatars.map((a: any) => ({
+        ...a,
+        has_motion: motionSet.has(a.id),
+      }))
+
+      setAvatars(avatarsWithMotion)
+      setDefaultAvatarId(response.data.default_avatar_id || null)
+      if (!planDefaultAvatarId && response.data.default_avatar_id) {
+        setPlanDefaultAvatarId(response.data.default_avatar_id)
+      }
+
+      // Set default avatar for all video slots that don't have an avatar selected
+      if (response.data.default_avatar_id) {
+        setVideoAvatars(prev => {
+          const newAvatars = [...prev]
+          for (let i = 0; i < newAvatars.length; i++) {
+            if (!newAvatars[i]) {
+              newAvatars[i] = response.data.default_avatar_id
+            }
+          }
+          return newAvatars
+        })
+      }
+
+      // Pre-load looks for avatars that are already selected (after state is updated)
+      setTimeout(() => {
+        const selectedAvatarIds = [...new Set(videoAvatars.filter(id => id))]
+        for (const avatarId of selectedAvatarIds) {
+          const avatar = loadedAvatars.find((a: any) => a.id === avatarId)
+          if (avatar && avatar.heygen_avatar_id) {
+            // Check if looks are already loaded
+            setLooksByAvatar(prev => {
+              if (prev.has(avatar.heygen_avatar_id!)) {
+                return prev // Already loaded
+              }
+              // Load in background
+              loadAvatarLooks(avatarId).catch(() => { })
+              return prev
+            })
+          }
+        }
+      }, 100)
+    } catch (error) {
+      console.error('Failed to load avatars:', error)
+    } finally {
+      setLoadingAvatars(false)
+    }
+  }
+
+  const loadAvatarLooks = async (avatarId: string) => {
+    // Prevent multiple simultaneous calls
+    if (loadingLooksRef.current) {
+      console.log(`[VideoPlanning] Already loading looks for avatar ${avatarId}, skipping duplicate call`)
+      return avatarLooks.length > 0 ? avatarLooks : []
+    }
+
+    loadingLooksRef.current = true
+    console.log(`[VideoPlanning] loadAvatarLooks called for avatar ${avatarId}`)
+    setLoadingLooks(true)
+    setAvatarLooks([]) // Clear previous looks immediately
+    try {
+      const response = await api.get(`/api/avatars/${avatarId}/details`)
+      const looks = response.data?.looks || []
+      console.log(`[VideoPlanning] Loaded ${looks.length} looks for avatar ${avatarId}:`, looks)
+
+      // Set looks state synchronously
+      setAvatarLooks(looks)
+
+      // Also store looks by avatar ID for display purposes
+      const avatar = avatars.find(a => a.id === avatarId)
+      if (avatar && avatar.heygen_avatar_id) {
+        setLooksByAvatar(prev => {
+          const newMap = new Map(prev)
+          newMap.set(avatar.heygen_avatar_id!, looks)
+          return newMap
+        })
+      }
+
+      return looks // Return looks so we can check them immediately
+    } catch (error: any) {
+      console.error('[VideoPlanning] Failed to load avatar looks:', error)
+      setAvatarLooks([])
+      return []
+    } finally {
+      setLoadingLooks(false)
+      loadingLooksRef.current = false
+    }
+  }
+
+  const handleSelectLook = (lookId: string) => {
+    const newLooks = [...videoLooks]
+    newLooks[avatarModalIndex] = lookId
+    setVideoLooks(newLooks)
+    setLookModalOpen(false)
+  }
+
+  // Reload looks when look modal opens to ensure fresh data
+  useEffect(() => {
+    if (lookModalOpen && avatarModalIndex >= 0 && videoAvatars[avatarModalIndex]) {
+      const selectedAvatarId = videoAvatars[avatarModalIndex]
+      if (selectedAvatarId && !loadingLooksRef.current) {
+        console.log(`[VideoPlanning] Look modal opened, reloading looks for avatar ${selectedAvatarId}`)
+        loadAvatarLooks(selectedAvatarId).catch(error => {
+          console.error('[VideoPlanning] Failed to reload looks when modal opened:', error)
+        })
+      }
+    }
+  }, [lookModalOpen, avatarModalIndex]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update videoTimes, videoTopics, and videoAvatars when videosPerDay changes
   useEffect(() => {
     const defaultTimes = ['09:00', '14:00', '19:00', '10:00', '11:00']
     if (videoTimes.length !== videosPerDay) {
       // If we need more times, add defaults. If fewer, keep first N.
       setVideoTimes(defaultTimes.slice(0, videosPerDay))
       setVideoTopics(Array(videosPerDay).fill(''))
+      // Set default avatar for new slots
+      const newAvatars = Array(videosPerDay).fill('')
+      for (let i = 0; i < videosPerDay; i++) {
+        if (i < videoAvatars.length && videoAvatars[i]) {
+          newAvatars[i] = videoAvatars[i]
+        } else if (defaultAvatarId) {
+          newAvatars[i] = defaultAvatarId
+        }
+      }
+      setVideoAvatars(newAvatars)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videosPerDay])
+  }, [videosPerDay, defaultAvatarId])
 
   // Available platforms
   const availablePlatforms = ['instagram', 'youtube', 'tiktok', 'twitter']
@@ -230,7 +393,11 @@ export function VideoPlanning() {
     localStorage.setItem('videoPlanning.statusFilter', statusFilter)
   }, [statusFilter])
 
-  // Avatar-related useEffect removed - using Sora for video generation
+  useEffect(() => {
+    if (defaultAvatarId && !planDefaultAvatarId) {
+      setPlanDefaultAvatarId(defaultAvatarId)
+    }
+  }, [defaultAvatarId, planDefaultAvatarId])
 
   useEffect(() => {
     if (selectedPlan) {
@@ -532,7 +699,16 @@ export function VideoPlanning() {
       setVideosPerDay(3)
       setStartDate(new Date().toISOString().split('T')[0])
       setEndDate('')
-      // Avatar state reset removed - using Sora for video generation
+      // Reset avatars to default
+      if (defaultAvatarId) {
+        setVideoAvatars(Array(3).fill(defaultAvatarId))
+        setPlanDefaultAvatarId(defaultAvatarId)
+      } else {
+        setVideoAvatars(['', '', ''])
+        setPlanDefaultAvatarId(null)
+      }
+      setVideoLooks([null, null, null])
+      setVideoLooks([null, null, null])
       setAutoScheduleTrigger('daily')
       setTriggerTime('09:00')
       setDefaultPlatforms([])
@@ -540,6 +716,9 @@ export function VideoPlanning() {
       setAutoCreate(false)
       setVideoTimes(['09:00', '14:00', '19:00'])
       setVideoTopics(['', '', ''])
+      setVideoAvatars(['', '', ''])
+      setVideoLooks([null, null, null])
+      setVideoLooks([null, null, null])
     } catch (error: any) {
       alert(error.response?.data?.error || 'Failed to create plan')
     } finally {
@@ -614,6 +793,7 @@ export function VideoPlanning() {
     // For now, use defaults
     setVideoTimes(['09:00', '14:00', '19:00'].slice(0, plan.videos_per_day))
     setVideoTopics(Array(plan.videos_per_day).fill(''))
+    setVideoAvatars(Array(plan.videos_per_day).fill(''))
   }
 
   const handleSavePlan = async () => {
@@ -654,6 +834,7 @@ export function VideoPlanning() {
       setAutoCreate(false)
       setVideoTimes(['09:00', '14:00', '19:00'])
       setVideoTopics(['', '', ''])
+      setVideoAvatars(['', '', ''])
     } catch (error: any) {
       alert(error.response?.data?.error || 'Failed to update plan')
     } finally {
@@ -2279,12 +2460,74 @@ export function VideoPlanning() {
                   ]}
                 />
 
-                {/* Avatar selection removed - using Sora for video generation */}
+                <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-slate-700">
+                        Plan Default Avatar
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        Used for all slots unless you override in Advanced.
+                      </p>
+                    </div>
+                    {loadingAvatars && (
+                      <Loader className="h-4 w-4 animate-spin text-brand-500" />
+                    )}
+                  </div>
+                  {avatars.length === 0 ? (
+                    <p className="text-sm text-amber-600">
+                      No avatars available. Please create an avatar first.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                      {avatars.map((avatar) => (
+                        <button
+                          key={avatar.id}
+                          type="button"
+                          onClick={() => {
+                            setPlanDefaultAvatarId(avatar.id)
+                            setVideoAvatars(Array(videosPerDay).fill(avatar.id))
+                          }}
+                          className={`flex items-center gap-2 rounded-xl border p-3 text-left transition ${planDefaultAvatarId === avatar.id
+                            ? 'border-brand-500 bg-brand-50 shadow-sm'
+                            : 'border-slate-200 hover:border-brand-300 hover:bg-white'
+                            }`}
+                        >
+                          {avatar.thumbnail_url || avatar.preview_url ? (
+                            <img
+                              src={
+                                avatar.thumbnail_url ||
+                                avatar.preview_url ||
+                                ''
+                              }
+                              alt={avatar.avatar_name}
+                              className="h-10 w-10 rounded-lg object-cover"
+                            />
+                          ) : (
+                            <div className="h-10 w-10 rounded-lg bg-brand-100 text-brand-700 flex items-center justify-center">
+                              <User className="h-5 w-5" />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-slate-700">
+                              {avatar.avatar_name}
+                            </p>
+                            {avatar.is_default && (
+                              <p className="text-xs text-brand-600">
+                                Workspace default
+                              </p>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 <div className="flex items-center justify-end gap-3 pt-2">
                   <Button
                     onClick={() => setCreateStep(2)}
-                    disabled={!planName || !startDate}
+                    disabled={!planName || !startDate || !planDefaultAvatarId}
                   >
                     Next: Advanced
                   </Button>
@@ -2303,6 +2546,22 @@ export function VideoPlanning() {
                   </div>
                   <div className="mt-4 space-y-4">
                     {Array.from({ length: videosPerDay }).map((_, index) => {
+                      const selectedAvatarId =
+                        videoAvatars[index] || planDefaultAvatarId || ''
+                      const selectedLookId = videoLooks[index]
+                      const selectedAvatar = avatars.find(
+                        (a) => a.id === selectedAvatarId,
+                      )
+                      const avatarLooksForDisplay = selectedAvatar?.heygen_avatar_id
+                        ? looksByAvatar.get(selectedAvatar.heygen_avatar_id) ||
+                        []
+                        : []
+                      const selectedLook =
+                        selectedLookId &&
+                        avatarLooksForDisplay.find(
+                          (l: any) => l.id === selectedLookId,
+                        )
+
                       return (
                         <div
                           key={index}
@@ -2314,7 +2573,8 @@ export function VideoPlanning() {
                                 Video {index + 1}
                               </span>
                               <span className="text-xs text-slate-500">
-                                Videos will be generated using Sora AI.
+                                Plan default avatar will be used unless
+                                overridden.
                               </span>
                             </div>
                             <div className="flex gap-2">
@@ -2363,7 +2623,88 @@ export function VideoPlanning() {
                             />
                           </div>
 
-                          {/* Avatar/look selection removed - using Sora for video generation */}
+                          <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                            {selectedLook ? (
+                              selectedLook.image_url ||
+                                selectedLook.preview_url ||
+                                selectedLook.thumbnail_url ? (
+                                <img
+                                  src={
+                                    selectedLook.image_url ||
+                                    selectedLook.preview_url ||
+                                    selectedLook.thumbnail_url ||
+                                    ''
+                                  }
+                                  alt={
+                                    selectedLook.name ||
+                                    selectedAvatar?.avatar_name
+                                  }
+                                  className="h-12 w-12 rounded-lg object-cover"
+                                />
+                              ) : (
+                                <div className="h-12 w-12 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                                  <User className="h-5 w-5" />
+                                </div>
+                              )
+                            ) : selectedAvatar?.thumbnail_url ||
+                              selectedAvatar?.preview_url ? (
+                              <img
+                                src={
+                                  selectedAvatar.thumbnail_url ||
+                                  selectedAvatar.preview_url ||
+                                  ''
+                                }
+                                alt={selectedAvatar.avatar_name}
+                                className="h-12 w-12 rounded-lg object-contain"
+                              />
+                            ) : (
+                              <div className="h-12 w-12 rounded-lg bg-brand-100 text-brand-700 flex items-center justify-center">
+                                <User className="h-5 w-5" />
+                              </div>
+                            )}
+
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-slate-700 truncate">
+                                {selectedLook
+                                  ? selectedLook.name ||
+                                  selectedAvatar?.avatar_name
+                                  : selectedAvatar?.avatar_name ||
+                                  'No avatar selected'}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {selectedLook
+                                  ? 'Look override for this slot'
+                                  : 'Using plan default avatar'}
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => {
+                                  setAvatarModalIndex(index)
+                                  setAvatarModalOpen(true)
+                                }}
+                              >
+                                Override avatar/look
+                              </Button>
+                              {videoLooks[index] && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    const newLooks = [...videoLooks]
+                                    newLooks[index] = null
+                                    setVideoLooks(newLooks)
+                                  }}
+                                >
+                                  Clear
+                                </Button>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       )
                     })}
@@ -2525,6 +2866,7 @@ export function VideoPlanning() {
                   <Button
                     onClick={handleCreatePlan}
                     loading={creating}
+                    disabled={!planDefaultAvatarId}
                   >
                     Create Plan
                   </Button>
@@ -2551,6 +2893,8 @@ export function VideoPlanning() {
             setAutoCreate(false)
             setVideoTimes(['09:00', '14:00', '19:00'])
             setVideoTopics(['', '', ''])
+            setVideoAvatars(['', '', ''])
+            setVideoLooks([null, null, null])
           }}
           title="Edit Video Plan"
         >
@@ -2710,7 +3054,7 @@ export function VideoPlanning() {
                   </label>
                   <p className="mt-1 text-xs text-slate-500">
                     Automatically start video generation for approved scripts. Works best
-                    with auto approval enabled.
+                    with auto approval enabled and requires a configured avatar.
                   </p>
                 </div>
               </div>
@@ -2758,6 +3102,8 @@ export function VideoPlanning() {
                   setAutoCreate(false)
                   setVideoTimes(['09:00', '14:00', '19:00'])
                   setVideoTopics(['', '', ''])
+                  setVideoAvatars(['', '', ''])
+                  setVideoLooks([null, null, null])
 
                 }}
               >
@@ -3045,7 +3391,33 @@ export function VideoPlanning() {
                   </div>
                 )}
 
-                {/* Avatar display removed - using Sora for video generation */}
+                {/* Avatar */}
+                {selectedItem.avatar_id && (() => {
+                  const itemAvatar = avatars.find(a => a.id === selectedItem.avatar_id)
+                  return itemAvatar ? (
+                    <div>
+                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Avatar
+                      </label>
+                      <div className="mt-2 flex items-center gap-3">
+                        {itemAvatar.thumbnail_url || itemAvatar.preview_url ? (
+                          <img
+                            src={itemAvatar.thumbnail_url || itemAvatar.preview_url || ''}
+                            alt={itemAvatar.avatar_name}
+                            className="h-16 w-16 rounded-lg object-contain border-2 border-brand-200 bg-slate-50"
+                          />
+                        ) : (
+                          <div className="h-16 w-16 rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center">
+                            <User className="h-8 w-8 text-white opacity-50" />
+                          </div>
+                        )}
+                        <p className="text-sm font-medium text-primary">
+                          {itemAvatar.avatar_name}
+                        </p>
+                      </div>
+                    </div>
+                  ) : null
+                })()}
 
                 {/* Description */}
                 {selectedItem.description && (
@@ -3294,7 +3666,214 @@ export function VideoPlanning() {
           })()}
         </Modal>
 
-        {/* Avatar and Look Selection Modals removed - using Sora for video generation */}
+        {/* Avatar Selection Modal */}
+        <Modal
+          isOpen={avatarModalOpen}
+          onClose={() => setAvatarModalOpen(false)}
+          title="Select Avatar"
+          size="xl"
+        >
+          <div className="space-y-6">
+            <p className="text-sm text-slate-500">
+              Choose an avatar for video {avatarModalIndex + 1}. The avatar will appear in the generated video.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 max-h-[65vh] overflow-y-auto pr-2 -mr-2">
+              {avatars.length === 0 ? (
+                <div className="col-span-full text-center py-12 text-slate-500">
+                  <Users className="h-12 w-12 mx-auto mb-3 text-slate-300" />
+                  <p>No avatars available</p>
+                </div>
+              ) : (
+                avatars.map((avatar) => {
+                  const isSelected = videoAvatars[avatarModalIndex] === avatar.id
+                  return (
+                    <button
+                      key={avatar.id}
+                      type="button"
+                      onClick={async () => {
+                        const newAvatars = [...videoAvatars]
+                        newAvatars[avatarModalIndex] = avatar.id
+                        setVideoAvatars(newAvatars)
+
+                        // Load looks for this avatar
+                        const looks = await loadAvatarLooks(avatar.id)
+
+                        // If avatar has looks, show look selection modal, otherwise just close avatar modal
+                        if (looks && looks.length > 0) {
+                          // Close avatar modal first
+                          setAvatarModalOpen(false)
+                          // Wait a bit for state to settle, then open look modal
+                          setTimeout(() => {
+                            setLookModalOpen(true)
+                          }, 100)
+                        } else {
+                          // Clear look selection if no looks available
+                          const newLooks = [...videoLooks]
+                          newLooks[avatarModalIndex] = null
+                          setVideoLooks(newLooks)
+                          setAvatarModalOpen(false)
+                        }
+                      }}
+                      className={`relative rounded-xl border-2 p-3 transition-all hover:scale-105 ${isSelected
+                        ? 'border-brand-500 bg-brand-50 shadow-lg ring-2 ring-brand-200'
+                        : 'border-slate-200 bg-white hover:border-brand-300 hover:shadow-md'
+                        }`}
+                    >
+                      {avatar.has_motion && (
+                        <div className="absolute top-2 left-2 z-10">
+                          <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-purple-600 text-white shadow-sm">
+                            <Zap className="h-3 w-3" />
+                          </span>
+                        </div>
+                      )}
+                      {avatar.thumbnail_url || avatar.preview_url ? (
+                        <img
+                          src={avatar.thumbnail_url || avatar.preview_url || ''}
+                          alt={avatar.avatar_name}
+                          className="w-full h-36 object-contain rounded-lg mb-2 bg-slate-50"
+                        />
+                      ) : (
+                        <div className="w-full h-36 bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center mb-2">
+                          <Users className="h-12 w-12 text-white opacity-50" />
+                        </div>
+                      )}
+                      <p className="text-xs font-medium text-slate-700 truncate text-center">
+                        {avatar.avatar_name}
+                      </p>
+                      {isSelected && (
+                        <div className="absolute top-2 right-2 bg-brand-500 text-white rounded-full p-1.5 shadow-lg ring-2 ring-white">
+                          <CheckCircle2 className="h-4 w-4" />
+                        </div>
+                      )}
+                    </button>
+                  )
+                })
+              )}
+            </div>
+            <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+              <p className="text-xs text-slate-400">
+                {avatars.length} avatar{avatars.length !== 1 ? 's' : ''} available
+              </p>
+              <Button
+                variant="ghost"
+                onClick={() => setAvatarModalOpen(false)}
+                className="border border-white/60 bg-white/70 text-slate-500 hover:border-slate-200 hover:bg-white"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Look Selection Modal */}
+        <Modal
+          isOpen={lookModalOpen}
+          onClose={() => {
+            console.log('[VideoPlanning] Closing look modal')
+            setLookModalOpen(false)
+          }}
+          title="Select Look"
+          size="xl"
+        >
+          <div className="space-y-6">
+            <p className="text-sm text-slate-500">
+              Choose a look for video {avatarModalIndex + 1}. You can also use the default avatar by closing this modal.
+            </p>
+            {loadingLooks ? (
+              <div className="text-center py-12">
+                <div className="inline-block h-8 w-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+                <p className="mt-4 text-sm text-slate-500">Loading looks...</p>
+              </div>
+            ) : !avatarLooks || avatarLooks.length === 0 ? (
+              <div className="text-center py-12 text-slate-500">
+                <Users className="h-12 w-12 mx-auto mb-3 text-slate-300" />
+                <p>No looks available for this avatar</p>
+                <p className="text-xs mt-2">The default avatar will be used</p>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    const newLooks = [...videoLooks]
+                    newLooks[avatarModalIndex] = null
+                    setVideoLooks(newLooks)
+                    setLookModalOpen(false)
+                  }}
+                  className="mt-4"
+                >
+                  Use Default Avatar
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 max-h-[65vh] overflow-y-auto pr-2 -mr-2">
+                {avatarLooks.map((look: any) => {
+                  const isSelected = videoLooks[avatarModalIndex] === look.id
+                  const imageUrl = look.image_url || look.preview_url || look.thumbnail_url
+                  return (
+                    <button
+                      key={look.id}
+                      type="button"
+                      onClick={() => handleSelectLook(look.id)}
+                      className={`relative aspect-[3/4] rounded-2xl overflow-hidden border-2 transition-all hover:scale-105 ${isSelected
+                        ? 'border-brand-500 ring-2 ring-brand-200 shadow-lg'
+                        : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
+                        }`}
+                    >
+                      {imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt={look.name || 'Look'}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-purple-400 to-indigo-600 flex items-center justify-center">
+                          <Users className="h-12 w-12 text-white opacity-50" />
+                        </div>
+                      )}
+                      {isSelected && (
+                        <div className="absolute top-2 right-2 bg-brand-500 text-white rounded-full p-1.5 shadow-lg ring-2 ring-white z-10">
+                          <CheckCircle2 className="h-4 w-4" />
+                        </div>
+                      )}
+                      {look.name && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                          <p className="text-xs font-medium text-white truncate text-center">
+                            {look.name}
+                          </p>
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+              <p className="text-xs text-slate-400">
+                {avatarLooks.length} look{avatarLooks.length !== 1 ? 's' : ''} available
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    // Clear look selection
+                    const newLooks = [...videoLooks]
+                    newLooks[avatarModalIndex] = null
+                    setVideoLooks(newLooks)
+                    setLookModalOpen(false)
+                  }}
+                  className="border border-white/60 bg-white/70 text-slate-500 hover:border-slate-200 hover:bg-white"
+                >
+                  Use Default Avatar
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => setLookModalOpen(false)}
+                  className="border border-white/60 bg-white/70 text-slate-500 hover:border-slate-200 hover:bg-white"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Modal>
       </div>
     </Layout>
   )
