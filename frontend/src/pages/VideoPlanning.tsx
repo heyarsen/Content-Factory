@@ -16,6 +16,7 @@ import {
   Sparkles,
   Video,
   Clock,
+  RefreshCw,
   Loader,
   PenSquare,
   Check,
@@ -25,11 +26,7 @@ import {
   Trash2,
   FileText,
   ExternalLink,
-  User,
-  RefreshCw,
-  CheckCircle2,
-  Users,
-  Zap,
+
 } from 'lucide-react'
 import api from '../lib/api'
 
