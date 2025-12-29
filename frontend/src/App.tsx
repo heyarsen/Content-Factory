@@ -26,7 +26,6 @@ import { AdminPanel } from './pages/AdminPanel'
 import { VideoPlanning } from './pages/VideoPlanning'
 import { ProfileSettings } from './pages/ProfileSettings'
 import { Preferences } from './pages/Preferences'
-import Avatars from './pages/Avatars'
 import { VideoPrompts } from './pages/VideoPrompts'
 import { Credits } from './pages/Credits'
 
@@ -168,14 +167,6 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <Preferences />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/avatars"
-          element={
-            <ProtectedRoute>
-              <Avatars />
             </ProtectedRoute>
           }
         />

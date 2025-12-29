@@ -1375,7 +1375,7 @@ export class VideoService {
         style: input.style || DEFAULT_REEL_STYLE,
         duration: input.duration || DEFAULT_REEL_DURATION,
         status: 'pending',
-        provider: input.provider || 'heygen',
+        provider: input.provider || 'sora',
         heygen_video_id: null,
         sora_task_id: null,
         video_url: null,

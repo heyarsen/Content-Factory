@@ -625,15 +625,6 @@ export function VideoPlanning() {
 
     setCreating(true)
     try {
-      const avatarsForSlots =
-        videoAvatars.length === videosPerDay
-          ? videoAvatars.map((avatarId) =>
-            avatarId || planDefaultAvatarId || defaultAvatarId || '',
-          )
-          : Array(videosPerDay)
-            .fill(planDefaultAvatarId || defaultAvatarId || '')
-            .map((val, idx) => videoAvatars[idx] || val)
-
       const response = await api.post('/api/plans', {
         name: planName,
         videos_per_day: videosPerDay,
@@ -654,8 +645,7 @@ export function VideoPlanning() {
           return cleanTime.length === 5 ? cleanTime : time
         }), // Send custom times in HH:MM format
         video_topics: videoTopics, // Send topics for each slot
-        video_avatars: avatarsForSlots, // Send avatar IDs for each slot (apply plan default)
-        video_looks: videoLooks, // Send look IDs for each slot (null if using default avatar)
+        // Avatars removed - using Sora for video generation
       })
 
       console.log(`[VideoPlanning] Plan creation response:`, {

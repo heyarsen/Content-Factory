@@ -59,24 +59,6 @@ export function QuickCreate() {
   // Step 3: Generate Video
   const [style, setStyle] = useState<'casual' | 'professional' | 'energetic' | 'educational'>('professional')
   const [duration, setDuration] = useState(30)
-  type AvatarRecord = {
-    id: string
-    heygen_avatar_id: string
-    avatar_name: string
-    thumbnail_url: string | null
-    preview_url: string | null
-    avatar_url?: string | null
-    status?: string
-    source?: 'synced' | 'user_photo' | 'ai_generated' | null
-    is_default: boolean
-  }
-  const [avatars, setAvatars] = useState<AvatarRecord[]>([])
-  const [selectedAvatarId, setSelectedAvatarId] = useState<string>('')
-  const [selectedLookId, setSelectedLookId] = useState<string | null>(null)
-  const [avatarLooks, setAvatarLooks] = useState<any[]>([])
-  const [loadingLooks, setLoadingLooks] = useState(false)
-  const [lookModalOpen, setLookModalOpen] = useState(false)
-  const [avatarModalOpen, setAvatarModalOpen] = useState(false)
   const [generatingVideo, setGeneratingVideo] = useState(false)
   const [videoError, setVideoError] = useState('')
   const [videoId, setVideoId] = useState<string | null>(null)
@@ -95,7 +77,6 @@ export function QuickCreate() {
 
   useEffect(() => {
     loadSocialAccounts()
-    loadAvatars()
     loadPrompts()
   }, [])
 
@@ -128,123 +109,6 @@ export function QuickCreate() {
     }
   }
 
-  const fetchAvatars = async (
-    params: Record<string, string> = {},
-    allowFallback: boolean = true
-  ) => {
-    const response = await api.get('/api/avatars', { params })
-    const avatars = response.data.avatars || []
-
-    if (
-      allowFallback &&
-      response.data.only_created &&
-      avatars.length === 0 &&
-      !params.all
-    ) {
-      return fetchAvatars({ all: 'true' }, false)
-    }
-
-    return response
-  }
-
-  const isUserCreatedAvatar = (avatar: AvatarRecord): boolean => {
-    if (avatar.source === 'user_photo' || avatar.source === 'ai_generated') {
-      return true
-    }
-    if (avatar.source === 'synced') {
-      // Include synced avatars (e.g. public/studio avatars or synced from HeyGen)
-      return true
-    }
-    if (avatar.avatar_url && avatar.avatar_url.includes('supabase.co/storage')) {
-      return true
-    }
-    if (avatar.status === 'generating') {
-      return true
-    }
-    if (
-      (avatar.status === 'training' || avatar.status === 'pending') &&
-      (!avatar.avatar_url || !avatar.avatar_url.includes('heygen'))
-    ) {
-      return true
-    }
-    if (!avatar.avatar_url && (avatar.status === 'training' || avatar.status === 'pending')) {
-      return true
-    }
-    if (avatar.status === 'active' && !avatar.avatar_url) {
-      return true
-    }
-    return false
-  }
-
-  const isAvatarReady = (avatar: AvatarRecord): boolean => avatar.status === 'active'
-
-  const handleSelectAvatar = async (avatar: AvatarRecord) => {
-    if (!isAvatarReady(avatar)) {
-      addNotification({
-        type: 'warning',
-        title: 'Avatar Training',
-        message: 'This avatar is still training and cannot be used for video generation yet.',
-      })
-      return
-    }
-    setSelectedAvatarId(avatar.heygen_avatar_id)
-    setSelectedLookId(null)
-    setAvatarModalOpen(false)
-    
-    // Fetch looks for this avatar
-    await loadAvatarLooks(avatar.id)
-  }
-
-  const loadAvatarLooks = async (avatarId: string) => {
-    setLoadingLooks(true)
-    try {
-      const response = await api.get(`/api/avatars/${avatarId}/details`)
-      const looks = response.data?.looks || []
-      setAvatarLooks(looks)
-      
-      // If there are looks, open the look selection modal
-      if (looks.length > 0) {
-        // Auto-select default look if available, otherwise first look
-        const defaultLook = looks.find((look: any) => look.is_default) || looks[0]
-        setSelectedLookId(defaultLook?.id || null)
-        setLookModalOpen(true)
-      } else {
-        // No looks available, just use the group ID
-        setSelectedLookId(null)
-      }
-    } catch (error: any) {
-      console.error('Failed to load avatar looks:', error)
-      // If loading looks fails, just use the group ID
-      setSelectedLookId(null)
-    } finally {
-      setLoadingLooks(false)
-    }
-  }
-
-  const handleSelectLook = (lookId: string) => {
-    setSelectedLookId(lookId)
-    setLookModalOpen(false)
-  }
-
-  const loadAvatars = async () => {
-    try {
-      // Fetch all avatars (including synced/public) so they can be used for quick create
-      const response = await api.get('/api/avatars?all=true')
-      const allAvatars: AvatarRecord[] = (response.data.avatars || []) as AvatarRecord[]
-      // Filter to ensure only user-created avatars (backend should already filter, but double-check)
-      const avatarsToUse = allAvatars.filter((avatar) => isUserCreatedAvatar(avatar))
-      
-      setAvatars(avatarsToUse)
-      const defaultAvatar = avatarsToUse.find((a: any) => a.is_default)
-      if (defaultAvatar) {
-        setSelectedAvatarId(defaultAvatar.heygen_avatar_id)
-      } else if (avatarsToUse.length > 0) {
-        setSelectedAvatarId(avatarsToUse[0].heygen_avatar_id)
-      }
-    } catch (error: any) {
-      console.error('Failed to load avatars:', error)
-    }
-  }
 
   // Poll for video status when video is generating
   useEffect(() => {
@@ -377,22 +241,6 @@ export function QuickCreate() {
       return
     }
 
-    const selectedAvatar = avatars.find((avatar) => avatar.heygen_avatar_id === selectedAvatarId)
-    if (!selectedAvatar) {
-      setVideoError('Please select an avatar')
-      return
-    }
-
-    if (!isAvatarReady(selectedAvatar)) {
-      setVideoError('Selected avatar is still training and cannot be used yet.')
-      addNotification({
-        type: 'warning',
-        title: 'Avatar still training',
-        message: 'Please wait until the avatar finishes training before generating a video.',
-      })
-      return
-    }
-
     setGeneratingVideo(true)
     setVideoError('')
 
@@ -406,10 +254,7 @@ export function QuickCreate() {
         scriptLength: generatedScript?.length,
         style,
         duration,
-        category: 'general',
-        avatar_id: selectedLookId ? undefined : selectedAvatarId || undefined,
-        talking_photo_id: selectedLookId || undefined,
-        look_id: selectedLookId || undefined,
+        provider: 'sora',
       })
       
       const response = await api.post('/api/videos/generate', {
@@ -417,10 +262,7 @@ export function QuickCreate() {
         script: generatedScript,
         style,
         duration,
-        category: 'general', // Default category
-        avatar_id: selectedLookId ? undefined : selectedAvatarId || undefined,
-        talking_photo_id: selectedLookId || undefined,
-        look_id: selectedLookId || undefined,
+        provider: 'sora', // Always use Sora via KIE
         generate_caption: generateCaption,
         aspect_ratio: DEFAULT_VERTICAL_ASPECT_RATIO,
         dimension: verticalDimension,
@@ -868,90 +710,6 @@ export function QuickCreate() {
                   </div>
                 </div>
 
-                {/* Avatar Selection */}
-                {avatars.length > 0 ? (
-                  <div className="rounded-2xl border border-white/60 bg-white/70 p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <label className="block text-sm font-semibold text-primary">
-                        Choose Avatar
-                      </label>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setAvatarModalOpen(true)
-                          // Reset look selection when changing avatar
-                          setSelectedLookId(null)
-                          setAvatarLooks([])
-                        }}
-                        className="text-xs"
-                      >
-                        {selectedAvatarId ? 'Change Avatar' : 'Select Avatar'}
-                      </Button>
-                    </div>
-                    {selectedAvatarId && (
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                          {(() => {
-                            const selected = avatars.find(a => a.heygen_avatar_id === selectedAvatarId)
-                            const selectedLook = avatarLooks.find((l: any) => l.id === selectedLookId)
-                            const displayImage = selectedLook?.thumbnail_url || selectedLook?.image_url || selectedLook?.preview_url || selected?.thumbnail_url || selected?.preview_url
-                            return selected ? (
-                              <>
-                                {displayImage ? (
-                                  <img
-                                    src={displayImage}
-                                    alt={selected.avatar_name}
-                                    className="w-12 h-12 object-cover rounded-lg"
-                                  />
-                                ) : (
-                                  <div className="w-12 h-12 bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center">
-                                    <Users className="h-6 w-6 text-white opacity-50" />
-                                  </div>
-                                )}
-                                <div className="flex-1">
-                                  <p className="text-sm font-medium text-slate-700">{selected.avatar_name}</p>
-                                  <p className="text-xs text-slate-500">
-                                    {selectedLook ? (selectedLook.name || 'Selected Look') : 'Default Look'}
-                                  </p>
-                                </div>
-                              </>
-                            ) : null
-                          })()}
-                        </div>
-                        {avatarLooks.length > 1 && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setLookModalOpen(true)}
-                            className="w-full text-xs"
-                          >
-                            {selectedLookId ? 'Change Look' : 'Choose Look'} ({avatarLooks.length} available)
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="rounded-2xl border border-amber-200/80 bg-amber-50/80 p-6">
-                    <div className="flex items-start gap-3">
-                      <Users className="h-5 w-5 text-amber-600 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-semibold text-amber-800">No Avatars Available</p>
-                        <p className="mt-1 text-xs text-amber-700">
-                          You need to create an avatar before generating videos.{' '}
-                          <a href="/avatars" className="underline hover:text-amber-900">
-                            Go to Avatars page
-                          </a>{' '}
-                          to create one.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 {/* Caption Generation Toggle */}
                 <div className="rounded-2xl border border-white/60 bg-white/70 p-6">
                   <div className="flex items-start gap-3">
@@ -986,7 +744,7 @@ export function QuickCreate() {
                   </Button>
                   <Button
                     onClick={handleGenerateVideo}
-                    disabled={generatingVideo || avatars.length === 0 || !selectedAvatarId}
+                    disabled={generatingVideo}
                     loading={generatingVideo}
                     leftIcon={!generatingVideo ? <Video className="h-4 w-4" /> : undefined}
                     className="min-w-[160px]"
@@ -1125,162 +883,6 @@ export function QuickCreate() {
           </div>
         )}
 
-        {/* Look Selection Modal */}
-        <Modal
-          isOpen={lookModalOpen}
-          onClose={() => setLookModalOpen(false)}
-          title="Choose Avatar Look"
-          size="lg"
-        >
-          <div className="space-y-6">
-            <p className="text-sm text-slate-500">
-              Select which look of the avatar you want to use for this video.
-            </p>
-            {loadingLooks ? (
-              <div className="py-12 text-center">
-                <Loader className="h-8 w-8 mx-auto mb-3 text-brand-500 animate-spin" />
-                <p className="text-sm text-slate-500">Loading looks...</p>
-              </div>
-            ) : avatarLooks.length === 0 ? (
-              <div className="py-12 text-center text-slate-500">
-                <Users className="h-12 w-12 mx-auto mb-3 text-slate-300" />
-                <p>No looks available for this avatar</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-h-[60vh] overflow-y-auto pr-2 -mr-2">
-                {avatarLooks.map((look: any) => (
-                  <button
-                    key={look.id}
-                    type="button"
-                    onClick={() => handleSelectLook(look.id)}
-                    className={`relative rounded-xl border-2 p-3 transition-all hover:scale-105 ${
-                      selectedLookId === look.id
-                        ? 'border-brand-500 bg-brand-50 shadow-lg ring-2 ring-brand-200'
-                        : 'border-slate-200 bg-white hover:border-brand-300 hover:shadow-md'
-                    }`}
-                  >
-                    {look.thumbnail_url || look.image_url || look.preview_url ? (
-                      <img
-                        src={look.thumbnail_url || look.image_url || look.preview_url || ''}
-                        alt={look.name || 'Look'}
-                        className="w-full h-32 object-cover rounded-lg mb-2 bg-slate-50"
-                      />
-                    ) : (
-                      <div className="w-full h-32 bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center mb-2">
-                        <Users className="h-12 w-12 text-white opacity-50" />
-                      </div>
-                    )}
-                    <p className="text-xs font-medium text-slate-700 truncate text-center">
-                      {look.name || 'Unnamed Look'}
-                    </p>
-                    {look.is_default && (
-                      <div className="absolute top-2 left-2 bg-brand-500 text-white px-2 py-0.5 rounded text-xs font-semibold">
-                        Default
-                      </div>
-                    )}
-                    {selectedLookId === look.id && (
-                      <div className="absolute top-2 right-2 bg-brand-500 text-white rounded-full p-1.5 shadow-lg ring-2 ring-white">
-                        <CheckCircle2 className="h-4 w-4" />
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-            <div className="flex items-center justify-between pt-4 border-t border-slate-200">
-              <p className="text-xs text-slate-400">
-                {avatarLooks.length} look{avatarLooks.length !== 1 ? 's' : ''} available
-              </p>
-              <Button
-                variant="ghost"
-                onClick={() => setLookModalOpen(false)}
-                className="border border-white/60 bg-white/70 text-slate-500 hover:border-slate-200 hover:bg-white"
-              >
-                Close
-              </Button>
-            </div>
-          </div>
-        </Modal>
-
-        {/* Avatar Selection Modal */}
-        <Modal
-          isOpen={avatarModalOpen}
-          onClose={() => setAvatarModalOpen(false)}
-          title="Select Avatar"
-          size="xl"
-        >
-          <div className="space-y-6">
-            <p className="text-sm text-slate-500">
-              Choose an avatar for your video. The avatar will appear in the generated video.
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 max-h-[65vh] overflow-y-auto pr-2 -mr-2">
-              {avatars.length === 0 ? (
-                <div className="col-span-full text-center py-12 text-slate-500">
-                  <Users className="h-12 w-12 mx-auto mb-3 text-slate-300" />
-                  <p>No avatars available</p>
-                </div>
-              ) : (
-                avatars.map((avatar) => (
-                  <button
-                    key={avatar.id}
-                    type="button"
-                      onClick={() => handleSelectAvatar(avatar)}
-                    className={`relative rounded-xl border-2 p-3 transition-all hover:scale-105 ${
-                      selectedAvatarId === avatar.heygen_avatar_id
-                        ? 'border-brand-500 bg-brand-50 shadow-lg ring-2 ring-brand-200'
-                        : 'border-slate-200 bg-white hover:border-brand-300 hover:shadow-md'
-                    }`}
-                  >
-                    {avatar.thumbnail_url || avatar.preview_url ? (
-                      <img
-                        src={avatar.thumbnail_url || avatar.preview_url || ''}
-                        alt={avatar.avatar_name}
-                        className="w-full h-36 object-contain rounded-lg mb-2 bg-slate-50"
-                      />
-                    ) : (
-                      <div className="w-full h-36 bg-gradient-to-br from-brand-400 to-brand-600 rounded-lg flex items-center justify-center mb-2">
-                        <Users className="h-12 w-12 text-white opacity-50" />
-                      </div>
-                    )}
-                    <p className="text-xs font-medium text-slate-700 truncate text-center">
-                      {avatar.avatar_name}
-                    </p>
-                    {selectedAvatarId === avatar.heygen_avatar_id && isAvatarReady(avatar) && (
-                      <div className="absolute top-2 right-2 bg-brand-500 text-white rounded-full p-1.5 shadow-lg ring-2 ring-white">
-                        <CheckCircle2 className="h-4 w-4" />
-                      </div>
-                    )}
-                    {!isAvatarReady(avatar) && (
-                      <div className="absolute inset-0 flex flex-col justify-between">
-                        <span className="text-center text-xs font-semibold uppercase tracking-widest text-rose-600 bg-rose-50/90 px-2 py-1">
-                          Training
-                        </span>
-                        <div className="flex-1"></div>
-                        <div className="text-center">
-                          <span className="text-[11px] font-semibold uppercase text-slate-400">
-                            Not ready yet
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </button>
-                ))
-              )}
-            </div>
-            <div className="flex items-center justify-between pt-4 border-t border-slate-200">
-              <p className="text-xs text-slate-400">
-                {avatars.length} avatar{avatars.length !== 1 ? 's' : ''} available
-              </p>
-              <Button
-                variant="ghost"
-                onClick={() => setAvatarModalOpen(false)}
-                className="border border-white/60 bg-white/70 text-slate-500 hover:border-slate-200 hover:bg-white"
-              >
-                Close
-              </Button>
-            </div>
-          </div>
-        </Modal>
       </div>
     </Layout>
   )
