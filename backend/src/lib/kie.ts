@@ -48,22 +48,23 @@ export interface CreateSoraTaskResponse {
 
 /**
  * Task status response from KIE API
+ * Per docs: state can be 'waiting', 'success', or 'fail'
+ * Results are in resultJson as a JSON string
  */
 export interface SoraTaskDetail {
     code: number
     msg: string
     data: {
         taskId: string
-        status: 'pending' | 'processing' | 'completed' | 'failed'
-        progress?: number
-        result?: {
-            video_url?: string
-            thumbnail_url?: string
-            duration?: number
-        }
-        error?: string
-        created_at?: string
-        updated_at?: string
+        model: string
+        state: 'waiting' | 'success' | 'fail' // API uses 'state', not 'status'
+        param: string // JSON string of original request params
+        resultJson: string | null // JSON string containing resultUrls array when success
+        failCode: string | null
+        failMsg: string | null
+        costTime: number | null // milliseconds
+        completeTime: number | null // timestamp
+        createTime: number // timestamp
     }
 }
 
@@ -244,8 +245,9 @@ export async function pollTaskUntilComplete(
         onProgress?: (progress: number, status: string) => void
     } = {}
 ): Promise<SoraTaskDetail> {
-    const maxAttempts = options.maxAttempts || 60 // 60 attempts = 5 minutes with 5s interval
-    const pollInterval = options.pollInterval || 5000 // 5 seconds
+    // Increase timeout: 120 attempts * 10s = 20 minutes (video generation can take longer)
+    const maxAttempts = options.maxAttempts || 120 // 120 attempts = 20 minutes with 10s interval
+    const pollInterval = options.pollInterval || 10000 // 10 seconds (less frequent polling)
 
     let attempts = 0
 
@@ -253,26 +255,28 @@ export async function pollTaskUntilComplete(
         attempts++
 
         const taskDetail = await getTaskDetails(taskId)
-        const status = taskDetail.data.status
-        const progress = taskDetail.data.progress || 0
+        const state = taskDetail.data.state // API uses 'state', not 'status'
 
-        console.log(`[KIE Sora] Task ${taskId} status: ${status}, progress: ${progress}%`)
+        console.log(`[KIE Sora] Task ${taskId} state: ${state} (attempt ${attempts}/${maxAttempts})`)
 
         if (options.onProgress) {
-            options.onProgress(progress, status)
+            // Calculate progress based on attempts (since API doesn't provide progress)
+            const progress = Math.min(95, Math.round((attempts / maxAttempts) * 100))
+            options.onProgress(progress, state)
         }
 
-        if (status === 'completed') {
+        if (state === 'success') {
             console.log(`[KIE Sora] Task ${taskId} completed successfully`)
             return taskDetail
         }
 
-        if (status === 'failed') {
-            const errorMsg = taskDetail.data.error || 'Video generation failed'
+        if (state === 'fail') {
+            const errorMsg = taskDetail.data.failMsg || taskDetail.data.failCode || 'Video generation failed'
             console.error(`[KIE Sora] Task ${taskId} failed:`, errorMsg)
             throw new Error(`Sora video generation failed: ${errorMsg}`)
         }
 
+        // State is 'waiting' - continue polling
         // Wait before next poll
         await new Promise(resolve => setTimeout(resolve, pollInterval))
     }

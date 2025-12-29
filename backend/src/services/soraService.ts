@@ -11,15 +11,15 @@ import type { Video } from '../types/database.js'
 
 /**
  * Map Sora task status to internal video status
+ * KIE API uses: 'waiting', 'success', 'fail'
  */
 function mapSoraStatusToVideoStatus(soraStatus: string): Video['status'] {
     switch (soraStatus) {
-        case 'pending':
-        case 'processing':
+        case 'waiting':
             return 'generating'
-        case 'completed':
+        case 'success':
             return 'completed'
-        case 'failed':
+        case 'fail':
             return 'failed'
         default:
             console.warn(`[Sora Service] Unknown Sora status: ${soraStatus}, defaulting to 'generating'`)
@@ -29,15 +29,28 @@ function mapSoraStatusToVideoStatus(soraStatus: string): Video['status'] {
 
 /**
  * Update video record with Sora task success
+ * KIE API returns results in resultJson as a JSON string: {"resultUrls": ["url1", "url2"]}
  */
 async function updateVideoWithSoraSuccess(
     videoId: string,
     taskDetail: SoraTaskDetail
 ): Promise<void> {
-    const videoUrl = taskDetail.data.result?.video_url
+    // Parse resultJson to get video URL
+    let videoUrl: string | null = null
+    
+    if (taskDetail.data.resultJson) {
+        try {
+            const result = JSON.parse(taskDetail.data.resultJson)
+            if (result.resultUrls && Array.isArray(result.resultUrls) && result.resultUrls.length > 0) {
+                videoUrl = result.resultUrls[0] // Get first video URL
+            }
+        } catch (error) {
+            console.error('[Sora Service] Failed to parse resultJson:', error)
+        }
+    }
 
     if (!videoUrl) {
-        throw new Error('Sora task completed but no video URL was provided')
+        throw new Error('Sora task completed but no video URL was provided in resultJson')
     }
 
     console.log('[Sora Service] Updating video record with success:', {
@@ -162,9 +175,10 @@ export async function generateVideoWithSora(
         console.log('[Sora Service] Task created, starting polling:', taskId)
 
         // Poll for completion
+        // Increased timeout: 120 attempts * 10s = 20 minutes (video generation can take longer)
         const taskDetail = await pollTaskUntilComplete(taskId, {
-            maxAttempts: 60, // 5 minutes with 5s interval
-            pollInterval: 5000,
+            maxAttempts: 120, // 20 minutes with 10s interval
+            pollInterval: 10000, // 10 seconds between polls
             onProgress: (progress, status) => {
                 console.log(`[Sora Service] Video ${video.id} - Progress: ${progress}%, Status: ${status}`)
             },
@@ -196,19 +210,19 @@ export async function checkSoraTaskStatus(
         const { getTaskDetails } = await import('../lib/kie.js')
         const taskDetail = await getTaskDetails(taskId)
 
-        const status = mapSoraStatusToVideoStatus(taskDetail.data.status)
+        const status = mapSoraStatusToVideoStatus(taskDetail.data.state) // API uses 'state', not 'status'
 
         console.log('[Sora Service] Task status check:', {
             videoId,
             taskId,
-            status: taskDetail.data.status,
+            state: taskDetail.data.state,
             mappedStatus: status,
         })
 
-        if (taskDetail.data.status === 'completed') {
+        if (taskDetail.data.state === 'success') {
             await updateVideoWithSoraSuccess(videoId, taskDetail)
-        } else if (taskDetail.data.status === 'failed') {
-            const error = new Error(taskDetail.data.error || 'Sora task failed')
+        } else if (taskDetail.data.state === 'fail') {
+            const error = new Error(taskDetail.data.failMsg || taskDetail.data.failCode || 'Sora task failed')
             await updateVideoWithSoraFailure(videoId, error)
         } else {
             // Update progress
