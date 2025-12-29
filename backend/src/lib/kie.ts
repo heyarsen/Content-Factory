@@ -16,8 +16,9 @@ function getKieApiKey(): string {
 
 /**
  * Sora aspect ratio options
+ * Per docs: only 'portrait' and 'landscape' are supported.
  */
-export type SoraAspectRatio = 'landscape' | 'portrait' | 'square'
+export type SoraAspectRatio = 'landscape' | 'portrait'
 
 /**
  * Request payload for creating a Sora text-to-video task
@@ -75,21 +76,19 @@ export function mapAspectRatioToSora(aspectRatio?: string | null): SoraAspectRat
     // Handle common aspect ratio formats
     if (aspectRatio === '9:16' || aspectRatio === 'vertical') return 'portrait'
     if (aspectRatio === '16:9' || aspectRatio === 'horizontal') return 'landscape'
-    if (aspectRatio === '1:1') return 'square'
 
     // Default to portrait
     return 'portrait'
 }
 
 /**
- * Calculate n_frames from duration in seconds
- * Sora uses frames, typical video is 24-30 fps
- * We'll use 30 fps as default
+ * Calculate n_frames from duration in seconds.
+ * Per docs, Sora currently supports only '10' or '15' (seconds).
  */
 export function calculateFramesFromDuration(durationSeconds: number): string {
-    const fps = 30
-    const frames = Math.round(durationSeconds * fps)
-    return frames.toString()
+    // Use '10' for very short clips, otherwise '15'
+    if (durationSeconds <= 10) return '10'
+    return '15'
 }
 
 /**
@@ -193,17 +192,15 @@ export async function getTaskDetails(taskId: string): Promise<SoraTaskDetail> {
     const apiKey = getKieApiKey()
 
     try {
-        const response = await axios.get<SoraTaskDetail>(
-            `${KIE_API_URL}/jobs/getTaskDetail`,
-            {
-                params: { taskId },
-                headers: {
-                    'Authorization': `Bearer ${apiKey}`,
-                    'Content-Type': 'application/json',
-                },
-                timeout: 15000,
-            }
-        )
+        // Per docs, task status endpoint is /jobs/recordInfo?taskId=...
+        const response = await axios.get<SoraTaskDetail>(`${KIE_API_URL}/jobs/recordInfo`, {
+            params: { taskId },
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+            },
+            timeout: 15000,
+        })
 
         if (response.data.code !== 200) {
             throw new Error(`KIE API error: ${response.data.msg}`)
