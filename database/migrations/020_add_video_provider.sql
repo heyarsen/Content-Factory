@@ -1,9 +1,9 @@
 -- Migration: Add Sora provider support to videos table
 -- Description: Adds provider and sora_task_id columns to support multiple video generation providers
 
--- Add provider column (defaults to 'heygen' for backward compatibility)
+-- Add provider column (defaults to 'sora' for new videos)
 ALTER TABLE videos 
-ADD COLUMN provider TEXT DEFAULT 'heygen' CHECK (provider IN ('heygen', 'sora'));
+ADD COLUMN provider TEXT DEFAULT 'sora' CHECK (provider IN ('heygen', 'sora'));
 
 -- Add sora_task_id column to store KIE Sora task ID
 ALTER TABLE videos 
