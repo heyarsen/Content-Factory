@@ -187,10 +187,23 @@ export async function generateVideoWithSora(
         // Update video record with success
         await updateVideoWithSoraSuccess(video.id, taskDetail)
 
+        // Extract video URL from resultJson for logging
+        let videoUrl: string | null = null
+        if (taskDetail.data.resultJson) {
+            try {
+                const result = JSON.parse(taskDetail.data.resultJson)
+                if (result.resultUrls && Array.isArray(result.resultUrls) && result.resultUrls.length > 0) {
+                    videoUrl = result.resultUrls[0]
+                }
+            } catch (error) {
+                // Ignore parse errors for logging
+            }
+        }
+
         console.log('[Sora Service] Video generation completed successfully:', {
             videoId: video.id,
             taskId,
-            videoUrl: taskDetail.data.result?.video_url,
+            videoUrl,
         })
     } catch (error: any) {
         console.error('[Sora Service] Video generation failed:', error)
