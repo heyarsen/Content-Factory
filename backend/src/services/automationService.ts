@@ -1463,7 +1463,7 @@ export class AutomationService {
       .from('video_plan_items')
       .select('*, plan:video_plans!inner(enabled, user_id, default_platforms), videos(*)')
       .eq('plan.enabled', true)
-      .eq('status', 'completed')
+      .in('status', ['completed', 'scheduled'])
       .not('video_id', 'is', null)
       .limit(10)
 
@@ -1702,140 +1702,24 @@ export class AutomationService {
             scheduledTime = undefined // Post immediately
             console.log(`[Distribution] Posting item ${item.id} now - scheduled time (${item.scheduled_time}) reached or passed`)
           } else if (timeDiffMinutes > 1 && item.scheduled_date >= today) {
-            // Future scheduled time - build ISO string for scheduling
-            // Ensure scheduled_time has proper format (HH:MM or HH:MM:SS)
-            let timeStr = item.scheduled_time
-            if (!timeStr.includes(':')) {
-              console.error(`[Distribution] Invalid scheduled_time format for item ${item.id}: ${timeStr}`)
-              continue
+            // Future scheduled time - wait for trigger time locally
+            // We don't send to API yet because we use local scheduler for precision/timezone handling
+
+            // Log once every hour or if status is not yet 'scheduled'
+            const shouldLog = item.status !== 'scheduled' || currentMinute === 0
+            if (shouldLog) {
+              console.log(`[Distribution] Item ${item.id} scheduled for future (${item.scheduled_date} ${item.scheduled_time}), waiting for trigger time...`)
             }
 
-            // Normalize time format to HH:MM:SS
-            const timeParts = timeStr.split(':')
-            if (timeParts.length === 2) {
-              // Add seconds if missing
-              timeStr = `${timeStr}:00`
-            } else if (timeParts.length > 3) {
-              // Too many parts, take first 3
-              timeStr = timeParts.slice(0, 3).join(':')
+            // Update status to 'scheduled' if not already
+            if (item.status !== 'scheduled') {
+              await supabase
+                .from('video_plan_items')
+                .update({ status: 'scheduled' })
+                .eq('id', item.id)
+              console.log(`[Distribution] Updated item ${item.id} status to 'scheduled'`)
             }
-
-            // Create scheduled time in UTC ISO format
-            // scheduled_date is in YYYY-MM-DD format, scheduled_time is in HH:MM:SS format
-            // Both represent a time in the plan's timezone, which we need to convert to UTC
-            try {
-              // Parse date and time components
-              const [year, month, day] = item.scheduled_date.split('-').map(Number)
-              const [hours, minutes, seconds = 0] = timeStr.split(':').map(Number)
-
-              // Convert from plan timezone to UTC
-              // Method: Create a date string representing the time in the plan timezone,
-              // then use Intl to find the UTC equivalent
-
-              // Create a formatter for the plan timezone
-              const planFormatter = new Intl.DateTimeFormat('en-US', {
-                timeZone: planTimezone,
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false,
-              })
-
-              // Strategy: We need to find a UTC time that, when formatted in plan timezone,
-              // equals our target time. We'll use an iterative approach with proper offset calculation.
-
-              // Start with UTC date at the target time
-              let candidateUtcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds))
-
-              console.log(`[Distribution] Initial UTC date: ${candidateUtcDate.toISOString()} (created from ${year}-${month}-${day} ${hours}:${minutes}:${seconds})`)
-
-              // Check what this UTC time represents in the plan timezone
-              let parts = planFormatter.formatToParts(candidateUtcDate)
-              let planYear = parseInt(parts.find(p => p.type === 'year')?.value || '0')
-              let planMonth = parseInt(parts.find(p => p.type === 'month')?.value || '0')
-              let planDay = parseInt(parts.find(p => p.type === 'day')?.value || '0')
-              let planHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0')
-              let planMinute = parseInt(parts.find(p => p.type === 'minute')?.value || '0')
-              let planSecond = parseInt(parts.find(p => p.type === 'second')?.value || '0')
-
-              console.log(`[Distribution] UTC ${candidateUtcDate.toISOString()} represents ${planYear}-${planMonth}-${planDay} ${planHour}:${planMinute}:${planSecond} in ${planTimezone}`)
-
-              // Calculate how many minutes off we are
-              // If plan timezone shows 19:00 but we want 17:00, we need to go back 2 hours in UTC
-              const targetTotalMinutes = hours * 60 + minutes
-              const planTotalMinutes = planHour * 60 + planMinute
-              const diffMinutes = targetTotalMinutes - planTotalMinutes
-
-              console.log(`[Distribution] Target: ${hours}:${minutes} (${targetTotalMinutes} min), Plan shows: ${planHour}:${planMinute} (${planTotalMinutes} min), Difference: ${diffMinutes} minutes`)
-
-              // Adjust UTC date by the difference
-              // If plan timezone shows later time (e.g., 19:00 when we want 17:00),
-              // we need to subtract from UTC to go back in time
-              candidateUtcDate = new Date(candidateUtcDate.getTime() - diffMinutes * 60 * 1000)
-
-              console.log(`[Distribution] Adjusted UTC date: ${candidateUtcDate.toISOString()}`)
-
-              // Verify the conversion
-              parts = planFormatter.formatToParts(candidateUtcDate)
-              planYear = parseInt(parts.find(p => p.type === 'year')?.value || '0')
-              planMonth = parseInt(parts.find(p => p.type === 'month')?.value || '0')
-              planDay = parseInt(parts.find(p => p.type === 'day')?.value || '0')
-              planHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0')
-              planMinute = parseInt(parts.find(p => p.type === 'minute')?.value || '0')
-              planSecond = parseInt(parts.find(p => p.type === 'second')?.value || '0')
-
-              console.log(`[Distribution] After adjustment, UTC ${candidateUtcDate.toISOString()} represents ${planYear}-${planMonth}-${planDay} ${planHour}:${planMinute}:${planSecond} in ${planTimezone}`)
-
-              // If still not matching, do one more adjustment
-              if (planHour !== hours || planMinute !== minutes) {
-                console.log(`[Distribution] Still not matching, doing final adjustment...`)
-                const finalTargetMinutes = hours * 60 + minutes
-                const finalPlanMinutes = planHour * 60 + planMinute
-                const finalDiffMinutes = finalTargetMinutes - finalPlanMinutes
-                console.log(`[Distribution] Final adjustment: ${finalDiffMinutes} minutes`)
-                candidateUtcDate = new Date(candidateUtcDate.getTime() - finalDiffMinutes * 60 * 1000)
-
-                // Re-verify
-                parts = planFormatter.formatToParts(candidateUtcDate)
-                planYear = parseInt(parts.find(p => p.type === 'year')?.value || '0')
-                planMonth = parseInt(parts.find(p => p.type === 'month')?.value || '0')
-                planDay = parseInt(parts.find(p => p.type === 'day')?.value || '0')
-                planHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0')
-                planMinute = parseInt(parts.find(p => p.type === 'minute')?.value || '0')
-                planSecond = parseInt(parts.find(p => p.type === 'second')?.value || '0')
-                console.log(`[Distribution] After final adjustment, UTC ${candidateUtcDate.toISOString()} represents ${planYear}-${planMonth}-${planDay} ${planHour}:${planMinute}:${planSecond} in ${planTimezone}`)
-              }
-
-              // Convert to ISO string
-              scheduledTime = candidateUtcDate.toISOString()
-
-              // Validate
-              if (isNaN(candidateUtcDate.getTime())) {
-                throw new Error(`Invalid date generated`)
-              }
-
-              // Log for debugging
-              const utcParts = new Intl.DateTimeFormat('en-US', {
-                timeZone: 'UTC',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false,
-              }).formatToParts(candidateUtcDate)
-              const utcHour = parseInt(utcParts.find(p => p.type === 'hour')?.value || '0')
-              const utcMinute = parseInt(utcParts.find(p => p.type === 'minute')?.value || '0')
-
-              console.log(`[Distribution] Timezone conversion: ${item.scheduled_date} ${item.scheduled_time} (${planTimezone}) -> ${scheduledTime} (UTC ${utcHour}:${String(utcMinute).padStart(2, '0')}), verified in ${planTimezone}: ${planHour}:${String(planMinute).padStart(2, '0')}:${String(planSecond).padStart(2, '0')}`)
-            } catch (e: any) {
-              console.error(`[Distribution] Error creating scheduled time for item ${item.id}:`, e.message, e.stack)
-              // Fallback: treat as UTC (not ideal but better than failing)
-              scheduledTime = `${item.scheduled_date}T${timeStr}.000Z`
-              console.log(`[Distribution] Using fallback scheduled time (UTC): ${scheduledTime}`)
-            }
-            console.log(`[Distribution] Scheduling item ${item.id} for ${scheduledTime} (${timeDiffMinutes} minutes from now)`)
+            continue
           } else {
             // Not time yet, skip this item (will be processed when time matches)
             console.log(`[Distribution] Skipping item ${item.id} - scheduled time (${item.scheduled_time}) not reached yet (current: ${currentHour}:${currentMinute.toString().padStart(2, '0')}, scheduled: ${postHour}:${postMinute.toString().padStart(2, '0')})`)
