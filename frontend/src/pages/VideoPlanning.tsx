@@ -2248,7 +2248,7 @@ export function VideoPlanning() {
                   Advanced
                 </div>
               </div>
-              <div className="text-xs text-slate-500">Timezone: {selectedPlan.timezone || timezone}</div>
+              <div className="text-xs text-slate-500">Timezone: {timezone}</div>
             </div>
 
             {createStep === 1 ? (
@@ -2422,9 +2422,7 @@ export function VideoPlanning() {
                     <div className="space-y-3">
                       <label className="block text-sm font-medium text-slate-700">
                         Trigger Time
-                        <span className="ml-2 text-xs text-slate-500">
-                          (Timezone: {selectedPlan.timezone || timezone})
-                        </span>
+                        (Timezone: {timezone})
                       </label>
                       <div className="flex flex-wrap gap-2">
                         {timePresets.map((preset) => (
@@ -2638,9 +2636,7 @@ export function VideoPlanning() {
               <div className="space-y-3">
                 <label className="block text-sm font-medium text-slate-700">
                   Trigger Time
-                  <span className="ml-2 text-xs text-slate-500">
-                    (Timezone: {selectedPlan?.timezone || timezone})
-                  </span>
+                  (Timezone: {timezone})
                 </label>
 
                 <div className="flex flex-wrap gap-2">
