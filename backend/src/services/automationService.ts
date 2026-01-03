@@ -1189,7 +1189,7 @@ export class AutomationService {
     // First, refresh video statuses for videos that might have completed
     const { data: itemsWithVideos } = await supabase
       .from('video_plan_items')
-      .select('*, plan:video_plans!inner(enabled, user_id, default_platforms), videos(*)')
+      .select('*, plan:video_plans!inner(enabled, user_id, default_platforms, timezone), videos(*)')
       .eq('plan.enabled', true)
       .eq('status', 'generating')
       .not('video_id', 'is', null)
@@ -1242,7 +1242,7 @@ export class AutomationService {
     // This handles items that have posts created but status wasn't updated properly
     const { data: itemsWithPosts } = await supabase
       .from('video_plan_items')
-      .select('*, plan:video_plans!inner(enabled, user_id)')
+      .select('*, plan:video_plans!inner(enabled, user_id, timezone)')
       .eq('plan.enabled', true)
       .in('status', ['completed', 'scheduled'])
       .not('video_id', 'is', null)
@@ -1431,6 +1431,8 @@ export class AutomationService {
               const currentHour = parseInt(hourFormatter.format(now), 10)
               const currentMinute = parseInt(minuteFormatter.format(now), 10)
 
+              console.log(`[Distribution] Item ${item.id} - Plan Timezone: ${planTimezone}, Current Time (in plan tz): ${today} ${currentHour}:${currentMinute.toString().padStart(2, '0')}, Scheduled: ${item.scheduled_date} ${item.scheduled_time} (checking status flow)`)
+
               const [postHours, postMinutes] = item.scheduled_time.split(':')
               const postHour = parseInt(postHours, 10)
               const postMinute = parseInt(postMinutes || '0', 10)
@@ -1461,7 +1463,7 @@ export class AutomationService {
     // First get completed items
     const { data: completedItems } = await supabase
       .from('video_plan_items')
-      .select('*, plan:video_plans!inner(enabled, user_id, default_platforms), videos(*)')
+      .select('*, plan:video_plans!inner(enabled, user_id, default_platforms, timezone), videos(*)')
       .eq('plan.enabled', true)
       .in('status', ['completed', 'scheduled'])
       .not('video_id', 'is', null)
@@ -1471,7 +1473,7 @@ export class AutomationService {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
     const { data: failedItems } = await supabase
       .from('video_plan_items')
-      .select('*, plan:video_plans!inner(enabled, user_id, default_platforms), videos(*)')
+      .select('*, plan:video_plans!inner(enabled, user_id, default_platforms, timezone), videos(*)')
       .eq('plan.enabled', true)
       .eq('status', 'failed')
       .not('video_id', 'is', null)
@@ -1676,6 +1678,8 @@ export class AutomationService {
         const currentHour = parseInt(hourFormatter.format(now), 10)
         const currentMinute = parseInt(minuteFormatter.format(now), 10)
         const today = dateFormatter.format(now)
+
+        console.log(`[Distribution] Item ${item.id} - Plan Timezone: ${planTimezone}, Current Time (in plan tz): ${today} ${currentHour}:${currentMinute.toString().padStart(2, '0')}, Scheduled: ${item.scheduled_date} ${item.scheduled_time} (posting flow)`)
 
         if (item.scheduled_date && item.scheduled_time) {
           // scheduled_time is the post time (e.g., 17:00)
