@@ -29,6 +29,7 @@ import {
 
 } from 'lucide-react'
 import api from '../lib/api'
+import { timezones } from '../lib/timezones'
 
 const STATUS_FILTER_KEY = 'video_planning_status_filter'
 
@@ -45,6 +46,7 @@ interface VideoPlan {
   trigger_time?: string | null
   default_platforms?: string[] | null
   auto_approve?: boolean
+  timezone?: string
   created_at: string
 }
 
@@ -155,7 +157,7 @@ export function VideoPlanning() {
   const [defaultPlatforms, setDefaultPlatforms] = useState<string[]>([])
   const [autoApprove, setAutoApprove] = useState(false)
   const [autoCreate, setAutoCreate] = useState(false)
-  const [timezone] = useState(
+  const [timezone, setTimezone] = useState(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone,
   )
   const [videoTimes, setVideoTimes] = useState<string[]>([
@@ -220,7 +222,19 @@ export function VideoPlanning() {
 
   useEffect(() => {
     loadPlans()
+    loadUserPreferences()
   }, [])
+
+  const loadUserPreferences = async () => {
+    try {
+      const response = await api.get('/api/preferences')
+      if (response.data.preferences?.timezone) {
+        setTimezone(response.data.preferences.timezone)
+      }
+    } catch (error) {
+      console.error('Failed to load user preferences:', error)
+    }
+  }
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -464,11 +478,11 @@ export function VideoPlanning() {
         auto_schedule_trigger: autoScheduleTrigger,
         trigger_time:
           autoScheduleTrigger === 'daily' ? `${triggerTime}:00` : null,
+        timezone: timezone,
         default_platforms:
           defaultPlatforms.length > 0 ? defaultPlatforms : null,
         auto_approve: autoApprove,
         auto_create: autoCreate,
-        timezone: timezone,
         video_times: videoTimes.map((time: string) => {
           // Ensure time is in HH:MM format (remove :00 if present, then add it back)
           const cleanTime = time.replace(/:00$/, '')
@@ -607,6 +621,7 @@ export function VideoPlanning() {
     setDefaultPlatforms(plan.default_platforms || [])
     setAutoApprove(plan.auto_approve || false)
     setAutoCreate(plan.auto_create || false)
+    setTimezone(plan.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone)
     // Load existing video times and topics from plan items if needed
     // For now, use defaults
     setVideoTimes(['09:00', '14:00', '19:00'].slice(0, plan.videos_per_day))
@@ -634,6 +649,7 @@ export function VideoPlanning() {
           defaultPlatforms.length > 0 ? defaultPlatforms : null,
         auto_approve: autoApprove,
         auto_create: autoCreate,
+        timezone: timezone,
       })
 
       // Reload plans to get updated data
@@ -2232,7 +2248,7 @@ export function VideoPlanning() {
                   Advanced
                 </div>
               </div>
-              <div className="text-xs text-slate-500">Timezone: {timezone}</div>
+              <div className="text-xs text-slate-500">Timezone: {selectedPlan.timezone || timezone}</div>
             </div>
 
             {createStep === 1 ? (
@@ -2276,7 +2292,12 @@ export function VideoPlanning() {
                   ]}
                 />
 
-                {/* Avatar selection removed - using Sora for video generation */}
+                <Select
+                  label="Plan Timezone"
+                  value={timezone}
+                  onChange={(e) => setTimezone(e.target.value)}
+                  options={timezones}
+                />
 
                 <div className="flex items-center justify-end gap-3 pt-2">
                   <Button
@@ -2402,7 +2423,7 @@ export function VideoPlanning() {
                       <label className="block text-sm font-medium text-slate-700">
                         Trigger Time
                         <span className="ml-2 text-xs text-slate-500">
-                          (Timezone: {timezone})
+                          (Timezone: {selectedPlan.timezone || timezone})
                         </span>
                       </label>
                       <div className="flex flex-wrap gap-2">
@@ -2592,6 +2613,13 @@ export function VideoPlanning() {
             />
 
             <Select
+              label="Plan Timezone"
+              value={timezone}
+              onChange={(e) => setTimezone(e.target.value)}
+              options={timezones}
+            />
+
+            <Select
               label="Schedule Trigger"
               value={autoScheduleTrigger}
               onChange={(e) =>
@@ -2611,7 +2639,7 @@ export function VideoPlanning() {
                 <label className="block text-sm font-medium text-slate-700">
                   Trigger Time
                   <span className="ml-2 text-xs text-slate-500">
-                    (Timezone: {timezone})
+                    (Timezone: {selectedPlan?.timezone || timezone})
                   </span>
                 </label>
 

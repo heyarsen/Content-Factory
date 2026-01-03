@@ -7,6 +7,7 @@ import { Badge } from '../components/ui/Badge'
 import { useToast } from '../hooks/useToast'
 import { Settings, Globe, Bell, Sparkles, Share2, Instagram, Youtube, Facebook, Users } from 'lucide-react'
 import api from '../lib/api'
+import { timezones } from '../lib/timezones'
 
 interface Preferences {
   user_id: string
@@ -23,44 +24,6 @@ interface SocialAccount {
   status: string
 }
 
-// Generate comprehensive timezone list
-function getAllTimezones() {
-  try {
-    // Use Intl.supportedValuesOf if available (modern browsers)
-    if (typeof Intl !== 'undefined' && 'supportedValuesOf' in Intl) {
-      const timezones = (Intl as any).supportedValuesOf('timeZone') as string[]
-      return timezones.map((tz: string) => {
-        // Format timezone name for display
-        const parts = tz.split('/')
-        const name = parts[parts.length - 1].replace(/_/g, ' ')
-        return {
-          value: tz,
-          label: `${tz} - ${name}`,
-        }
-      }).sort((a: { value: string; label: string }, b: { value: string; label: string }) => a.label.localeCompare(b.label))
-    }
-  } catch (e) {
-    console.warn('Intl.supportedValuesOf not available, using fallback list')
-  }
-
-  // Fallback to common timezones if Intl.supportedValuesOf is not available
-  return [
-    { value: 'UTC', label: 'UTC (Coordinated Universal Time)' },
-    { value: 'America/New_York', label: 'America/New_York - Eastern Time' },
-    { value: 'America/Chicago', label: 'America/Chicago - Central Time' },
-    { value: 'America/Denver', label: 'America/Denver - Mountain Time' },
-    { value: 'America/Los_Angeles', label: 'America/Los_Angeles - Pacific Time' },
-    { value: 'Europe/London', label: 'Europe/London - London' },
-    { value: 'Europe/Paris', label: 'Europe/Paris - Paris' },
-    { value: 'Europe/Berlin', label: 'Europe/Berlin - Berlin' },
-    { value: 'Asia/Tokyo', label: 'Asia/Tokyo - Tokyo' },
-    { value: 'Asia/Shanghai', label: 'Asia/Shanghai - Shanghai' },
-    { value: 'Asia/Dubai', label: 'Asia/Dubai - Dubai' },
-    { value: 'Australia/Sydney', label: 'Australia/Sydney - Sydney' },
-  ]
-}
-
-const timezones = getAllTimezones()
 
 const availablePlatforms = ['instagram', 'youtube', 'tiktok', 'x', 'linkedin', 'pinterest', 'threads', 'facebook']
 const platformIcons: Record<string, any> = {
@@ -267,13 +230,12 @@ export function Preferences() {
                     type="button"
                     onClick={() => togglePlatform(platform)}
                     disabled={!isConnected}
-                    className={`rounded-lg border px-4 py-2 text-sm font-medium capitalize transition ${
-                      preferences.default_platforms.includes(platform)
+                    className={`rounded-lg border px-4 py-2 text-sm font-medium capitalize transition ${preferences.default_platforms.includes(platform)
                         ? 'border-brand-500 bg-brand-50 text-brand-700'
                         : isConnected
-                        ? 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                        : 'border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed'
-                    }`}
+                          ? 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                          : 'border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed'
+                      }`}
                     title={!isConnected ? 'Connect this platform in Social Accounts first' : ''}
                   >
                     {platformNames[platform] || platform}
