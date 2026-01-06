@@ -501,8 +501,6 @@ export class AutomationService {
    * Only processes today's items after trigger time
    */
   static async generateResearchForReadyItems(): Promise<void> {
-    const now = new Date()
-
     // Get all enabled plans with trigger times and auto_research enabled
     const { data: plans } = await supabase
       .from('video_plans')
@@ -518,26 +516,8 @@ export class AutomationService {
     for (const plan of plans) {
       try {
         const planTimezone = plan.timezone || 'UTC'
-        const dateFormatter = new Intl.DateTimeFormat('en-CA', {
-          timeZone: planTimezone,
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-        })
-        const hourFormatter = new Intl.DateTimeFormat('en-US', {
-          timeZone: planTimezone,
-          hour: '2-digit',
-          hour12: false,
-        })
-        const minuteFormatter = new Intl.DateTimeFormat('en-US', {
-          timeZone: planTimezone,
-          minute: '2-digit',
-          hour12: false,
-        })
-
-        const today = dateFormatter.format(now)
-        const currentHour = parseInt(hourFormatter.format(now), 10)
-        const currentMinute = parseInt(minuteFormatter.format(now), 10)
+        const nowInPlanTz = DateTime.now().setZone(planTimezone)
+        const today = nowInPlanTz.toFormat('yyyy-MM-dd')
 
         // Check if trigger time has passed
         if (plan.trigger_time) {
@@ -546,7 +526,7 @@ export class AutomationService {
           const triggerMinute = parseInt(triggerMinuteStr || '0', 10)
 
           const triggerMinutes = triggerHour * 60 + triggerMinute
-          const currentMinutes = currentHour * 60 + currentMinute
+          const currentMinutes = nowInPlanTz.hour * 60 + nowInPlanTz.minute
 
           // Only process if trigger time has passed
           if (currentMinutes < triggerMinutes) {
@@ -593,8 +573,6 @@ export class AutomationService {
    * Only processes today's items after trigger time
    */
   static async generateScriptsForReadyItems(): Promise<void> {
-    const now = new Date()
-
     // Get all enabled plans with trigger times
     const { data: plans } = await supabase
       .from('video_plans')
@@ -609,26 +587,8 @@ export class AutomationService {
     for (const plan of plans) {
       try {
         const planTimezone = plan.timezone || 'UTC'
-        const dateFormatter = new Intl.DateTimeFormat('en-CA', {
-          timeZone: planTimezone,
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-        })
-        const hourFormatter = new Intl.DateTimeFormat('en-US', {
-          timeZone: planTimezone,
-          hour: '2-digit',
-          hour12: false,
-        })
-        const minuteFormatter = new Intl.DateTimeFormat('en-US', {
-          timeZone: planTimezone,
-          minute: '2-digit',
-          hour12: false,
-        })
-
-        const today = dateFormatter.format(now)
-        const currentHour = parseInt(hourFormatter.format(now), 10)
-        const currentMinute = parseInt(minuteFormatter.format(now), 10)
+        const nowInPlanTz = DateTime.now().setZone(planTimezone)
+        const today = nowInPlanTz.toFormat('yyyy-MM-dd')
 
         // Check if trigger time has passed
         if (plan.trigger_time) {
@@ -637,7 +597,7 @@ export class AutomationService {
           const triggerMinute = parseInt(triggerMinuteStr || '0', 10)
 
           const triggerMinutes = triggerHour * 60 + triggerMinute
-          const currentMinutes = currentHour * 60 + currentMinute
+          const currentMinutes = nowInPlanTz.hour * 60 + nowInPlanTz.minute
 
           // Only process if trigger time has passed
           if (currentMinutes < triggerMinutes) {
@@ -742,8 +702,6 @@ export class AutomationService {
    * Only processes today's items after trigger time
    */
   static async generateVideosForApprovedItems(): Promise<void> {
-    const now = new Date()
-
     // Get all enabled plans with trigger times and auto_create enabled
     const { data: plans } = await supabase
       .from('video_plans')
@@ -759,26 +717,8 @@ export class AutomationService {
     for (const plan of plans) {
       try {
         const planTimezone = plan.timezone || 'UTC'
-        const dateFormatter = new Intl.DateTimeFormat('en-CA', {
-          timeZone: planTimezone,
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-        })
-        const hourFormatter = new Intl.DateTimeFormat('en-US', {
-          timeZone: planTimezone,
-          hour: '2-digit',
-          hour12: false,
-        })
-        const minuteFormatter = new Intl.DateTimeFormat('en-US', {
-          timeZone: planTimezone,
-          minute: '2-digit',
-          hour12: false,
-        })
-
-        const today = dateFormatter.format(now)
-        const currentHour = parseInt(hourFormatter.format(now), 10)
-        const currentMinute = parseInt(minuteFormatter.format(now), 10)
+        const nowInPlanTz = DateTime.now().setZone(planTimezone)
+        const today = nowInPlanTz.toFormat('yyyy-MM-dd')
 
         // Check if trigger time has passed
         if (plan.trigger_time) {
@@ -787,7 +727,7 @@ export class AutomationService {
           const triggerMinute = parseInt(triggerMinuteStr || '0', 10)
 
           const triggerMinutes = triggerHour * 60 + triggerMinute
-          const currentMinutes = currentHour * 60 + currentMinute
+          const currentMinutes = nowInPlanTz.hour * 60 + nowInPlanTz.minute
 
           // Only process if trigger time has passed
           if (currentMinutes < triggerMinutes) {

@@ -15,19 +15,17 @@ RUN npm config set fetch-retries 5 && \
 COPY frontend/ ./frontend/
 
 # Build frontend with environment variables
-# These need to be set as build args in Railway (or use defaults for build)
-ARG VITE_SUPABASE_URL=${VITE_SUPABASE_URL:-https://okgerovytptsrylpweqo.supabase.co}
-ARG VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY:-}
-ARG VITE_API_URL=${VITE_API_URL:-}
-
-# Set as ENV so Vite can access them during build
-ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
-ENV VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
-ENV VITE_API_URL=${VITE_API_URL}
+# These need to be set as build args in Railway
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_API_URL
 
 # Build frontend
-RUN echo "Building frontend with VITE_SUPABASE_URL=${VITE_SUPABASE_URL}" && \
+RUN echo "Building frontend..." && \
     cd frontend && \
+    VITE_SUPABASE_URL=${VITE_SUPABASE_URL} \
+    VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY} \
+    VITE_API_URL=${VITE_API_URL} \
     npm run build && \
     echo "Frontend build complete"
 
