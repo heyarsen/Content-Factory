@@ -4,6 +4,7 @@ import { ResearchService } from './researchService.js'
 import { ScriptService } from './scriptService.js'
 import { VideoService } from './videoService.js'
 import { postVideo } from '../lib/uploadpost.js'
+import { DateTime } from 'luxon'
 
 export class AutomationService {
   /**
@@ -24,27 +25,8 @@ export class AutomationService {
     for (const plan of plans) {
       try {
         const planTimezone = plan.timezone || 'UTC'
-
-        const hourFormatter = new Intl.DateTimeFormat('en-US', {
-          timeZone: planTimezone,
-          hour: '2-digit',
-          hour12: false,
-        })
-        const minuteFormatter = new Intl.DateTimeFormat('en-US', {
-          timeZone: planTimezone,
-          minute: '2-digit',
-          hour12: false,
-        })
-        const dateFormatter = new Intl.DateTimeFormat('en-CA', {
-          timeZone: planTimezone,
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-        })
-
-        const currentHour = parseInt(hourFormatter.format(now), 10)
-        const currentMinute = parseInt(minuteFormatter.format(now), 10)
-        const today = dateFormatter.format(now)
+        const nowInPlanTz = DateTime.now().setZone(planTimezone)
+        const today = nowInPlanTz.toFormat('yyyy-MM-dd')
 
         let shouldProcessPlan = plan.auto_schedule_trigger !== 'daily'
 
@@ -55,7 +37,7 @@ export class AutomationService {
           const triggerMinute = parseInt(triggerMinuteStr || '0', 10)
 
           const triggerMinutes = triggerHour * 60 + triggerMinute
-          const currentMinutes = currentHour * 60 + currentMinute
+          const currentMinutes = nowInPlanTz.hour * 60 + nowInPlanTz.minute
 
           // Process if we're at or past the trigger time (within 5 minutes window)
           // This ensures we catch the trigger time exactly when cron runs
@@ -1263,46 +1245,25 @@ export class AutomationService {
           if (!posts || posts.length === 0) {
             // No posts found - item should be available for posting
             // Check if it's time to post
-            const now = new Date()
             const planTimezone = (item.plan as any).timezone || 'UTC'
-
-            const dateFormatter = new Intl.DateTimeFormat('en-CA', {
-              timeZone: planTimezone,
-              year: 'numeric',
-              month: '2-digit',
-              day: '2-digit',
-            })
-            const hourFormatter = new Intl.DateTimeFormat('en-US', {
-              timeZone: planTimezone,
-              hour: '2-digit',
-              hour12: false,
-            })
-            const minuteFormatter = new Intl.DateTimeFormat('en-US', {
-              timeZone: planTimezone,
-              minute: '2-digit',
-              hour12: false,
-            })
-
-            const today = dateFormatter.format(now)
-            const currentHour = parseInt(hourFormatter.format(now), 10)
-            const currentMinute = parseInt(minuteFormatter.format(now), 10)
+            const now = DateTime.now().setZone(planTimezone)
+            const today = now.toFormat('yyyy-MM-dd')
 
             if (item.scheduled_date && item.scheduled_time) {
-              const [postHours, postMinutes] = item.scheduled_time.split(':')
-              const postHour = parseInt(postHours, 10)
-              const postMinute = parseInt(postMinutes || '0', 10)
+              const [hour, minute] = item.scheduled_time.split(':').map(Number)
+              const scheduledDateTime = DateTime.fromFormat(
+                `${item.scheduled_date} ${item.scheduled_time}`,
+                item.scheduled_time.split(':').length === 3 ? 'yyyy-MM-dd HH:mm:ss' : 'yyyy-MM-dd HH:mm',
+                { zone: planTimezone }
+              )
 
-              const postMinutesTotal = postHour * 60 + postMinute
-              const currentMinutesTotal = currentHour * 60 + currentMinute
-              const timeDiffMinutes = (item.scheduled_date === today)
-                ? (postMinutesTotal - currentMinutesTotal)
-                : (item.scheduled_date < today ? -999999 : 999999)
+              const timeDiffMinutes = scheduledDateTime.diff(now, 'minutes').minutes
+
+              console.log(`[Distribution] Item ${item.id} - Plan Timezone: ${planTimezone}, Current Time (in plan tz): ${now.toFormat('yyyy-MM-dd HH:mm')}, Scheduled: ${item.scheduled_date} ${item.scheduled_time} (checking status flow), timeDiff: ${Math.round(timeDiffMinutes)}min`)
 
               // If scheduled time has passed, this item should be processed for posting
-              // Reset scheduled_post_id so it can be picked up
               if (timeDiffMinutes <= 1 && item.scheduled_date <= today) {
                 console.log(`[Distribution] Item ${item.id} has no posts but scheduled time passed, will be processed for posting`)
-                // Don't reset here - let it be processed in the next section
               }
             }
             continue
@@ -1407,41 +1368,19 @@ export class AutomationService {
 
             // Update item status to 'scheduled' if it has pending posts and scheduled time is in future
             if (item.status === 'completed' && item.scheduled_date && item.scheduled_time) {
-              const now = new Date()
               const planTimezone = (item.plan as any).timezone || 'UTC'
+              const now = DateTime.now().setZone(planTimezone)
+              const today = now.toFormat('yyyy-MM-dd')
 
-              const dateFormatter = new Intl.DateTimeFormat('en-CA', {
-                timeZone: planTimezone,
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-              })
-              const hourFormatter = new Intl.DateTimeFormat('en-US', {
-                timeZone: planTimezone,
-                hour: '2-digit',
-                hour12: false,
-              })
-              const minuteFormatter = new Intl.DateTimeFormat('en-US', {
-                timeZone: planTimezone,
-                minute: '2-digit',
-                hour12: false,
-              })
+              const scheduledDateTime = DateTime.fromFormat(
+                `${item.scheduled_date} ${item.scheduled_time}`,
+                item.scheduled_time.split(':').length === 3 ? 'yyyy-MM-dd HH:mm:ss' : 'yyyy-MM-dd HH:mm',
+                { zone: planTimezone }
+              )
 
-              const today = dateFormatter.format(now)
-              const currentHour = parseInt(hourFormatter.format(now), 10)
-              const currentMinute = parseInt(minuteFormatter.format(now), 10)
+              const timeDiffMinutes = scheduledDateTime.diff(now, 'minutes').minutes
 
-              console.log(`[Distribution] Item ${item.id} - Plan Timezone: ${planTimezone}, Current Time (in plan tz): ${today} ${currentHour}:${currentMinute.toString().padStart(2, '0')}, Scheduled: ${item.scheduled_date} ${item.scheduled_time} (checking status flow)`)
-
-              const [postHours, postMinutes] = item.scheduled_time.split(':')
-              const postHour = parseInt(postHours, 10)
-              const postMinute = parseInt(postMinutes || '0', 10)
-
-              const postMinutesTotal = postHour * 60 + postMinute
-              const currentMinutesTotal = currentHour * 60 + currentMinute
-              const timeDiffMinutes = (item.scheduled_date === today)
-                ? (postMinutesTotal - currentMinutesTotal)
-                : (item.scheduled_date < today ? -999999 : 999999)
+              console.log(`[Distribution] Item ${item.id} - Plan Timezone: ${planTimezone}, Current Time (in plan tz): ${now.toFormat('yyyy-MM-dd HH:mm')}, Scheduled: ${item.scheduled_date} ${item.scheduled_time} (checking status flow), timeDiff: ${Math.round(timeDiffMinutes)}min`)
 
               // If scheduled time is in the future and we have scheduled posts, update status to 'scheduled'
               if (timeDiffMinutes > 1 && item.scheduled_date >= today) {
@@ -1654,51 +1593,21 @@ export class AutomationService {
         // Build scheduled time - use scheduled_date and scheduled_time
         // Post at the exact scheduled_time (post time, e.g., 17:00)
         let scheduledTime: string | undefined
-        const now = new Date()
         const planTimezone = (plan as any).timezone || 'UTC'
+        const now = DateTime.now().setZone(planTimezone)
+        const today = now.toFormat('yyyy-MM-dd')
 
-        // Get current time in plan's timezone
-        const hourFormatter = new Intl.DateTimeFormat('en-US', {
-          timeZone: planTimezone,
-          hour: '2-digit',
-          hour12: false,
-        })
-        const minuteFormatter = new Intl.DateTimeFormat('en-US', {
-          timeZone: planTimezone,
-          minute: '2-digit',
-          hour12: false,
-        })
-        const dateFormatter = new Intl.DateTimeFormat('en-CA', {
-          timeZone: planTimezone,
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-        })
-
-        const currentHour = parseInt(hourFormatter.format(now), 10)
-        const currentMinute = parseInt(minuteFormatter.format(now), 10)
-        const today = dateFormatter.format(now)
-
-        console.log(`[Distribution] Item ${item.id} - Plan Timezone: ${planTimezone}, Current Time (in plan tz): ${today} ${currentHour}:${currentMinute.toString().padStart(2, '0')}, Scheduled: ${item.scheduled_date} ${item.scheduled_time} (posting flow)`)
+        console.log(`[Distribution] Item ${item.id} - Plan Timezone: ${planTimezone}, Current Time (in plan tz): ${now.toFormat('yyyy-MM-dd HH:mm')}, Scheduled: ${item.scheduled_date} ${item.scheduled_time} (posting flow)`)
 
         if (item.scheduled_date && item.scheduled_time) {
-          // scheduled_time is the post time (e.g., 17:00)
-          const [postHours, postMinutes] = item.scheduled_time.split(':')
-          const postHour = parseInt(postHours, 10)
-          const postMinute = parseInt(postMinutes || '0', 10)
+          const scheduledDateTime = DateTime.fromFormat(
+            `${item.scheduled_date} ${item.scheduled_time}`,
+            item.scheduled_time.split(':').length === 3 ? 'yyyy-MM-dd HH:mm:ss' : 'yyyy-MM-dd HH:mm',
+            { zone: planTimezone }
+          )
 
-          const postMinutesTotal = postHour * 60 + postMinute
-          const currentMinutesTotal = currentHour * 60 + currentMinute
-
-          // Check if scheduled date is today or in the past
-          const scheduledDate = new Date(item.scheduled_date + 'T00:00:00')
-          const todayDate = new Date(today + 'T00:00:00')
-          const isScheduledDateTodayOrPast = scheduledDate <= todayDate
-
-          // Calculate time difference in minutes
-          const timeDiffMinutes = (item.scheduled_date === today)
-            ? (postMinutesTotal - currentMinutesTotal)
-            : (item.scheduled_date < today ? -999999 : 999999) // Past date = negative, future date = positive
+          const timeDiffMinutes = scheduledDateTime.diff(now, 'minutes').minutes
+          const isScheduledDateTodayOrPast = scheduledDateTime.startOf('day') <= now.startOf('day')
 
           // Check if it's time to post (within 1 minute window for cron timing)
           if (isScheduledDateTodayOrPast && timeDiffMinutes <= 1) {
@@ -1710,7 +1619,7 @@ export class AutomationService {
             // We don't send to API yet because we use local scheduler for precision/timezone handling
 
             // Log once every hour or if status is not yet 'scheduled'
-            const shouldLog = item.status !== 'scheduled' || currentMinute === 0
+            const shouldLog = item.status !== 'scheduled' || now.minute === 0
             if (shouldLog) {
               console.log(`[Distribution] Item ${item.id} scheduled for future (${item.scheduled_date} ${item.scheduled_time}), waiting for trigger time...`)
             }
@@ -1726,7 +1635,7 @@ export class AutomationService {
             continue
           } else {
             // Not time yet, skip this item (will be processed when time matches)
-            console.log(`[Distribution] Skipping item ${item.id} - scheduled time (${item.scheduled_time}) not reached yet (current: ${currentHour}:${currentMinute.toString().padStart(2, '0')}, scheduled: ${postHour}:${postMinute.toString().padStart(2, '0')})`)
+            console.log(`[Distribution] Skipping item ${item.id} - scheduled time (${item.scheduled_time}) not reached yet (current: ${now.toFormat('HH:mm')}, scheduled: ${item.scheduled_time})`)
             continue
           }
         } else {
@@ -2319,68 +2228,27 @@ export class AutomationService {
         try {
           const plan = item.plan as any
           const planTimezone = plan?.timezone || 'UTC'
-          const [year, month, day] = item.scheduled_date.split('-').map(Number)
-          const [hours, minutes, seconds = 0] = timeStr.split(':').map(Number)
 
-          const planFormatter = new Intl.DateTimeFormat('en-US', {
-            timeZone: planTimezone,
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false,
-          })
+          // Use Luxon for robust timezone conversion
+          const scheduledDateTime = DateTime.fromFormat(
+            `${item.scheduled_date} ${timeStr}`,
+            timeStr.split(':').length === 3 ? 'yyyy-MM-dd HH:mm:ss' : 'yyyy-MM-dd HH:mm',
+            { zone: planTimezone }
+          )
 
-          // Start with UTC date at target time
-          let candidateUtcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds))
-
-          // Check what this UTC time represents in plan timezone
-          let parts = planFormatter.formatToParts(candidateUtcDate)
-          let planHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0')
-          let planMinute = parseInt(parts.find(p => p.type === 'minute')?.value || '0')
-
-          // Calculate difference in minutes
-          const targetMinutes = hours * 60 + minutes
-          const planMinutes = planHour * 60 + planMinute
-          const diffMinutes = targetMinutes - planMinutes
-
-          // Adjust UTC date
-          candidateUtcDate = new Date(candidateUtcDate.getTime() - diffMinutes * 60 * 1000)
-
-          // Verify
-          parts = planFormatter.formatToParts(candidateUtcDate)
-          planHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0')
-          planMinute = parseInt(parts.find(p => p.type === 'minute')?.value || '0')
-
-          if (planHour !== hours || planMinute !== minutes) {
-            const finalTargetMinutes = hours * 60 + minutes
-            const finalPlanMinutes = planHour * 60 + planMinute
-            const finalDiffMinutes = finalTargetMinutes - finalPlanMinutes
-            candidateUtcDate = new Date(candidateUtcDate.getTime() - finalDiffMinutes * 60 * 1000)
-
-            parts = planFormatter.formatToParts(candidateUtcDate)
-            planHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0')
-            planMinute = parseInt(parts.find(p => p.type === 'minute')?.value || '0')
+          if (!scheduledDateTime.isValid) {
+            throw new Error(`Invalid date/time: ${scheduledDateTime.invalidReason}`)
           }
 
-          scheduledTime = candidateUtcDate.toISOString()
+          scheduledTime = scheduledDateTime.toUTC().toISO() || undefined
 
-          // Log for debugging
-          const utcParts = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'UTC',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-          }).formatToParts(candidateUtcDate)
-          const utcHour = parseInt(utcParts.find(p => p.type === 'hour')?.value || '0')
-          const utcMinute = parseInt(utcParts.find(p => p.type === 'minute')?.value || '0')
+          // Verify by converting back to plan timezone for logging
+          const backToPlanTime = scheduledDateTime.setZone(planTimezone)
 
-          console.log(`[Distribution] Manual schedule: ${item.scheduled_date} ${item.scheduled_time} (${planTimezone}) -> ${scheduledTime} (UTC ${utcHour}:${String(utcMinute).padStart(2, '0')}), verified: ${planHour}:${String(planMinute).padStart(2, '0')}`)
+          console.log(`[Distribution] Manual schedule: ${item.scheduled_date} ${item.scheduled_time} (${planTimezone}) -> ${scheduledTime} (UTC), verified back to plan tz: ${backToPlanTime.toFormat('HH:mm')}`)
         } catch (e: any) {
           console.error(`[Distribution] Error converting scheduled time:`, e.message, e.stack)
-          // Fallback to UTC
+          // Fallback to simpler format if possible, but Luxon should handle it
           scheduledTime = `${item.scheduled_date}T${timeStr}.000Z`
         }
       }
