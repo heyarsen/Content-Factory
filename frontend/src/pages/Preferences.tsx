@@ -5,7 +5,7 @@ import { Button } from '../components/ui/Button'
 import { Select } from '../components/ui/Select'
 import { Badge } from '../components/ui/Badge'
 import { useToast } from '../hooks/useToast'
-import { Settings, Globe, Bell, Sparkles, Share2, Instagram, Youtube, Facebook, Users } from 'lucide-react'
+import { Settings, Globe, Bell, Share2, Instagram, Youtube, Facebook, Users } from 'lucide-react'
 import api from '../lib/api'
 import { timezones } from '../lib/timezones'
 

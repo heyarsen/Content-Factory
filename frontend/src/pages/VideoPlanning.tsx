@@ -26,7 +26,7 @@ import {
   Trash2,
   FileText,
   ExternalLink,
-
+  Video,
 } from 'lucide-react'
 import api from '../lib/api'
 import { timezones } from '../lib/timezones'
@@ -144,7 +144,6 @@ export function VideoPlanning() {
     new Date().toISOString().split('T')[0],
   )
   const [endDate, setEndDate] = useState('')
-  const [autoResearch, setAutoResearch] = useState(true)
   const [autoScheduleTrigger, setAutoScheduleTrigger] = useState<
     'daily' | 'time_based' | 'manual'
   >('daily')
@@ -155,8 +154,6 @@ export function VideoPlanning() {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
   })
   const [defaultPlatforms, setDefaultPlatforms] = useState<string[]>([])
-  const [autoApprove, setAutoApprove] = useState(true)
-  const [autoCreate, setAutoCreate] = useState(true)
   const [timezone, setTimezone] = useState(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone,
   )
@@ -252,7 +249,6 @@ export function VideoPlanning() {
   }, [selectedPlan])
 
   useEffect(() => {
-    setSelectedItemIds([])
     setSelectedItem(null)
     setIsDetailDrawerOpen(false)
   }, [selectedPlan?.id])
@@ -537,8 +533,6 @@ export function VideoPlanning() {
       setAutoScheduleTrigger('daily')
       setTriggerTime('09:00')
       setDefaultPlatforms([])
-      setAutoApprove(false)
-      setAutoCreate(false)
       setVideoTimes(['09:00', '14:00', '19:00'])
       setVideoTopics(['', '', ''])
     } catch (error: any) {
@@ -603,14 +597,11 @@ export function VideoPlanning() {
     setVideosPerDay(plan.videos_per_day)
     setStartDate(plan.start_date.split('T')[0])
     setEndDate(plan.end_date ? plan.end_date.split('T')[0] : '')
-    setAutoResearch(plan.auto_research)
     setAutoScheduleTrigger(plan.auto_schedule_trigger || 'daily')
     setTriggerTime(
       plan.trigger_time ? plan.trigger_time.substring(0, 5) : '09:00',
     )
     setDefaultPlatforms(plan.default_platforms || [])
-    setAutoApprove(true)
-    setAutoCreate(true)
     setTimezone(plan.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone)
     // Load existing video times and topics from plan items if needed
     // For now, use defaults
@@ -653,8 +644,6 @@ export function VideoPlanning() {
       setAutoScheduleTrigger('daily')
       setTriggerTime('09:00')
       setDefaultPlatforms([])
-      setAutoApprove(false)
-      setAutoCreate(false)
       setVideoTimes(['09:00', '14:00', '19:00'])
       setVideoTopics(['', '', ''])
     } catch (error: any) {
@@ -938,13 +927,6 @@ export function VideoPlanning() {
     return '_isScheduledPost' in item && (item as any)._isScheduledPost === true
   }
 
-  const toggleItemSelection = (itemId: string) => {
-    setSelectedItemIds((prev) =>
-      prev.includes(itemId)
-        ? prev.filter((id) => id !== itemId)
-        : [...prev, itemId],
-    )
-  }
 
   const openDetailDrawer = (item: VideoPlanItem) => {
     setSelectedItem(item)
@@ -965,37 +947,8 @@ export function VideoPlanning() {
     setSelectedItem(null)
   }
 
-  const clearSelection = () => setSelectedItemIds([])
+  const clearSelection = () => { }
 
-  const runBulkAction = async (
-    action: 'approve' | 'generate' | 'create' | 'set-time',
-  ) => {
-    if (!selectedPlan || selectedItemIds.length === 0) return
-    const actions: Record<
-      typeof action,
-      (id: string) => Promise<void>
-    > = {
-      approve: (id) => api.post(`/api/plans/items/${id}/approve-script`),
-      generate: (id) => api.post(`/api/plans/items/${id}/generate-script`),
-      create: (id) => api.post(`/api/plans/items/${id}/create-video`, { style: 'professional', duration: 30 }),
-      'set-time': (id) =>
-        api.patch(`/api/plans/items/${id}`, {
-          scheduled_time: bulkTime,
-        }),
-    }
-
-    const results = await Promise.allSettled(
-      selectedItemIds.map((id) => actions[action](id)),
-    )
-
-    const failures = results.filter((r) => r.status === 'rejected').length
-    if (failures > 0) {
-      console.warn(`[VideoPlanning] Bulk ${action} had ${failures} failure(s)`)
-    }
-
-    await loadPlanItems(selectedPlan.id)
-    clearSelection()
-  }
 
   const getStatusCounts = () => {
     const scheduledCount = scheduledPosts.filter((p) => p.status === 'pending' || p.status === 'scheduled').length
@@ -2218,8 +2171,8 @@ export function VideoPlanning() {
             setAutoScheduleTrigger('daily')
             setTriggerTime('09:00')
             setDefaultPlatforms([])
-            setAutoApprove(false)
-            setAutoCreate(false)
+            setTriggerTime('09:00')
+            setDefaultPlatforms([])
             setVideoTimes(['09:00', '14:00', '19:00'])
             setVideoTopics(['', '', ''])
           }}
@@ -2360,8 +2313,6 @@ export function VideoPlanning() {
                   setAutoScheduleTrigger('daily')
                   setTriggerTime('09:00')
                   setDefaultPlatforms([])
-                  setAutoApprove(false)
-                  setAutoCreate(false)
                   setVideoTimes(['09:00', '14:00', '19:00'])
                   setVideoTopics(['', '', ''])
 
