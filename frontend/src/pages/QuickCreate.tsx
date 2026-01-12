@@ -46,8 +46,6 @@ export function QuickCreate() {
   // Step 1: Idea
   const [topic, setTopic] = useState('')
   const [description, setDescription] = useState('')
-  const [whyImportant, setWhyImportant] = useState('')
-  const [usefulTips, setUsefulTips] = useState('')
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([])
 
   // Step 2: Script

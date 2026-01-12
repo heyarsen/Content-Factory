@@ -10,7 +10,7 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Modal } from '../components/ui/Modal'
 import { Textarea } from '../components/ui/Textarea'
-import { Video as VideoIcon, Search, Trash2, RefreshCw, Play, Download, Share2 } from 'lucide-react'
+import { Video as VideoIcon, Search, Trash2, RefreshCw, Download, Share2 } from 'lucide-react'
 import { useNotifications } from '../contexts/NotificationContext'
 import {
   listVideos,
