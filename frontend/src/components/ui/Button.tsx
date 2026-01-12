@@ -7,6 +7,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean
   leftIcon?: ReactNode
   rightIcon?: ReactNode
+  className?: string
 }
 
 export function Button({
@@ -22,7 +23,7 @@ export function Button({
 }: ButtonProps) {
   const baseStyles =
     'inline-flex items-center justify-center rounded-2xl font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 active:scale-[0.98]'
-  
+
   const variants = {
     primary:
       'bg-gradient-to-r from-brand-500 via-brand-500 to-brand-600 text-white shadow-[0_18px_35px_-18px_rgba(79,70,229,0.8)] hover:from-brand-500 hover:via-brand-500 hover:to-brand-500 active:scale-[0.99]',
@@ -33,7 +34,7 @@ export function Button({
     ghost:
       'border border-transparent bg-transparent text-slate-500 hover:border-slate-200 hover:bg-white/80 hover:text-primary active:scale-[0.99] shadow-none',
   }
-  
+
   const sizes = {
     sm: 'px-3.5 py-2 text-xs min-h-[44px] min-w-[44px] touch-manipulation',
     md: 'px-5 py-2.5 text-sm min-h-[44px] min-w-[44px] touch-manipulation',

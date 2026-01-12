@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
@@ -264,7 +264,7 @@ export function VideoPlanning() {
   }, [])
 
   // Smart polling for plan items - only poll frequently when items are in progress
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const pollingIntervalRef = useRef<any | null>(null)
   const lastPollTimeRef = useRef<number>(0)
 
   useEffect(() => {
@@ -449,8 +449,8 @@ export function VideoPlanning() {
   }
 
   const handleCreatePlan = async () => {
-    if (!planName || !startDate) {
-      alert('Please fill in plan name and start date')
+    if (!planName || !startDate || !videoTopics.some((t: string) => t.trim() !== '')) {
+      alert('Please fill in plan name, start date, and at least one video topic')
       return
     }
 
@@ -475,7 +475,7 @@ export function VideoPlanning() {
           const cleanTime = time.replace(/:00$/, '')
           return cleanTime.length === 5 ? cleanTime : time
         }), // Send custom times in HH:MM format
-        video_topics: videoTopics, // Send topics for each slot
+        video_topics: videoTopics.filter((t: string) => t.trim() !== ''), // Send only non-empty topics
         // Avatars removed - using Sora for video generation
       })
 
@@ -659,9 +659,9 @@ export function VideoPlanning() {
     setDeleting(true)
     try {
       await api.delete(`/api/plans/${deleteModal}`)
-      setPlans(plans.filter((p) => p.id !== deleteModal))
+      setPlans(plans.filter((p: VideoPlan) => p.id !== deleteModal))
       if (selectedPlan?.id === deleteModal) {
-        const remainingPlans = plans.filter((p) => p.id !== deleteModal)
+        const remainingPlans = plans.filter((p: VideoPlan) => p.id !== deleteModal)
         setSelectedPlan(remainingPlans.length > 0 ? remainingPlans[0] : null)
       }
       setDeleteModal(null)
@@ -741,17 +741,17 @@ export function VideoPlanning() {
         'approved',
         'scheduled',
       ]
-      return planItems.filter((item) => activeStatuses.includes(item.status))
+      return planItems.filter((item: VideoPlanItem) => activeStatuses.includes(item.status))
     }
     if (statusFilter === 'completed') {
       return planItems.filter(
-        (item) => item.status === 'completed' || item.status === 'posted',
+        (item: VideoPlanItem) => item.status === 'completed' || item.status === 'posted',
       )
     }
     if (statusFilter === 'failed') {
-      return planItems.filter((item) => item.status === 'failed')
+      return planItems.filter((item: VideoPlanItem) => item.status === 'failed')
     }
-    return planItems.filter((item) => item.status === statusFilter)
+    return planItems.filter((item: VideoPlanItem) => item.status === statusFilter)
   }, [planItems, statusFilter])
 
   // Filter scheduled posts by status
@@ -759,11 +759,11 @@ export function VideoPlanning() {
     statusFilter === 'all'
       ? scheduledPosts
       : statusFilter === 'scheduled' || statusFilter === 'pending'
-        ? scheduledPosts.filter((p) => p.status === 'pending' || p.status === 'scheduled')
+        ? scheduledPosts.filter((p: ScheduledPost) => p.status === 'pending' || p.status === 'scheduled')
         : statusFilter === 'posted'
-          ? scheduledPosts.filter((p) => p.status === 'posted')
+          ? scheduledPosts.filter((p: ScheduledPost) => p.status === 'posted')
           : statusFilter === 'failed'
-            ? scheduledPosts.filter((p) => p.status === 'failed')
+            ? scheduledPosts.filter((p: ScheduledPost) => p.status === 'failed')
             : []
 
   // Group plan items by date
@@ -793,7 +793,7 @@ export function VideoPlanning() {
   // Use useMemo to avoid recalculating on every render
   const planItemsByDate = useMemo(() => {
     const grouped = filteredItems.reduce(
-      (acc, item) => {
+      (acc: Record<string, VideoPlanItem[]>, item: VideoPlanItem) => {
         // Database returns scheduled_date as YYYY-MM-DD string, use it directly
         const dateKey = normalizeDate(item.scheduled_date)
         if (!dateKey) {
@@ -905,7 +905,7 @@ export function VideoPlanning() {
   }
 
   const navigateMonth = (direction: 'prev' | 'next') => {
-    setCurrentMonth((prev) => {
+    setCurrentMonth((prev: Date) => {
       const newDate = new Date(prev)
       if (direction === 'prev') {
         newDate.setMonth(prev.getMonth() - 1)
@@ -947,21 +947,20 @@ export function VideoPlanning() {
     setSelectedItem(null)
   }
 
-  const clearSelection = () => { }
 
 
   const getStatusCounts = () => {
-    const scheduledCount = scheduledPosts.filter((p) => p.status === 'pending' || p.status === 'scheduled').length
-    const postedCount = scheduledPosts.filter((p) => p.status === 'posted').length
+    const scheduledCount = scheduledPosts.filter((p: ScheduledPost) => p.status === 'pending' || p.status === 'scheduled').length
+    const postedCount = scheduledPosts.filter((p: ScheduledPost) => p.status === 'posted').length
 
     return {
       all: planItems.length + scheduledPosts.length,
-      pending: planItems.filter((i) => i.status === 'pending').length + scheduledCount,
-      ready: planItems.filter((i) => i.status === 'ready').length,
-      completed: planItems.filter((i) => i.status === 'completed').length,
-      scheduled: planItems.filter((i) => i.status === 'scheduled').length + scheduledCount,
-      posted: planItems.filter((i) => i.status === 'posted').length + postedCount,
-      failed: planItems.filter((i) => i.status === 'failed').length + scheduledPosts.filter((p) => p.status === 'failed').length,
+      pending: planItems.filter((i: VideoPlanItem) => i.status === 'pending').length + scheduledCount,
+      ready: planItems.filter((i: VideoPlanItem) => i.status === 'ready').length,
+      completed: planItems.filter((i: VideoPlanItem) => i.status === 'completed').length,
+      scheduled: planItems.filter((i: VideoPlanItem) => i.status === 'scheduled').length + scheduledCount,
+      posted: planItems.filter((i: VideoPlanItem) => i.status === 'posted').length + postedCount,
+      failed: planItems.filter((i: VideoPlanItem) => i.status === 'failed').length + scheduledPosts.filter((p: ScheduledPost) => p.status === 'failed').length,
     }
   }
 
@@ -977,10 +976,10 @@ export function VideoPlanning() {
 
     // Check if there are pending scheduled posts for this item (indicates publishing in progress)
     const itemScheduledPosts = item?.video_id
-      ? scheduledPosts.filter(p => p.video_id === item.video_id)
+      ? scheduledPosts.filter((p: ScheduledPost) => p.video_id === item.video_id)
       : []
-    const hasPendingPosts = itemScheduledPosts.some(p => p.status === 'pending' || p.status === 'scheduled')
-    const allPostsPublished = itemScheduledPosts.length > 0 && itemScheduledPosts.every(p => p.status === 'posted')
+    const hasPendingPosts = itemScheduledPosts.some((p: ScheduledPost) => p.status === 'pending' || p.status === 'scheduled')
+    const allPostsPublished = itemScheduledPosts.length > 0 && itemScheduledPosts.every((p: ScheduledPost) => p.status === 'posted')
 
     // Determine the most descriptive label based on status and script_status
     let label = ''
@@ -1129,7 +1128,7 @@ export function VideoPlanning() {
         {plans.length > 0 && (
           <Card className="p-4">
             <div className="flex flex-wrap gap-2">
-              {plans.map((plan) => (
+              {plans.map((plan: VideoPlan) => (
                 <div key={plan.id} className="flex items-center gap-2">
                   <button
                     onClick={() => setSelectedPlan(plan)}
@@ -2059,7 +2058,6 @@ export function VideoPlanning() {
           isOpen={createModal}
           onClose={() => {
             setCreateModal(false)
-            setCreateStep(1)
 
           }}
           title="Create Video Plan"
@@ -2075,6 +2073,18 @@ export function VideoPlanning() {
               value={planName}
               onChange={(e) => setPlanName(e.target.value)}
               required
+            />
+
+            <Textarea
+              label="Video Topics (What should the videos be about?)"
+              placeholder="e.g., Trading for beginners, Technical analysis, Risk management"
+              value={videoTopics.join('\n')}
+              onChange={(e) => {
+                const topics = e.target.value.split('\n')
+                setVideoTopics(topics)
+              }}
+              required
+              rows={3}
             />
 
             <div className="grid gap-4 md:grid-cols-2">
