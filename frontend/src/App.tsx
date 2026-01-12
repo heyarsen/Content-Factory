@@ -27,6 +27,7 @@ import { VideoPlanning } from './pages/VideoPlanning'
 import { ProfileSettings } from './pages/ProfileSettings'
 import { Preferences } from './pages/Preferences'
 import { Credits } from './pages/Credits'
+import { Avatars } from './pages/Avatars'
 
 function AppContent() {
   const { toasts, removeToast } = useToast()
@@ -40,7 +41,7 @@ function AppContent() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
-        
+
         <Route
           path="/dashboard"
           element={
@@ -169,7 +170,15 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
-        
+        <Route
+          path="/avatars"
+          element={
+            <ProtectedRoute>
+              <Avatars />
+            </ProtectedRoute>
+          }
+        />
+
         <Route path="/" element={<Navigate to="/create" replace />} />
         <Route path="*" element={<Navigate to="/create" replace />} />
       </Routes>
