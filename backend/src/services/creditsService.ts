@@ -25,7 +25,7 @@ export class CreditsService {
       try {
         const { data: newProfile } = await supabase
           .from('user_profiles')
-          .insert({ id: userId, credits: 0 })
+          .insert({ id: userId, credits: 3 })
           .select('credits')
           .single()
         return newProfile?.credits ?? 0
@@ -60,12 +60,12 @@ export class CreditsService {
   static async hasEnoughCredits(userId: string, cost: number): Promise<{ hasSubscription: boolean; hasCredits: boolean; credits: number | null }> {
     const hasSubscription = await this.hasActiveSubscription(userId)
     const credits = await this.getUserCredits(userId)
-    
+
     // NULL means unlimited credits
     if (credits === null) {
       return { hasSubscription, hasCredits: true, credits: null }
     }
-    
+
     return {
       hasSubscription,
       hasCredits: credits >= cost,
@@ -150,25 +150,25 @@ export class CreditsService {
       // Try to create profile if it doesn't exist
       const { data: newProfile } = await supabase
         .from('user_profiles')
-        .insert({ id: userId, credits: 20 })
+        .insert({ id: userId, credits: 3 })
         .select('credits')
         .single()
-      
+
       if (!newProfile) {
         throw new Error('Failed to check credits')
       }
-      
+
       const currentCredits = newProfile.credits
       // NULL means unlimited, so no deduction needed
       if (currentCredits === null) {
         console.log(`[Credits] User ${userId} has unlimited credits, skipping deduction for ${operation}`)
         return null
       }
-      
+
       if (currentCredits < cost) {
         throw new Error(`Insufficient credits. You have ${currentCredits} credits but need ${cost} credits for ${operation}.`)
       }
-      
+
       const newCredits = currentCredits - cost
       const { data, error } = await supabase
         .from('user_profiles')
@@ -176,12 +176,12 @@ export class CreditsService {
         .eq('id', userId)
         .select('credits')
         .single()
-      
+
       if (error) {
         console.error('[Credits] Error deducting credits:', error)
         throw new Error('Failed to deduct credits')
       }
-      
+
       // Log transaction
       await this.createTransaction(
         userId,
@@ -192,7 +192,7 @@ export class CreditsService {
         operation,
         `Deducted ${cost} credits for ${operation}`
       )
-      
+
       console.log(`[Credits] Deducted ${cost} credits from user ${userId} for ${operation}. New balance: ${newCredits}`)
       return data.credits
     }
@@ -262,31 +262,31 @@ export class CreditsService {
         .insert({ id: userId, credits: 0 })
         .select('credits')
         .single()
-      
+
       if (!newProfile) {
         throw new Error('Failed to check credits')
       }
-      
+
       const currentCredits = newProfile.credits
       // If unlimited, stay unlimited
       if (currentCredits === null) {
         return null
       }
-      
+
       const newCredits = (currentCredits ?? 0) + amount
-      
+
       const { data, error } = await supabase
         .from('user_profiles')
         .update({ credits: newCredits, updated_at: new Date().toISOString() })
         .eq('id', userId)
         .select('credits')
         .single()
-      
+
       if (error) {
         console.error('[Credits] Error adding credits:', error)
         throw new Error('Failed to add credits')
       }
-      
+
       // Log transaction (unless skipped)
       if (!skipTransactionLog) {
         await this.createTransaction(
@@ -299,7 +299,7 @@ export class CreditsService {
           reason || `Added ${amount} credits`
         )
       }
-      
+
       console.log(`[Credits] Added ${amount} credits to user ${userId}${reason ? ` (${reason})` : ''}. New balance: ${newCredits}`)
       return data.credits
     }
@@ -309,8 +309,8 @@ export class CreditsService {
     if (currentCredits === null) {
       return null
     }
-    
-    const newCredits = (currentCredits ?? 20) + amount
+
+    const newCredits = (currentCredits ?? 3) + amount
 
     const { data, error } = await supabase
       .from('user_profiles')
@@ -348,11 +348,11 @@ export class CreditsService {
    */
   static async checkAndDeduct(userId: string, cost: number, operation: string): Promise<number | null> {
     const checkResult = await this.hasEnoughCredits(userId, cost)
-    
+
     if (!checkResult.hasSubscription) {
       throw new Error('You need an active subscription to use this feature. Please purchase a subscription plan.')
     }
-    
+
     if (!checkResult.hasCredits) {
       const creditsDisplay = checkResult.credits === null ? 'unlimited' : checkResult.credits.toString()
       throw new Error(`Insufficient credits. You have ${creditsDisplay} credits but need ${cost} credits for ${operation}. You can top up credits or choose a different subscription plan.`)

@@ -397,10 +397,10 @@ export function Videos() {
                         variant="ghost"
                         size="sm"
                         className="border border-white/60 bg-white/70 text-brand-600 hover:border-brand-200 hover:bg-white"
-                        onClick={() => window.open(video.video_url!, '_blank')}
+                        onClick={() => window.location.href = `/posts?create_for=${video.id}`}
                       >
-                        <Play className="mr-2 h-4 w-4" />
-                        Preview
+                        <Share2 className="mr-2 h-4 w-4" />
+                        Post
                       </Button>
                       <Button
                         variant="ghost"
@@ -484,11 +484,11 @@ export function Videos() {
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => window.open(selectedVideo.video_url!, '_blank')}
-                        leftIcon={<Play className="h-4 w-4" />}
+                        onClick={() => window.location.href = `/posts?create_for=${selectedVideo.id}`}
+                        leftIcon={<Share2 className="h-4 w-4" />}
                         className="w-full justify-center"
                       >
-                        Preview
+                        Post
                       </Button>
                       <Button
                         variant="secondary"

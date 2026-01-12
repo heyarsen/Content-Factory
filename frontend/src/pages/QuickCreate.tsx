@@ -174,7 +174,14 @@ export function QuickCreate() {
   const loadSocialAccounts = async () => {
     try {
       const response = await api.get('/api/social/accounts')
-      setSocialAccounts(response.data.accounts || [])
+      const accounts = response.data.accounts || []
+      setSocialAccounts(accounts)
+
+      // Auto-select connected platforms by default
+      const connected = accounts
+        .filter((acc: SocialAccount) => acc.status === 'connected')
+        .map((acc: SocialAccount) => acc.platform)
+      setSelectedPlatforms(connected)
     } catch (error) {
       console.error('Failed to load social accounts:', error)
     }
@@ -194,8 +201,6 @@ export function QuickCreate() {
         category: 'general', // Default category
         topic,
         description: description || undefined,
-        whyImportant: whyImportant || undefined,
-        usefulTips: usefulTips || undefined,
       })
 
       setGeneratedScript(response.data.script)
@@ -473,21 +478,6 @@ export function QuickCreate() {
                 onChange={(e) => setDescription(e.target.value)}
               />
 
-              <Textarea
-                label="Why is this important? (optional)"
-                placeholder="Why should viewers care about this topic?"
-                rows={3}
-                value={whyImportant}
-                onChange={(e) => setWhyImportant(e.target.value)}
-              />
-
-              <Textarea
-                label="Useful tips (optional)"
-                placeholder="Any key points or tips to include?"
-                rows={3}
-                value={usefulTips}
-                onChange={(e) => setUsefulTips(e.target.value)}
-              />
 
               <div className="flex justify-end gap-3 pt-4">
                 <Button
