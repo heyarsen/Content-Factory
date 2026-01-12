@@ -139,7 +139,6 @@ export function VideoPlanning() {
 
   // Create plan form
   const [planName, setPlanName] = useState('')
-  const [videosPerDay, setVideosPerDay] = useState(3)
   const [startDate, setStartDate] = useState(
     new Date().toISOString().split('T')[0],
   )
@@ -157,12 +156,8 @@ export function VideoPlanning() {
   const [timezone, setTimezone] = useState(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone,
   )
-  const [videoTimes, setVideoTimes] = useState<string[]>([
-    '09:00',
-    '14:00',
-    '19:00',
-  ]) // Default times for 3 videos
-  const [videoTopics, setVideoTopics] = useState<string[]>(['', '', '']) // Topics for each video slot
+  const [videoTimes, setVideoTimes] = useState<string[]>(['09:00']) // Initial video slot
+  const [videoTopics, setVideoTopics] = useState<string[]>(['']) // Topics for each video slot
   // Avatar-related state removed - using Sora for video generation
   const [deleteModal, setDeleteModal] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -193,16 +188,6 @@ export function VideoPlanning() {
 
   // Avatar-related functions removed - using Sora for video generation
 
-  // Update videoTimes and videoTopics when videosPerDay changes
-  useEffect(() => {
-    const defaultTimes = ['09:00', '14:00', '19:00', '10:00', '11:00']
-    if (videoTimes.length !== videosPerDay) {
-      // If we need more times, add defaults. If fewer, keep first N.
-      setVideoTimes(defaultTimes.slice(0, videosPerDay))
-      setVideoTopics(Array(videosPerDay).fill(''))
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videosPerDay])
 
   // Available platforms
   const availablePlatforms = ['instagram', 'youtube', 'tiktok', 'twitter']
@@ -448,6 +433,31 @@ export function VideoPlanning() {
     }
   }
 
+  const addVideoSlot = () => {
+    setVideoTimes([...videoTimes, '12:00'])
+    setVideoTopics([...videoTopics, ''])
+  }
+
+  const removeVideoSlot = (index: number) => {
+    if (videoTimes.length <= 1) return
+    const newTimes = videoTimes.filter((_: any, i: number) => i !== index)
+    const newTopics = videoTopics.filter((_: any, i: number) => i !== index)
+    setVideoTimes(newTimes)
+    setVideoTopics(newTopics)
+  }
+
+  const updateVideoSlotTime = (index: number, time: string) => {
+    const newTimes = [...videoTimes]
+    newTimes[index] = time
+    setVideoTimes(newTimes)
+  }
+
+  const updateVideoSlotTopic = (index: number, topic: string) => {
+    const newTopics = [...videoTopics]
+    newTopics[index] = topic
+    setVideoTopics(newTopics)
+  }
+
   const handleCreatePlan = async () => {
     if (!planName || !startDate || !videoTopics.some((t: string) => t.trim() !== '')) {
       alert('Please fill in plan name, start date, and at least one video topic')
@@ -458,7 +468,7 @@ export function VideoPlanning() {
     try {
       const response = await api.post('/api/plans', {
         name: planName,
-        videos_per_day: videosPerDay,
+        videos_per_day: videoTimes.length,
         start_date: startDate,
         end_date: endDate || null,
         auto_research: true,
@@ -619,7 +629,7 @@ export function VideoPlanning() {
     try {
       await api.patch(`/api/plans/${editPlanModal.id}`, {
         name: planName,
-        videos_per_day: videosPerDay,
+        videos_per_day: videoTimes.length,
         start_date: startDate,
         end_date: endDate || null,
         auto_research: true,
@@ -2075,24 +2085,12 @@ export function VideoPlanning() {
               required
             />
 
-            <Textarea
-              label="Video Topics (What should the videos be about?)"
-              placeholder="e.g., Trading for beginners, Technical analysis, Risk management"
-              value={videoTopics.join('\n')}
-              onChange={(e) => {
-                const topics = e.target.value.split('\n')
-                setVideoTopics(topics)
-              }}
-              required
-              rows={3}
-            />
-
             <div className="grid gap-4 md:grid-cols-2">
               <Input
                 label="Start Date"
                 type="date"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(e: any) => setStartDate(e.target.value)}
                 required
               />
 
@@ -2100,23 +2098,59 @@ export function VideoPlanning() {
                 label="End Date (optional)"
                 type="date"
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                onChange={(e: any) => setEndDate(e.target.value)}
                 min={startDate}
               />
             </div>
 
-            <Select
-              label="Videos Per Day"
-              value={videosPerDay.toString()}
-              onChange={(e) => setVideosPerDay(parseInt(e.target.value))}
-              options={[
-                { value: '1', label: '1 video per day' },
-                { value: '2', label: '2 videos per day' },
-                { value: '3', label: '3 videos per day' },
-                { value: '4', label: '4 videos per day' },
-                { value: '5', label: '5 videos per day' },
-              ]}
-            />
+            <div className="space-y-4">
+              <label className="block text-sm font-medium text-slate-700">
+                Videos & Topics
+              </label>
+              <div className="space-y-3">
+                {videoTimes.map((time: string, index: number) => (
+                  <div key={index} className="relative space-y-2 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                    {videoTimes.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeVideoSlot(index)}
+                        className="absolute right-2 top-2 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-red-500"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                    <div className="flex items-center gap-3">
+                      <div className="flex-shrink-0 text-xs font-bold text-slate-400">
+                        #{index + 1}
+                      </div>
+                      <Input
+                        type="time"
+                        value={time}
+                        onChange={(e: any) => updateVideoSlotTime(index, e.target.value)}
+                        className="w-32"
+                      />
+                    </div>
+                    <Textarea
+                      placeholder={`Topic for video #${index + 1}`}
+                      value={videoTopics[index]}
+                      onChange={(e: any) => updateVideoSlotTopic(index, e.target.value)}
+                      rows={2}
+                      required
+                    />
+                  </div>
+                ))}
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={addVideoSlot}
+                className="w-full border-dashed"
+                leftIcon={<Plus size={16} />}
+              >
+                Add Another Video
+              </Button>
+            </div>
 
             <Select
               label="Plan Timezone"
@@ -2175,16 +2209,13 @@ export function VideoPlanning() {
             setEditPlanModal(null)
             // Reset form
             setPlanName('')
-            setVideosPerDay(3)
             setStartDate(new Date().toISOString().split('T')[0])
             setEndDate('')
             setAutoScheduleTrigger('daily')
             setTriggerTime('09:00')
             setDefaultPlatforms([])
-            setTriggerTime('09:00')
-            setDefaultPlatforms([])
-            setVideoTimes(['09:00', '14:00', '19:00'])
-            setVideoTopics(['', '', ''])
+            setVideoTimes(['09:00'])
+            setVideoTopics([''])
           }}
           title="Edit Video Plan"
         >
@@ -2215,30 +2246,66 @@ export function VideoPlanning() {
               />
             </div>
 
-            <Select
-              label="Videos Per Day"
-              value={videosPerDay.toString()}
-              onChange={(e) => setVideosPerDay(parseInt(e.target.value))}
-              options={[
-                { value: '1', label: '1 video per day' },
-                { value: '2', label: '2 videos per day' },
-                { value: '3', label: '3 videos per day' },
-                { value: '4', label: '4 videos per day' },
-                { value: '5', label: '5 videos per day' },
-              ]}
-            />
+            <div className="space-y-4">
+              <label className="block text-sm font-medium text-slate-700">
+                Videos & Topics
+              </label>
+              <div className="space-y-3">
+                {videoTimes.map((time: string, index: number) => (
+                  <div key={index} className="relative space-y-2 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                    {videoTimes.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeVideoSlot(index)}
+                        className="absolute right-2 top-2 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-red-500"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                    <div className="flex items-center gap-3">
+                      <div className="flex-shrink-0 text-xs font-bold text-slate-400">
+                        #{index + 1}
+                      </div>
+                      <Input
+                        type="time"
+                        value={time}
+                        onChange={(e: any) => updateVideoSlotTime(index, e.target.value)}
+                        className="w-32"
+                      />
+                    </div>
+                    <Textarea
+                      placeholder={`Topic for video #${index + 1}`}
+                      value={videoTopics[index]}
+                      onChange={(e: any) => updateVideoSlotTopic(index, e.target.value)}
+                      rows={2}
+                      required
+                    />
+                  </div>
+                ))}
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={addVideoSlot}
+                className="w-full border-dashed"
+                leftIcon={<Plus size={16} />}
+              >
+                Add Another Video
+              </Button>
+            </div>
 
             <Select
               label="Plan Timezone"
               value={timezone}
-              onChange={(e) => setTimezone(e.target.value)}
+              onChange={(e: any) => setTimezone(e.target.value)}
               options={timezones}
             />
 
             <Select
               label="Schedule Trigger"
               value={autoScheduleTrigger}
-              onChange={(e) =>
+              onChange={(e: any) =>
                 setAutoScheduleTrigger(
                   e.target.value as 'daily' | 'time_based' | 'manual',
                 )
