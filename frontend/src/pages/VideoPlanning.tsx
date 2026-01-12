@@ -613,7 +613,7 @@ export function VideoPlanning() {
     setTimezone(plan.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone)
     // Load existing video times and topics from plan items if needed
     // For now, use defaults based on plan.videos_per_day count
-    setVideoTimes(Array(plan.videos_per_day).fill('09:00').map((t, i) => {
+    setVideoTimes(Array(plan.videos_per_day).fill('09:00').map((_, i) => {
       // Very rough approximation - ideally we fetch items here
       return ['09:00', '14:00', '19:00', '21:00', '12:00'][i] || '09:00'
     }).slice(0, plan.videos_per_day))
