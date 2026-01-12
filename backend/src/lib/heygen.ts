@@ -498,7 +498,7 @@ export interface MotionConfig {
 export interface GenerateVideoRequest {
   topic: string
   script?: string
-  style: 'casual' | 'professional' | 'energetic' | 'educational'
+  style: string
   duration: number
   avatar_id?: string
   talking_photo_id?: string // For photo avatars

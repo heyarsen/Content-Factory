@@ -57,8 +57,8 @@ export function QuickCreate() {
   const [canEditScript, setCanEditScript] = useState(false)
 
   // Step 3: Generate Video
-  const [style, setStyle] = useState<'casual' | 'professional' | 'energetic' | 'educational'>('professional')
-  const [duration, setDuration] = useState(30)
+  const [style, setStyle] = useState('Cinematic')
+  const [duration] = useState(15) // Fixed duration for Sora
   const [generatingVideo, setGeneratingVideo] = useState(false)
   const [videoError, setVideoError] = useState('')
   const [videoId, setVideoId] = useState<string | null>(null)
@@ -625,34 +625,18 @@ export function QuickCreate() {
                   <Select
                     label="Video Style"
                     value={style}
-                    onChange={(e) => setStyle(e.target.value as any)}
+                    onChange={(e) => setStyle(e.target.value)}
                     options={[
-                      { value: 'casual', label: 'Casual' },
-                      { value: 'professional', label: 'Professional' },
-                      { value: 'energetic', label: 'Energetic' },
-                      { value: 'educational', label: 'Educational' },
+                      { value: 'Cinematic', label: 'Cinematic' },
+                      { value: 'Realistic', label: 'Realistic' },
+                      { value: 'Anime', label: 'Anime' },
+                      { value: '3D Render', label: '3D Render' },
+                      { value: 'Cyberpunk', label: 'Cyberpunk' },
+                      { value: 'Minimalist', label: 'Minimalist' },
+                      { value: 'Documentary', label: 'Documentary' },
                     ]}
+                    className="w-full"
                   />
-
-                  <div className="rounded-2xl border border-white/60 bg-white/70 px-5 py-6">
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm font-semibold text-primary">Duration</label>
-                      <span className="text-xs font-medium uppercase tracking-wide text-slate-400">{duration} seconds</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="15"
-                      max="60"
-                      step="5"
-                      value={duration}
-                      onChange={(e) => setDuration(Number(e.target.value))}
-                      className="mt-4 w-full accent-brand-500"
-                    />
-                    <div className="mt-2 flex justify-between text-[11px] uppercase tracking-wide text-slate-400">
-                      <span>15s</span>
-                      <span>60s</span>
-                    </div>
-                  </div>
                 </div>
 
                 {/* Caption Generation Toggle */}

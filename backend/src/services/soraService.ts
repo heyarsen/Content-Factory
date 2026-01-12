@@ -37,7 +37,7 @@ async function updateVideoWithSoraSuccess(
 ): Promise<void> {
     // Parse resultJson to get video URL
     let videoUrl: string | null = null
-    
+
     if (taskDetail.data.resultJson) {
         try {
             const result = JSON.parse(taskDetail.data.resultJson)
@@ -128,11 +128,11 @@ export async function generateVideoWithSora(
             aspectRatio: options.aspectRatio,
         })
 
-        // Build the prompt from topic and script
-        let prompt = video.topic
+        // Build the prompt from topic, style, and script
+        let prompt = `Style: ${video.style}. Topic: ${video.topic}`
         if (video.script) {
-            // Combine topic and script for a more detailed prompt
-            prompt = `${video.topic}. ${video.script}`
+            // Combine topic, style and script for a more detailed prompt
+            prompt = `Style: ${video.style}. Topic: ${video.topic}. Script: ${video.script}`
         }
 
         // Limit prompt length (Sora may have limits)

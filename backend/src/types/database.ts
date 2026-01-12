@@ -3,7 +3,7 @@ export interface Video {
   user_id: string
   topic: string
   script: string | null
-  style: 'casual' | 'professional' | 'energetic' | 'educational'
+  style: string
   duration: number
   status: 'pending' | 'generating' | 'completed' | 'failed'
   provider?: 'heygen' | 'sora'

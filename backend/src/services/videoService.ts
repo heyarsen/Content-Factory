@@ -11,8 +11,8 @@ import type {
 } from '../lib/heygen.js'
 import type { Reel, Video } from '../types/database.js'
 
-const DEFAULT_REEL_STYLE: Video['style'] = 'professional'
-const DEFAULT_REEL_DURATION = 30
+const DEFAULT_REEL_STYLE = 'Cinematic'
+const DEFAULT_REEL_DURATION = 15
 
 type VideoStyle = Video['style']
 
