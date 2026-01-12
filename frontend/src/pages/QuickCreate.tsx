@@ -41,27 +41,27 @@ export function QuickCreate() {
   const navigate = useNavigate()
   const { addNotification } = useNotifications()
   const [step, setStep] = useState<Step>('idea')
-  
+
   // Step 1: Idea
   const [topic, setTopic] = useState('')
   const [description, setDescription] = useState('')
   const [whyImportant, setWhyImportant] = useState('')
   const [usefulTips, setUsefulTips] = useState('')
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([])
-  
+
   // Step 2: Script
   const [generatedScript, setGeneratedScript] = useState('')
   const [generatingScript, setGeneratingScript] = useState(false)
   const [scriptError, setScriptError] = useState('')
   const [canEditScript, setCanEditScript] = useState(false)
-  
+
   // Step 3: Generate Video
   const [style, setStyle] = useState<'casual' | 'professional' | 'energetic' | 'educational'>('professional')
   const [duration, setDuration] = useState(30)
   const [generatingVideo, setGeneratingVideo] = useState(false)
   const [videoError, setVideoError] = useState('')
   const [videoId, setVideoId] = useState<string | null>(null)
-  
+
   // Step 4: Post-Generation
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [videoStatus, setVideoStatus] = useState<'pending' | 'generating' | 'completed' | 'failed'>('pending')
@@ -71,42 +71,13 @@ export function QuickCreate() {
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
   const [posting, setPosting] = useState(false)
   const [generateCaption, setGenerateCaption] = useState(true)
-  const [prompts, setPrompts] = useState<Array<{ id: string; name: string; topic: string | null; category: string | null; description: string | null; why_important: string | null; useful_tips: string | null }>>([])
-  const [selectedPromptId, setSelectedPromptId] = useState<string>('')
+
 
   useEffect(() => {
     loadSocialAccounts()
-    loadPrompts()
   }, [])
 
-  const loadPrompts = async () => {
-    try {
-      const response = await api.get('/api/prompts')
-      setPrompts(response.data.prompts || [])
-    } catch (error) {
-      console.error('Failed to load prompts:', error)
-    }
-  }
 
-  const handleSelectPrompt = (promptId: string) => {
-    const selectedPrompt = prompts.find(p => p.id === promptId)
-    if (selectedPrompt) {
-      console.log('Selected prompt:', selectedPrompt)
-      // Set all values from prompt - use empty string if null/undefined
-      setTopic(selectedPrompt.topic || '')
-      setDescription(selectedPrompt.description || '')
-      setWhyImportant(selectedPrompt.why_important || '')
-      setUsefulTips(selectedPrompt.useful_tips || '')
-      console.log('Updated fields:', {
-        topic: selectedPrompt.topic || '',
-        description: selectedPrompt.description || '',
-        why_important: selectedPrompt.why_important || '',
-        useful_tips: selectedPrompt.useful_tips || '',
-      })
-      // Keep the selection visible - don't reset it
-      setSelectedPromptId(promptId)
-    }
-  }
 
 
   // Poll for video status when video is generating
@@ -124,19 +95,19 @@ export function QuickCreate() {
         const video = response.data.video
         const previousStatus = previousStatusRef.current
         const newStatus = video.status as 'pending' | 'generating' | 'completed' | 'failed'
-        
+
         // Reset error tracking on success
         consecutiveErrors = 0
         pollDelay = 3000 // Reset to normal polling interval
-        
+
         // Update ref before setting state
         previousStatusRef.current = newStatus
         setVideoStatus(newStatus)
-        
+
         if (newStatus === 'completed' && video.video_url) {
           setVideoUrl(video.video_url)
           setStep('complete')
-          
+
           // Show notification when video completes
           if (previousStatus !== 'completed') {
             addNotification({
@@ -162,13 +133,13 @@ export function QuickCreate() {
       } catch (error: any) {
         consecutiveErrors++
         const is429 = error.response?.status === 429
-        
+
         if (is429) {
           // Exponential backoff for rate limits: 30s, 60s, 120s, max 300s
           pollDelay = Math.min(30000 * Math.pow(2, consecutiveErrors - 1), 300000)
-          
+
           console.warn(`Rate limited (429). Waiting ${pollDelay / 1000}s before next poll.`)
-          
+
           // Show notification only once
           if (consecutiveErrors === 1) {
             addNotification({
@@ -182,7 +153,7 @@ export function QuickCreate() {
           pollDelay = Math.min(5000 * consecutiveErrors, 60000)
           console.error('Failed to poll video status:', error)
         }
-        
+
         // Continue polling with backoff
         pollInterval = setTimeout(pollStatus, pollDelay)
       }
@@ -246,7 +217,7 @@ export function QuickCreate() {
     try {
       console.log('Sending video generation request to:', '/api/videos/generate')
       const verticalDimension = { ...DEFAULT_VERTICAL_DIMENSION }
-      
+
       console.log('Request payload:', {
         topic,
         hasScript: !!generatedScript,
@@ -255,7 +226,7 @@ export function QuickCreate() {
         duration,
         provider: 'sora',
       })
-      
+
       const response = await api.post('/api/videos/generate', {
         topic,
         script: generatedScript,
@@ -272,7 +243,7 @@ export function QuickCreate() {
       const initialStatus = response.data.video.status as 'pending' | 'generating' | 'completed' | 'failed'
       previousStatusRef.current = initialStatus
       setVideoStatus(initialStatus)
-      
+
       // Show success message immediately
       setVideoError('')
       addNotification({
@@ -280,7 +251,7 @@ export function QuickCreate() {
         title: 'Video Generation Started!',
         message: `"${topic}" is now being generated. This typically takes 1-3 minutes. You'll be notified when it's ready!`,
       })
-      
+
       // If video is already completed (unlikely), go to complete step
       if (response.data.video.status === 'completed' && response.data.video.video_url) {
         setVideoUrl(response.data.video.video_url)
@@ -302,12 +273,12 @@ export function QuickCreate() {
           baseURL: error.config?.baseURL,
         },
       })
-      
+
       // Extract detailed error message
       let errorMessage = 'Failed to generate video'
-      
+
       if (error.response?.status === 404) {
-        errorMessage = error.response?.data?.error || 
+        errorMessage = error.response?.data?.error ||
           'Video generation endpoint not found (404). Please check if the feature is available.'
       } else if (error.response?.data?.error) {
         errorMessage = error.response.data.error
@@ -316,7 +287,7 @@ export function QuickCreate() {
       } else if (error.message) {
         errorMessage = error.message
       }
-      
+
       setVideoError(errorMessage)
     } finally {
       setGeneratingVideo(false)
@@ -397,11 +368,10 @@ export function QuickCreate() {
           <div className="flex items-center justify-between overflow-x-auto">
             <div className="flex items-center gap-2 sm:gap-4 min-w-max">
               <div className={`flex items-center gap-3 ${step === 'idea' ? 'text-brand-600' : ['script', 'generate', 'complete'].includes(step) ? 'text-emerald-600' : 'text-slate-400'}`}>
-                <div className={`flex h-10 w-10 items-center justify-center rounded-full border-2 ${
-                  step === 'idea' ? 'border-brand-500 bg-brand-50' : 
-                  ['script', 'generate', 'complete'].includes(step) ? 'border-emerald-500 bg-emerald-50' : 
-                  'border-slate-300 bg-white'
-                }`}>
+                <div className={`flex h-10 w-10 items-center justify-center rounded-full border-2 ${step === 'idea' ? 'border-brand-500 bg-brand-50' :
+                    ['script', 'generate', 'complete'].includes(step) ? 'border-emerald-500 bg-emerald-50' :
+                      'border-slate-300 bg-white'
+                  }`}>
                   {['script', 'generate', 'complete'].includes(step) ? <CheckCircle2 className="h-5 w-5" /> : <span className="text-sm font-semibold">1</span>}
                 </div>
                 <div>
@@ -413,11 +383,10 @@ export function QuickCreate() {
               <ArrowRight className="h-5 w-5 text-slate-300" />
 
               <div className={`flex items-center gap-3 ${step === 'script' ? 'text-brand-600' : ['generate', 'complete'].includes(step) ? 'text-emerald-600' : 'text-slate-400'}`}>
-                <div className={`flex h-10 w-10 items-center justify-center rounded-full border-2 ${
-                  step === 'script' ? 'border-brand-500 bg-brand-50' : 
-                  ['generate', 'complete'].includes(step) ? 'border-emerald-500 bg-emerald-50' : 
-                  'border-slate-300 bg-white'
-                }`}>
+                <div className={`flex h-10 w-10 items-center justify-center rounded-full border-2 ${step === 'script' ? 'border-brand-500 bg-brand-50' :
+                    ['generate', 'complete'].includes(step) ? 'border-emerald-500 bg-emerald-50' :
+                      'border-slate-300 bg-white'
+                  }`}>
                   {['generate', 'complete'].includes(step) ? <CheckCircle2 className="h-5 w-5" /> : step === 'script' ? <Loader className="h-5 w-5 animate-spin" /> : <span className="text-sm font-semibold">2</span>}
                 </div>
                 <div>
@@ -429,9 +398,8 @@ export function QuickCreate() {
               <ArrowRight className="h-5 w-5 text-slate-300" />
 
               <div className={`flex items-center gap-3 ${step === 'generate' ? 'text-brand-600' : step === 'complete' ? 'text-emerald-600' : 'text-slate-400'}`}>
-                <div className={`flex h-10 w-10 items-center justify-center rounded-full border-2 ${
-                  step === 'generate' ? 'border-brand-500 bg-brand-50' : step === 'complete' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-300 bg-white'
-                }`}>
+                <div className={`flex h-10 w-10 items-center justify-center rounded-full border-2 ${step === 'generate' ? 'border-brand-500 bg-brand-50' : step === 'complete' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-300 bg-white'
+                  }`}>
                   {step === 'complete' ? <CheckCircle2 className="h-5 w-5" /> : step === 'generate' ? <Loader className="h-5 w-5 animate-spin" /> : <span className="text-sm font-semibold">3</span>}
                 </div>
                 <div>
@@ -479,35 +447,7 @@ export function QuickCreate() {
               </div>
             )}
 
-            {/* Prompt Selector */}
-            {prompts.length > 0 && (
-              <div className="mb-6 rounded-2xl border border-brand-200/60 bg-brand-50/40 p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Sparkles className="h-4 w-4 text-brand-600" />
-                  <p className="text-sm font-semibold text-brand-700">Use a Prompt Template</p>
-                </div>
-                <Select
-                  options={[
-                    { value: '', label: 'Select a prompt to auto-fill fields...' },
-                    ...prompts.map(p => ({ value: p.id, label: p.name }))
-                  ]}
-                  value={selectedPromptId}
-                  onChange={(e) => {
-                    const value = e.target.value
-                    if (value) {
-                      handleSelectPrompt(value)
-                    } else {
-                      // Allow clearing selection
-                      setSelectedPromptId('')
-                    }
-                  }}
-                  className="w-full"
-                />
-                <p className="mt-2 text-xs text-brand-600">
-                  Select a prompt to auto-fill the fields below. You can still edit them after.
-                </p>
-              </div>
-            )}
+
 
             <div className="space-y-6">
 
@@ -770,16 +710,16 @@ export function QuickCreate() {
                 <Video className="h-5 w-5 text-brand-500" />
                 <h2 className="text-xl font-semibold text-primary">Your Video</h2>
               </div>
-            <div
-              className="rounded-xl bg-slate-900 overflow-hidden mb-4"
-              style={{ aspectRatio: '9 / 16' }}
-            >
-              <video
-                src={videoUrl}
-                controls
-                className="w-full h-full object-contain"
-              />
-            </div>
+              <div
+                className="rounded-xl bg-slate-900 overflow-hidden mb-4"
+                style={{ aspectRatio: '9 / 16' }}
+              >
+                <video
+                  src={videoUrl}
+                  controls
+                  className="w-full h-full object-contain"
+                />
+              </div>
               <Button
                 variant="secondary"
                 onClick={handleDownload}
@@ -825,11 +765,10 @@ export function QuickCreate() {
                           key={platform}
                           type="button"
                           onClick={() => togglePlatform(platform)}
-                          className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition touch-manipulation min-h-[44px] ${
-                            isSelected
+                          className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition touch-manipulation min-h-[44px] ${isSelected
                               ? 'border-brand-500 bg-brand-50 text-brand-700'
                               : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                          }`}
+                            }`}
                         >
                           <Icon className="h-4 w-4" />
                           {platformNames[platform] || platform}
