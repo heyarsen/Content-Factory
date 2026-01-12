@@ -14,12 +14,12 @@ import {
   Calendar,
   Plus,
   Sparkles,
-  Video,
+  Check,
+  Clapperboard,
   Clock,
   RefreshCw,
   Loader,
   PenSquare,
-  Check,
   X,
   Edit2,
   Save,
@@ -155,8 +155,8 @@ export function VideoPlanning() {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
   })
   const [defaultPlatforms, setDefaultPlatforms] = useState<string[]>([])
-  const [autoApprove, setAutoApprove] = useState(false)
-  const [autoCreate, setAutoCreate] = useState(false)
+  const [autoApprove, setAutoApprove] = useState(true)
+  const [autoCreate, setAutoCreate] = useState(true)
   const [timezone, setTimezone] = useState(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone,
   )
@@ -174,9 +174,6 @@ export function VideoPlanning() {
   const [selectedItem, setSelectedItem] = useState<VideoPlanItem | null>(null)
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([])
   const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false)
-  const [createStep, setCreateStep] = useState<1 | 2>(1)
-  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([])
-  const [bulkTime, setBulkTime] = useState('09:00')
 
 
   // Preset times for quick selection
@@ -187,12 +184,6 @@ export function VideoPlanning() {
     { label: 'Evening (6:00 PM)', value: '18:00' },
   ]
 
-  // Avatar loading removed - using Sora for video generation
-  useEffect(() => {
-    if (createModal) {
-      setCreateStep(1)
-    }
-  }, [createModal])
 
 
 
@@ -474,15 +465,15 @@ export function VideoPlanning() {
         videos_per_day: videosPerDay,
         start_date: startDate,
         end_date: endDate || null,
-        auto_research: autoResearch,
+        auto_research: true,
         auto_schedule_trigger: autoScheduleTrigger,
         trigger_time:
           autoScheduleTrigger === 'daily' ? `${triggerTime}:00` : null,
         timezone: timezone,
         default_platforms:
           defaultPlatforms.length > 0 ? defaultPlatforms : null,
-        auto_approve: autoApprove,
-        auto_create: autoCreate,
+        auto_approve: true,
+        auto_create: true,
         video_times: videoTimes.map((time: string) => {
           // Ensure time is in HH:MM format (remove :00 if present, then add it back)
           const cleanTime = time.replace(/:00$/, '')
@@ -538,7 +529,6 @@ export function VideoPlanning() {
         }, 1000)
       }
       setCreateModal(false)
-      setCreateStep(1)
       setPlanName('')
       setVideosPerDay(3)
       setStartDate(new Date().toISOString().split('T')[0])
@@ -619,8 +609,8 @@ export function VideoPlanning() {
       plan.trigger_time ? plan.trigger_time.substring(0, 5) : '09:00',
     )
     setDefaultPlatforms(plan.default_platforms || [])
-    setAutoApprove(plan.auto_approve || false)
-    setAutoCreate(plan.auto_create || false)
+    setAutoApprove(true)
+    setAutoCreate(true)
     setTimezone(plan.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone)
     // Load existing video times and topics from plan items if needed
     // For now, use defaults
@@ -641,14 +631,14 @@ export function VideoPlanning() {
         videos_per_day: videosPerDay,
         start_date: startDate,
         end_date: endDate || null,
-        auto_research: autoResearch,
+        auto_research: true,
         auto_schedule_trigger: autoScheduleTrigger,
         trigger_time:
           autoScheduleTrigger === 'daily' ? `${triggerTime}:00` : null,
         default_platforms:
           defaultPlatforms.length > 0 ? defaultPlatforms : null,
-        auto_approve: autoApprove,
-        auto_create: autoCreate,
+        auto_approve: true,
+        auto_create: true,
         timezone: timezone,
       })
 
@@ -1310,56 +1300,6 @@ export function VideoPlanning() {
               </div>
             </Card>
 
-            {/* Bulk actions bar */}
-            {selectedItemIds.length > 0 && (
-              <Card className="p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div className="text-sm font-semibold text-slate-700">
-                  {selectedItemIds.length} selected
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Input
-                    type="time"
-                    value={bulkTime}
-                    onChange={(e) => setBulkTime(e.target.value)}
-                    className="w-28"
-                  />
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => runBulkAction('set-time')}
-                  >
-                    Set Time
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => runBulkAction('approve')}
-                  >
-                    Approve Scripts
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => runBulkAction('generate')}
-                  >
-                    Generate Scripts
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => runBulkAction('create')}
-                  >
-                    Create Videos
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={clearSelection}
-                  >
-                    Clear
-                  </Button>
-                </div>
-              </Card>
-            )}
 
             {/* Calendar Grid */}
             <Card className="p-6">
@@ -1680,15 +1620,6 @@ export function VideoPlanning() {
                             <div className="flex items-start justify-between gap-4">
                               <div className="flex-1 space-y-3">
                                 <div className="flex items-center gap-3">
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedItemIds.includes(item.id)}
-                                    onChange={(e) => {
-                                      e.stopPropagation()
-                                      toggleItemSelection(item.id)
-                                    }}
-                                    className="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
-                                  />
                                   <Clock className="h-4 w-4 text-slate-400" />
                                   <span className="text-sm font-medium text-slate-600">
                                     {formatTime(item.scheduled_time)}
@@ -1970,118 +1901,110 @@ export function VideoPlanning() {
           />
         )}
 
-        {/* Detail Drawer */}
-        <div
-          className={`fixed inset-0 z-40 transition ${isDetailDrawerOpen && selectedItem ? 'visible' : 'invisible'
-            }`}
+        {/* Item Detail Modal */}
+        <Modal
+          isOpen={isDetailDrawerOpen && !!selectedItem}
+          onClose={closeDetailDrawer}
+          title={selectedItem?.topic || 'Video Detail'}
+          size="xl"
         >
-          <div
-            className={`absolute inset-0 bg-slate-900/20 transition-opacity ${isDetailDrawerOpen && selectedItem ? 'opacity-100' : 'opacity-0'
-              }`}
-            onClick={closeDetailDrawer}
-          />
-          <div
-            className={`absolute right-0 top-0 h-full w-full max-w-xl bg-white shadow-2xl transition-transform duration-300 ${isDetailDrawerOpen && selectedItem
-              ? 'translate-x-0'
-              : 'translate-x-full'
-              }`}
-          >
-            {selectedItem && (
-              <div className="flex h-full flex-col">
-                <div className="flex items-start justify-between border-b border-slate-200 p-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-400">
-                      {selectedItem.scheduled_date}
-                    </p>
-                    <h3 className="text-xl font-semibold text-primary">
-                      {selectedItem.topic || 'Untitled slot'}
-                    </h3>
-                    <div className="mt-2 flex items-center gap-2 text-sm text-slate-600">
-                      <Clock className="h-4 w-4" />
-                      <span>{formatTime(selectedItem.scheduled_time)}</span>
-                      {getStatusBadge(
-                        selectedItem.status,
-                        selectedItem.script_status,
-                        selectedItem,
-                      )}
+          {selectedItem && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Left Column: Preview/Video */}
+              <div className="space-y-4">
+                <div className="aspect-video w-full rounded-xl bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200">
+                  {selectedItem.video_id ? (
+                    <div className="text-center p-4">
+                      <Video className="h-12 w-12 text-slate-300 mx-auto mb-2" />
+                      <p className="text-sm text-slate-500">Video generated (ID: {selectedItem.video_id})</p>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => navigate(`/videos?videoId=${selectedItem.video_id}`)}
+                      >
+                        View Full Video
+                      </Button>
                     </div>
-                  </div>
-                  <button
-                    onClick={closeDetailDrawer}
-                    className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
+                  ) : (
+                    <div className="text-center p-4">
+                      <Clapperboard className="h-12 w-12 text-slate-300 mx-auto mb-2" />
+                      <p className="text-sm text-slate-500">Video preview will appear here once generated</p>
+                    </div>
+                  )}
                 </div>
 
-                <div className="flex-1 space-y-6 overflow-y-auto p-4">
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="info">{selectedItem.status}</Badge>
+                <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-slate-700">Script</p>
                     {selectedItem.script_status && (
-                      <Badge variant="info">
-                        Script: {selectedItem.script_status}
-                      </Badge>
+                      <Badge variant="info">Script: {selectedItem.script_status}</Badge>
                     )}
                   </div>
-
-
-
-                  <div className="space-y-3">
-                    <Input
-                      label="Topic"
-                      value={editForm.topic}
-                      onChange={(e) =>
-                        setEditForm((prev) => ({ ...prev, topic: e.target.value }))
+                  <div className="max-h-[300px] overflow-y-auto rounded border border-slate-200 bg-white p-3 text-sm text-slate-700">
+                    {selectedItem.script ? (
+                      <pre className="whitespace-pre-wrap font-sans leading-relaxed">
+                        {selectedItem.script}
+                      </pre>
+                    ) : (
+                      <p className="text-slate-500 italic">No script generated yet.</p>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => handleGenerateTopic(selectedItem.id)}
+                      leftIcon={<Sparkles className="h-4 w-4" />}
+                    >
+                      Regenerate
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() =>
+                        api
+                          .post(`/api/plans/items/${selectedItem.id}/generate-script`)
+                          .then(() => selectedPlan && loadPlanItems(selectedPlan.id))
                       }
-                    />
+                      leftIcon={<PenSquare className="h-4 w-4" />}
+                    >
+                      Regenerate Script
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Details/Form */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-sm text-slate-600 mb-2">
+                  <Clock className="h-4 w-4" />
+                  <span>{formatTime(selectedItem.scheduled_time)}</span>
+                  <span className="text-slate-300">|</span>
+                  <span>{selectedItem.scheduled_date}</span>
+                  {getStatusBadge(
+                    selectedItem.status,
+                    selectedItem.script_status,
+                    selectedItem,
+                  )}
+                </div>
+
+                <div className="space-y-4">
+                  <Input
+                    label="Topic"
+                    value={editForm.topic}
+                    onChange={(e) =>
+                      setEditForm((prev) => ({ ...prev, topic: e.target.value }))
+                    }
+                  />
+                  <div className="grid grid-cols-2 gap-4">
                     <Input
-                      label="Scheduled Time"
+                      label="Posting Time"
                       type="time"
                       value={editForm.scheduled_time}
-                      onChange={(e) =>
-                        setEditForm((prev) => ({
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        setEditForm((prev: any) => ({
                           ...prev,
                           scheduled_time: e.target.value,
-                        }))
-                      }
-                    />
-                    <Textarea
-                      label="Description"
-                      value={editForm.description}
-                      onChange={(e) =>
-                        setEditForm((prev) => ({
-                          ...prev,
-                          description: e.target.value,
-                        }))
-                      }
-                    />
-                    <Textarea
-                      label="Why it matters"
-                      value={editForm.why_important}
-                      onChange={(e) =>
-                        setEditForm((prev) => ({
-                          ...prev,
-                          why_important: e.target.value,
-                        }))
-                      }
-                    />
-                    <Textarea
-                      label="Useful tips"
-                      value={editForm.useful_tips}
-                      onChange={(e) =>
-                        setEditForm((prev) => ({
-                          ...prev,
-                          useful_tips: e.target.value,
-                        }))
-                      }
-                    />
-                    <Textarea
-                      label="Caption"
-                      value={editForm.caption}
-                      onChange={(e) =>
-                        setEditForm((prev) => ({
-                          ...prev,
-                          caption: e.target.value,
                         }))
                       }
                     />
@@ -2089,7 +2012,7 @@ export function VideoPlanning() {
                       <label className="block text-sm font-medium text-slate-700">
                         Platforms
                       </label>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-1">
                         {availablePlatforms.map((platform) => (
                           <button
                             key={platform}
@@ -2098,14 +2021,14 @@ export function VideoPlanning() {
                               const newPlatforms = editForm.platforms.includes(
                                 platform,
                               )
-                                ? editForm.platforms.filter((p) => p !== platform)
+                                ? editForm.platforms.filter((p: string) => p !== platform)
                                 : [...editForm.platforms, platform]
-                              setEditForm((prev) => ({
+                              setEditForm((prev: any) => ({
                                 ...prev,
                                 platforms: newPlatforms,
                               }))
                             }}
-                            className={`rounded-full border px-3 py-1 text-xs font-semibold capitalize transition ${editForm.platforms.includes(platform)
+                            className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize transition ${editForm.platforms.includes(platform)
                               ? 'border-brand-500 bg-brand-50 text-brand-700'
                               : 'border-slate-200 bg-white text-slate-600 hover:border-brand-200'
                               }`}
@@ -2116,78 +2039,36 @@ export function VideoPlanning() {
                       </div>
                     </div>
                   </div>
-
-                  <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    <p className="text-sm font-semibold text-slate-700">
-                      Script
-                    </p>
-                    <div className="rounded border border-slate-200 bg-white p-3 text-sm text-slate-700">
-                      {selectedItem.script ? (
-                        <pre className="whitespace-pre-wrap text-sm text-slate-700">
-                          {selectedItem.script}
-                        </pre>
-                      ) : (
-                        <p className="text-slate-500">No script yet.</p>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => handleGenerateTopic(selectedItem.id)}
-                        leftIcon={<Sparkles className="h-4 w-4" />}
-                      >
-                        Generate Topic
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() =>
-                          api
-                            .post(`/api/plans/items/${selectedItem.id}/generate-script`)
-                            .then(() => selectedPlan && loadPlanItems(selectedPlan.id))
-                        }
-                        leftIcon={<PenSquare className="h-4 w-4" />}
-                      >
-                        Generate Script
-                      </Button>
-                      {selectedItem.script_status === 'draft' && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleRejectScript(selectedItem.id)}
-                            leftIcon={<X className="h-4 w-4" />}
-                          >
-                            Reject
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => handleApproveScript(selectedItem.id)}
-                            leftIcon={<Check className="h-4 w-4" />}
-                          >
-                            Approve
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </div>
+                  <Textarea
+                    label="Description"
+                    value={editForm.description}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                      setEditForm((prev: any) => ({
+                        ...prev,
+                        description: e.target.value,
+                      }))
+                    }
+                    rows={3}
+                  />
+                  <Textarea
+                    label="Caption"
+                    value={editForm.caption}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                      setEditForm((prev: any) => ({
+                        ...prev,
+                        caption: e.target.value,
+                      }))
+                    }
+                    rows={2}
+                  />
                 </div>
 
-                <div className="flex items-center justify-between gap-2 border-t border-slate-200 p-4">
+                <div className="flex items-center justify-between gap-3 pt-6 border-t border-slate-100">
                   <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
-                        openDetailDrawer(selectedItem)
-                      }}
-                      leftIcon={<RefreshCw className="h-4 w-4" />}
-                    >
-                      Refresh
-                    </Button>
                     {selectedItem.status === 'approved' && (
                       <Button
                         variant="secondary"
+                        size="sm"
                         onClick={() => handleCreateVideo(selectedItem)}
                         leftIcon={<Video className="h-4 w-4" />}
                       >
@@ -2198,25 +2079,27 @@ export function VideoPlanning() {
                   <div className="flex gap-2">
                     <Button
                       variant="ghost"
+                      size="sm"
                       onClick={closeDetailDrawer}
                     >
-                      Close
+                      Cancel
                     </Button>
                     <Button
+                      size="sm"
                       onClick={async () => {
                         await handleSaveItem()
                         closeDetailDrawer()
                       }}
                       leftIcon={<Save className="h-4 w-4" />}
                     >
-                      Save changes
+                      Save Changes
                     </Button>
                   </div>
                 </div>
               </div>
-            )}
-          </div>
-        </div>
+            </div>
+          )}
+        </Modal>
 
         {/* Create Plan Modal */}
         <Modal
@@ -2229,324 +2112,96 @@ export function VideoPlanning() {
           title="Create Video Plan"
         >
           <div className="space-y-6">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div
-                  className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${createStep === 1 ? 'bg-brand-50 text-brand-700' : 'bg-slate-100 text-slate-500'}`}
-                >
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-brand-600 shadow-sm">
-                    1
-                  </span>
-                  Basics
-                </div>
-                <div
-                  className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${createStep === 2 ? 'bg-brand-50 text-brand-700' : 'bg-slate-100 text-slate-500'}`}
-                >
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-brand-600 shadow-sm">
-                    2
-                  </span>
-                  Advanced
-                </div>
-              </div>
-              <div className="text-xs text-slate-500">Timezone: {timezone}</div>
+            <div className="text-xs text-slate-500">Timezone: {timezone}</div>
+          </div>
+
+          <div className="space-y-4">
+            <Input
+              label="Plan Name"
+              placeholder="e.g., Daily Trading Content"
+              value={planName}
+              onChange={(e) => setPlanName(e.target.value)}
+              required
+            />
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <Input
+                label="Start Date"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                required
+              />
+
+              <Input
+                label="End Date (optional)"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                min={startDate}
+              />
             </div>
 
-            {createStep === 1 ? (
-              <div className="space-y-4">
-                <Input
-                  label="Plan Name"
-                  placeholder="e.g., Daily Trading Content"
-                  value={planName}
-                  onChange={(e) => setPlanName(e.target.value)}
-                  required
-                />
+            <Select
+              label="Videos Per Day"
+              value={videosPerDay.toString()}
+              onChange={(e) => setVideosPerDay(parseInt(e.target.value))}
+              options={[
+                { value: '1', label: '1 video per day' },
+                { value: '2', label: '2 videos per day' },
+                { value: '3', label: '3 videos per day' },
+                { value: '4', label: '4 videos per day' },
+                { value: '5', label: '5 videos per day' },
+              ]}
+            />
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Input
-                    label="Start Date"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    required
-                  />
+            <Select
+              label="Plan Timezone"
+              value={timezone}
+              onChange={(e) => setTimezone(e.target.value)}
+              options={timezones}
+            />
 
-                  <Input
-                    label="End Date (optional)"
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    min={startDate}
-                  />
-                </div>
-
-                <Select
-                  label="Videos Per Day"
-                  value={videosPerDay.toString()}
-                  onChange={(e) => setVideosPerDay(parseInt(e.target.value))}
-                  options={[
-                    { value: '1', label: '1 video per day' },
-                    { value: '2', label: '2 videos per day' },
-                    { value: '3', label: '3 videos per day' },
-                    { value: '4', label: '4 videos per day' },
-                    { value: '5', label: '5 videos per day' },
-                  ]}
-                />
-
-                <Select
-                  label="Plan Timezone"
-                  value={timezone}
-                  onChange={(e) => setTimezone(e.target.value)}
-                  options={timezones}
-                />
-
-                <div className="flex items-center justify-end gap-3 pt-2">
-                  <Button
-                    onClick={() => setCreateStep(2)}
-                    disabled={!planName || !startDate}
-                  >
-                    Next: Advanced
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-5">
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-slate-700">
-                      Video slots (time, topic, per-slot look)
-                    </p>
-                    <span className="text-xs text-slate-500">
-                      Defaults from step 1
-                    </span>
-                  </div>
-                  <div className="mt-4 space-y-4">
-                    {Array.from({ length: videosPerDay }).map((_, index) => {
-                      return (
-                        <div
-                          key={index}
-                          className="rounded-lg border border-slate-200 bg-white p-4 space-y-3"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="rounded-full bg-brand-500 px-2 py-1 text-xs font-semibold text-white">
-                                Video {index + 1}
-                              </span>
-                              <span className="text-xs text-slate-500">
-                                Videos will be generated using Sora AI.
-                              </span>
-                            </div>
-                            <div className="flex gap-2">
-                              {timePresets.map((preset) => (
-                                <button
-                                  key={preset.value}
-                                  type="button"
-                                  onClick={() => {
-                                    const newTimes = [...videoTimes]
-                                    newTimes[index] = preset.value
-                                    setVideoTimes(newTimes)
-                                  }}
-                                  className={`rounded border px-2 py-1 text-[11px] ${videoTimes[index] === preset.value
-                                    ? 'border-brand-500 bg-brand-50 text-brand-700'
-                                    : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
-                                    }`}
-                                >
-                                  {preset.label.split('(')[0].trim()}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-
-
-
-                          <div className="grid gap-3 md:grid-cols-2">
-                            <Input
-                              label="Posting Time"
-                              type="time"
-                              value={videoTimes[index] || ''}
-                              onChange={(e) => {
-                                const newTimes = [...videoTimes]
-                                newTimes[index] = e.target.value
-                                setVideoTimes(newTimes)
-                              }}
-                            />
-                            <Input
-                              label="Topic (optional)"
-                              value={videoTopics[index] || ''}
-                              onChange={(e) => {
-                                const newTopics = [...videoTopics]
-                                newTopics[index] = e.target.value
-                                setVideoTopics(newTopics)
-                              }}
-                              placeholder="Leave blank to auto-generate"
-                            />
-                          </div>
-
-                          {/* Avatar/look selection removed - using Sora for video generation */}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-700">
-                        Automation
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        Keeps auto-research/create/schedule but tucked behind
-                        one section.
-                      </p>
-                    </div>
-                    <Select
-                      label="Schedule Trigger"
-                      value={autoScheduleTrigger}
-                      onChange={(e) =>
-                        setAutoScheduleTrigger(
-                          e.target.value as 'daily' | 'time_based' | 'manual',
+            <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <label className="block text-sm font-medium text-slate-700">
+                Social media where this video will be posted
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {availablePlatforms.map((platform) => (
+                  <button
+                    key={platform}
+                    type="button"
+                    onClick={() => {
+                      if (defaultPlatforms.includes(platform)) {
+                        setDefaultPlatforms(
+                          defaultPlatforms.filter((p) => p !== platform),
                         )
+                      } else {
+                        setDefaultPlatforms([...defaultPlatforms, platform])
                       }
-                      options={[
-                        { value: 'daily', label: 'Daily at specific time' },
-                        {
-                          value: 'time_based',
-                          label: 'Based on scheduled post times',
-                        },
-                        { value: 'manual', label: 'Manual only' },
-                      ]}
-                    />
-                  </div>
-
-                  {autoScheduleTrigger === 'daily' && (
-                    <div className="space-y-3">
-                      <label className="block text-sm font-medium text-slate-700">
-                        Trigger Time
-                        (Timezone: {timezone})
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {timePresets.map((preset) => (
-                          <button
-                            key={preset.value}
-                            type="button"
-                            onClick={() => setTriggerTime(preset.value)}
-                            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${triggerTime === preset.value
-                              ? 'border-brand-500 bg-brand-50 text-brand-700'
-                              : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                              }`}
-                          >
-                            {preset.label.split('(')[0].trim()}
-                          </button>
-                        ))}
-                      </div>
-                      <Input
-                        label="Custom Time"
-                        type="time"
-                        value={triggerTime}
-                        onChange={(e) => setTriggerTime(e.target.value)}
-                        min="00:00"
-                        max="23:59"
-                      />
-                    </div>
-                  )}
-
-                  <div className="grid gap-3 md:grid-cols-3">
-                    <label className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                      <input
-                        type="checkbox"
-                        checked={autoResearch}
-                        onChange={(e) => setAutoResearch(e.target.checked)}
-                        className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
-                      />
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium text-slate-700">
-                          Auto research
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          Use Perplexity to prep topics automatically.
-                        </p>
-                      </div>
-                    </label>
-                    <label className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                      <input
-                        type="checkbox"
-                        checked={autoApprove}
-                        onChange={(e) => setAutoApprove(e.target.checked)}
-                        className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
-                      />
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium text-slate-700">
-                          Auto-approve scripts
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          Skip manual review for trusted flows.
-                        </p>
-                      </div>
-                    </label>
-                    <label className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                      <input
-                        type="checkbox"
-                        checked={autoCreate}
-                        onChange={(e) => setAutoCreate(e.target.checked)}
-                        className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
-                      />
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium text-slate-700">
-                          Auto-generate videos
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          Kick off generation as soon as scripts are approved.
-                        </p>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  <label className="block text-sm font-medium text-slate-700">
-                    Default Platforms (for automated posting)
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {availablePlatforms.map((platform) => (
-                      <button
-                        key={platform}
-                        type="button"
-                        onClick={() => {
-                          if (defaultPlatforms.includes(platform)) {
-                            setDefaultPlatforms(
-                              defaultPlatforms.filter((p) => p !== platform),
-                            )
-                          } else {
-                            setDefaultPlatforms([...defaultPlatforms, platform])
-                          }
-                        }}
-                        className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition ${defaultPlatforms.includes(platform)
-                          ? 'border-brand-500 bg-brand-50 text-brand-700'
-                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                          }`}
-                      >
-                        {platform}
-                        {defaultPlatforms.includes(platform) && (
-                          <span className="ml-1">✓</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-2">
-                  <Button variant="secondary" onClick={() => setCreateStep(1)}>
-                    ← Back to basics
-                  </Button>
-                  <Button
-                    onClick={handleCreatePlan}
-                    loading={creating}
+                    }}
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition ${defaultPlatforms.includes(platform)
+                      ? 'border-brand-500 bg-brand-50 text-brand-700'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                      }`}
                   >
-                    Create Plan
-                  </Button>
-                </div>
+                    {platform}
+                    {defaultPlatforms.includes(platform) && (
+                      <span className="ml-1">✓</span>
+                    )}
+                  </button>
+                ))}
               </div>
-            )}
+            </div>
+
+            <div className="flex items-center justify-end pt-2">
+              <Button
+                onClick={handleCreatePlan}
+                loading={creating}
+              >
+                Create Plan
+              </Button>
+            </div>
           </div>
         </Modal>
 
@@ -2666,80 +2321,10 @@ export function VideoPlanning() {
               </div>
             )}
 
-            <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-start gap-3">
-                <input
-                  type="checkbox"
-                  id="editAutoResearch"
-                  checked={autoResearch}
-                  onChange={(e) => setAutoResearch(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
-                />
-                <div>
-                  <label
-                    htmlFor="editAutoResearch"
-                    className="text-sm font-medium text-slate-700"
-                  >
-                    Auto Research Topics
-                  </label>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Automatically research topics using Perplexity AI
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-start gap-3">
-                <input
-                  type="checkbox"
-                  id="editAutoApprove"
-                  checked={autoApprove}
-                  onChange={(e) => setAutoApprove(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
-                />
-                <div>
-                  <label
-                    htmlFor="editAutoApprove"
-                    className="text-sm font-medium text-slate-700"
-                  >
-                    Auto Approve Scripts
-                  </label>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Automatically approve generated scripts without manual
-                    review
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-start gap-3">
-                <input
-                  type="checkbox"
-                  id="editAutoCreate"
-                  checked={autoCreate}
-                  onChange={(e) => setAutoCreate(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
-                />
-                <div>
-                  <label
-                    htmlFor="editAutoCreate"
-                    className="text-sm font-medium text-slate-700"
-                  >
-                    Auto Generate Videos
-                  </label>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Automatically start video generation for approved scripts. Works best
-                    with auto approval enabled.
-                  </p>
-                </div>
-              </div>
-            </div>
 
             <div className="space-y-2">
               <label className="block text-sm font-medium text-slate-700">
-                Default Platforms
+                Social media where this video will be posted
               </label>
               <div className="flex flex-wrap gap-2">
                 {availablePlatforms.map((platform) => (
@@ -3316,7 +2901,7 @@ export function VideoPlanning() {
         </Modal>
 
         {/* Avatar and Look Selection Modals removed - using Sora for video generation */}
-      </div>
-    </Layout>
+      </div >
+    </Layout >
   )
 }

@@ -20,7 +20,7 @@ interface SidebarProps {
 const navigation = [
   { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
   { label: 'Create Video', to: '/create', icon: Zap },
-  { label: 'Prompts', to: '/prompts', icon: Sparkles },
+  // { label: 'Prompts', to: '/prompts', icon: Sparkles },
   { label: 'Video Planning', to: '/planning', icon: Calendar },
   { label: 'My Videos', to: '/videos', icon: Clapperboard },
   { label: 'Social Accounts', to: '/social', icon: Share2 },
@@ -49,9 +49,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   return (
     <Fragment>
       <div
-        className={`fixed inset-0 z-30 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${
-          isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
-        }`}
+        className={`fixed inset-0 z-30 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
+          }`}
         onClick={onClose}
       />
 
@@ -59,9 +58,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         className={`fixed z-40 inset-y-0 left-0 w-72 transform transition-all duration-300 lg:fixed lg:translate-x-0`}
       >
         <div
-          className={`flex h-screen flex-col border-r border-white/60 bg-white/80 px-6 py-8 backdrop-blur-xl shadow-[0_25px_70px_-35px_rgba(15,23,42,0.35)] transition-transform duration-300 ${
-            isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-          }`}
+          className={`flex h-screen flex-col border-r border-white/60 bg-white/80 px-6 py-8 backdrop-blur-xl shadow-[0_25px_70px_-35px_rgba(15,23,42,0.35)] transition-transform duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+            }`}
         >
           <div className="flex items-center justify-between">
             <Link to="/dashboard" className="flex items-center gap-3">
@@ -94,18 +92,16 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   key={to}
                   to={to}
                   onClick={onClose}
-                  className={`group relative flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
-                    isActive
+                  className={`group relative flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all duration-200 ${isActive
                       ? 'bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-transparent text-brand-600'
                       : 'text-slate-500 hover:bg-white hover:text-primary'
-                  }`}
+                    }`}
                 >
                   <div
-                    className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-all duration-200 ${
-                      isActive
+                    className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-all duration-200 ${isActive
                         ? 'border-brand-200 bg-white text-brand-600 shadow-sm'
                         : 'border-transparent bg-slate-100 text-slate-500 group-hover:border-slate-200'
-                    }`}
+                      }`}
                   >
                     <Icon className="h-4 w-4" />
                   </div>

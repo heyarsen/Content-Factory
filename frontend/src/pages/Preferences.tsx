@@ -231,10 +231,10 @@ export function Preferences() {
                     onClick={() => togglePlatform(platform)}
                     disabled={!isConnected}
                     className={`rounded-lg border px-4 py-2 text-sm font-medium capitalize transition ${preferences.default_platforms.includes(platform)
-                        ? 'border-brand-500 bg-brand-50 text-brand-700'
-                        : isConnected
-                          ? 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                          : 'border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed'
+                      ? 'border-brand-500 bg-brand-50 text-brand-700'
+                      : isConnected
+                        ? 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                        : 'border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed'
                       }`}
                     title={!isConnected ? 'Connect this platform in Social Accounts first' : ''}
                   >
@@ -250,53 +250,6 @@ export function Preferences() {
           </div>
         </Card>
 
-        {/* Automation Defaults */}
-        <Card className="p-6">
-          <div className="mb-6 flex items-center gap-3">
-            <Sparkles className="h-5 w-5 text-slate-400" />
-            <h2 className="text-lg font-semibold text-primary">Automation Defaults</h2>
-          </div>
-          <div className="space-y-4">
-            <div className="flex items-start gap-3">
-              <input
-                type="checkbox"
-                id="auto_research"
-                checked={preferences.auto_research_default}
-                onChange={(e) =>
-                  setPreferences({ ...preferences, auto_research_default: e.target.checked })
-                }
-                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
-              />
-              <div className="flex-1">
-                <label htmlFor="auto_research" className="text-sm font-medium text-slate-700">
-                  Auto-research topics
-                </label>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  Automatically research topics using Perplexity AI when creating video plans.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <input
-                type="checkbox"
-                id="auto_approve"
-                checked={preferences.auto_approve_default}
-                onChange={(e) =>
-                  setPreferences({ ...preferences, auto_approve_default: e.target.checked })
-                }
-                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
-              />
-              <div className="flex-1">
-                <label htmlFor="auto_approve" className="text-sm font-medium text-slate-700">
-                  Auto-approve scripts
-                </label>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  Automatically approve generated scripts without manual review. Recommended for trusted AI outputs.
-                </p>
-              </div>
-            </div>
-          </div>
-        </Card>
 
         {/* Notifications */}
         <Card className="p-6">
