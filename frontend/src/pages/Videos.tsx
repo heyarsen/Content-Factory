@@ -457,7 +457,7 @@ export function Videos() {
             setSelectedVideo(null)
           }}
           title="Video Details"
-          size="4xl"
+          size="xl"
         >
           {loadingVideo ? (
             <div className="py-12 text-center">
