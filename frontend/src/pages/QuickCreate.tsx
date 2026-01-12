@@ -8,6 +8,7 @@ import { Textarea } from '../components/ui/Textarea'
 import { Select } from '../components/ui/Select'
 import { Badge } from '../components/ui/Badge'
 import { Video, Sparkles, FileText, CheckCircle2, ArrowRight, ArrowLeft, Loader, Download, Share2, Instagram, Youtube, Users, Facebook } from 'lucide-react'
+import { Modal } from '../components/ui/Modal'
 import api from '../lib/api'
 import { DEFAULT_VERTICAL_ASPECT_RATIO, DEFAULT_VERTICAL_DIMENSION } from '../lib/videos'
 import { useNotifications } from '../contexts/NotificationContext'
@@ -70,6 +71,8 @@ export function QuickCreate() {
   const [generatingDescription, setGeneratingDescription] = useState(false)
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
   const [posting, setPosting] = useState(false)
+  const [isPostModalOpen, setIsPostModalOpen] = useState(false)
+  const [postStatus, setPostStatus] = useState<'idle' | 'posting' | 'success' | 'error'>('idle')
   const [generateCaption, setGenerateCaption] = useState(true)
 
 
@@ -324,6 +327,8 @@ export function QuickCreate() {
   const handlePostToSocial = async () => {
     if (!videoId || selectedPlatforms.length === 0) return
 
+    setIsPostModalOpen(true)
+    setPostStatus('posting')
     setPosting(true)
     try {
       await api.post('/api/posts/schedule', {
@@ -331,9 +336,10 @@ export function QuickCreate() {
         platforms: selectedPlatforms,
         caption: socialDescription || topic,
       })
-      navigate('/posts')
+      setPostStatus('success')
     } catch (error: any) {
       console.error('Failed to post:', error)
+      setPostStatus('error')
     } finally {
       setPosting(false)
     }
@@ -369,8 +375,8 @@ export function QuickCreate() {
             <div className="flex items-center gap-2 sm:gap-4 min-w-max">
               <div className={`flex items-center gap-3 ${step === 'idea' ? 'text-brand-600' : ['script', 'generate', 'complete'].includes(step) ? 'text-emerald-600' : 'text-slate-400'}`}>
                 <div className={`flex h-10 w-10 items-center justify-center rounded-full border-2 ${step === 'idea' ? 'border-brand-500 bg-brand-50' :
-                    ['script', 'generate', 'complete'].includes(step) ? 'border-emerald-500 bg-emerald-50' :
-                      'border-slate-300 bg-white'
+                  ['script', 'generate', 'complete'].includes(step) ? 'border-emerald-500 bg-emerald-50' :
+                    'border-slate-300 bg-white'
                   }`}>
                   {['script', 'generate', 'complete'].includes(step) ? <CheckCircle2 className="h-5 w-5" /> : <span className="text-sm font-semibold">1</span>}
                 </div>
@@ -384,8 +390,8 @@ export function QuickCreate() {
 
               <div className={`flex items-center gap-3 ${step === 'script' ? 'text-brand-600' : ['generate', 'complete'].includes(step) ? 'text-emerald-600' : 'text-slate-400'}`}>
                 <div className={`flex h-10 w-10 items-center justify-center rounded-full border-2 ${step === 'script' ? 'border-brand-500 bg-brand-50' :
-                    ['generate', 'complete'].includes(step) ? 'border-emerald-500 bg-emerald-50' :
-                      'border-slate-300 bg-white'
+                  ['generate', 'complete'].includes(step) ? 'border-emerald-500 bg-emerald-50' :
+                    'border-slate-300 bg-white'
                   }`}>
                   {['generate', 'complete'].includes(step) ? <CheckCircle2 className="h-5 w-5" /> : step === 'script' ? <Loader className="h-5 w-5 animate-spin" /> : <span className="text-sm font-semibold">2</span>}
                 </div>
@@ -766,8 +772,8 @@ export function QuickCreate() {
                           type="button"
                           onClick={() => togglePlatform(platform)}
                           className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition touch-manipulation min-h-[44px] ${isSelected
-                              ? 'border-brand-500 bg-brand-50 text-brand-700'
-                              : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                            ? 'border-brand-500 bg-brand-50 text-brand-700'
+                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                             }`}
                         >
                           <Icon className="h-4 w-4" />
@@ -821,6 +827,71 @@ export function QuickCreate() {
           </div>
         )}
 
+        <Modal
+          isOpen={isPostModalOpen}
+          onClose={() => {
+            if (postStatus !== 'posting') {
+              setIsPostModalOpen(false)
+            }
+          }}
+          title={postStatus === 'posting' ? 'Posting Video...' : postStatus === 'success' ? 'Video Posted!' : 'Error'}
+          size="md"
+        >
+          <div className="py-6 text-center">
+            {postStatus === 'posting' && (
+              <div className="space-y-4">
+                <Loader className="mx-auto h-12 w-12 animate-spin text-brand-500" />
+                <p className="text-lg font-medium text-slate-900">Your video is being posted</p>
+                <p className="text-sm text-slate-500">This may take a few moments...</p>
+              </div>
+            )}
+
+            {postStatus === 'success' && (
+              <div className="space-y-6">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
+                  <CheckCircle2 className="h-10 w-10 text-emerald-600" />
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xl font-semibold text-slate-900">Success!</p>
+                  <p className="text-slate-500">Your video has been scheduled for posting to your selected platforms.</p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setIsPostModalOpen(false)}
+                    className="flex-1"
+                  >
+                    Ok, stay here
+                  </Button>
+                  <Button
+                    onClick={() => navigate('/posts')}
+                    className="flex-1"
+                  >
+                    View all posts
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {postStatus === 'error' && (
+              <div className="space-y-6">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rose-100">
+                  <span className="text-4xl text-rose-600">!</span>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xl font-semibold text-slate-900">Failed to post</p>
+                  <p className="text-slate-500">There was an error scheduling your post. Please try again.</p>
+                </div>
+                <Button
+                  onClick={() => setIsPostModalOpen(false)}
+                  className="w-full"
+                >
+                  Close
+                </Button>
+              </div>
+            )}
+          </div>
+        </Modal>
       </div>
     </Layout>
   )
