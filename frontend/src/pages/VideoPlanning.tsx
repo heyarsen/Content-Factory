@@ -536,15 +536,14 @@ export function VideoPlanning() {
       }
       setCreateModal(false)
       setPlanName('')
-      setVideosPerDay(3)
       setStartDate(new Date().toISOString().split('T')[0])
       setEndDate('')
       // Avatar state reset removed - using Sora for video generation
       setAutoScheduleTrigger('daily')
       setTriggerTime('09:00')
       setDefaultPlatforms([])
-      setVideoTimes(['09:00', '14:00', '19:00'])
-      setVideoTopics(['', '', ''])
+      setVideoTimes(['09:00'])
+      setVideoTopics([''])
     } catch (error: any) {
       alert(error.response?.data?.error || 'Failed to create plan')
     } finally {
@@ -604,7 +603,6 @@ export function VideoPlanning() {
   const handleEditPlan = (plan: VideoPlan) => {
     setEditPlanModal(plan)
     setPlanName(plan.name)
-    setVideosPerDay(plan.videos_per_day)
     setStartDate(plan.start_date.split('T')[0])
     setEndDate(plan.end_date ? plan.end_date.split('T')[0] : '')
     setAutoScheduleTrigger(plan.auto_schedule_trigger || 'daily')
@@ -614,8 +612,11 @@ export function VideoPlanning() {
     setDefaultPlatforms(plan.default_platforms || [])
     setTimezone(plan.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone)
     // Load existing video times and topics from plan items if needed
-    // For now, use defaults
-    setVideoTimes(['09:00', '14:00', '19:00'].slice(0, plan.videos_per_day))
+    // For now, use defaults based on plan.videos_per_day count
+    setVideoTimes(Array(plan.videos_per_day).fill('09:00').map((t, i) => {
+      // Very rough approximation - ideally we fetch items here
+      return ['09:00', '14:00', '19:00', '21:00', '12:00'][i] || '09:00'
+    }).slice(0, plan.videos_per_day))
     setVideoTopics(Array(plan.videos_per_day).fill(''))
   }
 
@@ -648,14 +649,13 @@ export function VideoPlanning() {
       setEditPlanModal(null)
       // Reset form
       setPlanName('')
-      setVideosPerDay(3)
       setStartDate(new Date().toISOString().split('T')[0])
       setEndDate('')
       setAutoScheduleTrigger('daily')
       setTriggerTime('09:00')
       setDefaultPlatforms([])
-      setVideoTimes(['09:00', '14:00', '19:00'])
-      setVideoTopics(['', '', ''])
+      setVideoTimes(['09:00'])
+      setVideoTopics([''])
     } catch (error: any) {
       alert(error.response?.data?.error || 'Failed to update plan')
     } finally {
@@ -2384,14 +2384,13 @@ export function VideoPlanning() {
                 onClick={() => {
                   setEditPlanModal(null)
                   setPlanName('')
-                  setVideosPerDay(3)
                   setStartDate(new Date().toISOString().split('T')[0])
                   setEndDate('')
                   setAutoScheduleTrigger('daily')
                   setTriggerTime('09:00')
                   setDefaultPlatforms([])
-                  setVideoTimes(['09:00', '14:00', '19:00'])
-                  setVideoTopics(['', '', ''])
+                  setVideoTimes(['09:00'])
+                  setVideoTopics([''])
 
                 }}
               >
