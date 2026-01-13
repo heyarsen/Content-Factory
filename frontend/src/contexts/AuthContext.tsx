@@ -13,6 +13,7 @@ interface AuthContextType {
   loading: boolean
   signUp: (email: string, password: string) => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
+  signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
 }
@@ -60,10 +61,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('[Auth] Attempting to sign in...')
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
       console.log('[Auth] API URL:', API_URL)
-      
+
       const { data } = await api.post('/api/auth/login', { email, password })
       console.log('[Auth] Login response received:', { hasToken: !!data.access_token, hasUser: !!data.user })
-      
+
       if (data.access_token) {
         localStorage.setItem('access_token', data.access_token)
         setUser(data.user)
@@ -117,12 +118,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('access_token')
   }
 
+  const signInWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/dashboard`,
+      },
+    })
+    if (error) throw error
+  }
+
   const resetPassword = async (email: string) => {
     await api.post('/api/auth/reset-password', { email })
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signUp, signIn, signOut, resetPassword }}>
+    <AuthContext.Provider value={{ user, loading, signUp, signIn, signInWithGoogle, signOut, resetPassword }}>
       {children}
     </AuthContext.Provider>
   )
