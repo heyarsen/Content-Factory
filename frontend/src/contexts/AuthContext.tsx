@@ -28,19 +28,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Check for existing session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('role')
-          .eq('id', session.user.id)
-          .single()
+      try {
+        if (session?.user) {
+          const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('role')
+            .eq('id', session.user.id)
+            .single()
 
-        setUser({
-          ...session.user,
-          role: profile?.role || 'user'
-        } as User)
-        localStorage.setItem('access_token', session.access_token)
+          setUser({
+            ...session.user,
+            role: profile?.role || 'user'
+          } as User)
+          localStorage.setItem('access_token', session.access_token)
+        }
+      } catch (error) {
+        console.error('Error loading initial session:', error)
+      } finally {
+        setLoading(false)
       }
+    }).catch((err: any) => {
+      console.error('Get session error:', err)
       setLoading(false)
     })
 
@@ -48,23 +56,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) {
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('role')
-          .eq('id', session.user.id)
-          .single()
+      try {
+        if (session?.user) {
+          const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('role')
+            .eq('id', session.user.id)
+            .single()
 
-        setUser({
-          ...session.user,
-          role: profile?.role || 'user'
-        } as User)
-        localStorage.setItem('access_token', session.access_token)
-      } else {
-        setUser(null)
-        localStorage.removeItem('access_token')
+          setUser({
+            ...session.user,
+            role: profile?.role || 'user'
+          } as User)
+          localStorage.setItem('access_token', session.access_token)
+        } else {
+          setUser(null)
+          localStorage.removeItem('access_token')
+        }
+      } catch (error) {
+        console.error('Error handling auth change:', error)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     })
 
     return () => subscription.unsubscribe()
