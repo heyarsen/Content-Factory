@@ -26,11 +26,24 @@ export function useCredits() {
   }
 
   useEffect(() => {
-    fetchCredits()
+    let mounted = true
+
+    const safeFetch = async () => {
+      if (!mounted) return
+      await fetchCredits()
+    }
+
+    safeFetch()
 
     // Refresh credits every 30 seconds
-    const interval = setInterval(fetchCredits, 30000)
-    return () => clearInterval(interval)
+    const interval = setInterval(() => {
+      if (mounted) fetchCredits()
+    }, 30000)
+
+    return () => {
+      mounted = false
+      clearInterval(interval)
+    }
   }, [])
 
   return { credits, unlimited, subscription, loading, refreshCredits: fetchCredits }
