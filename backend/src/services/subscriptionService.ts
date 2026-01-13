@@ -116,7 +116,7 @@ export class SubscriptionService {
   static async getUserSubscription(userId: string): Promise<UserSubscription | null> {
     const { data, error } = await supabase
       .from('user_subscriptions')
-      .select('*')
+      .select('*, plan:subscription_plans(*)')
       .eq('user_id', userId)
       .eq('status', 'active')
       .eq('payment_status', 'completed') // Only return subscriptions with completed payment
@@ -134,14 +134,9 @@ export class SubscriptionService {
       return null
     }
 
-    console.log('[Subscription] Found active subscription:', {
-      userId,
-      subscriptionId: data.id,
-      planId: data.plan_id,
-      creditsRemaining: data.credits_remaining,
-    })
-
-    return data
+    // Cast the joined data to match expectation if needed, or just return as is
+    // The caller will need to handle the nested 'plan' object
+    return data as any as UserSubscription
   }
 
   /**

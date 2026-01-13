@@ -8,7 +8,7 @@ import { Badge } from '../components/ui/Badge'
 import { Skeleton } from '../components/ui/Skeleton'
 import { MessageSquare, Plus, Send, Clock } from 'lucide-react'
 import api from '../lib/api'
-import { useNotification } from '../contexts/NotificationContext'
+import { useNotifications } from '../contexts/NotificationContext'
 
 interface Ticket {
     id: string
@@ -38,7 +38,7 @@ export function Support() {
     const [message, setMessage] = useState('')
     const [reply, setReply] = useState('')
     const [sending, setSending] = useState(false)
-    const { addNotification } = useNotification()
+    const { addNotification } = useNotifications()
 
     useEffect(() => {
         loadTickets()
