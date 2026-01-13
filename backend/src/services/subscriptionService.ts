@@ -270,12 +270,11 @@ export class SubscriptionService {
       currentPaymentStatus: subscription.payment_status,
     })
 
-    // Check if credits were already added
+    // Check if credits were already added for this specific payment
     const { data: existingTransaction } = await supabase
       .from('credit_transactions')
       .select('id')
-      .eq('user_id', userId)
-      .eq('operation', `subscription_${plan.id}`)
+      .eq('payment_id', orderReference)
       .limit(1)
       .maybeSingle()
 
