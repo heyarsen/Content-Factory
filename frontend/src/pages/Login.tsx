@@ -24,7 +24,14 @@ export function Login() {
       // Check backend connectivity first
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
       try {
-        const healthCheck = await fetch(`${API_URL}/health`)
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+
+        const healthCheck = await fetch(`${API_URL}/health`, {
+          signal: controller.signal
+        })
+        clearTimeout(timeoutId)
+
         if (!healthCheck.ok) {
           throw new Error('Backend server is not responding correctly')
         }
