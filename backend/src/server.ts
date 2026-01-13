@@ -18,6 +18,8 @@ import avatarRoutes from './routes/avatars.js'
 import creditsRoutes from './routes/credits.js'
 import promptsRoutes from './routes/prompts.js'
 import { initializeScheduler } from './jobs/scheduler.js'
+import adminRoutes from './routes/admin.js'
+import supportRoutes from './routes/support.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -130,7 +132,7 @@ app.get('/diagnostics/supabase', async (req, res) => {
     const controller1 = new AbortController()
     const timeout1 = setTimeout(() => controller1.abort(), 10000)
     const start1 = Date.now()
-    
+
     try {
       const response = await fetch(`${supabaseUrl}/rest/v1/`, {
         method: 'HEAD',
@@ -141,7 +143,7 @@ app.get('/diagnostics/supabase', async (req, res) => {
       })
       clearTimeout(timeout1)
       const duration1 = Date.now() - start1
-      
+
       tests.push({
         name: 'Basic Connectivity (HEAD /rest/v1/)',
         success: true,
@@ -151,7 +153,7 @@ app.get('/diagnostics/supabase', async (req, res) => {
     } catch (error: any) {
       clearTimeout(timeout1)
       const duration1 = Date.now() - start1
-      
+
       tests.push({
         name: 'Basic Connectivity (HEAD /rest/v1/)',
         success: false,
@@ -173,7 +175,7 @@ app.get('/diagnostics/supabase', async (req, res) => {
     const controller2 = new AbortController()
     const timeout2 = setTimeout(() => controller2.abort(), 10000)
     const start2 = Date.now()
-    
+
     try {
       const response = await fetch(`${supabaseUrl}/auth/v1/health`, {
         method: 'GET',
@@ -181,7 +183,7 @@ app.get('/diagnostics/supabase', async (req, res) => {
       })
       clearTimeout(timeout2)
       const duration2 = Date.now() - start2
-      
+
       tests.push({
         name: 'Auth Endpoint (/auth/v1/health)',
         success: true,
@@ -191,7 +193,7 @@ app.get('/diagnostics/supabase', async (req, res) => {
     } catch (error: any) {
       clearTimeout(timeout2)
       const duration2 = Date.now() - start2
-      
+
       tests.push({
         name: 'Auth Endpoint (/auth/v1/health)',
         success: false,
@@ -212,7 +214,7 @@ app.get('/diagnostics/supabase', async (req, res) => {
   try {
     const urlObj = new URL(supabaseUrl)
     const hostname = urlObj.hostname
-    
+
     tests.push({
       name: 'DNS Resolution',
       success: true,
@@ -246,6 +248,8 @@ app.use('/api/preferences', preferencesRoutes)
 app.use('/api/avatars', avatarRoutes)
 app.use('/api/credits', creditsRoutes)
 app.use('/api/prompts', promptsRoutes)
+app.use('/api/admin', adminRoutes)
+app.use('/api/support', supportRoutes)
 
 // Serve static files from frontend build (if exists)
 // Compiled path: backend/dist/server.js -> go up one level to backend/public

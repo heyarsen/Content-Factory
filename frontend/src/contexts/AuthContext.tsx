@@ -6,6 +6,7 @@ interface User {
   id: string
   email: string
   email_confirmed_at?: string
+  role?: 'user' | 'admin'
 }
 
 interface AuthContextType {
@@ -28,7 +29,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Check for existing session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        setUser(session.user as User)
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single()
+
+        setUser({
+          ...session.user,
+          role: profile?.role || 'user'
+        } as User)
         localStorage.setItem('access_token', session.access_token)
       }
       setLoading(false)
@@ -39,7 +49,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        setUser(session.user as User)
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single()
+
+        setUser({
+          ...session.user,
+          role: profile?.role || 'user'
+        } as User)
         localStorage.setItem('access_token', session.access_token)
       } else {
         setUser(null)

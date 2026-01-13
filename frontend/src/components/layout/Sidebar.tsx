@@ -9,8 +9,12 @@ import {
   Calendar,
   User,
   Settings,
+  HelpCircle,
+  BarChart3,
+  MessagesSquare,
 } from 'lucide-react'
 import api from '../../lib/api'
+import { useAuth } from '../../contexts/AuthContext'
 
 interface SidebarProps {
   isOpen: boolean
@@ -25,10 +29,17 @@ const navigation = [
   { label: 'My Videos', to: '/videos', icon: Clapperboard },
   { label: 'Social Accounts', to: '/social', icon: Share2 },
   { label: 'Avatars', to: '/avatars', icon: User },
+  { label: 'Support', to: '/support', icon: HelpCircle },
   { label: 'Preferences', to: '/preferences', icon: Settings },
 ]
 
+const adminNavigation = [
+  { label: 'Admin Dashboard', to: '/admin', icon: BarChart3 },
+  { label: 'Admin Support', to: '/admin/support', icon: MessagesSquare },
+]
+
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
+  const { user } = useAuth()
   const location = useLocation()
   const [hasVideos, setHasVideos] = useState<boolean | null>(null) // null = loading
 
@@ -86,21 +97,21 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
           <nav className="mt-10 flex flex-1 flex-col gap-2 overflow-y-auto">
             {navigation.map(({ label, to, icon: Icon }) => {
-              const isActive = location.pathname.startsWith(to)
+              const isActive = location.pathname === to || location.pathname.startsWith(to + '/')
               return (
                 <NavLink
                   key={to}
                   to={to}
                   onClick={onClose}
                   className={`group relative flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all duration-200 ${isActive
-                      ? 'bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-transparent text-brand-600'
-                      : 'text-slate-500 hover:bg-white hover:text-primary'
+                    ? 'bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-transparent text-brand-600'
+                    : 'text-slate-500 hover:bg-white hover:text-primary'
                     }`}
                 >
                   <div
                     className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-all duration-200 ${isActive
-                        ? 'border-brand-200 bg-white text-brand-600 shadow-sm'
-                        : 'border-transparent bg-slate-100 text-slate-500 group-hover:border-slate-200'
+                      ? 'border-brand-200 bg-white text-brand-600 shadow-sm'
+                      : 'border-transparent bg-slate-100 text-slate-500 group-hover:border-slate-200'
                       }`}
                   >
                     <Icon className="h-4 w-4" />
@@ -112,6 +123,39 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 </NavLink>
               )
             })}
+
+            {user?.role === 'admin' && (
+              <div className="mt-6 flex flex-col gap-2">
+                <p className="px-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Administration</p>
+                {adminNavigation.map(({ label, to, icon: Icon }) => {
+                  const isActive = location.pathname === to || location.pathname.startsWith(to + '/')
+                  return (
+                    <NavLink
+                      key={to}
+                      to={to}
+                      onClick={onClose}
+                      className={`group relative flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all duration-200 ${isActive
+                        ? 'bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-transparent text-brand-600'
+                        : 'text-slate-500 hover:bg-white hover:text-primary'
+                        }`}
+                    >
+                      <div
+                        className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-all duration-200 ${isActive
+                          ? 'border-brand-200 bg-white text-brand-600 shadow-sm'
+                          : 'border-transparent bg-slate-100 text-slate-500 group-hover:border-slate-200'
+                          }`}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      <span>{label}</span>
+                      {isActive && (
+                        <span className="absolute inset-y-0 right-0 w-1 rounded-full bg-brand-500" />
+                      )}
+                    </NavLink>
+                  )
+                })}
+              </div>
+            )}
           </nav>
 
           {hasVideos === false && (

@@ -5,13 +5,11 @@ import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Modal } from '../components/ui/Modal'
-import { 
-  Users, 
-  Video, 
-  Share2, 
-  Calendar, 
-  Shield, 
-  ShieldCheck, 
+import {
+  Users,
+  Video,
+  Shield,
+  ShieldCheck,
   BarChart3,
   UserPlus,
   UserMinus
@@ -22,19 +20,17 @@ import { useAuth } from '../contexts/AuthContext'
 interface AdminStats {
   users: {
     total: number
+    new: number
   }
   videos: {
     total: number
-    byStatus: Record<string, number>
+    new: number
   }
-  socialAccounts: {
-    total: number
-    byPlatform: Record<string, { total: number; connected: number }>
+  credits: {
+    totalSpent: number
+    totalPurchased: number
   }
-  posts: {
-    total: number
-    byStatus: Record<string, number>
-  }
+  timestamp: string
 }
 
 interface User {
@@ -51,6 +47,7 @@ export function AdminPanel() {
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
+  const [range, setRange] = useState('24h')
   const [usersLoading, setUsersLoading] = useState(false)
   const [actionModal, setActionModal] = useState<{
     type: 'assign' | 'remove'
@@ -62,11 +59,12 @@ export function AdminPanel() {
   useEffect(() => {
     loadStats()
     loadUsers()
-  }, [])
+  }, [range])
 
   const loadStats = async () => {
     try {
-      const response = await api.get('/api/admin/stats')
+      setLoading(true)
+      const response = await api.get(`/api/admin/stats?range=${range}`)
       setStats(response.data)
     } catch (error) {
       console.error('Failed to load stats:', error)
@@ -134,15 +132,29 @@ export function AdminPanel() {
     <Layout>
       <div className="space-y-10">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Administration</p>
-            <h1 className="text-3xl font-semibold text-primary">Admin Panel</h1>
-            <p className="text-sm text-slate-500">Manage users, monitor platform activity, and oversee system operations.</p>
+            <h1 className="text-3xl font-semibold text-primary">Admin Dashboard</h1>
+            <p className="text-sm text-slate-500">Monitor platform activity and oversee system operations.</p>
           </div>
-          <div className="flex items-center gap-2 rounded-2xl border border-brand-200 bg-brand-50/70 px-4 py-2">
-            <Shield className="h-5 w-5 text-brand-600" />
-            <span className="text-sm font-semibold text-brand-600">Administrator</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 rounded-2xl border border-brand-200 bg-brand-50/70 px-4 py-2">
+              <Shield className="h-5 w-5 text-brand-600" />
+              <span className="text-sm font-semibold text-brand-600">Administrator</span>
+            </div>
+            <select
+              value={range}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setRange(e.target.value)}
+              className="rounded-xl border-slate-200 bg-white text-sm focus:ring-brand-500 py-2 pl-3 pr-8"
+            >
+              <option value="1h">Last Hour</option>
+              <option value="24h">Last 24 Hours</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="1m">Last Month</option>
+              <option value="1y">Last Year</option>
+              <option value="lifetime">Lifetime</option>
+            </select>
           </div>
         </div>
 
@@ -152,8 +164,13 @@ export function AdminPanel() {
             <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-blue-100/60 blur-3xl" />
             <div className="relative z-10 flex items-start justify-between">
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Total Users</p>
-                <p className="mt-3 text-4xl font-semibold text-primary">{stats?.users.total || 0}</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Total Clients</p>
+                <div className="mt-3 flex items-baseline gap-2">
+                  <p className="text-4xl font-semibold text-primary">{stats?.users.total || 0}</p>
+                  {stats?.users.new !== undefined && stats.users.new > 0 && (
+                    <span className="text-xs font-medium text-green-600">+{stats.users.new} new</span>
+                  )}
+                </div>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
                 <Users className="h-5 w-5" />
@@ -166,7 +183,12 @@ export function AdminPanel() {
             <div className="relative z-10 flex items-start justify-between">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Total Videos</p>
-                <p className="mt-3 text-4xl font-semibold text-primary">{stats?.videos.total || 0}</p>
+                <div className="mt-3 flex items-baseline gap-2">
+                  <p className="text-4xl font-semibold text-primary">{stats?.videos.total || 0}</p>
+                  {stats?.videos.new !== undefined && stats.videos.new > 0 && (
+                    <span className="text-xs font-medium text-green-600">+{stats.videos.new} new</span>
+                  )}
+                </div>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-purple-600">
                 <Video className="h-5 w-5" />
@@ -178,11 +200,11 @@ export function AdminPanel() {
             <div className="absolute -right-12 -top-12 h-36 w-36 rounded-full bg-green-100/60 blur-3xl" />
             <div className="relative z-10 flex items-start justify-between">
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Social Accounts</p>
-                <p className="mt-3 text-4xl font-semibold text-primary">{stats?.socialAccounts.total || 0}</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Credits Purchased</p>
+                <p className="mt-3 text-4xl font-semibold text-primary">{stats?.credits.totalPurchased || 0}</p>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-green-50 text-green-600">
-                <Share2 className="h-5 w-5" />
+                <BarChart3 className="h-5 w-5" />
               </div>
             </div>
           </Card>
@@ -191,50 +213,12 @@ export function AdminPanel() {
             <div className="absolute -right-12 -top-12 h-36 w-36 rounded-full bg-amber-100/60 blur-3xl" />
             <div className="relative z-10 flex items-start justify-between">
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Scheduled Posts</p>
-                <p className="mt-3 text-4xl font-semibold text-primary">{stats?.posts.total || 0}</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Credits Spent</p>
+                <p className="mt-3 text-4xl font-semibold text-primary">{stats?.credits.totalSpent || 0}</p>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
-                <Calendar className="h-5 w-5" />
+                <ShieldCheck className="h-5 w-5" />
               </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Detailed Stats */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card>
-            <h2 className="mb-4 text-lg font-semibold text-primary">Video Status Breakdown</h2>
-            <div className="space-y-3">
-              {stats?.videos.byStatus ? (
-                Object.entries(stats.videos.byStatus).map(([status, count]) => (
-                  <div key={status} className="flex items-center justify-between">
-                    <span className="text-sm text-slate-600 capitalize">{status}</span>
-                    <Badge variant="default">{count}</Badge>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-slate-400">No video data available</p>
-              )}
-            </div>
-          </Card>
-
-          <Card>
-            <h2 className="mb-4 text-lg font-semibold text-primary">Social Accounts by Platform</h2>
-            <div className="space-y-3">
-              {stats?.socialAccounts.byPlatform ? (
-                Object.entries(stats.socialAccounts.byPlatform).map(([platform, data]) => (
-                  <div key={platform} className="flex items-center justify-between">
-                    <span className="text-sm text-slate-600 capitalize">{platform}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-400">{data.connected} connected</span>
-                      <Badge variant="default">{data.total} total</Badge>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-slate-400">No social account data available</p>
-              )}
             </div>
           </Card>
         </div>
@@ -260,7 +244,7 @@ export function AdminPanel() {
               {users.map((u) => {
                 const isAdmin = u.roles.includes('admin')
                 const isCurrentUser = u.id === user?.id
-                
+
                 return (
                   <div
                     key={u.id}

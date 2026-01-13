@@ -28,6 +28,8 @@ import { ProfileSettings } from './pages/ProfileSettings'
 import { Preferences } from './pages/Preferences'
 import { Credits } from './pages/Credits'
 import { Avatars } from './pages/Avatars'
+import { Support } from './pages/Support'
+import { AdminSupport } from './pages/AdminSupport'
 
 function AppContent() {
   const { toasts, removeToast } = useToast()
@@ -143,6 +145,22 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <AdminPanel />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/support"
+          element={
+            <ProtectedRoute>
+              <AdminSupport />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/support"
+          element={
+            <ProtectedRoute>
+              <Support />
             </ProtectedRoute>
           }
         />
