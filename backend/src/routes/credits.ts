@@ -39,7 +39,19 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const credits = await CreditsService.getUserCredits(userId)
-    res.json({ credits, unlimited: credits === null })
+    const subscription = await SubscriptionService.getUserSubscription(userId)
+
+    // Check if subscription object has the nested plan
+    const planName = (subscription as any)?.plan?.display_name || (subscription as any)?.plan?.name || null
+
+    res.json({
+      credits,
+      unlimited: credits === null,
+      subscription: subscription ? {
+        ...subscription,
+        plan_name: planName
+      } : null
+    })
   } catch (error: any) {
     console.error('Get credits error:', error)
     res.status(500).json({ error: 'Failed to get credits' })

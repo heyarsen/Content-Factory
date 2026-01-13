@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import api from '../../lib/api'
 import { useAuth } from '../../contexts/AuthContext'
+import { useCredits } from '../../hooks/useCredits'
 
 interface SidebarProps {
   isOpen: boolean
@@ -40,22 +41,8 @@ const adminNavigation = [
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { user } = useAuth()
+  const { credits, subscription, unlimited } = useCredits()
   const location = useLocation()
-  const [hasVideos, setHasVideos] = useState<boolean | null>(null) // null = loading
-
-  // Check if user has videos
-  useEffect(() => {
-    const checkVideos = async () => {
-      try {
-        const response = await api.get('/api/videos', { params: { limit: 1 } })
-        setHasVideos((response.data.videos || []).length > 0)
-      } catch (error) {
-        console.error('Failed to check videos:', error)
-        setHasVideos(false) // Default to showing get started on error
-      }
-    }
-    checkVideos()
-  }, [])
 
   return (
     <Fragment>
@@ -158,23 +145,46 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             )}
           </nav>
 
-          {hasVideos === false && (
-            <div className="mt-auto rounded-2xl border border-white/60 bg-white/70 p-5 text-sm text-slate-500 shadow-inner backdrop-blur">
-              <p className="font-semibold text-primary">Get started</p>
-              <p className="mt-1 text-xs text-slate-500">Create your first video or view your library.</p>
-              <Link
-                to="/create"
-                onClick={onClose}
-                className="mt-4 inline-flex items-center gap-2 text-xs font-semibold text-brand-600 hover:text-brand-700"
-              >
-                Create Video
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M5 12h14" />
-                  <path d="m12 5 7 7-7 7" />
-                </svg>
-              </Link>
-            </div>
-          )}
+          <div className="mt-auto px-2 pb-2">
+            <Link
+              to="/credits"
+              onClick={onClose}
+              className="group block rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 shadow-sm transition-all hover:border-brand-200 hover:shadow-md hover:from-brand-50/50 hover:to-white"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${credits !== null && credits < 5 && !unlimited ? 'bg-amber-100 text-amber-600' : 'bg-brand-100 text-brand-600'}`}>
+                    <Sparkles className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-900">
+                      {subscription?.plan_name || 'Free Plan'}
+                    </p>
+                    <p className="text-[10px] text-slate-500 font-medium">
+                      {unlimited ? 'Unlimited' : `${credits ?? 0} credits`}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Progress Bar (Visual flair) */}
+              {!unlimited && subscription?.credits_included && (
+                <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className="h-full bg-brand-500 transition-all duration-500"
+                    style={{ width: `${Math.min(100, ((credits ?? 0) / subscription.credits_included) * 100)}%` }}
+                  />
+                </div>
+              )}
+
+              {/* Top Up Button */}
+              {credits !== null && credits < 5 && !unlimited && (
+                <button className="mt-3 w-full rounded-xl bg-brand-600 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700">
+                  Top Up Credits
+                </button>
+              )}
+            </Link>
+          </div>
         </div>
       </aside>
     </Fragment>
