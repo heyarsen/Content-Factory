@@ -50,17 +50,19 @@ CREATE TABLE IF NOT EXISTS credit_packages (
 
 -- Insert top-up packages
 INSERT INTO credit_packages (id, credits, price_usd, display_name, description, sort_order) VALUES
-  ('package_1', 10, 10.00, 'Starter Pack', '10 credits for $10', 1),
-  ('package_2', 25, 20.00, 'Value Pack', '25 credits for $20', 2),
-  ('package_3', 50, 40.00, 'Popular Pack', '50 credits for $40', 3),
-  ('package_4', 100, 80.00, 'Pro Pack', '100 credits for $80', 4),
-  ('package_5', 200, 150.00, 'Mega Pack', '200 credits for $150', 5)
+  ('package_1', 20, 10.00, 'Starter Pack', '20 credits for $10', 1),
+  ('package_2', 40, 20.00, 'Value Pack', '40 credits for $20', 2),
+  ('package_3', 120, 50.00, 'Popular Pack', '120 credits for $50', 3),
+  ('package_4', 250, 100.00, 'Pro Pack', '250 credits for $100', 4)
 ON CONFLICT (id) DO UPDATE SET
   credits = EXCLUDED.credits,
   price_usd = EXCLUDED.price_usd,
   display_name = EXCLUDED.display_name,
   description = EXCLUDED.description,
   sort_order = EXCLUDED.sort_order;
+
+-- Deactivate any other packages that might exist
+UPDATE credit_packages SET is_active = false WHERE id NOT IN ('package_1', 'package_2', 'package_3', 'package_4');
 
 -- Enable RLS for packages (read-only for all authenticated users)
 ALTER TABLE credit_packages ENABLE ROW LEVEL SECURITY;

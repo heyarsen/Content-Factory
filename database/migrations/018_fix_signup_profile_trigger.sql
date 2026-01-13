@@ -14,7 +14,7 @@ RETURNS TRIGGER AS $$
 BEGIN
   BEGIN
     INSERT INTO user_profiles (id, credits)
-    VALUES (NEW.id, 0)
+    VALUES (NEW.id, 3)
     ON CONFLICT (id) DO NOTHING;
   EXCEPTION WHEN OTHERS THEN
     -- Never block user signup if profile creation fails.

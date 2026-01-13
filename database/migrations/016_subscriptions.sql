@@ -16,9 +16,10 @@ CREATE TABLE IF NOT EXISTS subscription_plans (
 
 -- Insert subscription plans
 INSERT INTO subscription_plans (id, name, credits, price_usd, display_name, description, sort_order) VALUES
+  ('plan_free', 'free', 0, 0.00, 'Free Plan', 'Free testing plan', 0),
   ('plan_1', 'starter', 20, 10.00, 'Starter Plan', '20 credits for $10', 1),
-  ('plan_2', 'professional', 40, 30.00, 'Professional Plan', '40 credits for $30', 2),
-  ('plan_3', 'enterprise', 150, 100.00, 'Enterprise Plan', '150 credits for $100', 3)
+  ('plan_2', 'professional', 70, 30.00, 'Professional Plan', '70 credits for $30', 2),
+  ('plan_3', 'enterprise', 250, 100.00, 'Enterprise Plan', '250 credits for $100', 3)
 ON CONFLICT (id) DO UPDATE SET
   credits = EXCLUDED.credits,
   price_usd = EXCLUDED.price_usd,

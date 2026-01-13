@@ -67,12 +67,12 @@ export function Credits() {
     loadPackages()
     loadTransactionHistory()
     loadSubscriptionStatus()
-    
+
     // Check for payment status in URL params
     const params = new URLSearchParams(window.location.search)
     const status = params.get('status')
     const orderRef = params.get('order')
-    
+
     if (status === 'success' && orderRef) {
       checkPaymentStatus(orderRef)
       // Clean up URL
@@ -159,8 +159,17 @@ export function Credits() {
     try {
       setPurchasing(planId)
       const response = await api.post('/api/credits/subscribe', { planId })
-      
-      if (response.data.paymentUrl && response.data.paymentFields) {
+
+      if (response.data.type === 'free' || response.data.success) {
+        addNotification({
+          type: 'success',
+          title: 'Plan Activated',
+          message: response.data.message || 'Plan activated successfully!',
+        })
+        refreshCredits()
+        loadSubscriptionStatus()
+        setPurchasing(null)
+      } else if (response.data.paymentUrl && response.data.paymentFields) {
         submitWayForPayForm(response.data.paymentUrl, response.data.paymentFields)
       } else {
         addNotification({
@@ -168,6 +177,7 @@ export function Credits() {
           title: 'Payment Error',
           message: 'Failed to initiate payment',
         })
+        setPurchasing(null)
       }
     } catch (error: any) {
       console.error('Purchase error:', error)
@@ -218,7 +228,7 @@ export function Credits() {
   const checkPaymentStatus = async (orderReference: string) => {
     try {
       const response = await api.get(`/api/credits/check-status/${orderReference}`)
-      
+
       // Backend may return either WayForPay orderStatus (e.g. 'Approved') or our normalized 'completed'
       const status = response.data.status
       if (status === 'Approved' || status === 'completed') {
@@ -468,11 +478,10 @@ export function Credits() {
                     <div className="flex items-center gap-4">
                       <div className="text-right">
                         <p
-                          className={`font-semibold ${
-                            transaction.type === 'topup' || transaction.type === 'refund'
+                          className={`font-semibold ${transaction.type === 'topup' || transaction.type === 'refund'
                               ? 'text-green-600'
                               : 'text-red-600'
-                          }`}
+                            }`}
                         >
                           {transaction.type === 'topup' || transaction.type === 'refund' ? '+' : '-'}
                           {Math.abs(transaction.amount)} credits

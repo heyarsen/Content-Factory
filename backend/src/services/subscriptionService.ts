@@ -128,7 +128,7 @@ export class SubscriptionService {
     // Create new subscription with status based on payment status
     // If payment is pending, subscription status should be 'pending' (not 'active')
     const subscriptionStatus = paymentStatus === 'completed' ? 'active' : 'pending'
-    
+
     console.log('[Subscription] Creating subscription:', {
       userId,
       planId,
@@ -148,6 +148,8 @@ export class SubscriptionService {
         credits_remaining: plan.credits,
         payment_id: orderReference,
         payment_status: paymentStatus,
+        started_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days for monthly subscription
       })
       .select()
       .single()
@@ -160,7 +162,7 @@ export class SubscriptionService {
     // Update user profile and add credits only if payment is completed
     if (paymentStatus === 'completed') {
       console.log('[Subscription] Payment completed, activating subscription and adding credits')
-      
+
       await supabase
         .from('user_profiles')
         .update({
@@ -172,7 +174,7 @@ export class SubscriptionService {
       // Add credits to user account
       const { CreditsService } = await import('./creditsService.js')
       const balanceAfter = await CreditsService.addCredits(userId, plan.credits, `subscription_${planId}`, false)
-      
+
       console.log('[Subscription] Credits added:', {
         userId,
         creditsAdded: plan.credits,
@@ -242,6 +244,8 @@ export class SubscriptionService {
       .update({
         status: 'active',
         payment_status: 'completed',
+        started_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days for monthly subscription
       })
       .eq('id', subscription.id)
 
@@ -275,7 +279,7 @@ export class SubscriptionService {
       const { CreditsService } = await import('./creditsService.js')
       const balanceBefore = await CreditsService.getUserCredits(userId)
       const balanceAfter = await CreditsService.addCredits(userId, plan.credits, `subscription_${plan.id}`, false)
-      
+
       console.log('[Subscription] Credits added successfully:', {
         userId,
         creditsAdded: plan.credits,

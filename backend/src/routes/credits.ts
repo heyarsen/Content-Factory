@@ -16,10 +16,10 @@ const initializeWayForPay = () => {
   const merchantAccount = process.env.WAYFORPAY_MERCHANT_ACCOUNT || 'test_merch_n1'
   const merchantSecretKey = process.env.WAYFORPAY_MERCHANT_SECRET_KEY || 'flk3409refn54t54t*FNJRET'
   const merchantDomainName = process.env.WAYFORPAY_MERCHANT_DOMAIN || 'test.merchant.com'
-  
+
   console.log('[WayForPay] Initializing with merchant account:', merchantAccount)
   console.log('[WayForPay] Using test mode:', merchantAccount === 'test_merch_n1')
-  
+
   WayForPayService.initialize({
     merchantAccount,
     merchantSecretKey,
@@ -54,17 +54,17 @@ router.get('/subscription-status', authenticate, async (req: AuthRequest, res: R
   try {
     const userId = req.userId!
     console.log('[Credits API] Getting subscription status for user:', userId)
-    
+
     const subscription = await SubscriptionService.getUserSubscription(userId)
     const hasSubscription = subscription !== null
-    
+
     // Also check user profile to ensure consistency
     const { data: profile } = await supabase
       .from('user_profiles')
       .select('has_active_subscription, current_subscription_id, credits')
       .eq('id', userId)
       .single()
-    
+
     console.log('[Credits API] Subscription status:', {
       userId,
       hasSubscription,
@@ -74,10 +74,10 @@ router.get('/subscription-status', authenticate, async (req: AuthRequest, res: R
       creditsRemaining: subscription?.credits_remaining,
       userCredits: profile?.credits,
     })
-    
-    res.json({ 
+
+    res.json({
       hasSubscription: hasSubscription && profile?.has_active_subscription === true,
-      subscription 
+      subscription
     })
   } catch (error: any) {
     console.error('[Credits API] Get subscription status error:', error)
@@ -243,6 +243,17 @@ router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) 
       })
     }
 
+    // If amount is 0, activate immediately (free plan)
+    if (amountToCharge === 0) {
+      console.log('[Credits API] Activating free plan:', { userId, planId })
+      await SubscriptionService.createSubscription(userId, planId, orderReference, 'completed')
+      return res.json({
+        success: true,
+        type: 'free',
+        message: 'Plan activated successfully',
+      })
+    }
+
     const hostedForm = WayForPayService.createHostedPaymentForm({
       orderReference,
       amount: amountToCharge,
@@ -296,13 +307,13 @@ router.post('/webhook', async (req: Request, res: Response) => {
 
     // Check if this is a subscription or top-up
     const isSubscription = orderReference.startsWith('subscription_')
-    
+
     console.log('[WayForPay] Processing webhook:', {
       orderReference,
       transactionStatus,
       isSubscription,
     })
-    
+
     if (isSubscription) {
       // Handle subscription payment
       const { data: subscription, error: subError } = await supabase
@@ -379,7 +390,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
         const balanceBefore = await CreditsService.getUserCredits(userId)
         const packageId = transaction.operation?.replace('topup_', '') || ''
         const packageData = await CreditsService.getPackage(packageId)
-        
+
         if (packageData) {
           // Add credits (skip transaction log since we already have one)
           const balanceAfter = await CreditsService.addCredits(
@@ -502,7 +513,7 @@ router.get('/check-status/:orderReference', authenticate, async (req: AuthReques
 
     // Check if this is a subscription or top-up
     const isSubscription = orderReference.startsWith('subscription_')
-    
+
     if (isSubscription) {
       // Handle subscription status check
       const { data: subscription } = await supabase
@@ -530,7 +541,7 @@ router.get('/check-status/:orderReference', authenticate, async (req: AuthReques
         try {
           await SubscriptionService.activateSubscription(userId, orderReference)
           console.log('[Credits API] Subscription activated successfully')
-          
+
           // Fetch updated subscription
           const { data: updatedSubscription } = await supabase
             .from('user_subscriptions')
@@ -538,7 +549,7 @@ router.get('/check-status/:orderReference', authenticate, async (req: AuthReques
             .eq('payment_id', orderReference)
             .eq('user_id', userId)
             .single()
-          
+
           return res.json({
             orderReference: statusResponse.orderReference,
             status: 'completed',
@@ -549,9 +560,9 @@ router.get('/check-status/:orderReference', authenticate, async (req: AuthReques
           })
         } catch (activateError: any) {
           console.error('[Credits API] Error activating subscription:', activateError)
-          return res.status(500).json({ 
+          return res.status(500).json({
             error: 'Failed to activate subscription',
-            details: activateError.message 
+            details: activateError.message
           })
         }
       }
@@ -580,7 +591,7 @@ router.get('/check-status/:orderReference', authenticate, async (req: AuthReques
       if (statusResponse.orderStatus === 'Approved' && transaction.payment_status !== 'completed') {
         const packageId = transaction.operation?.replace('topup_', '') || ''
         const packageData = await CreditsService.getPackage(packageId)
-        
+
         if (packageData) {
           const balanceBefore = await CreditsService.getUserCredits(userId)
           const balanceAfter = await CreditsService.addCredits(
