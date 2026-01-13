@@ -43,6 +43,7 @@ interface UserSubscription {
   status: string
   credits_remaining: number
   started_at: string
+  expires_at: string | null
 }
 
 export function Credits() {
@@ -322,13 +323,20 @@ export function Credits() {
             <h1 className="text-3xl font-bold text-slate-900">Credits & Subscription</h1>
             <p className="mt-2 text-slate-600">Manage your subscription and view credit history</p>
             {hasSubscription && subscription?.status === 'active' && (
-              <button
-                onClick={handleCancel}
-                disabled={purchasing === 'cancel'}
-                className="mt-2 text-sm text-red-600 hover:text-red-700 font-medium underline"
-              >
-                Cancel Subscription
-              </button>
+              <div className="mt-2 flex items-center gap-4">
+                {subscription.expires_at && (
+                  <p className="text-sm text-slate-500">
+                    Subscription renews in {Math.ceil((new Date(subscription.expires_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days
+                  </p>
+                )}
+                <button
+                  onClick={handleCancel}
+                  disabled={purchasing === 'cancel'}
+                  className="text-sm text-red-600 hover:text-red-700 font-medium underline"
+                >
+                  Cancel Subscription
+                </button>
+              </div>
             )}
           </div>
           <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-6 py-4 shadow-sm">
