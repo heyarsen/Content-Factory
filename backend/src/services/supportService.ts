@@ -160,11 +160,11 @@ export class SupportService {
 
         if (messageError) {
             console.error('[Support] Error fetching messages:', messageError)
-            return { ticket: { ...ticket, user_email: (ticket as any).user?.email }, messages: [] }
+            return { ticket: { ...(ticket as any), user_email: (ticket as any).user?.email }, messages: [] }
         }
 
         return {
-            ticket: { ...ticket, user_email: (ticket as any).user?.email },
+            ticket: { ...(ticket as any), user_email: (ticket as any).user?.email },
             messages: messages || []
         }
     }
