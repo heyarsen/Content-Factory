@@ -10,17 +10,25 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Modal } from '../components/ui/Modal'
 import { Textarea } from '../components/ui/Textarea'
-import { Video as VideoIcon, Search, Trash2, RefreshCw, Download, Share2 } from 'lucide-react'
+import { Video as VideoIcon, Search, Trash2, RefreshCw, Download, Share2, Sparkles, Check, Music, Heart, MessageCircle, Bookmark } from 'lucide-react'
 import { useNotifications } from '../contexts/NotificationContext'
+import api from '../lib/api'
 import {
   listVideos,
   deleteVideo as deleteVideoRequest,
   retryVideo as retryVideoRequest,
   getVideo,
   refreshVideoStatus,
+  generateDescription,
   type VideoRecord,
   type ListVideosParams,
 } from '../lib/videos'
+
+interface SocialAccount {
+  id: string
+  platform: string
+  status: string
+}
 
 export function Videos() {
   const { addNotification } = useNotifications()
@@ -33,6 +41,15 @@ export function Videos() {
   const [deleting, setDeleting] = useState(false)
   const [selectedVideo, setSelectedVideo] = useState<VideoRecord | null>(null)
   const [loadingVideo, setLoadingVideo] = useState(false)
+
+  // Post Modal States
+  const [isPostModalOpen, setIsPostModalOpen] = useState(false)
+  const [selectedVideoForPost, setSelectedVideoForPost] = useState<VideoRecord | null>(null)
+  const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([])
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
+  const [postDescription, setPostDescription] = useState('')
+  const [isGeneratingDescription, setIsGeneratingDescription] = useState(false)
+  const [isPosting, setIsPosting] = useState(false)
 
   const notifiedVideosRef = useRef<Set<string>>(new Set())
 
@@ -54,6 +71,26 @@ export function Videos() {
     loadVideos()
   }, [loadVideos])
 
+  const loadSocialAccounts = useCallback(async () => {
+    try {
+      const response = await api.get('/api/social/accounts')
+      const accounts = response.data.accounts || []
+      setSocialAccounts(accounts)
+
+      // Auto-select connected platforms by default
+      const connected = accounts
+        .filter((acc: SocialAccount) => acc.status === 'connected')
+        .map((acc: SocialAccount) => acc.platform)
+      setSelectedPlatforms(connected)
+    } catch (error) {
+      console.error('Failed to load social accounts:', error)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadSocialAccounts()
+  }, [loadSocialAccounts])
+
   // Handle videoId query parameter - open video modal if videoId is in URL
   useEffect(() => {
     const videoId = searchParams.get('videoId')
@@ -66,7 +103,7 @@ export function Videos() {
       }
 
       // Try to find video in current list first
-      const video = videos.find(v => v.id === videoId)
+      const video = videos.find((v: VideoRecord) => v.id === videoId)
       if (video) {
         // Video found in list, load details and show modal
         setLoadingVideo(true)
@@ -221,6 +258,76 @@ export function Videos() {
     }
   }
 
+  const handleOpenPostModal = (video: VideoRecord) => {
+    setSelectedVideoForPost(video)
+    setPostDescription(video.topic) // Default description
+    setIsPostModalOpen(true)
+  }
+
+  const handleGenerateDescription = async () => {
+    if (!selectedVideoForPost) return
+
+    setIsGeneratingDescription(true)
+    try {
+      const { description } = await generateDescription(
+        selectedVideoForPost.id,
+        selectedVideoForPost.topic,
+        selectedVideoForPost.script || undefined
+      )
+      setPostDescription(description)
+      addNotification({
+        type: 'success',
+        title: 'Description Generated',
+        message: 'AI has generated a perfect caption for your video.',
+      })
+    } catch (error) {
+      console.error('Failed to generate description:', error)
+      addNotification({
+        type: 'error',
+        title: 'Generation Failed',
+        message: 'Failed to generate AI description. Please try again.',
+      })
+    } finally {
+      setIsGeneratingDescription(false)
+    }
+  }
+
+  const handlePostToSocial = async () => {
+    if (!selectedVideoForPost || selectedPlatforms.length === 0) {
+      addNotification({
+        type: 'error',
+        title: 'Selection Required',
+        message: 'Please select at least one social media platform.',
+      })
+      return
+    }
+
+    setIsPosting(true)
+    try {
+      await api.post('/api/posts/schedule', {
+        video_id: selectedVideoForPost.id,
+        platforms: selectedPlatforms,
+        caption: postDescription,
+      })
+
+      addNotification({
+        type: 'success',
+        title: 'Posted Successfully',
+        message: `Your video is being posted to ${selectedPlatforms.join(', ')}.`,
+      })
+      setIsPostModalOpen(false)
+    } catch (error) {
+      console.error('Failed to post video:', error)
+      addNotification({
+        type: 'error',
+        title: 'Posting Failed',
+        message: 'Failed to schedule your posts. Please check your social connections.',
+      })
+    } finally {
+      setIsPosting(false)
+    }
+  }
+
   const handleCardClick = async (videoId: string, e: React.MouseEvent) => {
     // Don't open modal if clicking on buttons or interactive elements
     const target = e.target as HTMLElement
@@ -321,7 +428,7 @@ export function Videos() {
           />
         ) : (
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {videos.map((video) => (
+            {videos.map((video: VideoRecord) => (
               <Card
                 key={video.id}
                 hover
@@ -397,7 +504,7 @@ export function Videos() {
                         variant="ghost"
                         size="sm"
                         className="border border-white/60 bg-white/70 text-brand-600 hover:border-brand-200 hover:bg-white"
-                        onClick={() => window.location.href = `/posts?create_for=${video.id}`}
+                        onClick={() => handleOpenPostModal(video)}
                       >
                         <Share2 className="mr-2 h-4 w-4" />
                         Post
@@ -606,7 +713,7 @@ export function Videos() {
                           // /social/share?videoId=... seems appropriate if it existed.
                           // I'll use a placeholder alert implementation for the "Posting" for now, or assume /posts is the place.
                           // Wait, the QuickCreate has logic to post. I should probably lift that.
-                          window.location.href = `/posts?create_for=${selectedVideo.id}`
+                          handleOpenPostModal(selectedVideo)
                         }}
                         leftIcon={<Share2 className="h-4 w-4" />}
                         className="flex-1"
@@ -619,6 +726,182 @@ export function Videos() {
               </div>
             </div>
           ) : null}
+        </Modal>
+
+        {/* Social Posting Modal with TikTok Mockup */}
+        <Modal
+          isOpen={isPostModalOpen}
+          onClose={() => setIsPostModalOpen(false)}
+          title="Post to Social Media"
+          size="lg"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+            {/* Left: TikTok Mockup */}
+            <div className="flex flex-col items-center justify-center bg-slate-50 rounded-2xl p-6 border border-slate-100">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
+                <VideoIcon className="h-3 w-3" />
+                TikTok Mobile Preview
+              </span>
+
+              <div className="relative w-[280px] h-[500px] bg-black rounded-[40px] shadow-2xl border-[8px] border-slate-900 overflow-hidden ring-4 ring-slate-200/50">
+                {/* Status Bar */}
+                <div className="absolute top-0 inset-x-0 h-6 flex justify-between px-6 items-end text-[10px] text-white z-20">
+                  <span>9:41</span>
+                  <div className="flex gap-1.5 h-3 items-center">
+                    <div className="w-4 h-2 border border-white/40 rounded-sm" />
+                  </div>
+                </div>
+
+                {/* Video Content */}
+                {selectedVideoForPost?.video_url ? (
+                  <video
+                    src={selectedVideoForPost.video_url}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center bg-slate-900 text-white text-xs">
+                    Loading preview...
+                  </div>
+                )}
+
+                {/* Vertical Sidebar UI */}
+                <div className="absolute right-3 bottom-24 flex flex-col gap-5 z-20">
+                  <div className="flex flex-col items-center">
+                    <div className="w-10 h-10 rounded-full border-2 border-white bg-slate-400 flex items-center justify-center overflow-hidden">
+                      <div className="w-full h-full bg-brand-500" />
+                    </div>
+                    <div className="absolute -bottom-2 bg-red-500 rounded-full w-4 h-4 flex items-center justify-center text-[10px] text-white font-bold border-2 border-black">+</div>
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <Heart className="h-7 w-7 text-white fill-white/10" />
+                    <span className="text-[10px] text-white font-semibold">12.4K</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <MessageCircle className="h-7 w-7 text-white fill-white/10" />
+                    <span className="text-[10px] text-white font-semibold">842</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <Bookmark className="h-7 w-7 text-white fill-white/10" />
+                    <span className="text-[10px] text-white font-semibold">2.1K</span>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <Share2 className="h-7 w-7 text-white fill-white/10" />
+                    <span className="text-[10px] text-white font-semibold">431</span>
+                  </div>
+                </div>
+
+                {/* Bottom Overlay UI */}
+                <div className="absolute bottom-4 inset-x-0 px-4 pb-2 z-20 text-white">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="font-bold text-sm">@yourcontentfactory</span>
+                    <span className="bg-brand-500 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-tighter">Follow</span>
+                  </div>
+                  <p className="text-xs leading-relaxed mb-3 line-clamp-3 overflow-hidden drop-shadow-md">
+                    {postDescription || selectedVideoForPost?.topic}
+                  </p>
+                  <div className="flex items-center gap-2 max-w-[200px]">
+                    <Music className="h-3 w-3 animate-pulse" />
+                    <div className="flex-1 overflow-hidden">
+                      <div className="text-[11px] whitespace-nowrap animate-scroll">
+                        Original Sound - Content Factory AI
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Nav Bar */}
+                <div className="absolute bottom-0 inset-x-0 h-1 flex justify-center pb-2">
+                  <div className="w-32 h-1 bg-white/30 rounded-full" />
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Post Controls */}
+            <div className="flex flex-col gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                  Select Platforms
+                  <span className="text-[10px] font-normal text-slate-400 normal-case bg-slate-100 px-2 py-0.5 rounded-full">Only connected accounts shown</span>
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {socialAccounts.length > 0 ? (
+                    socialAccounts
+                      .filter((acc: SocialAccount) => acc.status === 'connected')
+                      .map((acc: SocialAccount) => (
+                        <button
+                          key={acc.id}
+                          onClick={() => {
+                            setSelectedPlatforms(prev =>
+                              prev.includes(acc.platform)
+                                ? prev.filter((p: string) => p !== acc.platform)
+                                : [...prev, acc.platform]
+                            )
+                          }}
+                          className={`
+                            px-4 py-2 rounded-xl border text-sm font-medium transition-all duration-200 flex items-center gap-2
+                            ${selectedPlatforms.includes(acc.platform)
+                              ? 'bg-brand-50 border-brand-200 text-brand-600 shadow-sm ring-1 ring-brand-200/50'
+                              : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'}
+                          `}
+                        >
+                          <span className={`w-2 h-2 rounded-full ${selectedPlatforms.includes(acc.platform) ? 'bg-brand-500' : 'bg-slate-300'}`} />
+                          {acc.platform.charAt(0).toUpperCase() + acc.platform.slice(1)}
+                          {selectedPlatforms.includes(acc.platform) && <Check className="h-3 w-3" />}
+                        </button>
+                      ))
+                  ) : (
+                    <div className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3 w-full">
+                      No connected social accounts found. Please connect them in Preferences.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <label className="block text-sm font-semibold text-slate-700">Video Description</label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-[11px] font-bold text-brand-600 bg-brand-50 hover:bg-brand-100 border border-brand-200"
+                    onClick={handleGenerateDescription}
+                    loading={isGeneratingDescription}
+                  >
+                    {!isGeneratingDescription && <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+                    AI Rewrite
+                  </Button>
+                </div>
+                <Textarea
+                  value={postDescription}
+                  onChange={(e) => setPostDescription(e.target.value)}
+                  placeholder="Write a catchy caption..."
+                  className="min-h-[160px] text-sm bg-slate-50/50 border-slate-200 focus:bg-white resize-none"
+                />
+                <p className="mt-2 text-[10px] text-slate-400 italic">
+                  Pro Tip: AI generated descriptions include hashtags and emojis for higher engagement.
+                </p>
+              </div>
+
+              <div className="mt-4 pt-6 border-t border-slate-100">
+                <Button
+                  className="w-full h-12 text-base font-bold shadow-lg shadow-brand-500/20"
+                  onClick={handlePostToSocial}
+                  loading={isPosting}
+                  disabled={selectedPlatforms.length === 0}
+                  leftIcon={!isPosting && <Share2 className="h-5 w-5" />}
+                >
+                  {isPosting ? 'Posting...' : 'Post Now'}
+                </Button>
+                <p className="mt-3 text-center text-[11px] text-slate-400">
+                  Your video will be queued and posted immediately to selected platforms.
+                </p>
+              </div>
+            </div>
+          </div>
         </Modal>
 
         <Modal
@@ -644,7 +927,7 @@ export function Videos() {
           </div>
         </Modal>
       </div>
-    </Layout>
+    </Layout >
   )
 }
 

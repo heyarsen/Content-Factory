@@ -56,3 +56,14 @@ code {
   display: none;  /* Chrome, Safari and Opera */
 }
 
+
+/* TikTok Mockup Animations */
+@keyframes scrollText {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+.animate-scroll {
+  display: inline-block;
+  animation: scrollText 8s linear infinite;
+}
