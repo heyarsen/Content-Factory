@@ -100,6 +100,21 @@ router.get('/plans', authenticate, async (req: AuthRequest, res: Response) => {
 })
 
 /**
+ * POST /api/credits/cancel
+ * Cancel the active subscription
+ */
+router.post('/cancel', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    await SubscriptionService.cancelSubscription(userId)
+    res.json({ message: 'Subscription cancelled successfully' })
+  } catch (error: any) {
+    console.error('Cancel subscription error:', error)
+    res.status(500).json({ error: error.message || 'Failed to cancel subscription' })
+  }
+})
+
+/**
  * GET /api/credits/packages
  * Get available credit top-up packages
  */

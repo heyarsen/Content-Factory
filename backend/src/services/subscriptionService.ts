@@ -339,5 +339,41 @@ export class SubscriptionService {
 
     console.log('[Subscription] Subscription activated successfully')
   }
+
+  /**
+   * Cancel an active subscription
+   */
+  static async cancelSubscription(userId: string): Promise<void> {
+    console.log('[Subscription] Cancelling subscription for user:', userId)
+
+    // 1. Update subscription status
+    const { data: sub, error: updateError } = await supabase
+      .from('user_subscriptions')
+      .update({
+        status: 'cancelled',
+        cancelled_at: new Date().toISOString()
+      })
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .select('id, plan_id')
+      .single()
+
+    if (updateError) {
+      console.error('[Subscription] Error cancelling subscription:', updateError)
+      throw new Error('Failed to cancel subscription')
+    }
+
+    // 2. Update user profile
+    await supabase
+      .from('user_profiles')
+      .update({ has_active_subscription: false })
+      .eq('id', userId)
+
+    // 3. Burn all credits
+    const { CreditsService } = await import('./creditsService.js')
+    await CreditsService.setCredits(userId, 0, `subscription_cancelled_${sub.plan_id}`)
+
+    console.log('[Subscription] Subscription cancelled successfully for user:', userId)
+  }
 }
 

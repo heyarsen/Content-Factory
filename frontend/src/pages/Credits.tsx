@@ -137,7 +137,6 @@ export function Credits() {
   }
 
   const submitWayForPayForm = (paymentUrl: string, fields: Record<string, string>) => {
-    // WayForPay hosted checkout expects a POSTed HTML form
     const form = document.createElement('form')
     form.method = 'POST'
     form.action = paymentUrl
@@ -225,11 +224,36 @@ export function Credits() {
     }
   }
 
+  const handleCancel = async () => {
+    if (!window.confirm('Are you sure you want to cancel your subscription? All your remaining credits will be removed.')) {
+      return
+    }
+
+    try {
+      setPurchasing('cancel')
+      await api.post('/api/credits/cancel')
+      addNotification({
+        type: 'success',
+        title: 'Subscription Cancelled',
+        message: 'Your subscription has been cancelled and credits removed.',
+      })
+      refreshCredits()
+      loadSubscriptionStatus()
+    } catch (error: any) {
+      console.error('Cancel error:', error)
+      addNotification({
+        type: 'error',
+        title: 'Error',
+        message: error.response?.data?.error || 'Failed to cancel subscription',
+      })
+    } finally {
+      setPurchasing(null)
+    }
+  }
+
   const checkPaymentStatus = async (orderReference: string) => {
     try {
       const response = await api.get(`/api/credits/check-status/${orderReference}`)
-
-      // Backend may return either WayForPay orderStatus (e.g. 'Approved') or our normalized 'completed'
       const status = response.data.status
       if (status === 'Approved' || status === 'completed') {
         addNotification({
@@ -289,7 +313,7 @@ export function Credits() {
     })
   }
 
-  const currentPlan = plans.find(p => p.id === subscription?.plan_id)
+  const currentPlan = plans.find((p: SubscriptionPlan) => p.id === subscription?.plan_id)
 
   return (
     <Layout>
@@ -299,6 +323,15 @@ export function Credits() {
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Credits & Subscription</h1>
             <p className="mt-2 text-slate-600">Manage your subscription and view credit history</p>
+            {hasSubscription && subscription?.status === 'active' && (
+              <button
+                onClick={handleCancel}
+                disabled={purchasing === 'cancel'}
+                className="mt-2 text-sm text-red-600 hover:text-red-700 font-medium underline"
+              >
+                Cancel Subscription
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-6 py-4 shadow-sm">
             <Coins className="h-6 w-6 text-amber-500" />
@@ -326,15 +359,18 @@ export function Credits() {
                   <p className="text-sm font-semibold text-slate-700">Active Subscription</p>
                   <p className="text-lg font-bold text-slate-900">{currentPlan?.display_name || 'Subscription'}</p>
                   <p className="text-xs text-slate-600 mt-1">
-                    {subscription.credits_remaining} credits remaining
+                    {subscription.credits_remaining !== undefined ? `${subscription.credits_remaining} credits remaining` : 'Plan active'}
                   </p>
                 </div>
               </div>
               <Button
-                onClick={() => navigate('/credits')}
+                onClick={() => {
+                  const plansElement = document.getElementById('subscription-plans')
+                  plansElement?.scrollIntoView({ behavior: 'smooth' })
+                }}
                 variant="primary"
               >
-                Manage Subscription
+                Change Plan
               </Button>
             </div>
           </Card>
@@ -353,23 +389,23 @@ export function Credits() {
         )}
 
         {/* Subscription Plans */}
-        <div>
+        <div id="subscription-plans">
           <h2 className="mb-4 text-xl font-semibold text-slate-900">
             {hasSubscription ? 'Change Subscription Plan' : 'Choose a Subscription Plan'}
           </h2>
           {loadingPlans ? (
-            <div className="grid gap-4 md:grid-cols-3">
-              {[1, 2, 3].map((i) => (
+            <div className="grid gap-4 md:grid-cols-4">
+              {[1, 2, 3, 4].map((i) => (
                 <Skeleton key={i} className="h-64" />
               ))}
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-3">
-              {plans.map((plan) => {
-                const isCurrentPlan = subscription?.plan_id === plan.id
+            <div className="grid gap-4 md:grid-cols-4">
+              {plans.map((plan: SubscriptionPlan) => {
+                const isCurrentPlan = subscription?.plan_id === plan.id && subscription?.status === 'active'
                 return (
                   <Card key={plan.id} className={`p-6 ${isCurrentPlan ? 'border-brand-500 bg-brand-50' : ''}`}>
-                    <div className="flex flex-col">
+                    <div className="flex flex-col h-full">
                       {isCurrentPlan && (
                         <div className="mb-3 flex items-center gap-2 text-brand-600">
                           <CheckCircle2 className="h-4 w-4" />
@@ -379,12 +415,21 @@ export function Credits() {
                       <div className="mb-4">
                         <h3 className="text-lg font-semibold text-slate-900">{plan.display_name}</h3>
                         {plan.description && (
-                          <p className="mt-1 text-sm text-slate-600">{plan.description}</p>
+                          <p className="mt-1 text-sm text-slate-600 leading-snug">{plan.description}</p>
                         )}
                       </div>
-                      <div className="mb-4 flex items-baseline gap-2">
-                        <span className="text-3xl font-bold text-slate-900">{plan.credits}</span>
-                        <span className="text-sm text-slate-500">credits</span>
+                      <div className="mb-4 mt-auto">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-3xl font-bold text-slate-900">
+                            {plan.id === 'plan_free' ? '3' : plan.credits}
+                          </span>
+                          <span className="text-sm text-slate-500">credits</span>
+                        </div>
+                        {plan.id === 'plan_free' && (
+                          <p className="mt-1 text-[10px] text-slate-500 italic">
+                            (New accounts/Signup only)
+                          </p>
+                        )}
                       </div>
                       <div className="mb-6 flex items-baseline gap-2">
                         <span className="text-2xl font-bold text-brand-600">${plan.price_usd.toFixed(2)}</span>
@@ -393,7 +438,7 @@ export function Credits() {
                       <Button
                         onClick={() => handlePurchase(plan.id)}
                         disabled={purchasing === plan.id || isCurrentPlan}
-                        className="w-full"
+                        className="w-full mt-auto"
                         variant={isCurrentPlan ? "ghost" : "primary"}
                       >
                         {isCurrentPlan ? 'Current Plan' : purchasing === plan.id ? 'Processing...' : hasSubscription ? 'Switch Plan' : 'Subscribe Now'}
@@ -478,13 +523,13 @@ export function Credits() {
                     <div className="flex items-center gap-4">
                       <div className="text-right">
                         <p
-                          className={`font-semibold ${transaction.type === 'topup' || transaction.type === 'refund'
-                              ? 'text-green-600'
-                              : 'text-red-600'
+                          className={`font-semibold ${transaction.type === 'topup' || transaction.type === 'refund' || (transaction.type === 'adjustment' && transaction.amount > 0)
+                            ? 'text-green-600'
+                            : 'text-red-600'
                             }`}
                         >
-                          {transaction.type === 'topup' || transaction.type === 'refund' ? '+' : '-'}
-                          {Math.abs(transaction.amount)} credits
+                          {(transaction.type === 'topup' || transaction.type === 'refund' || (transaction.type === 'adjustment' && transaction.amount > 0)) ? '+' : ''}
+                          {transaction.amount} credits
                         </p>
                         {transaction.balance_after !== null && (
                           <p className="text-xs text-slate-500">
