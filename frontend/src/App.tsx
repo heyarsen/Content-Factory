@@ -205,17 +205,23 @@ function AppContent() {
   )
 }
 
+import { ErrorBoundary } from './components/ui/ErrorBoundary'
+
+// ... imports
+
 function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <NotificationProvider>
-          <BillingGateProvider>
-            <AppContent />
-          </BillingGateProvider>
-        </NotificationProvider>
-      </AuthProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <NotificationProvider>
+            <BillingGateProvider>
+              <AppContent />
+            </BillingGateProvider>
+          </NotificationProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   )
 }
 

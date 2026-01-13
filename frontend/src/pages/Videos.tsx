@@ -53,35 +53,61 @@ export function Videos() {
 
   const notifiedVideosRef = useRef<Set<string>>(new Set())
 
+  // Safety ref to track mounting status
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
   const loadVideos = useCallback(async () => {
     try {
       const videos = await listVideos({
         search: search || undefined,
         status: statusFilter,
       })
-      setVideos(videos)
+      if (mountedRef.current) {
+        setVideos(videos)
+      }
     } catch (error) {
       console.error('Failed to load videos:', error)
     } finally {
-      setLoading(false)
+      if (mountedRef.current) {
+        setLoading(false)
+      }
     }
   }, [search, statusFilter])
 
   useEffect(() => {
     loadVideos()
-  }, [loadVideos])
+
+    // Safety timeout for loading state
+    const timeout = setTimeout(() => {
+      if (loading && mountedRef.current) {
+        console.warn('Videos loading timed out')
+        setLoading(false)
+      }
+    }, 10000)
+
+    return () => clearTimeout(timeout)
+  }, [loadVideos]) // Removed loading from dependency to avoid loop, but it's safe
 
   const loadSocialAccounts = useCallback(async () => {
     try {
       const response = await api.get('/api/social/accounts')
-      const accounts = response.data.accounts || []
-      setSocialAccounts(accounts)
+      if (mountedRef.current) {
+        const accounts = response.data.accounts || []
+        setSocialAccounts(accounts)
 
-      // Auto-select connected platforms by default
-      const connected = accounts
-        .filter((acc: SocialAccount) => acc.status === 'connected')
-        .map((acc: SocialAccount) => acc.platform)
-      setSelectedPlatforms(connected)
+        // Auto-select connected platforms by default
+        const connected = accounts
+          .filter((acc: SocialAccount) => acc.status === 'connected')
+          .map((acc: SocialAccount) => acc.platform)
+        setSelectedPlatforms(connected)
+      }
     } catch (error) {
       console.error('Failed to load social accounts:', error)
     }
@@ -102,53 +128,40 @@ export function Videos() {
         return
       }
 
-      // Try to find video in current list first
-      const video = videos.find((v: VideoRecord) => v.id === videoId)
-      if (video) {
-        // Video found in list, load details and show modal
+      const fetchVideo = async () => {
+        if (!mountedRef.current) return
         setLoadingVideo(true)
-        getVideo(videoId)
-          .then((videoData) => {
-            setSelectedVideo(videoData)
-            // Remove videoId from URL to clean it up
+        try {
+          // Try to find video in current list first
+          let video = videos.find((v: VideoRecord) => v.id === videoId)
+          if (!video) {
+            video = await getVideo(videoId)
+          } else {
+            // Even if found in list, nice to refresh details if needed, but existing logic was:
+            // if in list, get details (refresh).
+            video = await getVideo(videoId)
+          }
+
+          if (mountedRef.current) {
+            setSelectedVideo(video)
             setSearchParams({}, { replace: true })
-          })
-          .catch((error) => {
-            console.error('Failed to load video details:', error)
+          }
+        } catch (error) {
+          console.error('Failed to load video details:', error)
+          if (mountedRef.current) {
             addNotification({
               type: 'error',
               title: 'Video Not Found',
               message: 'The requested video could not be found.',
             })
-            // Remove videoId from URL even on error
             setSearchParams({}, { replace: true })
-          })
-          .finally(() => {
-            setLoadingVideo(false)
-          })
-      } else {
-        // Video not in current list, try to load it directly (might be filtered out or list might be empty)
-        setLoadingVideo(true)
-        getVideo(videoId)
-          .then((videoData) => {
-            setSelectedVideo(videoData)
-            // Remove videoId from URL to clean it up
-            setSearchParams({}, { replace: true })
-          })
-          .catch((error) => {
-            console.error('Failed to load video details:', error)
-            addNotification({
-              type: 'error',
-              title: 'Video Not Found',
-              message: 'The requested video could not be found. It may have been deleted or you may not have permission to view it.',
-            })
-            // Remove videoId from URL even on error
-            setSearchParams({}, { replace: true })
-          })
-          .finally(() => {
-            setLoadingVideo(false)
-          })
+          }
+        } finally {
+          if (mountedRef.current) setLoadingVideo(false)
+        }
       }
+
+      fetchVideo()
     }
   }, [searchParams, videos, selectedVideo, loading, loadingVideo, setSearchParams, addNotification])
 
@@ -157,8 +170,11 @@ export function Videos() {
     let pollTimeout: NodeJS.Timeout
     let pollDelay = 3000 // Start with 3 seconds
     let consecutiveErrors = 0
+    let isActive = true
 
     const pollStatus = async () => {
+      if (!isActive || !mountedRef.current) return
+
       const generating = videos.filter((v) => v.status === 'generating' || v.status === 'pending')
       if (generating.length === 0) {
         // No videos to poll, check again in 10 seconds
@@ -169,27 +185,32 @@ export function Videos() {
       let hasError = false
       // Refresh status for generating videos
       for (const video of generating) {
+        if (!isActive || !mountedRef.current) break
+
         try {
           const updated = await refreshVideoStatus(video.id)
-          setVideos((prev) =>
-            prev.map((v) => v.id === video.id ? updated : v)
-          )
-          // If this is the selected video, update it too
-          if (selectedVideo?.id === video.id) {
-            setSelectedVideo(updated)
-          }
 
-          // Check if video just completed
-          if (updated.status === 'completed' && !notifiedVideosRef.current.has(video.id)) {
-            notifiedVideosRef.current.add(video.id)
-            addNotification({
-              type: 'success',
-              title: 'Video Ready!',
-              message: `"${updated.topic}" has finished generating and is ready to view.`,
-              link: `/videos`,
-            })
-          } else if (updated.status !== 'completed' && notifiedVideosRef.current.has(video.id)) {
-            notifiedVideosRef.current.delete(video.id)
+          if (mountedRef.current && isActive) {
+            setVideos((prev) =>
+              prev.map((v) => v.id === video.id ? updated : v)
+            )
+            // If this is the selected video, update it too
+            if (selectedVideo?.id === video.id) {
+              setSelectedVideo(updated)
+            }
+
+            // Check if video just completed
+            if (updated.status === 'completed' && !notifiedVideosRef.current.has(video.id)) {
+              notifiedVideosRef.current.add(video.id)
+              addNotification({
+                type: 'success',
+                title: 'Video Ready!',
+                message: `"${updated.topic}" has finished generating and is ready to view.`,
+                link: `/videos`,
+              })
+            } else if (updated.status !== 'completed' && notifiedVideosRef.current.has(video.id)) {
+              notifiedVideosRef.current.delete(video.id)
+            }
           }
         } catch (error: any) {
           hasError = true
@@ -202,7 +223,7 @@ export function Videos() {
             console.warn(`Rate limited (429) while polling. Waiting ${pollDelay / 1000}s before next poll.`)
 
             // Show notification only once
-            if (consecutiveErrors === 1) {
+            if (consecutiveErrors === 1 && mountedRef.current) {
               addNotification({
                 type: 'warning',
                 title: 'Rate Limit Reached',
@@ -218,6 +239,8 @@ export function Videos() {
         }
       }
 
+      if (!isActive || !mountedRef.current) return
+
       // Reset error tracking on success
       if (!hasError) {
         consecutiveErrors = 0
@@ -232,6 +255,7 @@ export function Videos() {
     pollTimeout = setTimeout(pollStatus, pollDelay)
 
     return () => {
+      isActive = false
       if (pollTimeout) clearTimeout(pollTimeout)
     }
   }, [videos, selectedVideo, addNotification])
