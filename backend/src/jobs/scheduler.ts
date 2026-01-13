@@ -10,12 +10,12 @@ import { processJobQueue } from './processors.js'
  */
 export function initializeScheduler(): void {
   console.log('Initializing job scheduler...')
-  const { SubscriptionService } = await import('../services/subscriptionService.js')
 
   // Subscription expiration job: Runs every hour
   cron.schedule('0 * * * *', async () => {
     console.log('[Cron] Running subscription expiration job...')
     try {
+      const { SubscriptionService } = await import('../services/subscriptionService.js')
       await SubscriptionService.expireSubscriptions()
     } catch (error: any) {
       console.error('[Subscription Expiration] Error:', error)
