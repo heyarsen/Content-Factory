@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import {
   Clapperboard,
@@ -13,7 +13,6 @@ import {
   BarChart3,
   MessagesSquare,
 } from 'lucide-react'
-import api from '../../lib/api'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCredits } from '../../hooks/useCredits'
 
