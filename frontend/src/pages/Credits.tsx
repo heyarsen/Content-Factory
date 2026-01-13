@@ -7,7 +7,6 @@ import { useCredits } from '../hooks/useCredits'
 import { useNotifications } from '../contexts/NotificationContext'
 import { Coins, CheckCircle2, XCircle, Clock, ArrowUpRight, ArrowDownRight, History, Crown, AlertCircle } from 'lucide-react'
 import api from '../lib/api'
-import { useNavigate } from 'react-router-dom'
 
 interface SubscriptionPlan {
   id: string
@@ -47,7 +46,6 @@ interface UserSubscription {
 }
 
 export function Credits() {
-  const navigate = useNavigate()
   const { credits, unlimited, loading: creditsLoading, refreshCredits } = useCredits()
   const { addNotification } = useNotifications()
   const [plans, setPlans] = useState<SubscriptionPlan[]>([])
