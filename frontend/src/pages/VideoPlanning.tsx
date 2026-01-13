@@ -82,6 +82,12 @@ interface VideoPlanItem {
   updated_at?: string
 }
 
+interface SocialAccount {
+  id: string
+  platform: string
+  status: string
+}
+
 interface ScheduledPost {
   id: string
   video_id: string
@@ -111,6 +117,7 @@ export function VideoPlanning() {
     const day = String(today.getDate()).padStart(2, '0')
     return `${year}-${month}-${day}`
   })
+  const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([])
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [statusFilter, setStatusFilter] = useState<string>(() => {
     if (typeof window === 'undefined') return 'all'
@@ -189,13 +196,28 @@ export function VideoPlanning() {
   // Avatar-related functions removed - using Sora for video generation
 
 
-  // Available platforms
-  const availablePlatforms = ['instagram', 'youtube', 'tiktok', 'twitter']
   const [creating, setCreating] = useState(false)
+
+  const loadSocialAccounts = async () => {
+    try {
+      const response = await api.get('/api/social/accounts')
+      const accounts = response.data.accounts || []
+      setSocialAccounts(accounts)
+
+      // Auto-select connected platforms by default for new plans
+      const connected = accounts
+        .filter((acc: SocialAccount) => acc.status === 'connected')
+        .map((acc: SocialAccount) => acc.platform)
+      setDefaultPlatforms(connected)
+    } catch (error) {
+      console.error('Failed to load social accounts:', error)
+    }
+  }
 
   useEffect(() => {
     loadPlans()
     loadUserPreferences()
+    loadSocialAccounts()
   }, [])
 
   const loadUserPreferences = async () => {
@@ -1655,37 +1677,37 @@ export function VideoPlanning() {
                                           Platforms
                                         </label>
                                         <div className="flex flex-wrap gap-2">
-                                          {availablePlatforms.map((platform) => (
-                                            <button
-                                              key={platform}
-                                              type="button"
-                                              onClick={() => {
-                                                const newPlatforms =
-                                                  editForm.platforms.includes(
-                                                    platform,
-                                                  )
-                                                    ? editForm.platforms.filter(
-                                                      (p) => p !== platform,
+                                          {socialAccounts
+                                            .filter((acc) => acc.status === 'connected')
+                                            .map((acc) => (
+                                              <button
+                                                key={acc.platform}
+                                                type="button"
+                                                onClick={() => {
+                                                  const newPlatforms =
+                                                    editForm.platforms.includes(
+                                                      acc.platform,
                                                     )
-                                                    : [
-                                                      ...editForm.platforms,
-                                                      platform,
-                                                    ]
-                                                setEditForm({
-                                                  ...editForm,
-                                                  platforms: newPlatforms,
-                                                })
-                                              }}
-                                              className={`rounded-lg border px-2 py-1 text-xs font-medium transition ${editForm.platforms.includes(
-                                                platform,
-                                              )
-                                                ? 'border-brand-500 bg-brand-50 text-brand-700'
-                                                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                                                }`}
-                                            >
-                                              {platform}
-                                            </button>
-                                          ))}
+                                                      ? editForm.platforms.filter(
+                                                        (p) => p !== acc.platform,
+                                                      )
+                                                      : [
+                                                        ...editForm.platforms,
+                                                        acc.platform,
+                                                      ]
+                                                  setEditForm((prev) => ({
+                                                    ...prev,
+                                                    platforms: newPlatforms,
+                                                  }))
+                                                }}
+                                                className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition ${editForm.platforms.includes(acc.platform)
+                                                  ? 'border-brand-500 bg-brand-50 text-brand-700'
+                                                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                                  }`}
+                                              >
+                                                {acc.platform}
+                                              </button>
+                                            ))}
                                         </div>
                                       </div>
                                     </div>
@@ -1975,29 +1997,31 @@ export function VideoPlanning() {
                         Platforms
                       </label>
                       <div className="flex flex-wrap gap-1">
-                        {availablePlatforms.map((platform) => (
-                          <button
-                            key={platform}
-                            type="button"
-                            onClick={() => {
-                              const newPlatforms = editForm.platforms.includes(
-                                platform,
-                              )
-                                ? editForm.platforms.filter((p: string) => p !== platform)
-                                : [...editForm.platforms, platform]
-                              setEditForm((prev: any) => ({
-                                ...prev,
-                                platforms: newPlatforms,
-                              }))
-                            }}
-                            className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize transition ${editForm.platforms.includes(platform)
-                              ? 'border-brand-500 bg-brand-50 text-brand-700'
-                              : 'border-slate-200 bg-white text-slate-600 hover:border-brand-200'
-                              }`}
-                          >
-                            {platform}
-                          </button>
-                        ))}
+                        {socialAccounts
+                          .filter((acc) => acc.status === 'connected')
+                          .map((acc) => (
+                            <button
+                              key={acc.platform}
+                              type="button"
+                              onClick={() => {
+                                const newPlatforms = editForm.platforms.includes(
+                                  acc.platform,
+                                )
+                                  ? editForm.platforms.filter((p: string) => p !== acc.platform)
+                                  : [...editForm.platforms, acc.platform]
+                                setEditForm((prev: any) => ({
+                                  ...prev,
+                                  platforms: newPlatforms,
+                                }))
+                              }}
+                              className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize transition ${editForm.platforms.includes(acc.platform)
+                                ? 'border-brand-500 bg-brand-50 text-brand-700'
+                                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                }`}
+                            >
+                              {acc.platform}
+                            </button>
+                          ))}
                       </div>
                     </div>
                   </div>
@@ -2164,30 +2188,32 @@ export function VideoPlanning() {
                 Social media where this video will be posted
               </label>
               <div className="flex flex-wrap gap-2">
-                {availablePlatforms.map((platform) => (
-                  <button
-                    key={platform}
-                    type="button"
-                    onClick={() => {
-                      if (defaultPlatforms.includes(platform)) {
-                        setDefaultPlatforms(
-                          defaultPlatforms.filter((p) => p !== platform),
-                        )
-                      } else {
-                        setDefaultPlatforms([...defaultPlatforms, platform])
-                      }
-                    }}
-                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition ${defaultPlatforms.includes(platform)
-                      ? 'border-brand-500 bg-brand-50 text-brand-700'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                      }`}
-                  >
-                    {platform}
-                    {defaultPlatforms.includes(platform) && (
-                      <span className="ml-1">✓</span>
-                    )}
-                  </button>
-                ))}
+                {socialAccounts
+                  .filter((acc) => acc.status === 'connected')
+                  .map((acc) => (
+                    <button
+                      key={acc.platform}
+                      type="button"
+                      onClick={() => {
+                        if (defaultPlatforms.includes(acc.platform)) {
+                          setDefaultPlatforms(
+                            defaultPlatforms.filter((p) => p !== acc.platform),
+                          )
+                        } else {
+                          setDefaultPlatforms([...defaultPlatforms, acc.platform])
+                        }
+                      }}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition ${defaultPlatforms.includes(acc.platform)
+                        ? 'border-brand-500 bg-brand-50 text-brand-700'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                        }`}
+                    >
+                      {acc.platform}
+                      {defaultPlatforms.includes(acc.platform) && (
+                        <span className="ml-1">✓</span>
+                      )}
+                    </button>
+                  ))}
               </div>
             </div>
 
@@ -2357,24 +2383,26 @@ export function VideoPlanning() {
                 Social media where this video will be posted
               </label>
               <div className="flex flex-wrap gap-2">
-                {availablePlatforms.map((platform) => (
-                  <button
-                    key={platform}
-                    type="button"
-                    onClick={() => {
-                      const newPlatforms = defaultPlatforms.includes(platform)
-                        ? defaultPlatforms.filter((p) => p !== platform)
-                        : [...defaultPlatforms, platform]
-                      setDefaultPlatforms(newPlatforms)
-                    }}
-                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${defaultPlatforms.includes(platform)
-                      ? 'border-brand-500 bg-brand-50 text-brand-700'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                      }`}
-                  >
-                    {platform.charAt(0).toUpperCase() + platform.slice(1)}
-                  </button>
-                ))}
+                {socialAccounts
+                  .filter((acc) => acc.status === 'connected')
+                  .map((acc) => (
+                    <button
+                      key={acc.platform}
+                      type="button"
+                      onClick={() => {
+                        const newPlatforms = defaultPlatforms.includes(acc.platform)
+                          ? defaultPlatforms.filter((p) => p !== acc.platform)
+                          : [...defaultPlatforms, acc.platform]
+                        setDefaultPlatforms(newPlatforms)
+                      }}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${defaultPlatforms.includes(acc.platform)
+                        ? 'border-brand-500 bg-brand-50 text-brand-700'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                        }`}
+                    >
+                      {acc.platform.charAt(0).toUpperCase() + acc.platform.slice(1)}
+                    </button>
+                  ))}
               </div>
             </div>
 
