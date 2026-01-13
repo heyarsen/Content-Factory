@@ -26,30 +26,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let mounted = true;
+
+    // Failsafe: If nothing happens within 5 seconds, stop loading
+    const safetyTimeout = setTimeout(() => {
+      if (mounted) {
+        console.warn('[Auth] Initialization timed out, forcing loading to false')
+        setLoading(false)
+      }
+    }, 5000)
+
     // Check for existing session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       try {
-        if (session?.user) {
+        if (mounted && session?.user) {
           const { data: profile } = await supabase
             .from('user_profiles')
             .select('role')
             .eq('id', session.user.id)
             .single()
 
-          setUser({
-            ...session.user,
-            role: profile?.role || 'user'
-          } as User)
-          localStorage.setItem('access_token', session.access_token)
+          if (mounted) {
+            setUser({
+              ...session.user,
+              role: profile?.role || 'user'
+            } as User)
+            localStorage.setItem('access_token', session.access_token)
+          }
         }
       } catch (error) {
         console.error('Error loading initial session:', error)
       } finally {
-        setLoading(false)
+        if (mounted) {
+          setLoading(false)
+          clearTimeout(safetyTimeout)
+        }
       }
     }).catch((err: any) => {
       console.error('Get session error:', err)
-      setLoading(false)
+      if (mounted) {
+        setLoading(false)
+        clearTimeout(safetyTimeout)
+      }
     })
 
     // Listen for auth changes
@@ -58,29 +76,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       try {
         if (session?.user) {
+          // If we receive an auth change event, clear the safety timeout as we're active
+          clearTimeout(safetyTimeout)
+
           const { data: profile } = await supabase
             .from('user_profiles')
             .select('role')
             .eq('id', session.user.id)
             .single()
 
-          setUser({
-            ...session.user,
-            role: profile?.role || 'user'
-          } as User)
-          localStorage.setItem('access_token', session.access_token)
-        } else {
+          if (mounted) {
+            setUser({
+              ...session.user,
+              role: profile?.role || 'user'
+            } as User)
+            localStorage.setItem('access_token', session.access_token)
+          }
+        } else if (mounted) {
           setUser(null)
           localStorage.removeItem('access_token')
         }
       } catch (error) {
         console.error('Error handling auth change:', error)
       } finally {
-        setLoading(false)
+        if (mounted) setLoading(false)
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      mounted = false
+      clearTimeout(safetyTimeout)
+      subscription.unsubscribe()
+    }
   }, [])
 
   const signUp = async (email: string, password: string) => {
@@ -94,7 +121,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
       console.log('[Auth] API URL:', API_URL)
 
-      const { data } = await api.post('/api/auth/login', { email, password })
+      // Use a shorter timeout for login specifically (15 seconds)
+      const { data } = await api.post('/api/auth/login', { email, password }, { timeout: 15000 })
       console.log('[Auth] Login response received:', { hasToken: !!data.access_token, hasUser: !!data.user })
 
       if (data.access_token) {
