@@ -128,16 +128,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data.access_token) {
         localStorage.setItem('access_token', data.access_token)
         setUser(data.user)
-        // Set session in Supabase client
-        const { error: sessionError } = await supabase.auth.setSession({
-          access_token: data.access_token,
-          refresh_token: data.refresh_token || data.access_token,
-        })
-        if (sessionError) {
-          console.error('[Auth] Failed to set Supabase session:', sessionError)
-          // Continue anyway since we have the token
-        } else {
-          console.log('[Auth] Supabase session set successfully')
+
+        // Log before setting session
+        console.log('[Auth] Setting Supabase session...')
+
+        // Set session in Supabase client with a timeout race
+        try {
+          const sessionPromise = supabase.auth.setSession({
+            access_token: data.access_token,
+            refresh_token: data.refresh_token || data.access_token,
+          })
+
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Supabase session set timeout')), 5000)
+          )
+
+          await Promise.race([sessionPromise, timeoutPromise])
+            .then((result: any) => {
+              if (result?.error) console.error('[Auth] Failed to set Supabase session:', result.error)
+              else console.log('[Auth] Supabase session set successfully')
+            })
+            .catch(err => {
+              console.warn('[Auth] Supabase session set warning:', err)
+              // Don't fail login if session set fails/times out, we have the token
+            })
+
+        } catch (error) {
+          console.error('[Auth] Unexpected error setting session:', error)
         }
       } else {
         console.error('[Auth] No access token in response:', data)
