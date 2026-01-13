@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -6,7 +6,7 @@ import { Input } from '../components/ui/Input'
 import { Textarea } from '../components/ui/Textarea'
 import { Badge } from '../components/ui/Badge'
 import { Skeleton } from '../components/ui/Skeleton'
-import { MessageSquare, Plus, Send, Clock, CheckCircle2, ChevronRight } from 'lucide-react'
+import { MessageSquare, Plus, Send, Clock } from 'lucide-react'
 import api from '../lib/api'
 import { useNotification } from '../contexts/NotificationContext'
 
@@ -32,7 +32,7 @@ export function Support() {
     const [tickets, setTickets] = useState<Ticket[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedTicket, setSelectedTicket] = useState<{ ticket: Ticket, messages: Message[] } | null>(null)
-    const [loadingTicket, setLoadingTicket] = useState(false)
+    // const [loadingTicket, setLoadingTicket] = useState(false)
     const [showCreate, setShowCreate] = useState(false)
     const [subject, setSubject] = useState('')
     const [message, setMessage] = useState('')
@@ -56,7 +56,7 @@ export function Support() {
     }
 
     const loadTicketDetails = async (id: string) => {
-        setLoadingTicket(true)
+        // setLoadingTicket(true)
         try {
             const response = await api.get(`/api/support/tickets/${id}`)
             setSelectedTicket(response.data)
@@ -64,7 +64,7 @@ export function Support() {
         } catch (error) {
             console.error('Failed to load ticket details:', error)
         } finally {
-            setLoadingTicket(false)
+            // setLoadingTicket(false)
         }
     }
 
@@ -120,7 +120,7 @@ export function Support() {
             case 'open': return <Badge variant="info">Open</Badge>
             case 'in_progress': return <Badge variant="warning">In Progress</Badge>
             case 'resolved': return <Badge variant="success">Resolved</Badge>
-            case 'closed': return <Badge variant="secondary">Closed</Badge>
+            case 'closed': return <Badge variant="default">Closed</Badge>
             default: return <Badge variant="default">{status}</Badge>
         }
     }
@@ -150,7 +150,7 @@ export function Support() {
                             </div>
                         ) : (
                             <div className="divide-y divide-slate-100">
-                                {tickets.map(ticket => (
+                                {tickets.map((ticket: Ticket) => (
                                     <button
                                         key={ticket.id}
                                         onClick={() => loadTicketDetails(ticket.id)}
@@ -183,7 +183,7 @@ export function Support() {
                                     <Input
                                         placeholder="Briefly describe your issue"
                                         value={subject}
-                                        onChange={e => setSubject(e.target.value)}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSubject(e.target.value)}
                                         required
                                     />
                                 </div>
@@ -192,7 +192,7 @@ export function Support() {
                                     <Textarea
                                         placeholder="Tell us more details about what's happening..."
                                         value={message}
-                                        onChange={e => setMessage(e.target.value)}
+                                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setMessage(e.target.value)}
                                         className="min-h-[200px]"
                                         required
                                     />
@@ -236,10 +236,10 @@ export function Support() {
                                     <Input
                                         placeholder="Type your reply here..."
                                         value={reply}
-                                        onChange={e => setReply(e.target.value)}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setReply(e.target.value)}
                                         disabled={selectedTicket.ticket.status === 'resolved' || selectedTicket.ticket.status === 'closed'}
                                     />
-                                    <Button type="submit" size="icon" disabled={!reply || selectedTicket.ticket.status === 'resolved' || selectedTicket.ticket.status === 'closed'} loading={sending}>
+                                    <Button type="submit" size="sm" disabled={!reply || selectedTicket.ticket.status === 'resolved' || selectedTicket.ticket.status === 'closed'} loading={sending}>
                                         <Send className="h-4 w-4" />
                                     </Button>
                                 </form>

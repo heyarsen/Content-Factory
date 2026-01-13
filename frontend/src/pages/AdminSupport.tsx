@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -32,7 +32,6 @@ export function AdminSupport() {
     const [tickets, setTickets] = useState<Ticket[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedTicket, setSelectedTicket] = useState<{ ticket: Ticket, messages: Message[] } | null>(null)
-    const [loadingTicket, setLoadingTicket] = useState(false)
     const [reply, setReply] = useState('')
     const [sending, setSending] = useState(false)
     const { addNotification } = useNotification()
@@ -53,14 +52,13 @@ export function AdminSupport() {
     }
 
     const loadTicketDetails = async (id: string) => {
-        setLoadingTicket(true)
         try {
             const response = await api.get(`/api/admin/tickets/${id}`)
             setSelectedTicket(response.data)
         } catch (error) {
             console.error('Failed to load ticket details:', error)
         } finally {
-            setLoadingTicket(false)
+            // No cleanup needed
         }
     }
 
