@@ -10,6 +10,17 @@ import { processJobQueue } from './processors.js'
  */
 export function initializeScheduler(): void {
   console.log('Initializing job scheduler...')
+  const { SubscriptionService } = await import('../services/subscriptionService.js')
+
+  // Subscription expiration job: Runs every hour
+  cron.schedule('0 * * * *', async () => {
+    console.log('[Cron] Running subscription expiration job...')
+    try {
+      await SubscriptionService.expireSubscriptions()
+    } catch (error: any) {
+      console.error('[Subscription Expiration] Error:', error)
+    }
+  })
 
   // Auto-approval job: Runs every 5 minutes
   // Checks for reels with status='pending' and scheduled_time <= now
@@ -17,7 +28,7 @@ export function initializeScheduler(): void {
     console.log('[Cron] Running auto-approval job...')
     try {
       const reels = await ReelService.getReelsReadyForAutoApproval()
-      
+
       for (const reel of reels) {
         try {
           await ReelService.approveReel(reel.id)

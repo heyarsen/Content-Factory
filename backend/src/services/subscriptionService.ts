@@ -45,6 +45,54 @@ export class SubscriptionService {
   }
 
   /**
+   * Expire subscriptions that have passed their expires_at date
+   */
+  static async expireSubscriptions(): Promise<void> {
+    const now = new Date().toISOString()
+
+    // 1. Find subscriptions that just expired
+    const { data: expiredSubs, error: findError } = await supabase
+      .from('user_subscriptions')
+      .select('id, user_id, plan_id')
+      .eq('status', 'active')
+      .lt('expires_at', now)
+
+    if (findError) {
+      console.error('[Subscription] Error finding expired subscriptions:', findError)
+      return
+    }
+
+    if (!expiredSubs || expiredSubs.length === 0) {
+      return
+    }
+
+    console.log(`[Subscription] Expiring ${expiredSubs.length} subscriptions`)
+
+    for (const sub of expiredSubs) {
+      try {
+        // Update subscription status
+        await supabase
+          .from('user_subscriptions')
+          .update({ status: 'expired' })
+          .eq('id', sub.id)
+
+        // Update user profile
+        await supabase
+          .from('user_profiles')
+          .update({ has_active_subscription: false })
+          .eq('id', sub.user_id)
+
+        // Reset credits to 0 (or a base amount)
+        const { CreditsService } = await import('./creditsService.js')
+        await CreditsService.setCredits(sub.user_id, 0, `subscription_expired_${sub.plan_id}`)
+
+        console.log(`[Subscription] Expired subscription ${sub.id} for user ${sub.user_id}`)
+      } catch (error) {
+        console.error(`[Subscription] Error processing expiry for sub ${sub.id}:`, error)
+      }
+    }
+  }
+  /**
    * Get plan by ID
    */
   static async getPlan(planId: string): Promise<SubscriptionPlan | null> {
@@ -171,9 +219,9 @@ export class SubscriptionService {
         })
         .eq('id', userId)
 
-      // Add credits to user account
+      // Add credits to user account (Reset to plan amount)
       const { CreditsService } = await import('./creditsService.js')
-      const balanceAfter = await CreditsService.addCredits(userId, plan.credits, `subscription_${planId}`, false)
+      const balanceAfter = await CreditsService.setCredits(userId, plan.credits, `subscription_${planId}`)
 
       console.log('[Subscription] Credits added:', {
         userId,
@@ -278,11 +326,11 @@ export class SubscriptionService {
 
       const { CreditsService } = await import('./creditsService.js')
       const balanceBefore = await CreditsService.getUserCredits(userId)
-      const balanceAfter = await CreditsService.addCredits(userId, plan.credits, `subscription_${plan.id}`, false)
+      const balanceAfter = await CreditsService.setCredits(userId, plan.credits, `subscription_${plan.id}`)
 
-      console.log('[Subscription] Credits added successfully:', {
+      console.log('[Subscription] Credits reset to plan amount successfully:', {
         userId,
-        creditsAdded: plan.credits,
+        planCredits: plan.credits,
         balanceBefore,
         balanceAfter,
       })

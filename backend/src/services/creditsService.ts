@@ -40,6 +40,50 @@ export class CreditsService {
   }
 
   /**
+   * Set user's credit balance to a specific amount
+   * (Used for subscription renewals or resets)
+   */
+  static async setCredits(userId: string, amount: number, reason?: string): Promise<number | null> {
+    console.log(`[Credits] Setting user ${userId} credits to ${amount}. Reason: ${reason}`)
+
+    const { data: currentUser } = await supabase
+      .from('user_profiles')
+      .select('credits')
+      .eq('id', userId)
+      .single()
+
+    const currentCredits = currentUser?.credits ?? 0
+
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .update({
+        credits: amount,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId)
+      .select('credits')
+      .single()
+
+    if (error) {
+      console.error('[Credits] Error setting credits:', error)
+      throw new Error('Failed to set credits')
+    }
+
+    // Log transaction
+    await this.createTransaction(
+      userId,
+      'adjustment',
+      amount - currentCredits,
+      currentCredits,
+      amount,
+      reason,
+      reason || `Set credits to ${amount}`
+    )
+
+    return data.credits
+  }
+
+  /**
    * Check if user has active subscription
    */
   static async hasActiveSubscription(userId: string): Promise<boolean> {
@@ -310,7 +354,7 @@ export class CreditsService {
       return null
     }
 
-    const newCredits = (currentCredits ?? 3) + amount
+    const newCredits = (currentCredits ?? 0) + amount
 
     const { data, error } = await supabase
       .from('user_profiles')
