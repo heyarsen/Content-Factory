@@ -258,15 +258,9 @@ router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) 
       })
     }
 
-    // If amount is 0, activate immediately (free plan)
-    if (amountToCharge === 0) {
-      console.log('[Credits API] Activating free plan:', { userId, planId })
-      await SubscriptionService.createSubscription(userId, planId, orderReference, 'completed')
-      return res.json({
-        success: true,
-        type: 'free',
-        message: 'Plan activated successfully',
-      })
+    // Block free plan from this route - it should be handled via the cancel/switch logic on frontend
+    if (planId === 'plan_free') {
+      return res.status(400).json({ error: 'Free plan cannot be subscribed to. Use cancellation to switch to free plan.' })
     }
 
     const hostedForm = WayForPayService.createHostedPaymentForm({

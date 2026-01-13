@@ -400,7 +400,7 @@ export function Credits() {
           ) : (
             <div className="grid gap-4 md:grid-cols-4">
               {plans.map((plan: SubscriptionPlan) => {
-                const isCurrentPlan = subscription?.plan_id === plan.id && subscription?.status === 'active'
+                const isCurrentPlan = (subscription?.plan_id === plan.id && subscription?.status === 'active') || (!hasSubscription && plan.id === 'plan_free')
                 return (
                   <Card key={plan.id} className={`p-6 ${isCurrentPlan ? 'border-brand-500 bg-brand-50' : ''}`}>
                     <div className="flex flex-col h-full">
@@ -434,7 +434,7 @@ export function Credits() {
                         <span className="text-sm text-slate-500">USD</span>
                       </div>
                       <Button
-                        onClick={() => handlePurchase(plan.id)}
+                        onClick={() => plan.id === 'plan_free' ? handleCancel() : handlePurchase(plan.id)}
                         disabled={purchasing === plan.id || isCurrentPlan}
                         className="w-full mt-auto"
                         variant={isCurrentPlan ? "ghost" : "primary"}
