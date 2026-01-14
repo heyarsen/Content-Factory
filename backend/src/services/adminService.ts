@@ -64,13 +64,13 @@ export class AdminService {
         }
         const { count: newUsers } = await usersQuery
 
-        // 2. Videos count (reels)
+        // 2. Videos count
         const { count: totalVideos } = await supabase
-            .from('reels')
+            .from('videos')
             .select('*', { count: 'exact', head: true })
 
         const videosQuery = supabase
-            .from('reels')
+            .from('videos')
             .select('*', { count: 'exact', head: true })
 
         if (startISO) {

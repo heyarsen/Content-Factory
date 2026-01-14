@@ -206,4 +206,27 @@ export class SupportService {
             throw new Error('Failed to resolve ticket')
         }
     }
+
+    /**
+     * Mark messages as read
+     */
+    static async markAsRead(ticketId: string, userId: string, userToken?: string): Promise<void> {
+        const client = this.getClient(userToken)
+
+        // If user is reading, mark admin replies as read
+        // If admin is reading, mark user messages as read (logic needs to know who is reading)
+        // For simplicity: Mark all messages in this ticket NOT sent by me as read.
+
+        const { error } = await client
+            .from('support_messages')
+            .update({ is_read: true })
+            .eq('ticket_id', ticketId)
+            .neq('sender_id', userId)
+            .eq('is_read', false)
+
+        if (error) {
+            console.error('[Support] Error marking messages as read:', error)
+            // Don't throw, just log
+        }
+    }
 }

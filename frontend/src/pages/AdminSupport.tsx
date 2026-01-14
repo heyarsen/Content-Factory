@@ -7,6 +7,7 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { MessageSquare, Send, Clock, CheckCircle2, User, Mail } from 'lucide-react'
 import api from '../lib/api'
 import { useNotifications } from '../contexts/NotificationContext'
+import { supabase } from '../lib/supabase'
 
 interface Ticket {
     id: string
@@ -34,6 +35,51 @@ export function AdminSupport() {
     const [reply, setReply] = useState('')
     const [sending, setSending] = useState(false)
     const { addNotification } = useNotifications()
+    // We can assume admin user is logged in
+
+    // Real-time subscription
+    useEffect(() => {
+        const subscription = supabase
+            .channel('admin_support_chat')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'support_messages',
+                },
+                async (payload) => {
+                    const newMessage = payload.new as Message
+
+                    // If viewing this ticket, append message
+                    if (selectedTicket && selectedTicket.ticket.id === newMessage.ticket_id) {
+                        setSelectedTicket(prev => {
+                            if (!prev) return null
+                            if (prev.messages.find(m => m.id === newMessage.id)) return prev
+                            return { ...prev, messages: [...prev.messages, newMessage] }
+                        })
+
+                        // If message is from user (not admin), mark as read
+                        if (!newMessage.is_admin_reply) {
+                            try {
+                                await api.post(`/api/admin/tickets/${newMessage.ticket_id}/read`)
+                            } catch (e) {
+                                console.error('Failed to mark user message as read', e)
+                            }
+                        }
+                    }
+
+                    // Always refresh list to update timestamps/status
+                    loadTickets()
+                }
+            )
+            .subscribe()
+
+        return () => {
+            subscription.unsubscribe()
+        }
+    }, [selectedTicket?.ticket.id]) // Re-bind when selected ticket changes to capture current ID in closure if needed, though ref might be better. 
+    // Actually, selectedTicket is in closure. simpler to include deps.
 
     useEffect(() => {
         loadTickets()
@@ -54,6 +100,13 @@ export function AdminSupport() {
         try {
             const response = await api.get(`/api/admin/tickets/${id}`)
             setSelectedTicket(response.data)
+
+            // Mark as read when opening
+            // We assume if admin opens it, they read user messages.
+            // But we only want to mark unread user messages. 
+            // The backend endpoint likely handles "mark all unread messages in this ticket as read".
+            await api.post(`/api/admin/tickets/${id}/read`)
+
         } catch (error) {
             console.error('Failed to load ticket details:', error)
         } finally {
@@ -68,10 +121,19 @@ export function AdminSupport() {
         setSending(true)
         try {
             const response = await api.post(`/api/admin/tickets/${selectedTicket.ticket.id}/message`, { message: reply })
-            setSelectedTicket({
-                ...selectedTicket,
-                messages: [...selectedTicket.messages, response.data]
+            // We don't need to manually append if subscription works, but for instant feedback/optimistic UI:
+            // Actually wait, subscription triggers INSERT event which we handle.
+            // If we append here AND subscription fires, check for dupes.
+            // Our subscription handler checks for dupes.
+
+            setSelectedTicket(prev => {
+                if (!prev) return null
+                return {
+                    ...prev,
+                    messages: [...prev.messages, response.data]
+                }
             })
+
             setReply('')
             // Update ticket in list as well
             setTickets((prev: Ticket[]) => prev.map((t: Ticket) => t.id === selectedTicket.ticket.id ? { ...t, status: 'in_progress', updated_at: new Date().toISOString() } : t))

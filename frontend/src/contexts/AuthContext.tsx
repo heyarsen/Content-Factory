@@ -118,10 +118,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           } catch (profileError) {
             console.warn('[Auth] Auth change profile load failed/timed out:', profileError)
+
             if (mounted) {
+              // PRESERVE ROLE: If we already have a user with the same ID, keep their role
+              // instead of overwriting with 'user' on transient errors.
+              // This fixes the "Admin tab disappears" issue.
+              const existingRole = user?.id === session.user.id ? user.role : 'user'
+
               setUser({
                 ...session.user,
-                role: 'user'
+                role: existingRole
               } as User)
               localStorage.setItem('access_token', session.access_token)
             }

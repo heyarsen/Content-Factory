@@ -9,6 +9,8 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { MessageSquare, Plus, Send, Clock } from 'lucide-react'
 import api from '../lib/api'
 import { useNotifications } from '../contexts/NotificationContext'
+import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 
 interface Ticket {
     id: string
@@ -38,11 +40,61 @@ export function Support() {
     const [message, setMessage] = useState('')
     const [reply, setReply] = useState('')
     const [sending, setSending] = useState(false)
-    const { addNotification } = useNotifications()
+    const { addNotification, refreshSupportCount } = useNotifications()
+    const { user } = useAuth() // Need user ID for subscription filtering if desired, or just use ticket ID
 
     useEffect(() => {
         loadTickets()
-    }, [])
+
+        // Real-time subscription for chat messages
+        const subscription = supabase
+            .channel('support_chat')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'support_messages',
+                },
+                async (payload) => {
+                    const newMessage = payload.new as Message
+
+                    // If looking at this ticket, append message
+                    if (selectedTicket && selectedTicket.ticket.id === newMessage.ticket_id) {
+                        setSelectedTicket(prev => {
+                            if (!prev) return null
+                            // Avoid duplicates
+                            if (prev.messages.find(m => m.id === newMessage.id)) return prev
+
+                            return {
+                                ...prev,
+                                messages: [...prev.messages, newMessage]
+                            }
+                        })
+
+                        // Mark as read immediately if it's not from me
+                        if (newMessage.sender_id !== user?.id) {
+                            try {
+                                await api.post(`/api/support/tickets/${newMessage.ticket_id}/read`)
+                                // Update badge count
+                                refreshSupportCount()
+                            } catch (e) {
+                                console.error('Failed to mark read on new message', e)
+                            }
+                        }
+                    } else {
+                        // If not looking at this ticket, assume badge count will update via NotificationContext
+                        // But we might want to refresh the ticket list to show "updated just now"
+                        loadTickets()
+                    }
+                }
+            )
+            .subscribe()
+
+        return () => {
+            subscription.unsubscribe()
+        }
+    }, [selectedTicket?.ticket.id, user?.id])
 
     const loadTickets = async () => {
         try {
@@ -61,6 +113,11 @@ export function Support() {
             const response = await api.get(`/api/support/tickets/${id}`)
             setSelectedTicket(response.data)
             setShowCreate(false)
+
+            // Mark as read
+            await api.post(`/api/support/tickets/${id}/read`)
+            refreshSupportCount()
+
         } catch (error) {
             console.error('Failed to load ticket details:', error)
         } finally {
