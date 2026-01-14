@@ -8,12 +8,18 @@ export interface Notification {
   title: string
   message: string
   duration?: number
+  read: boolean
+  link?: string
+  createdAt: number
 }
 
 interface NotificationContextType {
   notifications: Notification[]
-  addNotification: (notification: Omit<Notification, 'id'>) => void
+  addNotification: (notification: Omit<Notification, 'id' | 'read' | 'createdAt'>) => void
   removeNotification: (id: string) => void
+  markAsRead: (id: string) => void
+  markAllAsRead: () => void
+  unreadCount: number
   unreadSupportCount: number
   refreshSupportCount: () => Promise<void>
 }
@@ -25,10 +31,17 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [unreadSupportCount, setUnreadSupportCount] = useState(0)
   const { user } = useAuth()
 
-  const addNotification = useCallback((notification: Omit<Notification, 'id'>) => {
+  const unreadCount = notifications.filter(n => !n.read).length
+
+  const addNotification = useCallback((notification: Omit<Notification, 'id' | 'read' | 'createdAt'>) => {
     const id = Math.random().toString(36).substring(7)
-    const newNotification = { ...notification, id }
-    setNotifications((prev) => [...prev, newNotification])
+    const newNotification: Notification = {
+      ...notification,
+      id,
+      read: false,
+      createdAt: Date.now()
+    }
+    setNotifications((prev) => [newNotification, ...prev]) // Add to top
 
     if (notification.duration !== 0) {
       setTimeout(() => {
@@ -47,6 +60,14 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const removeNotification = useCallback((id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id))
+  }, [])
+
+  const markAsRead = useCallback((id: string) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
+  }, [])
+
+  const markAllAsRead = useCallback(() => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })))
   }, [])
 
   const refreshSupportCount = async () => {
@@ -104,10 +125,19 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, [user?.id])
 
   return (
-    <NotificationContext.Provider value={{ notifications, addNotification, removeNotification, unreadSupportCount, refreshSupportCount }}>
+    <NotificationContext.Provider value={{
+      notifications,
+      addNotification,
+      removeNotification,
+      markAsRead,
+      markAllAsRead,
+      unreadCount,
+      unreadSupportCount,
+      refreshSupportCount
+    }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
-        {notifications.map((notification) => (
+      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+        {notifications.slice(0, 5).map((notification) => (
           <NotificationToast key={notification.id} {...notification} onClose={() => removeNotification(notification.id)} />
         ))}
       </div>
@@ -124,7 +154,7 @@ function NotificationToast({ type, title, message, onClose }: Notification & { o
   }
 
   return (
-    <div className={`flex w-80 items-start justify-between rounded-lg border p-4 shadow-lg transition-all ${bgColors[type]}`}>
+    <div className={`pointer-events-auto flex w-80 items-start justify-between rounded-lg border p-4 shadow-lg transition-all ${bgColors[type]}`}>
       <div>
         <h4 className="font-semibold">{title}</h4>
         <p className="mt-1 text-sm opacity-90">{message}</p>
