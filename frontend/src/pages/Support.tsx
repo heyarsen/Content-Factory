@@ -43,6 +43,14 @@ export function Support() {
     const { addNotification, refreshSupportCount } = useNotifications()
     const { user } = useAuth() // Need user ID for subscription filtering if desired, or just use ticket ID
 
+    // Use a ref to track the currently selected ticket without triggering re-renders or stale closures in the effect
+    const selectedTicketRef = React.useRef<{ ticket: Ticket, messages: Message[] } | null>(null)
+
+    // Keep the ref in sync with state
+    useEffect(() => {
+        selectedTicketRef.current = selectedTicket
+    }, [selectedTicket])
+
     useEffect(() => {
         if (!user) return
 
@@ -65,8 +73,10 @@ export function Support() {
                     // Always reload tickets to update the "sidebar" list (unread status, last message time)
                     loadTickets()
 
+                    const currentTicket = selectedTicketRef.current
+
                     // If looking at this ticket, append message
-                    if (selectedTicket && selectedTicket.ticket.id === newMessage.ticket_id) {
+                    if (currentTicket && currentTicket.ticket.id === newMessage.ticket_id) {
                         setSelectedTicket(prev => {
                             if (!prev) return null
                             // Avoid duplicates
@@ -96,7 +106,7 @@ export function Support() {
         return () => {
             subscription.unsubscribe()
         }
-    }, [selectedTicket?.ticket.id, user?.id])
+    }, [user?.id]) // Removed selectedTicket dependency to avoid churn, relying on ref instead
 
     const loadTickets = async () => {
         try {
