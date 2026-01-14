@@ -831,7 +831,7 @@ export function Videos() {
                     <Music className="h-3 w-3 animate-pulse" />
                     <div className="flex-1 overflow-hidden">
                       <div className="text-[11px] whitespace-nowrap animate-scroll">
-                        Original Sound - Content Factory AI
+                        Original Sound - Content Fabrica AI
                       </div>
                     </div>
                   </div>
