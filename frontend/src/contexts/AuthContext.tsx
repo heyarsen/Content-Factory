@@ -28,13 +28,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    // Failsafe: If nothing happens within 5 seconds, stop loading
+    // Failsafe: If nothing happens within 15 seconds, stop loading
     const safetyTimeout = setTimeout(() => {
       if (mounted && loading) {
         console.warn('[Auth] Initialization timed out, forcing loading to false')
         setLoading(false)
       }
-    }, 5000)
+    }, 15000)
 
     const fetchProfileWithTimeout = async (userId: string, retries = 3): Promise<{ data: { role?: 'user' | 'admin' } | null, error: any }> => {
       const attemptFetch = async (attempt: number): Promise<any> => {
@@ -112,7 +112,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log(`[Auth] Auth state change: ${event}`, session?.user?.id)
+
       try {
         if (session?.user) {
           // Don't clear safety timeout here immediately, let it run its course 
@@ -146,6 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           }
         } else if (mounted) {
+          console.log('[Auth] No session user, clearing state')
           setUser(null)
           localStorage.removeItem('access_token')
         }
