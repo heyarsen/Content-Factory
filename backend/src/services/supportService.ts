@@ -15,6 +15,7 @@ export interface SupportMessage {
     id: string
     ticket_id: string
     sender_id: string
+    ticket_owner_id: string
     message: string
     is_admin_reply: boolean
     created_at: string
