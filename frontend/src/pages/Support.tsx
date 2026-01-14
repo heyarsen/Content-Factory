@@ -65,9 +65,6 @@ export function Support() {
                 {
                     event: 'INSERT',
                     schema: 'public',
-                {
-                    event: 'INSERT',
-                    schema: 'public',
                     table: 'support_messages',
                 },
                 async (payload) => {
