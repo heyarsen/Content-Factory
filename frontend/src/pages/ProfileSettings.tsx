@@ -22,6 +22,7 @@ export function ProfileSettings() {
     confirm_password: '',
   })
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     if (user?.email) {
@@ -80,6 +81,23 @@ export function ProfileSettings() {
       toast.error(error.response?.data?.error || 'Failed to update password')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm('This will permanently delete your account and associated data. Continue?')
+    if (!confirmed) return
+
+    setDeleting(true)
+    try {
+      await api.delete('/api/auth/account')
+      toast.success('Account deleted')
+      await signOut()
+      navigate('/login')
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to delete account')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -193,7 +211,7 @@ export function ProfileSettings() {
             <p className="text-sm text-slate-600">
               Sign out of your account. You'll need to sign in again to access your workspace.
             </p>
-            <div className="flex justify-end">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <Button
                 variant="danger"
                 onClick={async () => {
@@ -210,7 +228,18 @@ export function ProfileSettings() {
               >
                 Sign Out
               </Button>
+              <Button
+                variant="outline"
+                className="border-rose-200 text-rose-600 hover:bg-rose-50"
+                onClick={handleDeleteAccount}
+                loading={deleting}
+              >
+                Delete Account
+              </Button>
             </div>
+            <p className="text-xs text-slate-500">
+              Deleting your account removes your profile and related data permanently.
+            </p>
           </div>
         </Card>
       </div>

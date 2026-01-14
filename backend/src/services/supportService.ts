@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase.js'
+import { supabase, getSupabaseClientForUser } from '../lib/supabase.js'
 
 export interface SupportTicket {
     id: string
@@ -21,14 +21,28 @@ export interface SupportMessage {
 }
 
 export class SupportService {
+    private static getClient(userToken?: string) {
+        // Use the caller's token for RLS-aware operations when available,
+        // otherwise fall back to the service role client
+        return userToken ? getSupabaseClientForUser(userToken) : supabase
+    }
+
     /**
      * Create a new support ticket
      */
-    static async createTicket(userId: string, subject: string, initialMessage: string, priority: string = 'medium'): Promise<SupportTicket> {
+    static async createTicket(
+        userId: string,
+        subject: string,
+        initialMessage: string,
+        priority: string = 'medium',
+        userToken?: string
+    ): Promise<SupportTicket> {
         console.log('[Support] Creating ticket for user:', userId)
 
+        const client = this.getClient(userToken)
+
         // 1. Create ticket
-        const { data: ticket, error: ticketError } = await supabase
+        const { data: ticket, error: ticketError } = await client
             .from('support_tickets')
             .insert({
                 user_id: userId,
@@ -40,11 +54,11 @@ export class SupportService {
 
         if (ticketError) {
             console.error('[Support] Error creating ticket:', ticketError)
-            throw new Error('Failed to create support ticket')
+            throw new Error(ticketError?.message || 'Failed to create support ticket')
         }
 
         // 2. Add initial message
-        const { error: messageError } = await supabase
+        const { error: messageError } = await client
             .from('support_messages')
             .insert({
                 ticket_id: ticket.id,
@@ -64,10 +78,18 @@ export class SupportService {
     /**
      * Add a message to an existing ticket
      */
-    static async addMessage(ticketId: string, senderId: string, message: string, isAdminReply: boolean = false): Promise<SupportMessage> {
+    static async addMessage(
+        ticketId: string,
+        senderId: string,
+        message: string,
+        isAdminReply: boolean = false,
+        userToken?: string
+    ): Promise<SupportMessage> {
         console.log('[Support] Adding message to ticket:', ticketId)
 
-        const { data: supportMessage, error } = await supabase
+        const client = this.getClient(userToken)
+
+        const { data: supportMessage, error } = await client
             .from('support_messages')
             .insert({
                 ticket_id: ticketId,
@@ -80,17 +102,17 @@ export class SupportService {
 
         if (error) {
             console.error('[Support] Error adding message:', error)
-            throw new Error('Failed to add message to support ticket')
+            throw new Error(error?.message || 'Failed to add message to support ticket')
         }
 
         // Update ticket status if it's an admin reply
         if (isAdminReply) {
-            await supabase
+            await client
                 .from('support_tickets')
                 .update({ status: 'in_progress', updated_at: new Date().toISOString() })
                 .eq('id', ticketId)
         } else {
-            await supabase
+            await client
                 .from('support_tickets')
                 .update({ updated_at: new Date().toISOString() })
                 .eq('id', ticketId)
@@ -102,8 +124,10 @@ export class SupportService {
     /**
      * Get tickets for a user
      */
-    static async getUserTickets(userId: string): Promise<SupportTicket[]> {
-        const { data, error } = await supabase
+    static async getUserTickets(userId: string, userToken?: string): Promise<SupportTicket[]> {
+        const client = this.getClient(userToken)
+
+        const { data, error } = await client
             .from('support_tickets')
             .select('*')
             .eq('user_id', userId)
@@ -140,8 +164,10 @@ export class SupportService {
     /**
      * Get ticket details and messages
      */
-    static async getTicketDetails(ticketId: string): Promise<{ ticket: SupportTicket, messages: SupportMessage[] } | null> {
-        const { data: ticket, error: ticketError } = await supabase
+    static async getTicketDetails(ticketId: string, userToken?: string): Promise<{ ticket: SupportTicket, messages: SupportMessage[] } | null> {
+        const client = this.getClient(userToken)
+
+        const { data: ticket, error: ticketError } = await client
             .from('support_tickets')
             .select('*, user:auth.users(email)')
             .eq('id', ticketId)
@@ -152,7 +178,7 @@ export class SupportService {
             return null
         }
 
-        const { data: messages, error: messageError } = await supabase
+        const { data: messages, error: messageError } = await client
             .from('support_messages')
             .select('*')
             .eq('ticket_id', ticketId)

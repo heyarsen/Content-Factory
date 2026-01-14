@@ -11,7 +11,7 @@ const router = Router()
 router.get('/tickets', authenticate, async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.userId!
-        const tickets = await SupportService.getUserTickets(userId)
+        const tickets = await SupportService.getUserTickets(userId, req.userToken)
         res.json({ tickets })
     } catch (error: any) {
         console.error('Support tickets error:', error)
@@ -32,7 +32,7 @@ router.post('/tickets', authenticate, async (req: AuthRequest, res: Response) =>
             return res.status(400).json({ error: 'Subject and message are required' })
         }
 
-        const ticket = await SupportService.createTicket(userId, subject, message, priority)
+        const ticket = await SupportService.createTicket(userId, subject, message, priority, req.userToken)
         res.json(ticket)
     } catch (error: any) {
         console.error('Create support ticket error:', error)
@@ -49,7 +49,7 @@ router.get('/tickets/:id', authenticate, async (req: AuthRequest, res: Response)
         const userId = req.userId!
         const ticketId = req.params.id
 
-        const details = await SupportService.getTicketDetails(ticketId)
+        const details = await SupportService.getTicketDetails(ticketId, req.userToken)
         if (!details) {
             return res.status(404).json({ error: 'Ticket not found' })
         }
@@ -81,7 +81,7 @@ router.post('/tickets/:id/message', authenticate, async (req: AuthRequest, res: 
         }
 
         // Verify ownership
-        const details = await SupportService.getTicketDetails(ticketId)
+        const details = await SupportService.getTicketDetails(ticketId, req.userToken)
         if (!details) {
             return res.status(404).json({ error: 'Ticket not found' })
         }
@@ -94,7 +94,8 @@ router.post('/tickets/:id/message', authenticate, async (req: AuthRequest, res: 
             ticketId,
             userId,
             message,
-            req.role === 'admin' && details.ticket.user_id !== userId // It's an admin reply if role is admin and not own ticket
+            req.role === 'admin' && details.ticket.user_id !== userId, // It's an admin reply if role is admin and not own ticket
+            req.userToken
         )
         res.json(newMessage)
     } catch (error: any) {

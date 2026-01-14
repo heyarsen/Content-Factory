@@ -324,6 +324,24 @@ router.post('/logout', authenticate, async (req: AuthRequest, res: Response) => 
   }
 })
 
+// Delete account
+router.delete('/account', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+
+    const { error } = await supabase.auth.admin.deleteUser(userId)
+    if (error) {
+      console.error('Delete account error:', error)
+      return res.status(500).json({ error: 'Failed to delete account' })
+    }
+
+    res.json({ message: 'Account deleted' })
+  } catch (error: any) {
+    console.error('Delete account exception:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
 // Get current user
 router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
   try {

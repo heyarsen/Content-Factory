@@ -9,7 +9,6 @@ import {
   Calendar,
   User,
   Settings,
-  HelpCircle,
   BarChart3,
   MessagesSquare,
 } from 'lucide-react'
@@ -29,7 +28,6 @@ const navigation = [
   { label: 'My Videos', to: '/videos', icon: Clapperboard },
   { label: 'Social Accounts', to: '/social', icon: Share2 },
   { label: 'Avatars', to: '/avatars', icon: User },
-  { label: 'Support', to: '/support', icon: HelpCircle },
   { label: 'Preferences', to: '/preferences', icon: Settings },
 ]
 
