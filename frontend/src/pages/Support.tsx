@@ -68,6 +68,7 @@ export function Support() {
                     table: 'support_messages',
                 },
                 async (payload) => {
+                    console.log('Realtime payload received:', payload)
                     const newMessage = payload.new as Message
 
                     // Always reload tickets to update the "sidebar" list (unread status, last message time)
