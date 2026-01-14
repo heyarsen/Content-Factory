@@ -602,7 +602,7 @@ export function QuickCreate() {
               </div>
             )}
 
-            {videoStatus === 'pending' || videoStatus === 'generating' ? (
+            {videoStatus === 'pending' || videoStatus === 'generating' || videoStatus === 'failed' ? (
               <div className="space-y-6">
                 <div className="rounded-2xl border border-white/60 bg-white/70 p-6">
                   <h3 className="mb-4 text-sm font-semibold text-primary">Script Preview</h3>
@@ -673,7 +673,7 @@ export function QuickCreate() {
             ) : (
               <div className="text-center py-12">
                 <Loader className="h-12 w-12 animate-spin text-brand-500 mx-auto mb-4" />
-                <p className="text-sm text-slate-600">Generating your video... This may take a few moments.</p>
+                <p className="text-sm text-slate-600">Processing...</p>
               </div>
             )}
           </Card>
