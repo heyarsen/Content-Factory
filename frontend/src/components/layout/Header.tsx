@@ -11,7 +11,7 @@ interface HeaderProps {
 export function Header({ onToggleSidebar }: HeaderProps) {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const { notifications, unreadCount, markAsRead, markAllAsRead, removeNotification } = useNotifications()
+  const { notifications, unreadCount, markAsRead, markAllAsRead, removeNotification, unreadSupportCount } = useNotifications()
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const notificationRef = useRef<HTMLDivElement>(null)
 
@@ -65,7 +65,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             >
               <Bell className="h-5 w-5" />
               {unreadCount > 0 && (
-              <span className="absolute right-1.5 top-1.5 inline-flex h-2.5 w-2.5 rounded-full bg-brand-500 ring-2 ring-white" />
+                <span className="absolute right-1.5 top-1.5 inline-flex h-2.5 w-2.5 rounded-full bg-brand-500 ring-2 ring-white" />
               )}
             </button>
 
@@ -108,9 +108,8 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                         return (
                           <div
                             key={notification.id}
-                            className={`p-4 hover:bg-slate-50 transition-colors cursor-pointer ${
-                              !notification.read ? 'bg-blue-50/50' : ''
-                            }`}
+                            className={`p-4 hover:bg-slate-50 transition-colors cursor-pointer ${!notification.read ? 'bg-blue-50/50' : ''
+                              }`}
                             onClick={() => {
                               if (!notification.read) {
                                 markAsRead(notification.id)
@@ -152,7 +151,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                           </div>
                         )
                       })}
-                  </div>
+                    </div>
                   )}
                 </div>
               </div>
@@ -163,11 +162,16 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           <button
             type="button"
             onClick={() => navigate('/support')}
-            className="flex h-10 min-h-[44px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 touch-manipulation"
+            className="relative flex h-10 min-h-[44px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 touch-manipulation"
             aria-label="Support"
           >
             <HelpCircle className="h-4 w-4" />
             <span className="hidden sm:inline font-semibold text-slate-900">Support</span>
+            {unreadSupportCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm ring-2 ring-white">
+                {unreadSupportCount}
+              </span>
+            )}
           </button>
 
           {/* Account Button - Mobile */}

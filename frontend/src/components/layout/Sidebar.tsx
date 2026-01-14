@@ -13,7 +13,7 @@ import {
   MessagesSquare,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import { useNotifications } from '../../contexts/NotificationContext'
+
 import { useCredits } from '../../hooks/useCredits'
 
 interface SidebarProps {
@@ -40,7 +40,7 @@ const adminNavigation = [
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { user } = useAuth()
   const { credits, subscription, unlimited } = useCredits()
-  const { unreadSupportCount } = useNotifications()
+
   const location = useLocation()
 
   return (
@@ -143,25 +143,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               </div>
             )}
 
-            {/* User Support Link with Badge */}
-            <div className="px-4 py-2">
-              <NavLink
-                to="/support"
-                onClick={onClose}
-                className={({ isActive }) => `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all duration-200 ${isActive ? 'bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-transparent text-brand-600' : 'text-slate-500 hover:bg-white hover:text-primary'
-                  }`}
-              >
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-transparent bg-slate-100 text-slate-500 hover:border-slate-200">
-                  <MessagesSquare className="h-4 w-4" />
-                </div>
-                <span className="flex-1">Support</span>
-                {unreadSupportCount > 0 && (
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm ring-2 ring-white">
-                    {unreadSupportCount}
-                  </span>
-                )}
-              </NavLink>
-            </div>
+
           </nav>
 
           <div className="mt-auto px-2 pb-2">

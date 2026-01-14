@@ -451,22 +451,35 @@ async function runHeygenGeneration(
     console.error('HeyGen generation error:', error)
 
     // Extract detailed error message
+    // Extract detailed error message
     let errorMessage = error?.message || 'Failed to generate video'
 
     if (error?.response?.data?.message) {
       errorMessage = error.response.data.message
     } else if (error?.response?.data?.error?.message) {
       errorMessage = error.response.data.error.message
+    } else if (error?.response?.data?.error?.code === 'too_many_concurrent_tasks') {
+      errorMessage = 'Generation limit reached (3 concurrent requests). Please wait for a video to finish.'
     } else if (error?.response?.data?.error) {
-      errorMessage = typeof error.response.data.error === 'string'
-        ? error.response.data.error
-        : JSON.stringify(error.response.data.error)
+      // Check if error is an object with a message property (nested case)
+      if (typeof error.response.data.error === 'object' && error.response.data.error.message) {
+        errorMessage = error.response.data.error.message
+      } else {
+        errorMessage = typeof error.response.data.error === 'string'
+          ? error.response.data.error
+          : JSON.stringify(error.response.data.error)
+      }
     } else if (error?.response?.status === 401) {
       errorMessage = 'HeyGen API authentication failed. Please check your API key configuration.'
     } else if (error?.response?.status === 429) {
       errorMessage = 'HeyGen API rate limit exceeded. Please try again later.'
     } else if (error?.response?.status >= 500) {
       errorMessage = 'HeyGen API server error. Please try again later.'
+    }
+
+    // specific catch for the concurrent tasks if it wasn't caught above but exists in body
+    if (errorMessage.includes('too_many_concurrent_tasks') || JSON.stringify(error?.response?.data || {}).includes('too_many_concurrent_tasks')) {
+      errorMessage = 'Generation limit reached. You have too many active videos. Please wait.'
     }
 
     const enhancedError = new Error(errorMessage)
