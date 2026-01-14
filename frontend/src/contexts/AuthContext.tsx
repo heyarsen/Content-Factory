@@ -140,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           })
 
           const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Supabase session set timeout')), 5000)
+            setTimeout(() => reject(new Error('Supabase session set timeout')), 8000)
           )
 
           await Promise.race([sessionPromise, timeoutPromise])
@@ -152,6 +152,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               console.warn('[Auth] Supabase session set warning:', err)
               // Don't fail login if session set fails/times out, we have the token
             })
+
+          console.log('[Auth] Session setup complete, returning control to component')
 
         } catch (error) {
           console.error('[Auth] Unexpected error setting session:', error)
