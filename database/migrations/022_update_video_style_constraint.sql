@@ -1,13 +1,16 @@
 -- Migration: Update video style constraint to support more styles
--- Fixed to handle existing data with invalid styles
+-- Fixed to strictly handle existing data including NULLs and invalid styles
 
 -- 1. First, sanitize existing data
 -- Update any video with a style that isn't in our new allowed list to 'Realistic'
+-- This explicitly handles NULLs and empty strings
 UPDATE videos 
 SET style = 'Realistic'
-WHERE style NOT IN (
-  'Cinematic', 'Realistic', 'Anime', '3D Render', 'Cyberpunk', 'Minimalist', 'Documentary'
-);
+WHERE style IS NULL 
+   OR TRIM(style) = ''
+   OR style NOT IN (
+    'Cinematic', 'Realistic', 'Anime', '3D Render', 'Cyberpunk', 'Minimalist', 'Documentary'
+   );
 
 -- 2. Drop the existing constraint
 ALTER TABLE videos DROP CONSTRAINT IF EXISTS videos_style_check;
