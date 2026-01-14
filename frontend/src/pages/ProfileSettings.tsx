@@ -229,7 +229,7 @@ export function ProfileSettings() {
                 Sign Out
               </Button>
               <Button
-                variant="outline"
+                variant="secondary"
                 className="border-rose-200 text-rose-600 hover:bg-rose-50"
                 onClick={handleDeleteAccount}
                 loading={deleting}
