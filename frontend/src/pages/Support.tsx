@@ -66,9 +66,10 @@ export function Support() {
                     event: 'INSERT',
                     schema: 'public',
                     table: 'support_messages',
+                    filter: `ticket_owner_id=eq.${user.id}` // Explicit filter for performance and RLS
                 },
                 async (payload) => {
-                    console.log('Realtime payload received:', payload)
+                    console.log('Realtime payload received (Support):', payload)
                     const newMessage = payload.new as Message
 
                     // Always reload tickets to update the "sidebar" list (unread status, last message time)
@@ -102,7 +103,9 @@ export function Support() {
                     }
                 }
             )
-            .subscribe()
+            .subscribe((status) => {
+                console.log(`Support Chat Subscription status: ${status}`)
+            })
 
         return () => {
             subscription.unsubscribe()
