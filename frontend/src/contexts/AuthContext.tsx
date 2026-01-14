@@ -30,28 +30,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Failsafe: If nothing happens within 5 seconds, stop loading
     const safetyTimeout = setTimeout(() => {
-      if (mounted) {
+      if (mounted && loading) {
         console.warn('[Auth] Initialization timed out, forcing loading to false')
         setLoading(false)
       }
     }, 5000)
 
+    const fetchProfileWithTimeout = async (userId: string) => {
+      // Create a promise that rejects after 3 seconds
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Profile fetch timed out')), 3000)
+      })
+
+      // The actual fetch promise
+      const fetchPromise = supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('id', userId)
+        .single()
+
+      // Race them
+      return Promise.race([fetchPromise, timeoutPromise]) as Promise<{ data: { role?: 'user' | 'admin' } | null, error: any }>
+    }
+
     // Check for existing session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       try {
         if (mounted && session?.user) {
-          const { data: profile } = await supabase
-            .from('user_profiles')
-            .select('role')
-            .eq('id', session.user.id)
-            .single()
+          // Try to fetch profile with timeout
+          try {
+            const { data: profile } = await fetchProfileWithTimeout(session.user.id)
 
-          if (mounted) {
-            setUser({
-              ...session.user,
-              role: profile?.role || 'user'
-            } as User)
-            localStorage.setItem('access_token', session.access_token)
+            if (mounted) {
+              setUser({
+                ...session.user,
+                role: profile?.role || 'user'
+              } as User)
+              localStorage.setItem('access_token', session.access_token)
+            }
+          } catch (profileError) {
+            console.warn('[Auth] Profile load failed or timed out, using default role:', profileError)
+            // Still let them in with default role
+            if (mounted) {
+              setUser({
+                ...session.user,
+                role: 'user'
+              } as User)
+              localStorage.setItem('access_token', session.access_token)
+            }
           }
         }
       } catch (error) {
@@ -76,21 +102,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       try {
         if (session?.user) {
-          // If we receive an auth change event, clear the safety timeout as we're active
-          clearTimeout(safetyTimeout)
+          // Don't clear safety timeout here immediately, let it run its course 
+          // or be cleared when logic finishes.
+          // Actually, we should probably clear it if we successfully loaded everything.
 
-          const { data: profile } = await supabase
-            .from('user_profiles')
-            .select('role')
-            .eq('id', session.user.id)
-            .single()
+          try {
+            const { data: profile } = await fetchProfileWithTimeout(session.user.id)
 
-          if (mounted) {
-            setUser({
-              ...session.user,
-              role: profile?.role || 'user'
-            } as User)
-            localStorage.setItem('access_token', session.access_token)
+            if (mounted) {
+              setUser({
+                ...session.user,
+                role: profile?.role || 'user'
+              } as User)
+              localStorage.setItem('access_token', session.access_token)
+            }
+          } catch (profileError) {
+            console.warn('[Auth] Auth change profile load failed/timed out:', profileError)
+            if (mounted) {
+              setUser({
+                ...session.user,
+                role: 'user'
+              } as User)
+              localStorage.setItem('access_token', session.access_token)
+            }
           }
         } else if (mounted) {
           setUser(null)
@@ -99,7 +133,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         console.error('Error handling auth change:', error)
       } finally {
-        if (mounted) setLoading(false)
+        if (mounted) {
+          setLoading(false)
+          clearTimeout(safetyTimeout)
+        }
       }
     })
 
