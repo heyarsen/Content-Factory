@@ -63,6 +63,7 @@ export class SupportService {
             .insert({
                 ticket_id: ticket.id,
                 sender_id: userId,
+                ticket_owner_id: userId, // Set owner for RLS
                 message: initialMessage,
                 is_admin_reply: false
             })
@@ -89,11 +90,23 @@ export class SupportService {
 
         const client = this.getClient(userToken)
 
+        // Need ticket details to know the owner for RLS
+        const { data: ticket, error: ticketError } = await client
+            .from('support_tickets')
+            .select('user_id')
+            .eq('id', ticketId)
+            .single()
+
+        if (ticketError || !ticket) {
+            throw new Error('Ticket not found')
+        }
+
         const { data: supportMessage, error } = await client
             .from('support_messages')
             .insert({
                 ticket_id: ticketId,
                 sender_id: senderId,
+                ticket_owner_id: ticket.user_id, // Set owner for RLS
                 message,
                 is_admin_reply: isAdminReply
             })
