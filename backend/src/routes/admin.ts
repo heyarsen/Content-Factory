@@ -91,4 +91,18 @@ router.post('/tickets/:id/resolve', authenticate, isAdmin, async (req: AuthReque
     }
 })
 
+/**
+ * POST /api/admin/tickets/:id/read
+ * Mark ticket messages as read
+ */
+router.post('/tickets/:id/read', authenticate, isAdmin, async (req: AuthRequest, res: Response) => {
+    try {
+        await SupportService.markAsRead(req.params.id, req.userId!, req.userToken)
+        res.json({ success: true })
+    } catch (error: any) {
+        console.error('Admin mark read error:', error)
+        res.status(500).json({ error: 'Failed to mark messages as read' })
+    }
+})
+
 export default router
