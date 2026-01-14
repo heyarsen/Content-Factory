@@ -65,8 +65,10 @@ export function Support() {
                 {
                     event: 'INSERT',
                     schema: 'public',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
                     table: 'support_messages',
-                    filter: `ticket_owner_id=eq.${user.id}` // Explicit filter for performance and RLS
                 },
                 async (payload) => {
                     console.log('Realtime payload received (Support):', payload)

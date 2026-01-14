@@ -120,7 +120,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           event: '*', // Listen to all changes
           schema: 'public',
           table: 'support_messages',
-          filter: `ticket_owner_id=eq.${user.id}`
         },
         (payload: any) => {
           // Always refresh count

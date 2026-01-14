@@ -36,21 +36,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }, 5000)
 
-    const fetchProfileWithTimeout = async (userId: string) => {
-      // Create a promise that rejects after 3 seconds
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Profile fetch timed out')), 3000)
-      })
+    const fetchProfileWithTimeout = async (userId: string, retries = 3): Promise<{ data: { role?: 'user' | 'admin' } | null, error: any }> => {
+      const attemptFetch = async (attempt: number): Promise<any> => {
+        try {
+          // Create a promise that rejects after 10 seconds (increased from 3s)
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Profile fetch timed out')), 10000)
+          })
 
-      // The actual fetch promise
-      const fetchPromise = supabase
-        .from('user_profiles')
-        .select('role')
-        .eq('id', userId)
-        .single()
+          // The actual fetch promise
+          const fetchPromise = supabase
+            .from('user_profiles')
+            .select('role')
+            .eq('id', userId)
+            .single()
 
-      // Race them
-      return Promise.race([fetchPromise, timeoutPromise]) as Promise<{ data: { role?: 'user' | 'admin' } | null, error: any }>
+          // Race them
+          return await Promise.race([fetchPromise, timeoutPromise])
+        } catch (error) {
+          if (attempt > 0) {
+            console.warn(`[Auth] Profile fetch failed, retrying... (${attempt} attempts left)`)
+            await new Promise(r => setTimeout(r, 1000)) // Wait 1s before retry
+            return attemptFetch(attempt - 1)
+          }
+          throw error
+        }
+      }
+
+      return attemptFetch(retries)
     }
 
     // Check for existing session
