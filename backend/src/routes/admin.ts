@@ -6,6 +6,14 @@ import { SupportService } from '../services/supportService.js'
 const router = Router()
 
 /**
+ * GET /api/admin/check
+ * Check if current user is admin (useful for troubleshooting)
+ */
+router.get('/check', authenticate, async (req: AuthRequest, res: Response) => {
+    res.json({ isAdmin: req.role === 'admin' })
+})
+
+/**
  * GET /api/admin/stats
  * Get dashboard statistics
  */

@@ -147,7 +147,7 @@ export class SupportService {
     static async getAllTickets(): Promise<SupportTicket[]> {
         const { data, error } = await supabase
             .from('support_tickets')
-            .select('*, user:auth.users(email)')
+            .select('*')
             .order('updated_at', { ascending: false })
 
         if (error) {
@@ -155,10 +155,7 @@ export class SupportService {
             return []
         }
 
-        return data.map((t: any) => ({
-            ...t,
-            user_email: t.user?.email
-        }))
+        return data as any
     }
 
     /**
@@ -169,7 +166,7 @@ export class SupportService {
 
         const { data: ticket, error: ticketError } = await client
             .from('support_tickets')
-            .select('*, user:auth.users(email)')
+            .select('*')
             .eq('id', ticketId)
             .single()
 
@@ -186,11 +183,11 @@ export class SupportService {
 
         if (messageError) {
             console.error('[Support] Error fetching messages:', messageError)
-            return { ticket: { ...(ticket as any), user_email: (ticket as any).user?.email }, messages: [] }
+            return { ticket: ticket as any, messages: [] }
         }
 
         return {
-            ticket: { ...(ticket as any), user_email: (ticket as any).user?.email },
+            ticket: ticket as any,
             messages: messages || []
         }
     }

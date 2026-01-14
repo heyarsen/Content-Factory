@@ -16,7 +16,6 @@ interface Ticket {
     priority: 'low' | 'medium' | 'high' | 'urgent'
     created_at: string
     updated_at: string
-    user_email?: string
 }
 
 interface Message {
@@ -159,7 +158,7 @@ export function AdminSupport() {
                                         <p className="font-semibold text-slate-900 line-clamp-1">{ticket.subject}</p>
                                         <div className="mt-1 flex items-center text-xs text-slate-500">
                                             <Mail className="mr-1 h-3 w-3" />
-                                            {ticket.user_email}
+                                            <span className="font-mono">{ticket.user_id}</span>
                                         </div>
                                         <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400">
                                             <div className="flex items-center">
@@ -187,7 +186,7 @@ export function AdminSupport() {
                                         <div className="mt-2 flex items-center gap-4">
                                             <div className="flex items-center text-sm text-slate-600">
                                                 <User className="mr-2 h-4 w-4 text-slate-400" />
-                                                {selectedTicket.ticket.user_email}
+                                                <span className="font-mono">{selectedTicket.ticket.user_id}</span>
                                             </div>
                                             <div className="flex items-center text-sm text-slate-600">
                                                 <Clock className="mr-2 h-4 w-4 text-slate-400" />

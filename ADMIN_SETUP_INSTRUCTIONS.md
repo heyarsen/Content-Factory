@@ -7,9 +7,8 @@
 1. Open your **Supabase Dashboard**
 2. Go to **SQL Editor**
 3. Run the `database/admin_setup.sql` file:
-   - This creates the `roles` and `user_roles` tables
-   - Sets up the `is_admin()` and `get_user_roles()` functions
-   - Configures RLS policies
+   - This ensures `user_profiles.role` exists
+   - Sets up the `is_admin()` helper function (optional)
 
 ### Step 2: Create a User Account
 
@@ -26,44 +25,18 @@ You need to have a user account first. You can either:
 - Enter email and password
 - Click **"Create user"**
 
-### Step 3: Assign Admin Role
+### Step 3: Assign Admin Role (recommended)
 
 1. Open **Supabase Dashboard** → **SQL Editor**
 2. Copy and paste this SQL (replace the email with your actual email):
 
 ```sql
-DO $$
-DECLARE
-  target_user_id UUID;
-  admin_role_id UUID;
-BEGIN
-  -- Find user by email (REPLACE THIS EMAIL)
-  SELECT id INTO target_user_id
-  FROM auth.users
-  WHERE email = 'your-email@example.com';
-  
-  -- Check if user exists
-  IF target_user_id IS NULL THEN
-    RAISE EXCEPTION 'User with email not found';
-  END IF;
-  
-  -- Get admin role ID
-  SELECT id INTO admin_role_id
-  FROM roles
-  WHERE name = 'admin';
-  
-  -- Check if admin role exists
-  IF admin_role_id IS NULL THEN
-    RAISE EXCEPTION 'Admin role not found. Please run admin_setup.sql first.';
-  END IF;
-  
-  -- Assign admin role
-  INSERT INTO user_roles (user_id, role_id)
-  VALUES (target_user_id, admin_role_id)
-  ON CONFLICT (user_id, role_id) DO NOTHING;
-  
-  RAISE NOTICE 'Admin role assigned successfully';
-END $$;
+-- Replace with your email
+UPDATE user_profiles up
+SET role = 'admin'
+FROM auth.users u
+WHERE up.id = u.id
+  AND u.email = 'your-email@example.com';
 ```
 
 3. **Replace `'your-email@example.com'`** with your actual email address
@@ -87,27 +60,9 @@ If you prefer to use the user ID instead of email:
 3. Use this SQL (replace `USER_ID_HERE` with the actual UUID):
 
 ```sql
-DO $$
-DECLARE
-  target_user_id UUID := 'USER_ID_HERE';
-  admin_role_id UUID;
-BEGIN
-  -- Get admin role ID
-  SELECT id INTO admin_role_id
-  FROM roles
-  WHERE name = 'admin';
-  
-  IF admin_role_id IS NULL THEN
-    RAISE EXCEPTION 'Admin role not found. Please run admin_setup.sql first.';
-  END IF;
-  
-  -- Assign admin role
-  INSERT INTO user_roles (user_id, role_id)
-  VALUES (target_user_id, admin_role_id)
-  ON CONFLICT (user_id, role_id) DO NOTHING;
-  
-  RAISE NOTICE 'Admin role assigned successfully';
-END $$;
+UPDATE user_profiles
+SET role = 'admin'
+WHERE id = 'USER_ID_HERE';
 ```
 
 ---
@@ -117,14 +72,10 @@ END $$;
 To see all users with admin role:
 
 ```sql
-SELECT 
-  u.email,
-  u.created_at,
-  r.name as role_name
+SELECT u.email, up.role
 FROM auth.users u
-JOIN user_roles ur ON u.id = ur.user_id
-JOIN roles r ON ur.role_id = r.id
-WHERE r.name = 'admin';
+JOIN user_profiles up ON up.id = u.id
+WHERE up.role = 'admin';
 ```
 
 ---
@@ -142,6 +93,5 @@ WHERE r.name = 'admin';
 
 **Admin Panel not showing in sidebar**
 - Log out and log back in after assigning admin role
-- Check browser console for errors
 - Verify the admin check endpoint: `/api/admin/check` returns `{ isAdmin: true }`
 

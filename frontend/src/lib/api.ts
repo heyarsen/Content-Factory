@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { supabase } from './supabase'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
@@ -34,6 +35,31 @@ api.interceptors.response.use(
     }
     
     if (error.response?.status === 401) {
+      // Try to refresh the Supabase session once, then retry the request.
+      // This prevents "random logouts" when access tokens expire.
+      const originalRequest = error.config
+      if (!originalRequest?._retry) {
+        originalRequest._retry = true
+        try {
+          const { data: sessionData } = await supabase.auth.getSession()
+          const hasRefresh = !!sessionData.session?.refresh_token
+          const { data: refreshed } = hasRefresh
+            ? await supabase.auth.refreshSession()
+            : await supabase.auth.refreshSession()
+
+          const newToken = refreshed.session?.access_token
+          if (newToken) {
+            localStorage.setItem('access_token', newToken)
+            originalRequest.headers = originalRequest.headers || {}
+            originalRequest.headers.Authorization = `Bearer ${newToken}`
+            return api.request(originalRequest)
+          }
+        } catch (refreshError) {
+          // fall through to redirect below
+          console.warn('[API] Token refresh failed:', refreshError)
+        }
+      }
+
       // Don't redirect if we're already on the login page
       if (!window.location.pathname.includes('/login')) {
         localStorage.removeItem('access_token')
