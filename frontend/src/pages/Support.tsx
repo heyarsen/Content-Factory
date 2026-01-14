@@ -44,11 +44,14 @@ export function Support() {
     const { user } = useAuth() // Need user ID for subscription filtering if desired, or just use ticket ID
 
     useEffect(() => {
+        if (!user) return
+
         loadTickets()
 
         // Real-time subscription for chat messages
+        const channelName = `support_chat_${user.id}`
         const subscription = supabase
-            .channel('support_chat')
+            .channel(channelName)
             .on(
                 'postgres_changes',
                 {
@@ -58,6 +61,9 @@ export function Support() {
                 },
                 async (payload) => {
                     const newMessage = payload.new as Message
+
+                    // Always reload tickets to update the "sidebar" list (unread status, last message time)
+                    loadTickets()
 
                     // If looking at this ticket, append message
                     if (selectedTicket && selectedTicket.ticket.id === newMessage.ticket_id) {
@@ -73,7 +79,7 @@ export function Support() {
                         })
 
                         // Mark as read immediately if it's not from me
-                        if (newMessage.sender_id !== user?.id) {
+                        if (newMessage.sender_id !== user.id) {
                             try {
                                 await api.post(`/api/support/tickets/${newMessage.ticket_id}/read`)
                                 // Update badge count
@@ -82,10 +88,6 @@ export function Support() {
                                 console.error('Failed to mark read on new message', e)
                             }
                         }
-                    } else {
-                        // If not looking at this ticket, assume badge count will update via NotificationContext
-                        // But we might want to refresh the ticket list to show "updated just now"
-                        loadTickets()
                     }
                 }
             )

@@ -95,6 +95,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // We need current location to decide whether to show toast
+  // Since we are inside Router, we can use window.location or useLocation if available
+  // But useLocation needs to be imported. 
+  // For simplicity and safety inside a context that might be used differently, 
+  // checking window.location.pathname is essentially safe enough for this purpose
+  // or we can just rely on the fact that if they are looking at the chat, they see it.
+
   useEffect(() => {
     if (!user) {
       setUnreadSupportCount(0)
@@ -104,17 +111,36 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     refreshSupportCount()
 
     // Real-time subscription
+    const channelName = `support_notifications_${user.id}`
     const subscription = supabase
-      .channel('public:support_messages')
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
-          event: '*', // Listen to all changes (INSERT for new, UPDATE for read status)
+          event: '*', // Listen to all changes
           schema: 'public',
           table: 'support_messages',
         },
-        () => {
+        (payload: any) => {
+          // Always refresh count
           refreshSupportCount()
+
+          // If it's a new message from someone else (admin)
+          if (payload.eventType === 'INSERT' && payload.new) {
+            const newMessage = payload.new as any
+            if (newMessage.sender_id !== user.id) {
+              // Check if we are NOT on the support page
+              if (!window.location.pathname.includes('/support')) {
+                addNotification({
+                  type: 'info',
+                  title: 'New Support Message',
+                  message: newMessage.message ? (newMessage.message.length > 50 ? newMessage.message.substring(0, 50) + '...' : newMessage.message) : 'You have a new reply.',
+                  duration: 5000,
+                  link: '/support'
+                })
+              }
+            }
+          }
         }
       )
       .subscribe()
@@ -122,7 +148,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     return () => {
       subscription.unsubscribe()
     }
-  }, [user?.id])
+  }, [user?.id, addNotification])
 
   return (
     <NotificationContext.Provider value={{
