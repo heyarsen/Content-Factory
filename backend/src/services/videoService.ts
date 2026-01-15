@@ -139,7 +139,7 @@ async function resolveCharacterIdentifier(
 }
 
 interface AvatarContext {
-  avatarId: string
+  avatarId?: string
   avatarRecordId?: string
   isPhotoAvatar: boolean
 }
@@ -165,7 +165,9 @@ async function resolveAvatarContext(
       if (firstActiveAvatar) {
         return mapAvatarRecord(firstActiveAvatar)
       }
-      throw new Error('No avatar configured. Please create or select an avatar before generating videos.')
+
+      console.log('[resolveAvatarContext] No avatars found for user', userId)
+      return { isPhotoAvatar: false } // Return empty context instead of throwing
     }
     return mapAvatarRecord(defaultAvatar as AvatarRecord)
   }
@@ -189,7 +191,8 @@ async function resolveAvatarContext(
     return mapAvatarRecord(avatar)
   }
 
-  throw new Error('Avatar not found. Please ensure the selected avatar belongs to your account.')
+  console.log('[resolveAvatarContext] Requested avatar not found for user', { requestedAvatarId, userId })
+  return { isPhotoAvatar: false } // Return empty context instead of throwing
 }
 
 export interface ManualVideoInput {

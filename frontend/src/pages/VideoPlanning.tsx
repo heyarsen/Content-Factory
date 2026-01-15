@@ -1095,498 +1095,759 @@ export function VideoPlanning() {
       label = 'Video Ready'
       variant = 'success'
     }
-    break
-      case 'scheduled':
-  label = 'Scheduled to Post'
-  variant = 'success'
-  break
-      case 'posted':
-  label = 'Published'
-  variant = 'success'
-  break
-      case 'failed':
-  label = 'Error Occurred'
-  variant = 'error'
-  break
-      default:
-  label = status
-  variant = 'default'
-}
 
-return (
-  <Badge variant={variant}>
-    {showLoader && <Loader className="h-3 w-3 animate-spin" />}
-    {label}
-  </Badge>
-)
+
+    return (
+      <Badge variant={variant}>
+        {showLoader && <Loader className="h-3 w-3 animate-spin" />}
+        {label}
+      </Badge>
+    )
   }
 
-const formatTime = (time: string | null) => {
-  if (!time) return ''
-  const [hours, minutes] = time.split(':')
-  const hour = parseInt(hours)
-  const ampm = hour >= 12 ? 'PM' : 'AM'
-  const displayHour = hour % 12 || 12
-  return `${displayHour}:${minutes} ${ampm}`
-}
+  const formatTime = (time: string | null) => {
+    if (!time) return ''
+    const [hours, minutes] = time.split(':')
+    const hour = parseInt(hours)
+    const ampm = hour >= 12 ? 'PM' : 'AM'
+    const displayHour = hour % 12 || 12
+    return `${displayHour}:${minutes} ${ampm}`
+  }
 
-if (loading) {
+  if (loading) {
+    return (
+      <Layout>
+        <div className="space-y-8">
+          <Skeleton className="h-32 rounded-[28px]" />
+          <Skeleton className="h-96 rounded-3xl" />
+        </div>
+      </Layout>
+    )
+  }
+
   return (
     <Layout>
       <div className="space-y-8">
-        <Skeleton className="h-32 rounded-[28px]" />
-        <Skeleton className="h-96 rounded-3xl" />
-      </div>
-    </Layout>
-  )
-}
-
-return (
-  <Layout>
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-            {t('video_planning.title')}
-          </p>
-          <h1 className="text-3xl font-semibold text-primary">
-            {t('video_planning.page_title')}
-          </h1>
-          <p className="text-sm text-slate-500">
-            {t('video_planning.subtitle')}
-          </p>
-        </div>
-        <Button
-          onClick={() => setCreateModal(true)}
-          leftIcon={<Plus className="h-4 w-4" />}
-        >
-          {t('video_planning.new_plan')}
-        </Button>
-      </div>
-
-      {/* Plan Selector */}
-      {plans.length > 0 && (
-        <Card className="p-4">
-          <div className="flex flex-wrap gap-2">
-            {plans.map((plan: VideoPlan) => (
-              <div key={plan.id} className="flex items-center gap-2">
-                <button
-                  onClick={() => setSelectedPlan(plan)}
-                  className={`rounded-xl px-4 py-2 text-sm font-medium transition ${selectedPlan?.id === plan.id
-                    ? 'bg-brand-500 text-white'
-                    : 'bg-white text-slate-600 hover:bg-slate-50'
-                    }`}
-                >
-                  {plan.name} ({plan.videos_per_day}/day)
-                </button>
-                <button
-                  onClick={() => handleEditPlan(plan)}
-                  className="rounded-xl p-2 text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition"
-                  title={t('video_planning.edit_plan')}
-                >
-                  <Edit2 className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => setDeleteModal(plan.id)}
-                  className="rounded-xl p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
-                  title={t('video_planning.delete_plan')}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            ))}
+        {/* Header */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
+              {t('video_planning.title')}
+            </p>
+            <h1 className="text-3xl font-semibold text-primary">
+              {t('video_planning.page_title')}
+            </h1>
+            <p className="text-sm text-slate-500">
+              {t('video_planning.subtitle')}
+            </p>
           </div>
-        </Card>
-      )}
+          <Button
+            onClick={() => setCreateModal(true)}
+            leftIcon={<Plus className="h-4 w-4" />}
+          >
+            {t('video_planning.new_plan')}
+          </Button>
+        </div>
 
-      {/* Plan Items Calendar View */}
-      {selectedPlan ? (
-        <div className="space-y-6">
-          {/* Status Summary and Filters */}
+        {/* Plan Selector */}
+        {plans.length > 0 && (
           <Card className="p-4">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-wrap items-center gap-6">
-                <div className="text-sm">
-                  <span className="text-slate-600">{t('video_planning.total')}: </span>
-                  <span className="font-semibold">{statusCounts.all}</span>
-                </div>
-                <div className="text-sm">
-                  <span className="text-slate-600">{t('video_planning.ready')}: </span>
-                  <span className="font-semibold text-emerald-600">
-                    {statusCounts.ready}
-                  </span>
-                </div>
-                <div className="text-sm">
-                  <span className="text-slate-600">{t('video_planning.completed')}: </span>
-                  <span className="font-semibold text-blue-600">
-                    {statusCounts.completed}
-                  </span>
-                </div>
-                <div className="text-sm">
-                  <span className="text-slate-600">{t('video_planning.pending')}: </span>
-                  <span className="font-semibold text-yellow-600">
-                    {statusCounts.pending}
-                  </span>
-                </div>
-                {statusCounts.scheduled > 0 && (
-                  <div className="text-sm">
-                    <span className="text-slate-600">{t('video_planning.scheduled')}: </span>
-                    <span className="font-semibold text-purple-600">
-                      {statusCounts.scheduled}
-                    </span>
-                  </div>
-                )}
-                {statusCounts.posted > 0 && (
-                  <div className="text-sm">
-                    <span className="text-slate-600">{t('video_planning.posted')}: </span>
-                    <span className="font-semibold text-emerald-600">
-                      {statusCounts.posted}
-                    </span>
-                  </div>
-                )}
-                {statusCounts.failed > 0 && (
-                  <div className="text-sm">
-                    <span className="text-slate-600">{t('video_planning.failed')}: </span>
-                    <span className="font-semibold text-red-600">
-                      {statusCounts.failed}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                {[
-                  { value: 'all', label: t('video_planning.all') },
-                  { value: 'pending', label: t('video_planning.pending') },
-                  { value: 'ready', label: t('video_planning.ready') },
-                  { value: 'approved', label: t('video_planning.approved') },
-                  { value: 'scheduled', label: t('video_planning.scheduled') },
-                  { value: 'posted', label: t('video_planning.posted') },
-                  { value: 'failed', label: t('video_planning.failed') },
-                ].map((chip) => (
+            <div className="flex flex-wrap gap-2">
+              {plans.map((plan: VideoPlan) => (
+                <div key={plan.id} className="flex items-center gap-2">
                   <button
-                    key={chip.value}
-                    onClick={() => setStatusFilter(chip.value)}
-                    className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition ${statusFilter === chip.value
-                      ? 'border-brand-500 bg-brand-50 text-brand-700'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-brand-200'
+                    onClick={() => setSelectedPlan(plan)}
+                    className={`rounded-xl px-4 py-2 text-sm font-medium transition ${selectedPlan?.id === plan.id
+                      ? 'bg-brand-500 text-white'
+                      : 'bg-white text-slate-600 hover:bg-slate-50'
                       }`}
                   >
-                    <span>{chip.label}</span>
-                    {chip.value !== 'all' && (
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
-                        {statusCounts[
-                          chip.value as keyof typeof statusCounts
-                        ] || 0}
-                      </span>
-                    )}
+                    {plan.name} ({plan.videos_per_day}/day)
                   </button>
-                ))}
-                <button
-                  onClick={() => setStatusFilter('all')}
-                  className="ml-auto text-xs font-medium text-slate-500 hover:text-slate-700"
-                >
-                  {t('video_planning.clear_filter')}
-                </button>
-              </div>
-            </div>
-          </Card>
-
-
-          {/* Calendar Grid */}
-          <Card className="p-6">
-            <div className="mb-6 flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-primary">
-                {formatMonthYear(currentMonth)}
-              </h2>
-              <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigateMonth('prev')}
-                >
-                  ← {t('video_planning.prev')}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setCurrentMonth(new Date())}
-                >
-                  {t('video_planning.today')}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigateMonth('next')}
-                >
-                  {t('video_planning.next')} →
-                </Button>
-              </div>
-            </div>
-
-            {/* Calendar Grid */}
-            <div className="grid grid-cols-7 gap-2">
-              {/* Day Headers */}
-              {[
-                { key: 'sun', label: 'Sun' },
-                { key: 'mon', label: 'Mon' },
-                { key: 'tue', label: 'Tue' },
-                { key: 'wed', label: 'Wed' },
-                { key: 'thu', label: 'Thu' },
-                { key: 'fri', label: 'Fri' },
-                { key: 'sat', label: 'Sat' },
-              ].map((day) => (
-                <div
-                  key={day.key}
-                  className="p-2 text-center text-xs font-semibold text-slate-500"
-                >
-                  {t(`video_planning.${day.key}`)}
+                  <button
+                    onClick={() => handleEditPlan(plan)}
+                    className="rounded-xl p-2 text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition"
+                    title={t('video_planning.edit_plan')}
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setDeleteModal(plan.id)}
+                    className="rounded-xl p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                    title={t('video_planning.delete_plan')}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
               ))}
+            </div>
+          </Card>
+        )}
 
-              {/* Calendar Days */}
-              {getDaysInMonth(currentMonth).map((date, index) => {
-                const dateKey = getDateKey(date)
-                const items = getItemsForDate(date)
-                const isToday =
-                  date && dateKey === getDateKey(new Date())
-                const isSelected = date && dateKey === selectedDate
+        {/* Plan Items Calendar View */}
+        {selectedPlan ? (
+          <div className="space-y-6">
+            {/* Status Summary and Filters */}
+            <Card className="p-4">
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-wrap items-center gap-6">
+                  <div className="text-sm">
+                    <span className="text-slate-600">{t('video_planning.total')}: </span>
+                    <span className="font-semibold">{statusCounts.all}</span>
+                  </div>
+                  <div className="text-sm">
+                    <span className="text-slate-600">{t('video_planning.ready')}: </span>
+                    <span className="font-semibold text-emerald-600">
+                      {statusCounts.ready}
+                    </span>
+                  </div>
+                  <div className="text-sm">
+                    <span className="text-slate-600">{t('video_planning.completed')}: </span>
+                    <span className="font-semibold text-blue-600">
+                      {statusCounts.completed}
+                    </span>
+                  </div>
+                  <div className="text-sm">
+                    <span className="text-slate-600">{t('video_planning.pending')}: </span>
+                    <span className="font-semibold text-yellow-600">
+                      {statusCounts.pending}
+                    </span>
+                  </div>
+                  {statusCounts.scheduled > 0 && (
+                    <div className="text-sm">
+                      <span className="text-slate-600">{t('video_planning.scheduled')}: </span>
+                      <span className="font-semibold text-purple-600">
+                        {statusCounts.scheduled}
+                      </span>
+                    </div>
+                  )}
+                  {statusCounts.posted > 0 && (
+                    <div className="text-sm">
+                      <span className="text-slate-600">{t('video_planning.posted')}: </span>
+                      <span className="font-semibold text-emerald-600">
+                        {statusCounts.posted}
+                      </span>
+                    </div>
+                  )}
+                  {statusCounts.failed > 0 && (
+                    <div className="text-sm">
+                      <span className="text-slate-600">{t('video_planning.failed')}: </span>
+                      <span className="font-semibold text-red-600">
+                        {statusCounts.failed}
+                      </span>
+                    </div>
+                  )}
+                </div>
 
-                return (
+                <div className="flex flex-wrap items-center gap-2">
+                  {[
+                    { value: 'all', label: t('video_planning.all') },
+                    { value: 'pending', label: t('video_planning.pending') },
+                    { value: 'ready', label: t('video_planning.ready') },
+                    { value: 'approved', label: t('video_planning.approved') },
+                    { value: 'scheduled', label: t('video_planning.scheduled') },
+                    { value: 'posted', label: t('video_planning.posted') },
+                    { value: 'failed', label: t('video_planning.failed') },
+                  ].map((chip) => (
+                    <button
+                      key={chip.value}
+                      onClick={() => setStatusFilter(chip.value)}
+                      className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition ${statusFilter === chip.value
+                        ? 'border-brand-500 bg-brand-50 text-brand-700'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-brand-200'
+                        }`}
+                    >
+                      <span>{chip.label}</span>
+                      {chip.value !== 'all' && (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                          {statusCounts[
+                            chip.value as keyof typeof statusCounts
+                          ] || 0}
+                        </span>
+                      )}
+                    </button>
+                  ))}
                   <button
-                    key={index}
-                    onClick={() => {
-                      if (!date) return
-                      setSelectedDate(dateKey)
-                      setIsDetailDrawerOpen(true)
-                    }}
-                    className={`min-h-[120px] rounded-lg border p-2 text-left transition relative ${!date
-                      ? 'border-transparent bg-transparent cursor-default'
-                      : isSelected
-                        ? 'border-brand-500 bg-brand-50 shadow-md'
-                        : isToday
-                          ? 'border-brand-300 bg-brand-50/70 shadow-sm'
-                          : 'border-slate-200 bg-white hover:border-brand-300 hover:bg-slate-50 hover:shadow-sm'
-                      }`}
-                    disabled={!date}
-                    title={items.length > 0 ? `${items.length} item(s) scheduled` : ''}
+                    onClick={() => setStatusFilter('all')}
+                    className="ml-auto text-xs font-medium text-slate-500 hover:text-slate-700"
                   >
-                    {date && (
-                      <>
-                        <div className="flex items-center justify-between mb-1">
-                          <div
-                            className={`text-sm font-semibold ${isToday ? 'text-brand-600' : 'text-slate-700'}`}
-                          >
-                            {date.getDate()}
-                          </div>
-                          {items.length > 0 && (
-                            <div className="flex items-center gap-1">
-                              <div className="h-1.5 w-1.5 rounded-full bg-brand-500"></div>
-                              <span className="text-xs font-medium text-slate-600">
-                                {items.length}
-                              </span>
+                    {t('video_planning.clear_filter')}
+                  </button>
+                </div>
+              </div>
+            </Card>
+
+
+            {/* Calendar Grid */}
+            <Card className="p-6">
+              <div className="mb-6 flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-primary">
+                  {formatMonthYear(currentMonth)}
+                </h2>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigateMonth('prev')}
+                  >
+                    ← {t('video_planning.prev')}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCurrentMonth(new Date())}
+                  >
+                    {t('video_planning.today')}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigateMonth('next')}
+                  >
+                    {t('video_planning.next')} →
+                  </Button>
+                </div>
+              </div>
+
+              {/* Calendar Grid */}
+              <div className="grid grid-cols-7 gap-2">
+                {/* Day Headers */}
+                {[
+                  { key: 'sun', label: 'Sun' },
+                  { key: 'mon', label: 'Mon' },
+                  { key: 'tue', label: 'Tue' },
+                  { key: 'wed', label: 'Wed' },
+                  { key: 'thu', label: 'Thu' },
+                  { key: 'fri', label: 'Fri' },
+                  { key: 'sat', label: 'Sat' },
+                ].map((day) => (
+                  <div
+                    key={day.key}
+                    className="p-2 text-center text-xs font-semibold text-slate-500"
+                  >
+                    {t(`video_planning.${day.key}`)}
+                  </div>
+                ))}
+
+                {/* Calendar Days */}
+                {getDaysInMonth(currentMonth).map((date, index) => {
+                  const dateKey = getDateKey(date)
+                  const items = getItemsForDate(date)
+                  const isToday =
+                    date && dateKey === getDateKey(new Date())
+                  const isSelected = date && dateKey === selectedDate
+
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => {
+                        if (!date) return
+                        setSelectedDate(dateKey)
+                        setIsDetailDrawerOpen(true)
+                      }}
+                      className={`min-h-[120px] rounded-lg border p-2 text-left transition relative ${!date
+                        ? 'border-transparent bg-transparent cursor-default'
+                        : isSelected
+                          ? 'border-brand-500 bg-brand-50 shadow-md'
+                          : isToday
+                            ? 'border-brand-300 bg-brand-50/70 shadow-sm'
+                            : 'border-slate-200 bg-white hover:border-brand-300 hover:bg-slate-50 hover:shadow-sm'
+                        }`}
+                      disabled={!date}
+                      title={items.length > 0 ? `${items.length} item(s) scheduled` : ''}
+                    >
+                      {date && (
+                        <>
+                          <div className="flex items-center justify-between mb-1">
+                            <div
+                              className={`text-sm font-semibold ${isToday ? 'text-brand-600' : 'text-slate-700'}`}
+                            >
+                              {date.getDate()}
                             </div>
-                          )}
-                        </div>
-                        {items.length > 0 && (
-                          <div className="mt-1 space-y-1 max-h-[88px] overflow-y-auto">
-                            {items.slice(0, 4).map((item) => {
-                              const isPost = isScheduledPost(item)
-                              let status: string
-                              let displayTopic: string
-                              let displayTime: string
-
-                              if (isPost) {
-                                status = item.status
-                                displayTopic = item.videos?.topic || `${item.platform} Post`
-                                displayTime = item.scheduled_time
-                                  ? new Date(item.scheduled_time).toLocaleTimeString('en-US', {
-                                    hour: 'numeric',
-                                    minute: '2-digit',
-                                    hour12: true
-                                  })
-                                  : ''
-                              } else {
-                                status = item.status
-                                // Show "Planned" or time if no topic, otherwise show topic
-                                if (item.topic) {
-                                  displayTopic = item.topic
-                                } else if (item.scheduled_time) {
-                                  displayTopic = t('video_planning.planned_with_time').replace('{time}', formatTime(item.scheduled_time))
-                                } else {
-                                  displayTopic = t('video_planning.planned')
-                                }
-                                displayTime = item.scheduled_time ? formatTime(item.scheduled_time) : ''
-                              }
-
-                              return (
-                                <div
-                                  key={item.id}
-                                  className={`truncate rounded px-1.5 py-1 text-xs border ${status === 'completed' ||
-                                    status === 'posted'
-                                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                                    : status === 'scheduled'
-                                      ? 'bg-purple-50 border-purple-200 text-purple-800'
-                                      : status === 'ready'
-                                        ? 'bg-blue-50 border-blue-200 text-blue-800'
-                                        : status === 'generating'
-                                          ? 'bg-indigo-50 border-indigo-200 text-indigo-800'
-                                          : status === 'approved'
-                                            ? 'bg-teal-50 border-teal-200 text-teal-800'
-                                            : status === 'failed'
-                                              ? 'bg-red-50 border-red-200 text-red-800'
-                                              : status === 'pending'
-                                                ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
-                                                : status === 'researching'
-                                                  ? 'bg-cyan-50 border-cyan-200 text-cyan-800'
-                                                  : 'bg-slate-50 border-slate-200 text-slate-700'
-                                    }`}
-                                  title={`${displayTime ? displayTime + ' - ' : ''}${displayTopic} (${status})`}
-                                >
-                                  <div className="flex items-center gap-1">
-                                    {displayTime && (
-                                      <span className="text-[10px] font-medium opacity-75">
-                                        {displayTime}
-                                      </span>
-                                    )}
-                                    <span className="flex-1 truncate font-medium">
-                                      {displayTopic}
-                                    </span>
-                                  </div>
-                                </div>
-                              )
-                            })}
-                            {items.length > 4 && (
-                              <div className="text-xs font-medium text-slate-500 px-1.5 py-0.5 bg-slate-100 rounded">
-                                {t('video_planning.more_items').replace('{count}', (items.length - 4).toString())}
+                            {items.length > 0 && (
+                              <div className="flex items-center gap-1">
+                                <div className="h-1.5 w-1.5 rounded-full bg-brand-500"></div>
+                                <span className="text-xs font-medium text-slate-600">
+                                  {items.length}
+                                </span>
                               </div>
                             )}
                           </div>
-                        )}
-                      </>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
+                          {items.length > 0 && (
+                            <div className="mt-1 space-y-1 max-h-[88px] overflow-y-auto">
+                              {items.slice(0, 4).map((item) => {
+                                const isPost = isScheduledPost(item)
+                                let status: string
+                                let displayTopic: string
+                                let displayTime: string
 
-            {/* Status Legend */}
-            <div className="mt-6 pt-6 border-t border-slate-200">
-              <h3 className="text-sm font-semibold text-slate-700 mb-3">
-                {t('video_planning.status_legend')}
-              </h3>
-              <div className="flex flex-wrap gap-3 text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded border border-yellow-200 bg-yellow-50"></div>
-                  <span className="text-slate-600">{t('video_planning.pending')}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded border border-cyan-200 bg-cyan-50"></div>
-                  <span className="text-slate-600">{t('video_planning.gathering_research')}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded border border-blue-200 bg-blue-50"></div>
-                  <span className="text-slate-600">{t('video_planning.ready')}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded border border-teal-200 bg-teal-50"></div>
-                  <span className="text-slate-600">{t('video_planning.approved')}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded border border-indigo-200 bg-indigo-50"></div>
-                  <span className="text-slate-600">{t('video_planning.generating_video')}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded border border-emerald-200 bg-emerald-50"></div>
-                  <span className="text-slate-600">{t('video_planning.published')}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded border border-purple-200 bg-purple-50"></div>
-                  <span className="text-slate-600">{t('video_planning.scheduled')}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded border border-red-200 bg-red-50"></div>
-                  <span className="text-slate-600">Failed</span>
+                                if (isPost) {
+                                  status = item.status
+                                  displayTopic = item.videos?.topic || `${item.platform} Post`
+                                  displayTime = item.scheduled_time
+                                    ? new Date(item.scheduled_time).toLocaleTimeString('en-US', {
+                                      hour: 'numeric',
+                                      minute: '2-digit',
+                                      hour12: true
+                                    })
+                                    : ''
+                                } else {
+                                  status = item.status
+                                  // Show "Planned" or time if no topic, otherwise show topic
+                                  if (item.topic) {
+                                    displayTopic = item.topic
+                                  } else if (item.scheduled_time) {
+                                    displayTopic = t('video_planning.planned_with_time').replace('{time}', formatTime(item.scheduled_time))
+                                  } else {
+                                    displayTopic = t('video_planning.planned')
+                                  }
+                                  displayTime = item.scheduled_time ? formatTime(item.scheduled_time) : ''
+                                }
+
+                                return (
+                                  <div
+                                    key={item.id}
+                                    className={`truncate rounded px-1.5 py-1 text-xs border ${status === 'completed' ||
+                                      status === 'posted'
+                                      ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                                      : status === 'scheduled'
+                                        ? 'bg-purple-50 border-purple-200 text-purple-800'
+                                        : status === 'ready'
+                                          ? 'bg-blue-50 border-blue-200 text-blue-800'
+                                          : status === 'generating'
+                                            ? 'bg-indigo-50 border-indigo-200 text-indigo-800'
+                                            : status === 'approved'
+                                              ? 'bg-teal-50 border-teal-200 text-teal-800'
+                                              : status === 'failed'
+                                                ? 'bg-red-50 border-red-200 text-red-800'
+                                                : status === 'pending'
+                                                  ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
+                                                  : status === 'researching'
+                                                    ? 'bg-cyan-50 border-cyan-200 text-cyan-800'
+                                                    : 'bg-slate-50 border-slate-200 text-slate-700'
+                                      }`}
+                                    title={`${displayTime ? displayTime + ' - ' : ''}${displayTopic} (${status})`}
+                                  >
+                                    <div className="flex items-center gap-1">
+                                      {displayTime && (
+                                        <span className="text-[10px] font-medium opacity-75">
+                                          {displayTime}
+                                        </span>
+                                      )}
+                                      <span className="flex-1 truncate font-medium">
+                                        {displayTopic}
+                                      </span>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                              {items.length > 4 && (
+                                <div className="text-xs font-medium text-slate-500 px-1.5 py-0.5 bg-slate-100 rounded">
+                                  {t('video_planning.more_items').replace('{count}', (items.length - 4).toString())}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Status Legend */}
+              <div className="mt-6 pt-6 border-t border-slate-200">
+                <h3 className="text-sm font-semibold text-slate-700 mb-3">
+                  {t('video_planning.status_legend')}
+                </h3>
+                <div className="flex flex-wrap gap-3 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-3 rounded border border-yellow-200 bg-yellow-50"></div>
+                    <span className="text-slate-600">{t('video_planning.pending')}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-3 rounded border border-cyan-200 bg-cyan-50"></div>
+                    <span className="text-slate-600">{t('video_planning.gathering_research')}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-3 rounded border border-blue-200 bg-blue-50"></div>
+                    <span className="text-slate-600">{t('video_planning.ready')}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-3 rounded border border-teal-200 bg-teal-50"></div>
+                    <span className="text-slate-600">{t('video_planning.approved')}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-3 rounded border border-indigo-200 bg-indigo-50"></div>
+                    <span className="text-slate-600">{t('video_planning.generating_video')}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-3 rounded border border-emerald-200 bg-emerald-50"></div>
+                    <span className="text-slate-600">{t('video_planning.published')}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-3 rounded border border-purple-200 bg-purple-50"></div>
+                    <span className="text-slate-600">{t('video_planning.scheduled')}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-3 rounded border border-red-200 bg-red-50"></div>
+                    <span className="text-slate-600">Failed</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          </Card>
+            </Card>
 
-          {/* Items for Selected Date */}
-          {itemsByDate[selectedDate] &&
-            itemsByDate[selectedDate].length > 0 && (
-              <div className="space-y-4">
-                <h2 className="text-lg font-semibold text-primary">
-                  {new Date(selectedDate).toLocaleDateString(language === 'ru' ? 'ru-RU' : language === 'uk' ? 'uk-UA' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
-                </h2>
+            {/* Items for Selected Date */}
+            {itemsByDate[selectedDate] &&
+              itemsByDate[selectedDate].length > 0 && (
+                <div className="space-y-4">
+                  <h2 className="text-lg font-semibold text-primary">
+                    {new Date(selectedDate).toLocaleDateString(language === 'ru' ? 'ru-RU' : language === 'uk' ? 'uk-UA' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })}
+                  </h2>
 
-                <div className="space-y-3">
-                  {itemsByDate[selectedDate]
-                    .sort((a, b) => {
-                      // Sort by scheduled_time, handling both plan items and scheduled posts
-                      let timeA = ''
-                      let timeB = ''
+                  <div className="space-y-3">
+                    {itemsByDate[selectedDate]
+                      .sort((a, b) => {
+                        // Sort by scheduled_time, handling both plan items and scheduled posts
+                        let timeA = ''
+                        let timeB = ''
 
-                      if (isScheduledPost(a)) {
-                        // For scheduled posts, extract time from ISO string
-                        timeA = a.scheduled_time ? new Date(a.scheduled_time).toISOString().substring(11, 16) : '00:00'
-                      } else {
-                        // For plan items, use scheduled_time directly (HH:MM format)
-                        timeA = a.scheduled_time || '00:00'
-                      }
+                        if (isScheduledPost(a)) {
+                          // For scheduled posts, extract time from ISO string
+                          timeA = a.scheduled_time ? new Date(a.scheduled_time).toISOString().substring(11, 16) : '00:00'
+                        } else {
+                          // For plan items, use scheduled_time directly (HH:MM format)
+                          timeA = a.scheduled_time || '00:00'
+                        }
 
-                      if (isScheduledPost(b)) {
-                        timeB = b.scheduled_time ? new Date(b.scheduled_time).toISOString().substring(11, 16) : '00:00'
-                      } else {
-                        timeB = b.scheduled_time || '00:00'
-                      }
+                        if (isScheduledPost(b)) {
+                          timeB = b.scheduled_time ? new Date(b.scheduled_time).toISOString().substring(11, 16) : '00:00'
+                        } else {
+                          timeB = b.scheduled_time || '00:00'
+                        }
 
-                      return timeA.localeCompare(timeB)
-                    })
-                    .map((item) => {
-                      const isPost = isScheduledPost(item)
-                      if (isPost) {
-                        // Render scheduled post differently
-                        const scheduledTime = item.scheduled_time
+                        return timeA.localeCompare(timeB)
+                      })
+                      .map((item) => {
+                        const isPost = isScheduledPost(item)
+                        if (isPost) {
+                          // Render scheduled post differently
+                          const scheduledTime = item.scheduled_time
+                          return (
+                            <Card
+                              key={item.id}
+                              className="p-5 border-purple-200 bg-purple-50/50"
+                            >
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex-1 space-y-3">
+                                  <div className="flex items-center gap-3">
+                                    <Clock className="h-4 w-4 text-slate-400" />
+                                    <span className="text-sm font-medium text-slate-600">
+                                      {scheduledTime ? new Date(scheduledTime).toLocaleTimeString(language === 'ru' ? 'ru-RU' : language === 'uk' ? 'uk-UA' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US', {
+                                        hour: 'numeric',
+                                        minute: '2-digit',
+                                        hour12: true
+                                      }) : t('video_planning.no_time_set')}
+                                    </span>
+                                    <Badge variant={item.status === 'posted' ? 'success' : item.status === 'pending' ? 'warning' : item.status === 'failed' ? 'error' : 'default'}>
+                                      {item.status === 'posted' ? t('video_planning.posted') : item.status === 'pending' ? t('video_planning.scheduled') : item.status === 'failed' ? t('video_planning.failed') : item.status}
+                                    </Badge>
+                                    <Badge variant="info">{item.platform}</Badge>
+                                  </div>
+                                  <div>
+                                    <h3 className="font-semibold text-primary">
+                                      {item.videos?.topic || t('video_planning.scheduled_post')}
+                                    </h3>
+                                    {item.videos && (
+                                      <p className="mt-1 text-sm text-slate-600">
+                                        {t('video_planning.video_id')}: {item.video_id}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  {item.video_id && (
+                                    <Button
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        navigate(`/videos?videoId=${item.video_id}`)
+                                      }}
+                                      className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-600"
+                                    >
+                                      {t('video_planning.view_video')}
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            </Card>
+                          )
+                        }
+                        // Render regular plan item (existing code)
                         return (
                           <Card
                             key={item.id}
-                            className="p-5 border-purple-200 bg-purple-50/50"
+                            className="p-5 cursor-pointer transition hover:shadow-md"
+                            onClick={(e: React.MouseEvent<HTMLDivElement>) => {
+                              // Don't open modal if clicking on buttons or interactive elements
+                              const target = e.target as HTMLElement
+                              if (target.closest('button') || target.closest('a') || editingItem?.id === item.id) {
+                                return
+                              }
+                              openDetailDrawer(item)
+                            }}
                           >
                             <div className="flex items-start justify-between gap-4">
                               <div className="flex-1 space-y-3">
                                 <div className="flex items-center gap-3">
                                   <Clock className="h-4 w-4 text-slate-400" />
                                   <span className="text-sm font-medium text-slate-600">
-                                    {scheduledTime ? new Date(scheduledTime).toLocaleTimeString(language === 'ru' ? 'ru-RU' : language === 'uk' ? 'uk-UA' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US', {
-                                      hour: 'numeric',
-                                      minute: '2-digit',
-                                      hour12: true
-                                    }) : t('video_planning.no_time_set')}
+                                    {formatTime(item.scheduled_time)}
                                   </span>
-                                  <Badge variant={item.status === 'posted' ? 'success' : item.status === 'pending' ? 'warning' : item.status === 'failed' ? 'error' : 'default'}>
-                                    {item.status === 'posted' ? t('video_planning.posted') : item.status === 'pending' ? t('video_planning.scheduled') : item.status === 'failed' ? t('video_planning.failed') : item.status}
-                                  </Badge>
-                                  <Badge variant="info">{item.platform}</Badge>
-                                </div>
-                                <div>
-                                  <h3 className="font-semibold text-primary">
-                                    {item.videos?.topic || t('video_planning.scheduled_post')}
-                                  </h3>
-                                  {item.videos && (
-                                    <p className="mt-1 text-sm text-slate-600">
-                                      {t('video_planning.video_id')}: {item.video_id}
-                                    </p>
+                                  {getStatusBadge(
+                                    item.status,
+                                    item.script_status,
+                                    item,
                                   )}
                                 </div>
+
+                                {editingItem?.id === item.id ? (
+                                  <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                    <div className="flex items-center justify-between">
+                                      <h4 className="font-semibold text-primary">
+                                        {t('video_planning.edit_video_details')}
+                                      </h4>
+                                    </div>
+                                    <Input
+                                      label={t('video_planning.topic_label')}
+                                      value={editForm.topic}
+                                      onChange={(e) =>
+                                        setEditForm({
+                                          ...editForm,
+                                          topic: e.target.value,
+                                        })
+                                      }
+                                      placeholder={t('video_planning.topic_input_placeholder')}
+                                      required
+                                    />
+                                    <div className="space-y-3">
+                                      <div>
+                                        <label className="mb-2 block text-xs font-medium text-slate-700">
+                                          {t('video_planning.posting_time')}
+                                        </label>
+                                        <Input
+                                          type="time"
+                                          value={editForm.scheduled_time}
+                                          onChange={(e) =>
+                                            setEditForm({
+                                              ...editForm,
+                                              scheduled_time: e.target.value,
+                                            })
+                                          }
+                                          className="mb-2"
+                                        />
+                                        <div className="flex flex-wrap gap-2">
+                                          {timePresets.map((preset) => (
+                                            <button
+                                              key={preset.value}
+                                              type="button"
+                                              onClick={() =>
+                                                setEditForm({
+                                                  ...editForm,
+                                                  scheduled_time: preset.value,
+                                                })
+                                              }
+                                              className={`rounded-lg border px-2 py-1 text-xs font-medium transition ${editForm.scheduled_time ===
+                                                preset.value
+                                                ? 'border-brand-500 bg-brand-50 text-brand-700'
+                                                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                                }`}
+                                            >
+                                              {preset.label.split(' ')[0]}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                      <div className="space-y-2">
+                                        <label className="block text-xs font-medium text-slate-700">
+                                          {t('video_planning.platforms')}
+                                        </label>
+                                        <div className="flex flex-wrap gap-2">
+                                          {socialAccounts
+                                            .filter((acc) => acc.status === 'connected')
+                                            .map((acc) => (
+                                              <button
+                                                key={acc.platform}
+                                                type="button"
+                                                onClick={() => {
+                                                  const newPlatforms =
+                                                    editForm.platforms.includes(
+                                                      acc.platform,
+                                                    )
+                                                      ? editForm.platforms.filter(
+                                                        (p) => p !== acc.platform,
+                                                      )
+                                                      : [
+                                                        ...editForm.platforms,
+                                                        acc.platform,
+                                                      ]
+                                                  setEditForm((prev) => ({
+                                                    ...prev,
+                                                    platforms: newPlatforms,
+                                                  }))
+                                                }}
+                                                className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition ${editForm.platforms.includes(acc.platform)
+                                                  ? 'border-brand-500 bg-brand-50 text-brand-700'
+                                                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                                  }`}
+                                              >
+                                                {acc.platform}
+                                              </button>
+                                            ))}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <Textarea
+                                      label={t('video_planning.description')}
+                                      value={editForm.description}
+                                      onChange={(e) =>
+                                        setEditForm({
+                                          ...editForm,
+                                          description: e.target.value,
+                                        })
+                                      }
+                                      placeholder={t('video_planning.description_placeholder')}
+                                      rows={2}
+                                    />
+                                    <Textarea
+                                      label={t('video_planning.caption')}
+                                      value={editForm.caption}
+                                      onChange={(e) =>
+                                        setEditForm({
+                                          ...editForm,
+                                          caption: e.target.value,
+                                        })
+                                      }
+                                      placeholder={t('video_planning.caption_placeholder')}
+                                      rows={2}
+                                    />
+                                  </div>
+                                ) : (
+                                  <div>
+                                    {item.topic ? (
+                                      <>
+                                        <h3 className="font-semibold text-primary">
+                                          {item.topic}
+                                        </h3>
+                                        {item.description && (
+                                          <p className="mt-1 text-sm text-slate-600 line-clamp-2">
+                                            {item.description}
+                                          </p>
+                                        )}
+                                        {item.caption && (
+                                          <p className="mt-1 text-xs text-slate-500 italic">
+                                            {t('video_planning.social_media_caption')}: {item.caption}
+                                          </p>
+                                        )}
+                                        {item.platforms &&
+                                          item.platforms.length > 0 && (
+                                            <div className="mt-2 flex flex-wrap gap-1">
+                                              {item.platforms.map((platform: string) => (
+                                                <span
+                                                  key={platform}
+                                                  className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700"
+                                                >
+                                                  {platform}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          )}
+                                      </>
+                                    ) : (
+                                      <p className="text-sm text-slate-400">
+                                        {t('video_planning.no_topic_yet')}
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+
+                                {item.error_message && (
+                                  <p className="text-xs text-rose-600">
+                                    {item.error_message}
+                                  </p>
+                                )}
                               </div>
+
                               <div className="flex flex-wrap gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleEditItem(item)}
+                                  leftIcon={<Edit2 className="h-4 w-4" />}
+                                >
+                                  {item.topic ? t('video_planning.edit_item') : t('video_planning.set_topic')}
+                                </Button>
+                                {item.status === 'pending' && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleGenerateTopic(item.id)}
+                                    leftIcon={<Sparkles className="h-4 w-4" />}
+                                  >
+                                    {item.topic ? t('video_planning.regenerate') : t('video_planning.auto_generate')}
+                                  </Button>
+                                )}
+                                {item.script_status === 'draft' &&
+                                  item.script && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => setScriptPreviewItem(item)}
+                                      leftIcon={<PenSquare className="h-4 w-4" />}
+                                    >
+                                      {t('video_planning.review_script')}
+                                    </Button>
+                                  )}
+                                {item.status === 'ready' && !item.script && (
+                                  <Button
+                                    size="sm"
+                                    onClick={async () => {
+                                      try {
+                                        await api.post(
+                                          `/api/plans/items/${item.id}/generate-script`,
+                                        )
+                                        if (selectedPlan)
+                                          loadPlanItems(selectedPlan.id)
+                                      } catch (error: any) {
+                                        alert(
+                                          error.response?.data?.error ||
+                                          t('video_planning.generate_script_failed'),
+                                        )
+                                      }
+                                    }}
+                                    leftIcon={<Sparkles className="h-4 w-4" />}
+                                  >
+                                    {t('video_planning.generate_script')}
+                                  </Button>
+                                )}
+                                {item.status === 'approved' && (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleCreateVideo(item)}
+                                    leftIcon={<Video className="h-4 w-4" />}
+                                  >
+                                    {t('video_planning.create_video')}
+                                  </Button>
+                                )}
+                                {item.status === 'researching' ||
+                                  item.status === 'generating' ? (
+                                  <Loader className="h-4 w-4 animate-spin text-brand-500" />
+                                ) : null}
                                 {item.video_id && (
                                   <Button
                                     size="sm"
@@ -1603,1375 +1864,1098 @@ return (
                             </div>
                           </Card>
                         )
-                      }
-                      // Render regular plan item (existing code)
-                      return (
-                        <Card
-                          key={item.id}
-                          className="p-5 cursor-pointer transition hover:shadow-md"
-                          onClick={(e: React.MouseEvent<HTMLDivElement>) => {
-                            // Don't open modal if clicking on buttons or interactive elements
-                            const target = e.target as HTMLElement
-                            if (target.closest('button') || target.closest('a') || editingItem?.id === item.id) {
-                              return
-                            }
-                            openDetailDrawer(item)
-                          }}
-                        >
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 space-y-3">
-                              <div className="flex items-center gap-3">
-                                <Clock className="h-4 w-4 text-slate-400" />
-                                <span className="text-sm font-medium text-slate-600">
-                                  {formatTime(item.scheduled_time)}
-                                </span>
-                                {getStatusBadge(
-                                  item.status,
-                                  item.script_status,
-                                  item,
-                                )}
-                              </div>
-
-                              {editingItem?.id === item.id ? (
-                                <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                                  <div className="flex items-center justify-between">
-                                    <h4 className="font-semibold text-primary">
-                                      {t('video_planning.edit_video_details')}
-                                    </h4>
-                                  </div>
-                                  <Input
-                                    label={t('video_planning.topic_label')}
-                                    value={editForm.topic}
-                                    onChange={(e) =>
-                                      setEditForm({
-                                        ...editForm,
-                                        topic: e.target.value,
-                                      })
-                                    }
-                                    placeholder={t('video_planning.topic_input_placeholder')}
-                                    required
-                                  />
-                                  <div className="space-y-3">
-                                    <div>
-                                      <label className="mb-2 block text-xs font-medium text-slate-700">
-                                        {t('video_planning.posting_time')}
-                                      </label>
-                                      <Input
-                                        type="time"
-                                        value={editForm.scheduled_time}
-                                        onChange={(e) =>
-                                          setEditForm({
-                                            ...editForm,
-                                            scheduled_time: e.target.value,
-                                          })
-                                        }
-                                        className="mb-2"
-                                      />
-                                      <div className="flex flex-wrap gap-2">
-                                        {timePresets.map((preset) => (
-                                          <button
-                                            key={preset.value}
-                                            type="button"
-                                            onClick={() =>
-                                              setEditForm({
-                                                ...editForm,
-                                                scheduled_time: preset.value,
-                                              })
-                                            }
-                                            className={`rounded-lg border px-2 py-1 text-xs font-medium transition ${editForm.scheduled_time ===
-                                              preset.value
-                                              ? 'border-brand-500 bg-brand-50 text-brand-700'
-                                              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                                              }`}
-                                          >
-                                            {preset.label.split(' ')[0]}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                      <label className="block text-xs font-medium text-slate-700">
-                                        {t('video_planning.platforms')}
-                                      </label>
-                                      <div className="flex flex-wrap gap-2">
-                                        {socialAccounts
-                                          .filter((acc) => acc.status === 'connected')
-                                          .map((acc) => (
-                                            <button
-                                              key={acc.platform}
-                                              type="button"
-                                              onClick={() => {
-                                                const newPlatforms =
-                                                  editForm.platforms.includes(
-                                                    acc.platform,
-                                                  )
-                                                    ? editForm.platforms.filter(
-                                                      (p) => p !== acc.platform,
-                                                    )
-                                                    : [
-                                                      ...editForm.platforms,
-                                                      acc.platform,
-                                                    ]
-                                                setEditForm((prev) => ({
-                                                  ...prev,
-                                                  platforms: newPlatforms,
-                                                }))
-                                              }}
-                                              className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition ${editForm.platforms.includes(acc.platform)
-                                                ? 'border-brand-500 bg-brand-50 text-brand-700'
-                                                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                                                }`}
-                                            >
-                                              {acc.platform}
-                                            </button>
-                                          ))}
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <Textarea
-                                    label={t('video_planning.description')}
-                                    value={editForm.description}
-                                    onChange={(e) =>
-                                      setEditForm({
-                                        ...editForm,
-                                        description: e.target.value,
-                                      })
-                                    }
-                                    placeholder={t('video_planning.description_placeholder')}
-                                    rows={2}
-                                  />
-                                  <Textarea
-                                    label={t('video_planning.caption')}
-                                    value={editForm.caption}
-                                    onChange={(e) =>
-                                      setEditForm({
-                                        ...editForm,
-                                        caption: e.target.value,
-                                      })
-                                    }
-                                    placeholder={t('video_planning.caption_placeholder')}
-                                    rows={2}
-                                  />
-                                </div>
-                              ) : (
-                                <div>
-                                  {item.topic ? (
-                                    <>
-                                      <h3 className="font-semibold text-primary">
-                                        {item.topic}
-                                      </h3>
-                                      {item.description && (
-                                        <p className="mt-1 text-sm text-slate-600 line-clamp-2">
-                                          {item.description}
-                                        </p>
-                                      )}
-                                      {item.caption && (
-                                        <p className="mt-1 text-xs text-slate-500 italic">
-                                          {t('video_planning.social_media_caption')}: {item.caption}
-                                        </p>
-                                      )}
-                                      {item.platforms &&
-                                        item.platforms.length > 0 && (
-                                          <div className="mt-2 flex flex-wrap gap-1">
-                                            {item.platforms.map((platform: string) => (
-                                              <span
-                                                key={platform}
-                                                className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700"
-                                              >
-                                                {platform}
-                                              </span>
-                                            ))}
-                                          </div>
-                                        )}
-                                    </>
-                                  ) : (
-                                    <p className="text-sm text-slate-400">
-                                      {t('video_planning.no_topic_yet')}
-                                    </p>
-                                  )}
-                                </div>
-                              )}
-
-                              {item.error_message && (
-                                <p className="text-xs text-rose-600">
-                                  {item.error_message}
-                                </p>
-                              )}
-                            </div>
-
-                            <div className="flex flex-wrap gap-2">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleEditItem(item)}
-                                leftIcon={<Edit2 className="h-4 w-4" />}
-                              >
-                                {item.topic ? t('video_planning.edit_item') : t('video_planning.set_topic')}
-                              </Button>
-                              {item.status === 'pending' && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleGenerateTopic(item.id)}
-                                  leftIcon={<Sparkles className="h-4 w-4" />}
-                                >
-                                  {item.topic ? t('video_planning.regenerate') : t('video_planning.auto_generate')}
-                                </Button>
-                              )}
-                              {item.script_status === 'draft' &&
-                                item.script && (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => setScriptPreviewItem(item)}
-                                    leftIcon={<PenSquare className="h-4 w-4" />}
-                                  >
-                                    {t('video_planning.review_script')}
-                                  </Button>
-                                )}
-                              {item.status === 'ready' && !item.script && (
-                                <Button
-                                  size="sm"
-                                  onClick={async () => {
-                                    try {
-                                      await api.post(
-                                        `/api/plans/items/${item.id}/generate-script`,
-                                      )
-                                      if (selectedPlan)
-                                        loadPlanItems(selectedPlan.id)
-                                    } catch (error: any) {
-                                      alert(
-                                        error.response?.data?.error ||
-                                        t('video_planning.generate_script_failed'),
-                                      )
-                                    }
-                                  }}
-                                  leftIcon={<Sparkles className="h-4 w-4" />}
-                                >
-                                  {t('video_planning.generate_script')}
-                                </Button>
-                              )}
-                              {item.status === 'approved' && (
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleCreateVideo(item)}
-                                  leftIcon={<Video className="h-4 w-4" />}
-                                >
-                                  {t('video_planning.create_video')}
-                                </Button>
-                              )}
-                              {item.status === 'researching' ||
-                                item.status === 'generating' ? (
-                                <Loader className="h-4 w-4 animate-spin text-brand-500" />
-                              ) : null}
-                              {item.video_id && (
-                                <Button
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    navigate(`/videos?videoId=${item.video_id}`)
-                                  }}
-                                  className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-600"
-                                >
-                                  {t('video_planning.view_video')}
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        </Card>
-                      )
-                    })}
+                      })}
+                  </div>
                 </div>
-              </div>
-            )}
-        </div>
-      ) : (
-        <EmptyState
-          icon={<Calendar className="w-16 h-16" />}
-          title={t('video_planning.no_plans_yet')}
-          description={t('video_planning.no_plans_desc')}
-          action={
-            <Button
-              onClick={() => setCreateModal(true)}
-              leftIcon={<Plus className="h-4 w-4" />}
-            >
-              {t('video_planning.create_plan')}
-            </Button>
-          }
-        />
-      )}
+              )}
+          </div>
+        ) : (
+          <EmptyState
+            icon={<Calendar className="w-16 h-16" />}
+            title={t('video_planning.no_plans_yet')}
+            description={t('video_planning.no_plans_desc')}
+            action={
+              <Button
+                onClick={() => setCreateModal(true)}
+                leftIcon={<Plus className="h-4 w-4" />}
+              >
+                {t('video_planning.create_plan')}
+              </Button>
+            }
+          />
+        )}
 
-      {/* Item Detail Modal */}
-      <Modal
-        isOpen={isDetailDrawerOpen && !!selectedItem}
-        onClose={closeDetailDrawer}
-        title={selectedItem?.topic || t('video_planning.video_detail')}
-        size="xl"
-      >
-        {selectedItem && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Left Column: Preview/Video */}
-            <div className="space-y-4">
-              <div className="aspect-video w-full rounded-xl bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200">
-                {selectedItem.video_id ? (
-                  <div className="text-center p-4">
-                    <Video className="h-12 w-12 text-slate-300 mx-auto mb-2" />
-                    <p className="text-sm text-slate-500">{t('video_planning.video_id_prefix').replace('{id}', selectedItem.video_id)}</p>
+        {/* Item Detail Modal */}
+        <Modal
+          isOpen={isDetailDrawerOpen && !!selectedItem}
+          onClose={closeDetailDrawer}
+          title={selectedItem?.topic || t('video_planning.video_detail')}
+          size="xl"
+        >
+          {selectedItem && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Left Column: Preview/Video */}
+              <div className="space-y-4">
+                <div className="aspect-video w-full rounded-xl bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200">
+                  {selectedItem.video_id ? (
+                    <div className="text-center p-4">
+                      <Video className="h-12 w-12 text-slate-300 mx-auto mb-2" />
+                      <p className="text-sm text-slate-500">{t('video_planning.video_id_prefix').replace('{id}', selectedItem.video_id)}</p>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => navigate(`/videos?videoId=${selectedItem.video_id}`)}
+                      >
+                        {t('video_planning.view_full_video')}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="text-center p-4">
+                      <Clapperboard className="h-12 w-12 text-slate-300 mx-auto mb-2" />
+                      <p className="text-sm text-slate-500">{t('video_planning.video_preview_placeholder')}</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-slate-700">{t('video_planning.script_label')}</p>
+                    {selectedItem.script_status && (
+                      <Badge variant="info">Script: {selectedItem.script_status}</Badge>
+                    )}
+                  </div>
+                  <div className="max-h-[300px] overflow-y-auto rounded border border-slate-200 bg-white p-3 text-sm text-slate-700">
+                    {selectedItem.script ? (
+                      <pre className="whitespace-pre-wrap font-sans leading-relaxed">
+                        {selectedItem.script}
+                      </pre>
+                    ) : (
+                      <p className="text-slate-500 italic">{t('video_planning.no_script_yet')}</p>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2 pt-2">
                     <Button
-                      variant="secondary"
                       size="sm"
-                      onClick={() => navigate(`/videos?videoId=${selectedItem.video_id}`)}
+                      variant="secondary"
+                      onClick={() => handleGenerateTopic(selectedItem.id)}
+                      leftIcon={<Sparkles className="h-4 w-4" />}
                     >
-                      {t('video_planning.view_full_video')}
+                      {t('video_planning.regenerate')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() =>
+                        api
+                          .post(`/api/plans/items/${selectedItem.id}/generate-script`)
+                          .then(() => selectedPlan && loadPlanItems(selectedPlan.id))
+                      }
+                      leftIcon={<PenSquare className="h-4 w-4" />}
+                    >
+                      {t('video_planning.regenerate_script')}
                     </Button>
                   </div>
-                ) : (
-                  <div className="text-center p-4">
-                    <Clapperboard className="h-12 w-12 text-slate-300 mx-auto mb-2" />
-                    <p className="text-sm text-slate-500">{t('video_planning.video_preview_placeholder')}</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-slate-700">{t('video_planning.script_label')}</p>
-                  {selectedItem.script_status && (
-                    <Badge variant="info">Script: {selectedItem.script_status}</Badge>
-                  )}
-                </div>
-                <div className="max-h-[300px] overflow-y-auto rounded border border-slate-200 bg-white p-3 text-sm text-slate-700">
-                  {selectedItem.script ? (
-                    <pre className="whitespace-pre-wrap font-sans leading-relaxed">
-                      {selectedItem.script}
-                    </pre>
-                  ) : (
-                    <p className="text-slate-500 italic">{t('video_planning.no_script_yet')}</p>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2 pt-2">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => handleGenerateTopic(selectedItem.id)}
-                    leftIcon={<Sparkles className="h-4 w-4" />}
-                  >
-                    {t('video_planning.regenerate')}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() =>
-                      api
-                        .post(`/api/plans/items/${selectedItem.id}/generate-script`)
-                        .then(() => selectedPlan && loadPlanItems(selectedPlan.id))
-                    }
-                    leftIcon={<PenSquare className="h-4 w-4" />}
-                  >
-                    {t('video_planning.regenerate_script')}
-                  </Button>
                 </div>
               </div>
-            </div>
 
-            {/* Right Column: Details/Form */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm text-slate-600 mb-2">
-                <Clock className="h-4 w-4" />
-                <span>{formatTime(selectedItem.scheduled_time)}</span>
-                <span className="text-slate-300">|</span>
-                <span>{selectedItem.scheduled_date}</span>
-                {getStatusBadge(
-                  selectedItem.status,
-                  selectedItem.script_status,
-                  selectedItem,
-                )}
-              </div>
-
+              {/* Right Column: Details/Form */}
               <div className="space-y-4">
-                <Input
-                  label={t('video_planning.topic')}
-                  value={editForm.topic}
-                  onChange={(e) =>
-                    setEditForm((prev) => ({ ...prev, topic: e.target.value }))
-                  }
-                />
-                <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center gap-2 text-sm text-slate-600 mb-2">
+                  <Clock className="h-4 w-4" />
+                  <span>{formatTime(selectedItem.scheduled_time)}</span>
+                  <span className="text-slate-300">|</span>
+                  <span>{selectedItem.scheduled_date}</span>
+                  {getStatusBadge(
+                    selectedItem.status,
+                    selectedItem.script_status,
+                    selectedItem,
+                  )}
+                </div>
+
+                <div className="space-y-4">
                   <Input
-                    label={t('video_planning.posting_time')}
-                    type="time"
-                    value={editForm.scheduled_time}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    label={t('video_planning.topic')}
+                    value={editForm.topic}
+                    onChange={(e) =>
+                      setEditForm((prev) => ({ ...prev, topic: e.target.value }))
+                    }
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input
+                      label={t('video_planning.posting_time')}
+                      type="time"
+                      value={editForm.scheduled_time}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        setEditForm((prev: any) => ({
+                          ...prev,
+                          scheduled_time: e.target.value,
+                        }))
+                      }
+                    />
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-slate-700">
+                        {t('video_planning.platforms')}
+                      </label>
+                      <div className="flex flex-wrap gap-1">
+                        {socialAccounts
+                          .filter((acc) => acc.status === 'connected')
+                          .map((acc) => (
+                            <button
+                              key={acc.platform}
+                              type="button"
+                              onClick={() => {
+                                const newPlatforms = editForm.platforms.includes(
+                                  acc.platform,
+                                )
+                                  ? editForm.platforms.filter((p: string) => p !== acc.platform)
+                                  : [...editForm.platforms, acc.platform]
+                                setEditForm((prev: any) => ({
+                                  ...prev,
+                                  platforms: newPlatforms,
+                                }))
+                              }}
+                              className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize transition ${editForm.platforms.includes(acc.platform)
+                                ? 'border-brand-500 bg-brand-50 text-brand-700'
+                                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                }`}
+                            >
+                              {acc.platform}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  </div>
+                  <Textarea
+                    label={t('video_planning.description')}
+                    value={editForm.description}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
                       setEditForm((prev: any) => ({
                         ...prev,
-                        scheduled_time: e.target.value,
+                        description: e.target.value,
                       }))
                     }
+                    rows={3}
                   />
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-slate-700">
-                      {t('video_planning.platforms')}
-                    </label>
-                    <div className="flex flex-wrap gap-1">
-                      {socialAccounts
-                        .filter((acc) => acc.status === 'connected')
-                        .map((acc) => (
-                          <button
-                            key={acc.platform}
-                            type="button"
-                            onClick={() => {
-                              const newPlatforms = editForm.platforms.includes(
-                                acc.platform,
-                              )
-                                ? editForm.platforms.filter((p: string) => p !== acc.platform)
-                                : [...editForm.platforms, acc.platform]
-                              setEditForm((prev: any) => ({
-                                ...prev,
-                                platforms: newPlatforms,
-                              }))
-                            }}
-                            className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize transition ${editForm.platforms.includes(acc.platform)
-                              ? 'border-brand-500 bg-brand-50 text-brand-700'
-                              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                              }`}
-                          >
-                            {acc.platform}
-                          </button>
-                        ))}
-                    </div>
-                  </div>
-                </div>
-                <Textarea
-                  label={t('video_planning.description')}
-                  value={editForm.description}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                    setEditForm((prev: any) => ({
-                      ...prev,
-                      description: e.target.value,
-                    }))
-                  }
-                  rows={3}
-                />
-                <Textarea
-                  label={t('video_planning.caption')}
-                  value={editForm.caption}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                    setEditForm((prev: any) => ({
-                      ...prev,
-                      caption: e.target.value,
-                    }))
-                  }
-                  rows={2}
-                />
-              </div>
-
-              <div className="flex items-center justify-between gap-3 pt-6 border-t border-slate-100">
-                <div className="flex gap-2">
-                  {selectedItem.status === 'approved' && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => handleCreateVideo(selectedItem)}
-                      leftIcon={<Video className="h-4 w-4" />}
-                    >
-                      {t('video_planning.create_video')}
-                    </Button>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={closeDetailDrawer}
-                  >
-                    {t('video_planning.cancel')}
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={async () => {
-                      await handleSaveItem()
-                      closeDetailDrawer()
-                    }}
-                    leftIcon={<Save className="h-4 w-4" />}
-                  >
-                    {t('video_planning.save_changes')}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* Create Plan Modal */}
-      <Modal
-        isOpen={createModal}
-        onClose={() => {
-          setCreateModal(false)
-
-        }}
-        title={t('video_planning.create_plan')}
-      >
-        <div className="space-y-6">
-          <div className="text-xs text-slate-500">{t('video_planning.timezone_label')}: {timezone}</div>
-        </div>
-
-        <div className="space-y-4">
-          <Input
-            label="Plan Name"
-            placeholder="e.g., Daily Trading Content"
-            value={planName}
-            onChange={(e) => setPlanName(e.target.value)}
-            required
-          />
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <Input
-              label={t('video_planning.start_date')}
-              type="date"
-              value={startDate}
-              onChange={(e: any) => setStartDate(e.target.value)}
-              required
-            />
-
-            <Input
-              label={t('video_planning.end_date')}
-              type="date"
-              value={endDate}
-              onChange={(e: any) => setEndDate(e.target.value)}
-              min={startDate}
-            />
-          </div>
-
-          <div className="space-y-4">
-            <label className="block text-sm font-medium text-slate-700">
-              Videos & Topics
-            </label>
-            <div className="space-y-3">
-              {videoTimes.map((time: string, index: number) => (
-                <div key={index} className="relative space-y-2 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-                  {videoTimes.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeVideoSlot(index)}
-                      className="absolute right-2 top-2 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-red-500"
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-                  <div className="flex items-center gap-3">
-                    <div className="flex-shrink-0 text-xs font-bold text-slate-400">
-                      #{index + 1}
-                    </div>
-                    <Input
-                      type="time"
-                      value={time}
-                      onChange={(e: any) => updateVideoSlotTime(index, e.target.value)}
-                      className="w-32"
-                    />
-                  </div>
                   <Textarea
-                    placeholder={`Topic for video #${index + 1}`}
-                    value={videoTopics[index]}
-                    onChange={(e: any) => updateVideoSlotTopic(index, e.target.value)}
+                    label={t('video_planning.caption')}
+                    value={editForm.caption}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                      setEditForm((prev: any) => ({
+                        ...prev,
+                        caption: e.target.value,
+                      }))
+                    }
                     rows={2}
-                    required
                   />
                 </div>
-              ))}
-            </div>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={addVideoSlot}
-              className="w-full border-dashed"
-              leftIcon={<Plus size={16} />}
-            >
-              Add Another Video
-            </Button>
-          </div>
 
-          <Select
-            label={t('video_planning.timezone')}
-            value={timezone}
-            onChange={(e) => setTimezone(e.target.value)}
-            options={timezones}
-          />
-
-          <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <label className="block text-sm font-medium text-slate-700">
-              {t('video_planning.social_media_platforms')}
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {socialAccounts
-                .filter((acc) => acc.status === 'connected')
-                .map((acc) => (
-                  <button
-                    key={acc.platform}
-                    type="button"
-                    onClick={() => {
-                      if (defaultPlatforms.includes(acc.platform)) {
-                        setDefaultPlatforms(
-                          defaultPlatforms.filter((p) => p !== acc.platform),
-                        )
-                      } else {
-                        setDefaultPlatforms([...defaultPlatforms, acc.platform])
-                      }
-                    }}
-                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition ${defaultPlatforms.includes(acc.platform)
-                      ? 'border-brand-500 bg-brand-50 text-brand-700'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                      }`}
-                  >
-                    {acc.platform}
-                    {defaultPlatforms.includes(acc.platform) && (
-                      <span className="ml-1">✓</span>
+                <div className="flex items-center justify-between gap-3 pt-6 border-t border-slate-100">
+                  <div className="flex gap-2">
+                    {selectedItem.status === 'approved' && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleCreateVideo(selectedItem)}
+                        leftIcon={<Video className="h-4 w-4" />}
+                      >
+                        {t('video_planning.create_video')}
+                      </Button>
                     )}
-                  </button>
-                ))}
-            </div>
-          </div>
-
-          <div className="flex items-center justify-end pt-2">
-            <Button
-              onClick={handleCreatePlan}
-              loading={creating}
-            >
-              {t('video_planning.create_plan')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Edit Plan Modal */}
-      <Modal
-        isOpen={!!editPlanModal}
-        onClose={() => {
-          setEditPlanModal(null)
-          // Reset form
-          setPlanName('')
-          setStartDate(new Date().toISOString().split('T')[0])
-          setEndDate('')
-          setAutoScheduleTrigger('daily')
-          setTriggerTime('09:00')
-          setDefaultPlatforms([])
-          setVideoTimes(['09:00'])
-          setVideoTopics([''])
-        }}
-        title={t('video_planning.edit_plan')}
-      >
-        <div className="space-y-4">
-          <Input
-            label="Plan Name"
-            placeholder="e.g., Daily Trading Content"
-            value={planName}
-            onChange={(e) => setPlanName(e.target.value)}
-            required
-          />
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <Input
-              label={t('video_planning.start_date')}
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              required
-            />
-
-            <Input
-              label={t('video_planning.end_date')}
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              min={startDate}
-            />
-          </div>
-
-          <div className="space-y-4">
-            <label className="block text-sm font-medium text-slate-700">
-              Videos & Topics
-            </label>
-            <div className="space-y-3">
-              {videoTimes.map((time: string, index: number) => (
-                <div key={index} className="relative space-y-2 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-                  {videoTimes.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeVideoSlot(index)}
-                      className="absolute right-2 top-2 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-red-500"
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-                  <div className="flex items-center gap-3">
-                    <div className="flex-shrink-0 text-xs font-bold text-slate-400">
-                      #{index + 1}
-                    </div>
-                    <Input
-                      type="time"
-                      value={time}
-                      onChange={(e: any) => updateVideoSlotTime(index, e.target.value)}
-                      className="w-32"
-                    />
-                  </div>
-                  <Textarea
-                    placeholder={`Topic for video #${index + 1}`}
-                    value={videoTopics[index]}
-                    onChange={(e: any) => updateVideoSlotTopic(index, e.target.value)}
-                    rows={2}
-                    required
-                  />
-                </div>
-              ))}
-            </div>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={addVideoSlot}
-              className="w-full border-dashed"
-              leftIcon={<Plus size={16} />}
-            >
-              Add Another Video
-            </Button>
-          </div>
-
-          <Select
-            label={t('video_planning.timezone')}
-            value={timezone}
-            onChange={(e: any) => setTimezone(e.target.value)}
-            options={timezones}
-          />
-
-          <Select
-            label={t('video_planning.schedule_trigger')}
-            value={autoScheduleTrigger}
-            onChange={(e: any) =>
-              setAutoScheduleTrigger(
-                e.target.value as 'daily' | 'time_based' | 'manual',
-              )
-            }
-            options={[
-              { value: 'daily', label: t('video_planning.daily_trigger') },
-              { value: 'time_based', label: t('video_planning.time_based_trigger') },
-              { value: 'manual', label: t('video_planning.manual_trigger') },
-            ]}
-          />
-
-          {autoScheduleTrigger === 'daily' && (
-            <div className="space-y-3">
-              <label className="block text-sm font-medium text-slate-700">
-                {t('video_planning.trigger_time')}
-                ({t('video_planning.timezone_label')}: {timezone})
-              </label>
-
-              <div className="flex flex-wrap gap-2">
-                {timePresets.map((preset) => (
-                  <button
-                    key={preset.value}
-                    type="button"
-                    onClick={() => setTriggerTime(preset.value)}
-                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${triggerTime === preset.value
-                      ? 'border-brand-500 bg-brand-50 text-brand-700'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                      }`}
-                  >
-                    {preset.label.split('(')[0].trim()}
-                  </button>
-                ))}
-              </div>
-
-              <Input
-                label={t('video_planning.custom_time')}
-                type="time"
-                value={triggerTime}
-                onChange={(e) => setTriggerTime(e.target.value)}
-                min="00:00"
-                max="23:59"
-              />
-            </div>
-          )}
-
-
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-700">
-              {t('video_planning.social_media_platforms')}
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {socialAccounts
-                .filter((acc) => acc.status === 'connected')
-                .map((acc) => (
-                  <button
-                    key={acc.platform}
-                    type="button"
-                    onClick={() => {
-                      const newPlatforms = defaultPlatforms.includes(acc.platform)
-                        ? defaultPlatforms.filter((p) => p !== acc.platform)
-                        : [...defaultPlatforms, acc.platform]
-                      setDefaultPlatforms(newPlatforms)
-                    }}
-                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${defaultPlatforms.includes(acc.platform)
-                      ? 'border-brand-500 bg-brand-50 text-brand-700'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                      }`}
-                  >
-                    {acc.platform.charAt(0).toUpperCase() + acc.platform.slice(1)}
-                  </button>
-                ))}
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setEditPlanModal(null)
-                setPlanName('')
-                setStartDate(new Date().toISOString().split('T')[0])
-                setEndDate('')
-                setAutoScheduleTrigger('daily')
-                setTriggerTime('09:00')
-                setDefaultPlatforms([])
-                setVideoTimes(['09:00'])
-                setVideoTopics([''])
-
-              }}
-            >
-              {t('video_planning.cancel')}
-            </Button>
-            <Button
-              onClick={handleSavePlan}
-              loading={editingPlan}
-              leftIcon={<Save className="h-4 w-4" />}
-            >
-              {t('video_planning.save_changes')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Delete Plan Modal */}
-      <Modal
-        isOpen={!!deleteModal}
-        onClose={() => setDeleteModal(null)}
-        title={t('video_planning.delete_plan')}
-        size="sm"
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-slate-600">
-            {t('video_planning.delete_plan_confirm')}
-          </p>
-          <div className="flex justify-end gap-3 pt-4">
-            <Button
-              variant="ghost"
-              onClick={() => setDeleteModal(null)}
-              className="border border-white/60 bg-white/70 text-slate-500 hover:border-slate-200 hover:bg-white"
-            >
-              {t('video_planning.cancel')}
-            </Button>
-            <Button
-              variant="danger"
-              onClick={handleDeletePlan}
-              loading={deleting}
-            >
-              {t('video_planning.delete_plan')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Script Preview Modal */}
-      <Modal
-        isOpen={!!scriptPreviewItem}
-        onClose={() => setScriptPreviewItem(null)}
-        title={t('video_planning.review_script')}
-      >
-        {scriptPreviewItem && (
-          <div className="space-y-4">
-            <div>
-              <h3 className="font-semibold text-primary">
-                {scriptPreviewItem.topic}
-              </h3>
-            </div>
-
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <p className="whitespace-pre-wrap text-sm text-slate-700">
-                {scriptPreviewItem.script}
-              </p>
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4">
-              <Button
-                variant="ghost"
-                onClick={() => handleRejectScript(scriptPreviewItem.id)}
-                leftIcon={<X className="h-4 w-4" />}
-              >
-                Reject
-              </Button>
-              <Button
-                onClick={() => handleApproveScript(scriptPreviewItem.id)}
-                leftIcon={<Check className="h-4 w-4" />}
-              >
-                Approve
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* Edit Plan Item Modal */}
-      <Modal
-        isOpen={!!editingItem}
-        onClose={() => setEditingItem(null)}
-        title="Edit Plan Item"
-        size="lg"
-      >
-        {editingItem && (
-          <div className="space-y-4">
-
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <Input
-                label="Topic"
-                value={editForm.topic}
-                onChange={(e) =>
-                  setEditForm((prev) => ({ ...prev, topic: e.target.value }))
-                }
-                placeholder="Enter topic"
-              />
-              <Input
-                label="Scheduled Time"
-                type="time"
-                value={editForm.scheduled_time}
-                onChange={(e) =>
-                  setEditForm((prev) => ({
-                    ...prev,
-                    scheduled_time: e.target.value,
-                  }))
-                }
-              />
-            </div>
-
-            <Textarea
-              label="Description"
-              value={editForm.description}
-              onChange={(e) =>
-                setEditForm((prev) => ({
-                  ...prev,
-                  description: e.target.value,
-                }))
-              }
-            />
-
-            <Textarea
-              label="Why it matters"
-              value={editForm.why_important}
-              onChange={(e) =>
-                setEditForm((prev) => ({
-                  ...prev,
-                  why_important: e.target.value,
-                }))
-              }
-            />
-
-            <Textarea
-              label="Useful tips"
-              value={editForm.useful_tips}
-              onChange={(e) =>
-                setEditForm((prev) => ({
-                  ...prev,
-                  useful_tips: e.target.value,
-                }))
-              }
-            />
-
-            <Textarea
-              label="Caption"
-              value={editForm.caption}
-              onChange={(e) =>
-                setEditForm((prev) => ({
-                  ...prev,
-                  caption: e.target.value,
-                }))
-              }
-            />
-
-            <div className="flex justify-end gap-3 pt-2">
-              <Button variant="ghost" onClick={() => setEditingItem(null)}>
-                Cancel
-              </Button>
-              <Button onClick={handleSaveItem} leftIcon={<Save className="h-4 w-4" />}>
-                Save changes
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* Plan Item Details Modal */}
-      <Modal
-        isOpen={selectedItem !== null}
-        onClose={() => setSelectedItem(null)}
-        title="Plan Item Details"
-        size="lg"
-      >
-        {selectedItem && (() => {
-          // Get all items for the selected item's date
-          const itemDate = selectedItem.scheduled_date
-          const itemsForDate = planItems.filter(item => item.scheduled_date === itemDate)
-            .sort((a, b) => {
-              // Sort by scheduled_time
-              const timeA = a.scheduled_time || '00:00'
-              const timeB = b.scheduled_time || '00:00'
-              return timeA.localeCompare(timeB)
-            })
-
-          // Find current item index
-          const currentIndex = itemsForDate.findIndex(item => item.id === selectedItem.id)
-          const hasPrev = currentIndex > 0
-          const hasNext = currentIndex < itemsForDate.length - 1
-
-          const navigateToItem = (direction: 'prev' | 'next') => {
-            if (direction === 'prev' && hasPrev) {
-              setSelectedItem(itemsForDate[currentIndex - 1])
-            } else if (direction === 'next' && hasNext) {
-              setSelectedItem(itemsForDate[currentIndex + 1])
-            }
-          }
-
-          return (
-            <div className="space-y-6">
-              {/* Pagination Navigation - matching calendar style */}
-              {itemsForDate.length > 1 && (
-                <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-2">
-                  <div className="text-sm text-slate-600">
-                    Item {currentIndex + 1} of {itemsForDate.length}
                   </div>
                   <div className="flex gap-2">
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => navigateToItem('prev')}
-                      disabled={!hasPrev}
+                      onClick={closeDetailDrawer}
                     >
-                      ← Prev
+                      {t('video_planning.cancel')}
                     </Button>
                     <Button
-                      variant="ghost"
                       size="sm"
-                      onClick={() => navigateToItem('next')}
-                      disabled={!hasNext}
+                      onClick={async () => {
+                        await handleSaveItem()
+                        closeDetailDrawer()
+                      }}
+                      leftIcon={<Save className="h-4 w-4" />}
                     >
-                      Next →
+                      {t('video_planning.save_changes')}
                     </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Header Info */}
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Scheduled Time
-                  </label>
-                  <p className="mt-1 text-sm font-medium text-primary">
-                    {formatTime(selectedItem.scheduled_time)}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Scheduled Date
-                  </label>
-                  <p className="mt-1 text-sm font-medium text-primary">
-                    {new Date(selectedItem.scheduled_date).toLocaleDateString()}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Status
-                  </label>
-                  <div className="mt-1">
-                    {getStatusBadge(selectedItem.status, selectedItem.script_status, selectedItem)}
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+        </Modal>
 
-              {/* Topic */}
-              {selectedItem.topic && (
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Topic
-                  </label>
-                  <p className="mt-1 text-lg font-semibold text-primary">
-                    {selectedItem.topic}
-                  </p>
-                </div>
-              )}
+        {/* Create Plan Modal */}
+        <Modal
+          isOpen={createModal}
+          onClose={() => {
+            setCreateModal(false)
 
-              {/* Category */}
-              {selectedItem.category && (
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Category
-                  </label>
-                  <p className="mt-1 text-sm font-medium text-primary">
-                    {selectedItem.category}
-                  </p>
-                </div>
-              )}
+          }}
+          title={t('video_planning.create_plan')}
+        >
+          <div className="space-y-6">
+            <div className="text-xs text-slate-500">{t('video_planning.timezone_label')}: {timezone}</div>
+          </div>
 
-              {/* Avatar display removed - using Sora for video generation */}
+          <div className="space-y-4">
+            <Input
+              label="Plan Name"
+              placeholder="e.g., Daily Trading Content"
+              value={planName}
+              onChange={(e) => setPlanName(e.target.value)}
+              required
+            />
 
-              {/* Description */}
-              {selectedItem.description && (
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Description
-                  </label>
-                  <p className="mt-1 text-sm text-slate-700">
-                    {selectedItem.description}
-                  </p>
-                </div>
-              )}
+            <div className="grid gap-4 md:grid-cols-2">
+              <Input
+                label={t('video_planning.start_date')}
+                type="date"
+                value={startDate}
+                onChange={(e: any) => setStartDate(e.target.value)}
+                required
+              />
 
-              {/* Why Important */}
-              {selectedItem.why_important && (
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Why It Matters
-                  </label>
-                  <p className="mt-1 text-sm text-slate-700">
-                    {selectedItem.why_important}
-                  </p>
-                </div>
-              )}
+              <Input
+                label={t('video_planning.end_date')}
+                type="date"
+                value={endDate}
+                onChange={(e: any) => setEndDate(e.target.value)}
+                min={startDate}
+              />
+            </div>
 
-              {/* Useful Tips */}
-              {selectedItem.useful_tips && (
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Useful Tips
-                  </label>
-                  <p className="mt-1 text-sm text-slate-700">
-                    {selectedItem.useful_tips}
-                  </p>
-                </div>
-              )}
-
-              {/* Script */}
-              {selectedItem.script && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-slate-400" />
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      Script
-                    </label>
-                    {selectedItem.script_status && (
-                      <Badge variant={selectedItem.script_status === 'approved' ? 'success' : selectedItem.script_status === 'rejected' ? 'error' : 'info'}>
-                        {selectedItem.script_status === 'approved' ? 'Approved' :
-                          selectedItem.script_status === 'rejected' ? 'Rejected' :
-                            'Draft'}
-                      </Badge>
+            <div className="space-y-4">
+              <label className="block text-sm font-medium text-slate-700">
+                Videos & Topics
+              </label>
+              <div className="space-y-3">
+                {videoTimes.map((time: string, index: number) => (
+                  <div key={index} className="relative space-y-2 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                    {videoTimes.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeVideoSlot(index)}
+                        className="absolute right-2 top-2 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-red-500"
+                      >
+                        <X size={14} />
+                      </button>
                     )}
+                    <div className="flex items-center gap-3">
+                      <div className="flex-shrink-0 text-xs font-bold text-slate-400">
+                        #{index + 1}
+                      </div>
+                      <Input
+                        type="time"
+                        value={time}
+                        onChange={(e: any) => updateVideoSlotTime(index, e.target.value)}
+                        className="w-32"
+                      />
+                    </div>
+                    <Textarea
+                      placeholder={`Topic for video #${index + 1}`}
+                      value={videoTopics[index]}
+                      onChange={(e: any) => updateVideoSlotTopic(index, e.target.value)}
+                      rows={2}
+                      required
+                    />
                   </div>
-                  <Textarea
-                    value={selectedItem.script}
-                    readOnly
-                    rows={8}
-                    className="font-mono text-sm"
-                  />
-                  {selectedItem.script_status === 'draft' && (
-                    <div className="flex gap-3 pt-2">
+                ))}
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={addVideoSlot}
+                className="w-full border-dashed"
+                leftIcon={<Plus size={16} />}
+              >
+                Add Another Video
+              </Button>
+            </div>
+
+            <Select
+              label={t('video_planning.timezone')}
+              value={timezone}
+              onChange={(e) => setTimezone(e.target.value)}
+              options={timezones}
+            />
+
+            <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <label className="block text-sm font-medium text-slate-700">
+                {t('video_planning.social_media_platforms')}
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {socialAccounts
+                  .filter((acc) => acc.status === 'connected')
+                  .map((acc) => (
+                    <button
+                      key={acc.platform}
+                      type="button"
+                      onClick={() => {
+                        if (defaultPlatforms.includes(acc.platform)) {
+                          setDefaultPlatforms(
+                            defaultPlatforms.filter((p) => p !== acc.platform),
+                          )
+                        } else {
+                          setDefaultPlatforms([...defaultPlatforms, acc.platform])
+                        }
+                      }}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition ${defaultPlatforms.includes(acc.platform)
+                        ? 'border-brand-500 bg-brand-50 text-brand-700'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                        }`}
+                    >
+                      {acc.platform}
+                      {defaultPlatforms.includes(acc.platform) && (
+                        <span className="ml-1">✓</span>
+                      )}
+                    </button>
+                  ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end pt-2">
+              <Button
+                onClick={handleCreatePlan}
+                loading={creating}
+              >
+                {t('video_planning.create_plan')}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Edit Plan Modal */}
+        <Modal
+          isOpen={!!editPlanModal}
+          onClose={() => {
+            setEditPlanModal(null)
+            // Reset form
+            setPlanName('')
+            setStartDate(new Date().toISOString().split('T')[0])
+            setEndDate('')
+            setAutoScheduleTrigger('daily')
+            setTriggerTime('09:00')
+            setDefaultPlatforms([])
+            setVideoTimes(['09:00'])
+            setVideoTopics([''])
+          }}
+          title={t('video_planning.edit_plan')}
+        >
+          <div className="space-y-4">
+            <Input
+              label="Plan Name"
+              placeholder="e.g., Daily Trading Content"
+              value={planName}
+              onChange={(e) => setPlanName(e.target.value)}
+              required
+            />
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <Input
+                label={t('video_planning.start_date')}
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                required
+              />
+
+              <Input
+                label={t('video_planning.end_date')}
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                min={startDate}
+              />
+            </div>
+
+            <div className="space-y-4">
+              <label className="block text-sm font-medium text-slate-700">
+                Videos & Topics
+              </label>
+              <div className="space-y-3">
+                {videoTimes.map((time: string, index: number) => (
+                  <div key={index} className="relative space-y-2 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                    {videoTimes.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeVideoSlot(index)}
+                        className="absolute right-2 top-2 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-red-500"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                    <div className="flex items-center gap-3">
+                      <div className="flex-shrink-0 text-xs font-bold text-slate-400">
+                        #{index + 1}
+                      </div>
+                      <Input
+                        type="time"
+                        value={time}
+                        onChange={(e: any) => updateVideoSlotTime(index, e.target.value)}
+                        className="w-32"
+                      />
+                    </div>
+                    <Textarea
+                      placeholder={`Topic for video #${index + 1}`}
+                      value={videoTopics[index]}
+                      onChange={(e: any) => updateVideoSlotTopic(index, e.target.value)}
+                      rows={2}
+                      required
+                    />
+                  </div>
+                ))}
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={addVideoSlot}
+                className="w-full border-dashed"
+                leftIcon={<Plus size={16} />}
+              >
+                Add Another Video
+              </Button>
+            </div>
+
+            <Select
+              label={t('video_planning.timezone')}
+              value={timezone}
+              onChange={(e: any) => setTimezone(e.target.value)}
+              options={timezones}
+            />
+
+            <Select
+              label={t('video_planning.schedule_trigger')}
+              value={autoScheduleTrigger}
+              onChange={(e: any) =>
+                setAutoScheduleTrigger(
+                  e.target.value as 'daily' | 'time_based' | 'manual',
+                )
+              }
+              options={[
+                { value: 'daily', label: t('video_planning.daily_trigger') },
+                { value: 'time_based', label: t('video_planning.time_based_trigger') },
+                { value: 'manual', label: t('video_planning.manual_trigger') },
+              ]}
+            />
+
+            {autoScheduleTrigger === 'daily' && (
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-slate-700">
+                  {t('video_planning.trigger_time')}
+                  ({t('video_planning.timezone_label')}: {timezone})
+                </label>
+
+                <div className="flex flex-wrap gap-2">
+                  {timePresets.map((preset) => (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      onClick={() => setTriggerTime(preset.value)}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${triggerTime === preset.value
+                        ? 'border-brand-500 bg-brand-50 text-brand-700'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                        }`}
+                    >
+                      {preset.label.split('(')[0].trim()}
+                    </button>
+                  ))}
+                </div>
+
+                <Input
+                  label={t('video_planning.custom_time')}
+                  type="time"
+                  value={triggerTime}
+                  onChange={(e) => setTriggerTime(e.target.value)}
+                  min="00:00"
+                  max="23:59"
+                />
+              </div>
+            )}
+
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-slate-700">
+                {t('video_planning.social_media_platforms')}
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {socialAccounts
+                  .filter((acc) => acc.status === 'connected')
+                  .map((acc) => (
+                    <button
+                      key={acc.platform}
+                      type="button"
+                      onClick={() => {
+                        const newPlatforms = defaultPlatforms.includes(acc.platform)
+                          ? defaultPlatforms.filter((p) => p !== acc.platform)
+                          : [...defaultPlatforms, acc.platform]
+                        setDefaultPlatforms(newPlatforms)
+                      }}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${defaultPlatforms.includes(acc.platform)
+                        ? 'border-brand-500 bg-brand-50 text-brand-700'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                        }`}
+                    >
+                      {acc.platform.charAt(0).toUpperCase() + acc.platform.slice(1)}
+                    </button>
+                  ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setEditPlanModal(null)
+                  setPlanName('')
+                  setStartDate(new Date().toISOString().split('T')[0])
+                  setEndDate('')
+                  setAutoScheduleTrigger('daily')
+                  setTriggerTime('09:00')
+                  setDefaultPlatforms([])
+                  setVideoTimes(['09:00'])
+                  setVideoTopics([''])
+
+                }}
+              >
+                {t('video_planning.cancel')}
+              </Button>
+              <Button
+                onClick={handleSavePlan}
+                loading={editingPlan}
+                leftIcon={<Save className="h-4 w-4" />}
+              >
+                {t('video_planning.save_changes')}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Delete Plan Modal */}
+        <Modal
+          isOpen={!!deleteModal}
+          onClose={() => setDeleteModal(null)}
+          title={t('video_planning.delete_plan')}
+          size="sm"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              {t('video_planning.delete_plan_confirm')}
+            </p>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                variant="ghost"
+                onClick={() => setDeleteModal(null)}
+                className="border border-white/60 bg-white/70 text-slate-500 hover:border-slate-200 hover:bg-white"
+              >
+                {t('video_planning.cancel')}
+              </Button>
+              <Button
+                variant="danger"
+                onClick={handleDeletePlan}
+                loading={deleting}
+              >
+                {t('video_planning.delete_plan')}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Script Preview Modal */}
+        <Modal
+          isOpen={!!scriptPreviewItem}
+          onClose={() => setScriptPreviewItem(null)}
+          title={t('video_planning.review_script')}
+        >
+          {scriptPreviewItem && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-semibold text-primary">
+                  {scriptPreviewItem.topic}
+                </h3>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <p className="whitespace-pre-wrap text-sm text-slate-700">
+                  {scriptPreviewItem.script}
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  variant="ghost"
+                  onClick={() => handleRejectScript(scriptPreviewItem.id)}
+                  leftIcon={<X className="h-4 w-4" />}
+                >
+                  Reject
+                </Button>
+                <Button
+                  onClick={() => handleApproveScript(scriptPreviewItem.id)}
+                  leftIcon={<Check className="h-4 w-4" />}
+                >
+                  Approve
+                </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
+
+        {/* Edit Plan Item Modal */}
+        <Modal
+          isOpen={!!editingItem}
+          onClose={() => setEditingItem(null)}
+          title="Edit Plan Item"
+          size="lg"
+        >
+          {editingItem && (
+            <div className="space-y-4">
+
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Input
+                  label="Topic"
+                  value={editForm.topic}
+                  onChange={(e) =>
+                    setEditForm((prev) => ({ ...prev, topic: e.target.value }))
+                  }
+                  placeholder="Enter topic"
+                />
+                <Input
+                  label="Scheduled Time"
+                  type="time"
+                  value={editForm.scheduled_time}
+                  onChange={(e) =>
+                    setEditForm((prev) => ({
+                      ...prev,
+                      scheduled_time: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+
+              <Textarea
+                label="Description"
+                value={editForm.description}
+                onChange={(e) =>
+                  setEditForm((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
+              />
+
+              <Textarea
+                label="Why it matters"
+                value={editForm.why_important}
+                onChange={(e) =>
+                  setEditForm((prev) => ({
+                    ...prev,
+                    why_important: e.target.value,
+                  }))
+                }
+              />
+
+              <Textarea
+                label="Useful tips"
+                value={editForm.useful_tips}
+                onChange={(e) =>
+                  setEditForm((prev) => ({
+                    ...prev,
+                    useful_tips: e.target.value,
+                  }))
+                }
+              />
+
+              <Textarea
+                label="Caption"
+                value={editForm.caption}
+                onChange={(e) =>
+                  setEditForm((prev) => ({
+                    ...prev,
+                    caption: e.target.value,
+                  }))
+                }
+              />
+
+              <div className="flex justify-end gap-3 pt-2">
+                <Button variant="ghost" onClick={() => setEditingItem(null)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveItem} leftIcon={<Save className="h-4 w-4" />}>
+                  Save changes
+                </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
+
+        {/* Plan Item Details Modal */}
+        <Modal
+          isOpen={selectedItem !== null}
+          onClose={() => setSelectedItem(null)}
+          title="Plan Item Details"
+          size="lg"
+        >
+          {selectedItem && (() => {
+            // Get all items for the selected item's date
+            const itemDate = selectedItem.scheduled_date
+            const itemsForDate = planItems.filter(item => item.scheduled_date === itemDate)
+              .sort((a, b) => {
+                // Sort by scheduled_time
+                const timeA = a.scheduled_time || '00:00'
+                const timeB = b.scheduled_time || '00:00'
+                return timeA.localeCompare(timeB)
+              })
+
+            // Find current item index
+            const currentIndex = itemsForDate.findIndex(item => item.id === selectedItem.id)
+            const hasPrev = currentIndex > 0
+            const hasNext = currentIndex < itemsForDate.length - 1
+
+            const navigateToItem = (direction: 'prev' | 'next') => {
+              if (direction === 'prev' && hasPrev) {
+                setSelectedItem(itemsForDate[currentIndex - 1])
+              } else if (direction === 'next' && hasNext) {
+                setSelectedItem(itemsForDate[currentIndex + 1])
+              }
+            }
+
+            return (
+              <div className="space-y-6">
+                {/* Pagination Navigation - matching calendar style */}
+                {itemsForDate.length > 1 && (
+                  <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-2">
+                    <div className="text-sm text-slate-600">
+                      Item {currentIndex + 1} of {itemsForDate.length}
+                    </div>
+                    <div className="flex gap-2">
                       <Button
                         variant="ghost"
                         size="sm"
+                        onClick={() => navigateToItem('prev')}
+                        disabled={!hasPrev}
+                      >
+                        ← Prev
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => navigateToItem('next')}
+                        disabled={!hasNext}
+                      >
+                        Next →
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Header Info */}
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Scheduled Time
+                    </label>
+                    <p className="mt-1 text-sm font-medium text-primary">
+                      {formatTime(selectedItem.scheduled_time)}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Scheduled Date
+                    </label>
+                    <p className="mt-1 text-sm font-medium text-primary">
+                      {new Date(selectedItem.scheduled_date).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Status
+                    </label>
+                    <div className="mt-1">
+                      {getStatusBadge(selectedItem.status, selectedItem.script_status, selectedItem)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Topic */}
+                {selectedItem.topic && (
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Topic
+                    </label>
+                    <p className="mt-1 text-lg font-semibold text-primary">
+                      {selectedItem.topic}
+                    </p>
+                  </div>
+                )}
+
+                {/* Category */}
+                {selectedItem.category && (
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Category
+                    </label>
+                    <p className="mt-1 text-sm font-medium text-primary">
+                      {selectedItem.category}
+                    </p>
+                  </div>
+                )}
+
+                {/* Avatar display removed - using Sora for video generation */}
+
+                {/* Description */}
+                {selectedItem.description && (
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Description
+                    </label>
+                    <p className="mt-1 text-sm text-slate-700">
+                      {selectedItem.description}
+                    </p>
+                  </div>
+                )}
+
+                {/* Why Important */}
+                {selectedItem.why_important && (
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Why It Matters
+                    </label>
+                    <p className="mt-1 text-sm text-slate-700">
+                      {selectedItem.why_important}
+                    </p>
+                  </div>
+                )}
+
+                {/* Useful Tips */}
+                {selectedItem.useful_tips && (
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Useful Tips
+                    </label>
+                    <p className="mt-1 text-sm text-slate-700">
+                      {selectedItem.useful_tips}
+                    </p>
+                  </div>
+                )}
+
+                {/* Script */}
+                {selectedItem.script && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-slate-400" />
+                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Script
+                      </label>
+                      {selectedItem.script_status && (
+                        <Badge variant={selectedItem.script_status === 'approved' ? 'success' : selectedItem.script_status === 'rejected' ? 'error' : 'info'}>
+                          {selectedItem.script_status === 'approved' ? 'Approved' :
+                            selectedItem.script_status === 'rejected' ? 'Rejected' :
+                              'Draft'}
+                        </Badge>
+                      )}
+                    </div>
+                    <Textarea
+                      value={selectedItem.script}
+                      readOnly
+                      rows={8}
+                      className="font-mono text-sm"
+                    />
+                    {selectedItem.script_status === 'draft' && (
+                      <div className="flex gap-3 pt-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            handleRejectScript(selectedItem.id)
+                            setSelectedItem(null)
+                          }}
+                          leftIcon={<X className="h-4 w-4" />}
+                        >
+                          Reject
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            handleApproveScript(selectedItem.id)
+                            setSelectedItem(null)
+                          }}
+                          leftIcon={<Check className="h-4 w-4" />}
+                        >
+                          Approve
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Caption */}
+                {selectedItem.caption && (
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Social Media Caption
+                    </label>
+                    <p className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">
+                      {selectedItem.caption}
+                    </p>
+                  </div>
+                )}
+
+                {/* Platforms */}
+                {selectedItem.platforms && selectedItem.platforms.length > 0 && (
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Platforms
+                    </label>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {selectedItem.platforms.map((platform) => (
+                        <Badge key={platform} variant="default">
+                          {platform}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Video Link */}
+                {selectedItem.video_id && (
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Video
+                    </label>
+                    <div className="mt-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => navigate(`/videos?videoId=${selectedItem.video_id}`)}
+                        leftIcon={<ExternalLink className="h-4 w-4" />}
+                      >
+                        View Video
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Error Message */}
+                {selectedItem.error_message && (
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-rose-700">
+                      Error Message
+                    </label>
+                    <p className="mt-1 text-sm text-rose-600">
+                      {selectedItem.error_message}
+                    </p>
+                  </div>
+                )}
+
+                {/* Timestamps */}
+                {(selectedItem.created_at || selectedItem.updated_at) && (
+                  <div className="grid grid-cols-2 gap-4 border-t border-slate-200 pt-4">
+                    {selectedItem.created_at && (
+                      <div>
+                        <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          Created
+                        </label>
+                        <p className="mt-1 text-sm font-medium text-primary">
+                          {new Date(selectedItem.created_at).toLocaleString()}
+                        </p>
+                      </div>
+                    )}
+                    {selectedItem.updated_at && (
+                      <div>
+                        <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          Updated
+                        </label>
+                        <p className="mt-1 text-sm font-medium text-primary">
+                          {new Date(selectedItem.updated_at).toLocaleString()}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex gap-3 border-t border-slate-200 pt-4">
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setEditingItem(selectedItem)
+                      setEditForm({
+                        topic: selectedItem.topic || '',
+                        scheduled_time: selectedItem.scheduled_time || '',
+                        description: selectedItem.description || '',
+                        why_important: selectedItem.why_important || '',
+                        useful_tips: selectedItem.useful_tips || '',
+                        caption: selectedItem.caption || '',
+                        platforms: selectedItem.platforms || [],
+                      })
+                      setSelectedItem(null)
+                    }}
+                    leftIcon={<Edit2 className="h-4 w-4" />}
+                  >
+                    Edit
+                  </Button>
+                  {(selectedItem.status === 'completed' || selectedItem.status === 'scheduled' || selectedItem.status === 'generating') && selectedItem.video_id && (
+                    <Button
+                      variant="ghost"
+                      onClick={async () => {
+                        try {
+                          const response = await api.post(`/api/plans/items/${selectedItem.id}/refresh-status`)
+                          if (response.data.item) {
+                            // Update the item in the planItems array
+                            setPlanItems(prevItems =>
+                              prevItems.map(item =>
+                                item.id === selectedItem.id ? response.data.item : item
+                              )
+                            )
+                            // Update selectedItem
+                            setSelectedItem(response.data.item)
+                            console.log('[VideoPlanning] Status refreshed:', response.data.message)
+                          }
+                        } catch (error: any) {
+                          console.error('[VideoPlanning] Error refreshing status:', error)
+                        }
+                      }}
+                      leftIcon={<RefreshCw className="h-4 w-4" />}
+                    >
+                      Refresh Status
+                    </Button>
+                  )}
+                  {selectedItem.script && selectedItem.script_status === 'draft' && (
+                    <>
+                      <Button
+                        variant="ghost"
                         onClick={() => {
                           handleRejectScript(selectedItem.id)
                           setSelectedItem(null)
                         }}
                         leftIcon={<X className="h-4 w-4" />}
                       >
-                        Reject
+                        Reject Script
                       </Button>
                       <Button
-                        size="sm"
                         onClick={() => {
                           handleApproveScript(selectedItem.id)
                           setSelectedItem(null)
                         }}
                         leftIcon={<Check className="h-4 w-4" />}
                       >
-                        Approve
+                        Approve Script
                       </Button>
-                    </div>
+                    </>
                   )}
                 </div>
-              )}
-
-              {/* Caption */}
-              {selectedItem.caption && (
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Social Media Caption
-                  </label>
-                  <p className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">
-                    {selectedItem.caption}
-                  </p>
-                </div>
-              )}
-
-              {/* Platforms */}
-              {selectedItem.platforms && selectedItem.platforms.length > 0 && (
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Platforms
-                  </label>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {selectedItem.platforms.map((platform) => (
-                      <Badge key={platform} variant="default">
-                        {platform}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Video Link */}
-              {selectedItem.video_id && (
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Video
-                  </label>
-                  <div className="mt-2">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => navigate(`/videos?videoId=${selectedItem.video_id}`)}
-                      leftIcon={<ExternalLink className="h-4 w-4" />}
-                    >
-                      View Video
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Error Message */}
-              {selectedItem.error_message && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-rose-700">
-                    Error Message
-                  </label>
-                  <p className="mt-1 text-sm text-rose-600">
-                    {selectedItem.error_message}
-                  </p>
-                </div>
-              )}
-
-              {/* Timestamps */}
-              {(selectedItem.created_at || selectedItem.updated_at) && (
-                <div className="grid grid-cols-2 gap-4 border-t border-slate-200 pt-4">
-                  {selectedItem.created_at && (
-                    <div>
-                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                        Created
-                      </label>
-                      <p className="mt-1 text-sm font-medium text-primary">
-                        {new Date(selectedItem.created_at).toLocaleString()}
-                      </p>
-                    </div>
-                  )}
-                  {selectedItem.updated_at && (
-                    <div>
-                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                        Updated
-                      </label>
-                      <p className="mt-1 text-sm font-medium text-primary">
-                        {new Date(selectedItem.updated_at).toLocaleString()}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex gap-3 border-t border-slate-200 pt-4">
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setEditingItem(selectedItem)
-                    setEditForm({
-                      topic: selectedItem.topic || '',
-                      scheduled_time: selectedItem.scheduled_time || '',
-                      description: selectedItem.description || '',
-                      why_important: selectedItem.why_important || '',
-                      useful_tips: selectedItem.useful_tips || '',
-                      caption: selectedItem.caption || '',
-                      platforms: selectedItem.platforms || [],
-                    })
-                    setSelectedItem(null)
-                  }}
-                  leftIcon={<Edit2 className="h-4 w-4" />}
-                >
-                  Edit
-                </Button>
-                {(selectedItem.status === 'completed' || selectedItem.status === 'scheduled' || selectedItem.status === 'generating') && selectedItem.video_id && (
-                  <Button
-                    variant="ghost"
-                    onClick={async () => {
-                      try {
-                        const response = await api.post(`/api/plans/items/${selectedItem.id}/refresh-status`)
-                        if (response.data.item) {
-                          // Update the item in the planItems array
-                          setPlanItems(prevItems =>
-                            prevItems.map(item =>
-                              item.id === selectedItem.id ? response.data.item : item
-                            )
-                          )
-                          // Update selectedItem
-                          setSelectedItem(response.data.item)
-                          console.log('[VideoPlanning] Status refreshed:', response.data.message)
-                        }
-                      } catch (error: any) {
-                        console.error('[VideoPlanning] Error refreshing status:', error)
-                      }
-                    }}
-                    leftIcon={<RefreshCw className="h-4 w-4" />}
-                  >
-                    Refresh Status
-                  </Button>
-                )}
-                {selectedItem.script && selectedItem.script_status === 'draft' && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
-                        handleRejectScript(selectedItem.id)
-                        setSelectedItem(null)
-                      }}
-                      leftIcon={<X className="h-4 w-4" />}
-                    >
-                      Reject Script
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        handleApproveScript(selectedItem.id)
-                        setSelectedItem(null)
-                      }}
-                      leftIcon={<Check className="h-4 w-4" />}
-                    >
-                      Approve Script
-                    </Button>
-                  </>
-                )}
               </div>
-            </div>
-          )
-        })()}
-      </Modal>
+            )
+          })()}
+        </Modal>
 
-      {/* Avatar and Look Selection Modals removed - using Sora for video generation */}
-    </div >
-  </Layout >
-)
+        {/* Avatar and Look Selection Modals removed - using Sora for video generation */}
+      </div >
+    </Layout >
+  )
 }
