@@ -74,11 +74,20 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     if (!user) return
 
     try {
-      const { count, error } = await supabase
+      let query = supabase
         .from('support_messages')
         .select('*', { count: 'exact', head: true })
         .eq('is_read', false)
-        .neq('sender_id', user.id) // Messages NOT sent by me
+
+      if (user.role === 'admin') {
+        // Admins see unread messages FROM users
+        query = query.eq('is_admin_reply', false)
+      } else {
+        // Users see unread messages FROM admins
+        query = query.eq('is_admin_reply', true)
+      }
+
+      const { count, error } = await query
 
       if (!error && count !== null) {
         setUnreadSupportCount(count)

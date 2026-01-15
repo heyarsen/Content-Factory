@@ -34,7 +34,7 @@ export function AdminSupport() {
     const [selectedTicket, setSelectedTicket] = useState<{ ticket: Ticket, messages: Message[] } | null>(null)
     const [reply, setReply] = useState('')
     const [sending, setSending] = useState(false)
-    const { addNotification } = useNotifications()
+    const { addNotification, refreshSupportCount } = useNotifications()
     // We can assume admin user is logged in
 
     // Real-time subscription
@@ -63,6 +63,7 @@ export function AdminSupport() {
                         if (!newMessage.is_admin_reply) {
                             try {
                                 await api.post(`/api/admin/tickets/${newMessage.ticket_id}/read`)
+                                refreshSupportCount()
                             } catch (e) {
                                 console.error('Failed to mark user message as read', e)
                             }
@@ -78,8 +79,7 @@ export function AdminSupport() {
         return () => {
             subscription.unsubscribe()
         }
-    }, [selectedTicket?.ticket.id]) // Re-bind when selected ticket changes to capture current ID in closure if needed, though ref might be better. 
-    // Actually, selectedTicket is in closure. simpler to include deps.
+    }, [selectedTicket?.ticket.id, refreshSupportCount]) // Re-bind when selected ticket changes to capture current ID in closure if needed, though ref might be better. 
 
     useEffect(() => {
         loadTickets()
@@ -106,6 +106,7 @@ export function AdminSupport() {
             // But we only want to mark unread user messages. 
             // The backend endpoint likely handles "mark all unread messages in this ticket as read".
             await api.post(`/api/admin/tickets/${id}/read`)
+            refreshSupportCount()
 
         } catch (error) {
             console.error('Failed to load ticket details:', error)
