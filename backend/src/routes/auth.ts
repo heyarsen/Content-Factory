@@ -15,7 +15,7 @@ router.post('/signup', authLimiter, async (req: Request, res: Response) => {
     }
 
     const redirectUrl = process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:5173'
-    
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -26,10 +26,10 @@ router.post('/signup', authLimiter, async (req: Request, res: Response) => {
 
     if (error) {
       // If user already exists, don't automatically resend (could hit rate limits)
-      if (error.message.includes('already registered') || 
-          error.message.includes('already exists') ||
-          error.message.includes('User already registered')) {
-        return res.status(400).json({ 
+      if (error.message.includes('already registered') ||
+        error.message.includes('already exists') ||
+        error.message.includes('User already registered')) {
+        return res.status(400).json({
           error: 'An account with this email already exists.',
           message: 'If you need to verify your email, please use the resend verification option.',
           canLogin: true,
@@ -111,7 +111,7 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
     // Anon key is actually preferred for user authentication operations
     const supabaseUrl = process.env.SUPABASE_URL
     const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
-    
+
     if (!supabaseUrl || !supabaseAnonKey) {
       console.error(`[Auth] Missing Supabase configuration`)
       return res.status(500).json({
@@ -151,20 +151,20 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
       })
       data = result.data
       error = result.error
-      
+
       // Record success in circuit breaker
       if (!error) {
         circuitBreaker.recordSuccess('supabase')
       }
     } catch (authError: any) {
       // Check if it's a connection timeout error
-      const isTimeoutError = 
+      const isTimeoutError =
         authError?.cause?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
         authError?.message?.includes('timeout') ||
         authError?.message?.includes('fetch failed') ||
         authError?.message?.includes('Connect Timeout') ||
         authError?.name === 'AuthRetryableFetchError'
-      
+
       if (isTimeoutError) {
         // Record failure in circuit breaker
         circuitBreaker.recordFailure('supabase')
@@ -173,7 +173,7 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
           code: authError.cause?.code,
         })
       }
-      
+
       console.error(`[Auth] Exception during signInWithPassword:`, {
         message: authError.message,
         stack: authError.stack,
@@ -181,7 +181,7 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
         code: authError.code,
         cause: authError.cause,
       })
-      
+
       // Convert exception to error format
       error = {
         message: authError.message || 'Authentication failed',
@@ -200,15 +200,15 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
         errorType: typeof error,
         fullError: JSON.stringify(error, Object.getOwnPropertyNames(error), 2),
       })
-      
+
       // Check for specific error types
       const errorMsg = error.message || String(error) || 'Unknown error'
       const errorMsgLower = errorMsg.toLowerCase()
-      
+
       // Check if this is a connection/timeout error - should have been caught by health check
       // But if it still happens, treat it as service unavailable
-      const isConnectionError = 
-        errorMsgLower.includes('network') || 
+      const isConnectionError =
+        errorMsgLower.includes('network') ||
         errorMsgLower.includes('fetch') ||
         errorMsgLower.includes('failed to fetch') ||
         errorMsgLower.includes('connection') ||
@@ -217,17 +217,17 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
         errorMsgLower.includes('connect timeout') ||
         (error as any).cause?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
         error.name === 'AuthRetryableFetchError'
-      
+
       if (isConnectionError) {
         // Record failure in circuit breaker
         circuitBreaker.recordFailure('supabase')
-        
+
         // Return 503 Service Unavailable instead of 401
         const state = circuitBreaker.getState('supabase')
-        const retryAfter = state?.nextAttemptTime 
+        const retryAfter = state?.nextAttemptTime
           ? Math.max(0, Math.ceil((state.nextAttemptTime - Date.now()) / 1000))
           : 30
-        
+
         console.error(`[Auth] CRITICAL: Connection error after health check!`, {
           supabaseUrl: process.env.SUPABASE_URL,
           hasAnonKey: !!process.env.SUPABASE_ANON_KEY,
@@ -237,7 +237,7 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
           circuitBreakerState: state?.state,
           retryAfter,
         })
-        
+
         return res.status(503).json({
           error: 'Authentication service is temporarily unavailable. Please try again in a few moments.',
           retryAfter,
@@ -249,25 +249,25 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
           } : undefined,
         })
       }
-      
+
       // Provide more user-friendly error messages for other errors
       let errorMessage = errorMsg
-      if (errorMsgLower.includes('invalid login credentials') || 
-          errorMsgLower.includes('invalid credentials') ||
-          errorMsgLower.includes('invalid_credentials') ||
-          errorMsgLower.includes('invalid_grant')) {
+      if (errorMsgLower.includes('invalid login credentials') ||
+        errorMsgLower.includes('invalid credentials') ||
+        errorMsgLower.includes('invalid_credentials') ||
+        errorMsgLower.includes('invalid_grant')) {
         errorMessage = 'Invalid email or password. Please check your credentials and try again.'
-      } else if (errorMsgLower.includes('email not confirmed') || 
-                 errorMsgLower.includes('email_not_confirmed') ||
-                 errorMsgLower.includes('confirmation')) {
+      } else if (errorMsgLower.includes('email not confirmed') ||
+        errorMsgLower.includes('email_not_confirmed') ||
+        errorMsgLower.includes('confirmation')) {
         errorMessage = 'Please verify your email before signing in. Check your inbox for a verification link.'
-      } else if (errorMsgLower.includes('rate limit') || 
-                 errorMsgLower.includes('too_many_requests') ||
-                 errorMsgLower.includes('too many')) {
+      } else if (errorMsgLower.includes('rate limit') ||
+        errorMsgLower.includes('too_many_requests') ||
+        errorMsgLower.includes('too many')) {
         errorMessage = 'Too many login attempts. Please try again in a few minutes.'
       }
-      
-      return res.status(401).json({ 
+
+      return res.status(401).json({
         error: errorMessage,
         details: process.env.NODE_ENV === 'development' ? {
           originalMessage: errorMsg,
@@ -345,7 +345,12 @@ router.delete('/account', authenticate, async (req: AuthRequest, res: Response) 
 // Get current user
 router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    res.json({ user: req.user })
+    res.json({
+      user: {
+        ...req.user,
+        role: (req as any).role
+      }
+    })
   } catch (error: any) {
     console.error('Get user error:', error)
     res.status(500).json({ error: 'Internal server error' })
@@ -362,7 +367,7 @@ router.post('/verify-email', authLimiter, async (req: Request, res: Response) =>
     }
 
     const redirectUrl = process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:5173'
-    
+
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email,
@@ -481,9 +486,9 @@ router.patch('/profile', authenticate, async (req: AuthRequest, res: Response) =
         return res.status(500).json({ error: 'Failed to update email' })
       }
 
-      return res.json({ 
+      return res.json({
         message: 'Email update initiated. Please check your email to confirm the new address.',
-        email 
+        email
       })
     }
 
@@ -495,7 +500,7 @@ router.patch('/profile', authenticate, async (req: AuthRequest, res: Response) =
 
       // Verify old password by attempting to sign in
       const { data: userData } = await supabase.auth.admin.getUserById(userId)
-      
+
       if (!userData?.user?.email) {
         return res.status(404).json({ error: 'User not found' })
       }

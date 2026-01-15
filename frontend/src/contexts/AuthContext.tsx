@@ -39,24 +39,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const fetchProfileWithTimeout = async (userId: string, retries = 3): Promise<{ data: { role?: 'user' | 'admin' } | null, error: any }> => {
       const attemptFetch = async (attempt: number): Promise<any> => {
         try {
-          // Create a promise that rejects after 10 seconds (increased from 3s)
           const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Profile fetch timed out')), 10000)
+            setTimeout(() => reject(new Error('Profile fetch timed out')), 15000)
           })
 
-          // The actual fetch promise
+          console.log(`[Auth] Fetching profile for ${userId} (attempt ${4 - attempt})...`)
           const fetchPromise = supabase
             .from('user_profiles')
             .select('role')
             .eq('id', userId)
             .single()
 
-          // Race them
-          return await Promise.race([fetchPromise, timeoutPromise])
-        } catch (error) {
+          const result: any = await Promise.race([fetchPromise, timeoutPromise])
+          if (result.error) throw result.error
+          return result
+        } catch (error: any) {
           if (attempt > 0) {
-            console.warn(`[Auth] Profile fetch failed, retrying... (${attempt} attempts left)`)
-            await new Promise(r => setTimeout(r, 1000)) // Wait 1s before retry
+            console.warn(`[Auth] Profile fetch failed, retrying...`, error)
+            await new Promise(r => setTimeout(r, 1500))
             return attemptFetch(attempt - 1)
           }
           throw error
@@ -70,7 +70,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       try {
         if (mounted && session?.user) {
-          // Try to fetch profile with timeout
+          // Primary source of truth for role: Backend API (uses service role)
+          try {
+            console.log('[Auth] Fetching user profile from backend API...')
+            const { data } = await api.get('/api/auth/me')
+            if (mounted && data.user) {
+              setUser(data.user)
+              localStorage.setItem('access_token', session.access_token)
+              setLoading(false)
+              clearTimeout(safetyTimeout)
+              return
+            }
+          } catch (apiError) {
+            console.warn('[Auth] Backend profile fetch failed, falling back to direct Supabase query:', apiError)
+          }
+
+          // Fallback: Direct Supabase query
           try {
             const { data: profile } = await fetchProfileWithTimeout(session.user.id)
 
@@ -82,8 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               localStorage.setItem('access_token', session.access_token)
             }
           } catch (profileError) {
-            console.warn('[Auth] Profile load failed or timed out, using default role:', profileError)
-            // Still let them in with default role
+            console.warn('[Auth] All profile fetch attempts failed, using default role:', profileError)
             if (mounted) {
               setUser({
                 ...session.user,
@@ -118,6 +132,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         if (session?.user) {
           try {
+            // First try backend API (service role bypass)
+            try {
+              const { data } = await api.get('/api/auth/me')
+              if (mounted && data.user) {
+                setUser(data.user)
+                localStorage.setItem('access_token', session.access_token)
+                return
+              }
+            } catch (error) {
+              console.warn('[Auth] Auth change profile API fetch failed, falling back to direct query')
+            }
+
             const { data: profile } = await fetchProfileWithTimeout(session.user.id)
 
             if (mounted) {

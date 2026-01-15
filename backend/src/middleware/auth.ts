@@ -41,11 +41,27 @@ export async function authenticate(
     req.userToken = token // Store token for RLS
 
     // Fetch role and attach to request for authorization
-    const { data: profile } = await supabase
+    let { data: profile, error: profileError } = await supabase
       .from('user_profiles')
       .select('role')
       .eq('id', user.id)
       .single()
+
+    // If profile is missing, create it automatically (lazy initialization)
+    if (profileError && profileError.code === 'PGRST116') { // single row not found
+      console.log(`[Auth] Profile missing for user ${user.id}, creating...`)
+      const { data: newProfile, error: createError } = await supabase
+        .from('user_profiles')
+        .insert({ id: user.id, credits: 3, role: 'user' })
+        .select('role')
+        .single()
+
+      if (!createError) {
+        profile = newProfile
+      } else {
+        console.error('[Auth] Failed to lazy-create profile:', createError)
+      }
+    }
 
     if (profile) {
       (req as any).role = profile.role
