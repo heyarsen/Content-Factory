@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNotifications } from '../../contexts/NotificationContext'
+import { useLanguage } from '../../contexts/LanguageContext'
 import { Bell, Menu, User, X, CheckCircle2, AlertCircle, Info, AlertTriangle, HelpCircle } from 'lucide-react'
 import { useMemo, useState, useRef, useEffect } from 'react'
 
@@ -11,6 +12,7 @@ interface HeaderProps {
 export function Header({ onToggleSidebar }: HeaderProps) {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const { t } = useLanguage()
   const { notifications, unreadCount, markAsRead, markAllAsRead, removeNotification, unreadSupportCount } = useNotifications()
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const notificationRef = useRef<HTMLDivElement>(null)
@@ -43,14 +45,14 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             type="button"
             onClick={onToggleSidebar}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 lg:hidden"
-            aria-label="Open navigation"
+            aria-label={t('header.open_navigation') || 'Open navigation'}
           >
             <Menu className="h-5 w-5" />
           </button>
 
           <div className="hidden md:block min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Workspace</p>
-            <p className="mt-0.5 text-lg font-semibold text-slate-900 truncate">Welcome back, {greetingName}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{t('header.workspace')}</p>
+            <p className="mt-0.5 text-lg font-semibold text-slate-900 truncate">{t('header.welcome_back')}, {greetingName}</p>
           </div>
         </div>
 
@@ -61,7 +63,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
               type="button"
               onClick={() => setNotificationsOpen(!notificationsOpen)}
               className="relative flex h-10 w-10 min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 touch-manipulation"
-              aria-label="Notifications"
+              aria-label={t('header.notifications') || 'Notifications'}
             >
               <Bell className="h-5 w-5" />
               {unreadCount > 0 && (
@@ -72,13 +74,13 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             {notificationsOpen && (
               <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-96 sm:max-w-96 rounded-xl border border-slate-200 bg-white shadow-lg z-50 max-h-[80vh] overflow-hidden flex flex-col">
                 <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-                  <div className="text-sm font-semibold text-slate-900">Notifications</div>
+                  <div className="text-sm font-semibold text-slate-900">{t('header.notifications')}</div>
                   {unreadCount > 0 && (
                     <button
                       onClick={markAllAsRead}
                       className="text-xs text-brand-600 hover:text-brand-700 font-medium"
                     >
-                      Mark all as read
+                      {t('header.mark_all_read')}
                     </button>
                   )}
                 </div>
@@ -86,7 +88,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                   {notifications.length === 0 ? (
                     <div className="p-8 text-center">
                       <Bell className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-                      <div className="text-sm text-slate-500">No notifications</div>
+                      <div className="text-sm text-slate-500">{t('header.no_notifications')}</div>
                     </div>
                   ) : (
                     <div className="divide-y divide-slate-100">
@@ -163,10 +165,10 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             type="button"
             onClick={() => navigate('/support')}
             className="relative flex h-10 min-h-[44px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 touch-manipulation"
-            aria-label="Support"
+            aria-label={t('header.support') || 'Support'}
           >
             <HelpCircle className="h-4 w-4" />
-            <span className="hidden sm:inline font-semibold text-slate-900">Support</span>
+            <span className="hidden sm:inline font-semibold text-slate-900">{t('header.support')}</span>
             {unreadSupportCount > 0 && (
               <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm ring-2 ring-white">
                 {unreadSupportCount}
@@ -179,7 +181,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             type="button"
             onClick={() => navigate('/profile')}
             className="flex h-10 w-10 min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 touch-manipulation md:hidden"
-            aria-label="Account"
+            aria-label={t('header.account') || 'Account'}
           >
             <User className="h-5 w-5" />
           </button>
@@ -191,7 +193,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             className="hidden items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 md:flex min-h-[44px] touch-manipulation max-w-[200px]"
           >
             <div className="flex flex-col leading-tight min-w-0">
-              <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Account</span>
+              <span className="text-xs font-medium uppercase tracking-wide text-slate-400">{t('header.account')}</span>
               <span className="font-semibold text-slate-900 truncate">{user?.email}</span>
             </div>
             <User className="h-4 w-4 shrink-0" />

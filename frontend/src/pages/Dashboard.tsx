@@ -8,6 +8,8 @@ import { Badge } from '../components/ui/Badge'
 import { Video, Calendar, Users, Zap } from 'lucide-react'
 import api from '../lib/api'
 
+import { useLanguage } from '../contexts/LanguageContext'
+
 interface VideoStats {
   total: number
   completed: number
@@ -21,6 +23,7 @@ interface PostStats {
 }
 
 export function Dashboard() {
+  const { t } = useLanguage()
   const [videoStats, setVideoStats] = useState<VideoStats | null>(null)
   const [postStats, setPostStats] = useState<PostStats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -95,17 +98,17 @@ export function Dashboard() {
           <div className="absolute -right-16 top-8 h-44 w-44 rounded-full bg-cyan-400/30 blur-3xl" />
           <div className="relative z-10 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
             <div className="max-w-xl space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-white/70">Dashboard</p>
-              <h1 className="text-3xl font-semibold md:text-4xl">Video Creator</h1>
+              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-white/70">{t('common.dashboard')}</p>
+              <h1 className="text-3xl font-semibold md:text-4xl">{t('dashboard.title')}</h1>
               <p className="text-sm text-white/80">
-                Create videos, manage your library, and schedule posts across all your social channels.
+                {t('dashboard.description')}
               </p>
             </div>
             <div className="flex flex-wrap gap-3 text-sm font-medium">
               <Link to="/create">
                 <Button className="border border-white/20 bg-white/20 text-white backdrop-blur hover:bg-white/30 hover:text-white shadow-lg">
                   <Zap className="mr-2 h-4 w-4" />
-                  Create Video
+                  {t('dashboard.create_video')}
                 </Button>
               </Link>
               <Link to="/videos">
@@ -114,7 +117,7 @@ export function Dashboard() {
                   className="border border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/20 hover:text-white"
                 >
                   <Video className="mr-2 h-4 w-4" />
-                  Library
+                  {t('dashboard.library')}
                 </Button>
               </Link>
             </div>
@@ -126,9 +129,9 @@ export function Dashboard() {
             <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-brand-100/60 blur-3xl" />
             <div className="relative z-10 flex items-start justify-between">
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Total videos</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{t('dashboard.total_videos')}</p>
                 <p className="mt-3 text-4xl font-semibold text-primary">{videoStats?.total || 0}</p>
-                <p className="mt-2 text-xs text-slate-400">Across all styles and formats</p>
+                <p className="mt-2 text-xs text-slate-400">{t('dashboard.total_videos_desc') || 'Across all styles and formats'}</p>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
                 <Video className="h-5 w-5" />
@@ -141,12 +144,12 @@ export function Dashboard() {
             <div className="relative z-10 flex h-full flex-col justify-between">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Completed</p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{t('dashboard.completed')}</p>
                   <p className="mt-3 text-4xl font-semibold text-primary">{videoStats?.completed || 0}</p>
                 </div>
                 <Badge variant="success">Live</Badge>
               </div>
-              <p className="mt-4 text-xs text-slate-400">Ready to publish or distribute</p>
+              <p className="mt-4 text-xs text-slate-400">{t('dashboard.completed_desc') || 'Ready to publish or distribute'}</p>
             </div>
           </Card>
 
@@ -155,12 +158,12 @@ export function Dashboard() {
             <div className="relative z-10 flex h-full flex-col justify-between">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Generating</p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{t('dashboard.generating')}</p>
                   <p className="mt-3 text-4xl font-semibold text-primary">{videoStats?.generating || 0}</p>
                 </div>
                 <Badge variant="info">In flight</Badge>
               </div>
-              <p className="mt-4 text-xs text-slate-400">AI renderings actively producing assets</p>
+              <p className="mt-4 text-xs text-slate-400">{t('dashboard.generating_desc') || 'AI renderings actively producing assets'}</p>
             </div>
           </Card>
 
@@ -169,13 +172,13 @@ export function Dashboard() {
             <div className="relative z-10 flex h-full flex-col justify-between">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Scheduled posts</p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{t('dashboard.scheduled_posts')}</p>
                   <p className="mt-3 text-4xl font-semibold text-primary">{postStats?.pending || 0}</p>
                 </div>
                 <Calendar className="h-5 w-5 text-amber-500" />
               </div>
               <p className="mt-4 text-xs text-slate-400">
-                {postStats?.posted || 0} published automatically last cycle
+                {postStats?.posted || 0} {t('dashboard.posted_desc') || 'published automatically last cycle'}
               </p>
             </div>
           </Card>

@@ -4,6 +4,7 @@ import { NotificationProvider } from './contexts/NotificationContext'
 import { BillingGateProvider } from './contexts/BillingGateContext'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import { AuthHashHandler } from './components/auth/AuthHashHandler'
+import { LanguageProvider } from './contexts/LanguageContext'
 import { ToastContainer } from './components/ui/Toast'
 import { useToast } from './hooks/useToast'
 
@@ -213,13 +214,15 @@ function App() {
   return (
     <ErrorBoundary>
       <BrowserRouter>
-        <AuthProvider>
-          <NotificationProvider>
-            <BillingGateProvider>
-              <AppContent />
-            </BillingGateProvider>
-          </NotificationProvider>
-        </AuthProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <NotificationProvider>
+              <BillingGateProvider>
+                <AppContent />
+              </BillingGateProvider>
+            </NotificationProvider>
+          </AuthProvider>
+        </LanguageProvider>
       </BrowserRouter>
     </ErrorBoundary>
   )

@@ -8,6 +8,7 @@ import { useToast } from '../hooks/useToast'
 import { Settings, Globe, Bell, Share2, Instagram, Youtube, Facebook, Users } from 'lucide-react'
 import api from '../lib/api'
 import { timezones } from '../lib/timezones'
+import { useLanguage } from '../contexts/LanguageContext'
 
 interface Preferences {
   user_id: string
@@ -48,10 +49,7 @@ const platformNames: Record<string, string> = {
 }
 
 export function Preferences() {
-  const { toast } = useToast()
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([])
+  const { language, setLanguage, t } = useLanguage()
   const [preferences, setPreferences] = useState<Preferences>({
     user_id: '',
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -147,16 +145,49 @@ export function Preferences() {
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Settings</p>
-            <h1 className="text-3xl font-semibold text-primary">Preferences</h1>
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('common.settings')}</p>
+            <h1 className="text-3xl font-semibold text-primary">{t('common.preferences') || 'Preferences'}</h1>
             <p className="text-sm text-slate-500">
-              Configure your default settings for video creation and automation.
+              {t('preferences.description') || 'Configure your default settings for video creation and automation.'}
             </p>
           </div>
           <Button onClick={handleSave} loading={saving}>
-            Save Preferences
+            {t('common.save')}
           </Button>
         </div>
+
+        {/* Language Selection */}
+        <Card className="p-6">
+          <div className="mb-6 flex items-center gap-3">
+            <Globe className="h-5 w-5 text-slate-400" />
+            <h2 className="text-lg font-semibold text-primary">{t('preferences.language') || 'Platform Language'}</h2>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {[
+              { code: 'en', name: 'English', flag: '🇺🇸' },
+              { code: 'ru', name: 'Русский', flag: '🇷🇺' },
+              { code: 'uk', name: 'Українська', flag: '🇺🇦' },
+              { code: 'es', name: 'Español', flag: '🇪🇸' },
+              { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
+            ].map((lang) => (
+              <button
+                key={lang.code}
+                onClick={() => setLanguage(lang.code as any)}
+                className={`flex items-center gap-3 rounded-2xl border-2 p-4 transition-all hover:scale-[1.02] ${language === lang.code
+                  ? 'border-brand-500 bg-brand-50 shadow-md'
+                  : 'border-slate-100 bg-white hover:border-brand-200'
+                  }`}
+              >
+                <span className="text-2xl">{lang.flag}</span>
+                <div className="text-left">
+                  <p className={`text-sm font-semibold ${language === lang.code ? 'text-brand-700' : 'text-slate-700'}`}>
+                    {lang.name}
+                  </p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </Card>
 
         {/* Connected Social Media */}
         {connectedPlatforms.length > 0 && (

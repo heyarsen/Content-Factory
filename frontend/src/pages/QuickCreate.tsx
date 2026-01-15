@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
@@ -12,6 +12,7 @@ import { Modal } from '../components/ui/Modal'
 import api from '../lib/api'
 import { DEFAULT_VERTICAL_ASPECT_RATIO, DEFAULT_VERTICAL_DIMENSION } from '../lib/videos'
 import { useNotifications } from '../contexts/NotificationContext'
+import { useLanguage } from '../contexts/LanguageContext'
 
 
 interface SocialAccount {
@@ -22,7 +23,7 @@ interface SocialAccount {
 
 type Step = 'idea' | 'script' | 'generate' | 'complete'
 
-const platformIcons: Record<string, any> = {
+const platformIcons: Record<string, React.FC<any>> = {
   instagram: Instagram,
   youtube: Youtube,
   tiktok: Users,
@@ -41,6 +42,7 @@ const platformNames: Record<string, string> = {
 export function QuickCreate() {
   const navigate = useNavigate()
   const { addNotification } = useNotifications()
+  const { t } = useLanguage()
   const [step, setStep] = useState<Step>('idea')
 
   // Step 1: Idea
@@ -86,7 +88,7 @@ export function QuickCreate() {
     if (!videoId) return
     if (videoStatus === 'completed' || videoStatus === 'failed') return
 
-    let pollInterval: NodeJS.Timeout
+    let pollInterval: any
     let pollDelay = 3000 // Start with 3 seconds
     let consecutiveErrors = 0
 
@@ -113,18 +115,18 @@ export function QuickCreate() {
           if (previousStatus !== 'completed') {
             addNotification({
               type: 'success',
-              title: 'Video Ready!',
-              message: `"${topic}" has finished generating and is ready to view.`,
+              title: t('videos.video_ready_title'),
+              message: `"${topic}" ${t('videos.video_ready_message')}`,
               link: `/videos`,
             })
           }
         } else if (newStatus === 'failed') {
-          setVideoError(video.error_message || 'Video generation failed')
+          setVideoError(video.error_message || t('videos.status_failed'))
           if (previousStatus !== 'failed') {
             addNotification({
               type: 'error',
-              title: 'Video Generation Failed',
-              message: `"${topic}" failed to generate: ${video.error_message || 'Unknown error'}`,
+              title: t('videos.status_failed'),
+              message: `"${topic}" ${t('videos.status_failed')}: ${video.error_message || 'Unknown error'}`,
             })
           }
         } else {
@@ -145,8 +147,8 @@ export function QuickCreate() {
           if (consecutiveErrors === 1) {
             addNotification({
               type: 'warning',
-              title: 'Rate Limit Reached',
-              message: 'Polling paused due to rate limit. Will resume automatically.',
+              title: t('videos.rate_limit_title'),
+              message: t('videos.rate_limit_message'),
             })
           }
         } else {
@@ -187,7 +189,7 @@ export function QuickCreate() {
 
   const handleGenerateScript = async () => {
     if (!topic) {
-      setScriptError('Please fill in the topic')
+      setScriptError(t('quick_create.topic_label'))
       return
     }
 
@@ -213,7 +215,7 @@ export function QuickCreate() {
 
   const handleGenerateVideo = async () => {
     if (!generatedScript) {
-      setVideoError('Please generate a script first')
+      setVideoError(t('quick_create.script_preview'))
       return
     }
 
@@ -254,8 +256,8 @@ export function QuickCreate() {
       setVideoError('')
       addNotification({
         type: 'info',
-        title: 'Video Generation Started!',
-        message: `"${topic}" is now being generated. This typically takes 1-3 minutes. You'll be notified when it's ready!`,
+        title: t('quick_create.gen_start_title'),
+        message: t('quick_create.gen_start_desc'),
       })
 
       // If video is already completed (unlikely), go to complete step
@@ -349,26 +351,26 @@ export function QuickCreate() {
   }
 
   const togglePlatform = (platform: string) => {
-    setSelectedPlatforms(prev =>
+    setSelectedPlatforms((prev: string[]) =>
       prev.includes(platform)
-        ? prev.filter(p => p !== platform)
+        ? prev.filter((p: string) => p !== platform)
         : [...prev, platform]
     )
   }
 
   const canProceedToScript = topic.trim().length > 0
   const canProceedToVideo = generatedScript.trim().length > 0
-  const connectedPlatforms = socialAccounts.filter(acc => acc.status === 'connected').map(acc => acc.platform)
+  const connectedPlatforms = socialAccounts.filter((acc: SocialAccount) => acc.status === 'connected').map((acc: SocialAccount) => acc.platform)
 
   return (
     <Layout>
       <div className="mx-auto w-full max-w-4xl space-y-6 sm:space-y-8">
         {/* Header */}
         <div className="rounded-[28px] border border-white/40 bg-white/80 p-4 sm:p-6 lg:p-8 shadow-[0_35px_80px_-50px_rgba(79,70,229,0.6)] backdrop-blur-xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">create video</p>
-          <h1 className="mt-2 sm:mt-3 text-2xl sm:text-3xl font-semibold text-primary">Create a new video</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">{t('common.create')}</p>
+          <h1 className="mt-2 sm:mt-3 text-2xl sm:text-3xl font-semibold text-primary">{t('quick_create.title')}</h1>
           <p className="mt-2 text-sm text-slate-500">
-            Describe your idea, let AI write the script, then generate your video. Simple as that.
+            {t('quick_create.desc')}
           </p>
         </div>
 
@@ -384,8 +386,8 @@ export function QuickCreate() {
                   {['script', 'generate', 'complete'].includes(step) ? <CheckCircle2 className="h-5 w-5" /> : <span className="text-sm font-semibold">1</span>}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold">Idea</p>
-                  <p className="text-xs text-slate-500">Describe your topic</p>
+                  <p className="text-sm font-semibold">{t('quick_create.step_idea')}</p>
+                  <p className="text-xs text-slate-500">{t('quick_create.step_idea_desc')}</p>
                 </div>
               </div>
 
@@ -399,8 +401,8 @@ export function QuickCreate() {
                   {['generate', 'complete'].includes(step) ? <CheckCircle2 className="h-5 w-5" /> : step === 'script' ? <Loader className="h-5 w-5 animate-spin" /> : <span className="text-sm font-semibold">2</span>}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold">Script</p>
-                  <p className="text-xs text-slate-500">AI writes for you</p>
+                  <p className="text-sm font-semibold">{t('quick_create.step_script')}</p>
+                  <p className="text-xs text-slate-500">{t('quick_create.step_script_desc')}</p>
                 </div>
               </div>
 
@@ -412,8 +414,8 @@ export function QuickCreate() {
                   {step === 'complete' ? <CheckCircle2 className="h-5 w-5" /> : step === 'generate' ? <Loader className="h-5 w-5 animate-spin" /> : <span className="text-sm font-semibold">3</span>}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold">Generate</p>
-                  <p className="text-xs text-slate-500">Create video</p>
+                  <p className="text-sm font-semibold">{t('quick_create.step_generate')}</p>
+                  <p className="text-xs text-slate-500">{t('quick_create.step_generate_desc')}</p>
                 </div>
               </div>
             </div>
@@ -425,7 +427,7 @@ export function QuickCreate() {
           <Card className="p-4 sm:p-6 lg:p-8">
             <div className="mb-6 flex items-center gap-3">
               <Sparkles className="h-5 w-5 text-brand-500" />
-              <h2 className="text-xl font-semibold text-primary">Step 1: Your Idea</h2>
+              <h2 className="text-xl font-semibold text-primary">{t('quick_create.step_idea_title')}</h2>
             </div>
 
             {scriptError && (
@@ -438,7 +440,7 @@ export function QuickCreate() {
               <div className="mb-6 rounded-2xl border border-blue-200/60 bg-blue-50/40 p-4">
                 <p className="mb-2 text-sm font-semibold text-blue-700">Connected Social Media</p>
                 <div className="flex flex-wrap gap-2">
-                  {connectedPlatforms.map((platform) => {
+                  {connectedPlatforms.map((platform: string) => {
                     const Icon = platformIcons[platform] || Share2
                     return (
                       <div
@@ -461,19 +463,19 @@ export function QuickCreate() {
             <div className="space-y-6">
 
               <Input
-                label="Topic"
-                placeholder="e.g., 5 Trading Mistakes Beginners Make"
+                label={t('quick_create.topic_label')}
+                placeholder={t('quick_create.topic_placeholder')}
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
                 required
               />
 
               <Textarea
-                label="Description (optional)"
-                placeholder="Add more context about your idea..."
+                label={t('quick_create.desc_label')}
+                placeholder={t('quick_create.desc_placeholder')}
                 rows={4}
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value)}
               />
 
 
@@ -483,7 +485,7 @@ export function QuickCreate() {
                   onClick={() => navigate('/videos')}
                   className="border border-white/60 text-slate-500"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button
                   onClick={handleGenerateScript}
@@ -491,7 +493,7 @@ export function QuickCreate() {
                   loading={generatingScript}
                   leftIcon={!generatingScript ? <Sparkles className="h-4 w-4" /> : undefined}
                 >
-                  Generate Script
+                  {t('quick_create.generate_script')}
                 </Button>
               </div>
             </div>
@@ -503,7 +505,7 @@ export function QuickCreate() {
           <Card className="p-4 sm:p-6 lg:p-8">
             <div className="mb-6 flex items-center gap-3">
               <FileText className="h-5 w-5 text-brand-500" />
-              <h2 className="text-xl font-semibold text-primary">Step 2: AI-Generated Script</h2>
+              <h2 className="text-xl font-semibold text-primary">{t('quick_create.step_script_title')}</h2>
             </div>
 
             {scriptError && (
@@ -515,26 +517,26 @@ export function QuickCreate() {
             <div className="space-y-6">
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <label className="text-sm font-semibold text-primary">Script Preview</label>
+                  <label className="text-sm font-semibold text-primary">{t('quick_create.script_preview')}</label>
                   {canEditScript && (
                     <Badge variant="success">
-                      Editable
+                      {t('quick_create.editable')}
                     </Badge>
                   )}
                 </div>
                 <Textarea
                   value={generatedScript}
-                  onChange={(e) => setGeneratedScript(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setGeneratedScript(e.target.value)}
                   rows={12}
-                  placeholder={generatingScript ? 'Generating your script...' : 'Your script will appear here'}
+                  placeholder={generatingScript ? t('quick_create.generating_script') : t('quick_create.script_empty')}
                   disabled={generatingScript || !canEditScript}
                   className="font-mono text-sm"
                 />
               </div>
 
               <div className="rounded-2xl border border-blue-200/60 bg-blue-50/40 p-4 text-sm text-blue-700">
-                <p className="font-semibold">💡 Tip:</p>
-                <p className="mt-1">Review and edit the script if needed. You can make changes before generating the video.</p>
+                <p className="font-semibold">{t('quick_create.tip_title')}</p>
+                <p className="mt-1">{t('quick_create.tip_desc')}</p>
               </div>
 
               <div className="flex justify-between gap-3 pt-4">
@@ -543,7 +545,7 @@ export function QuickCreate() {
                   onClick={() => setStep('idea')}
                   leftIcon={<ArrowLeft className="h-4 w-4" />}
                 >
-                  Back
+                  {t('common.back')}
                 </Button>
                 <div className="flex gap-3">
                   <Button
@@ -552,14 +554,14 @@ export function QuickCreate() {
                     disabled={generatingScript}
                     loading={generatingScript}
                   >
-                    Regenerate
+                    {t('quick_create.regenerate')}
                   </Button>
                   <Button
                     onClick={() => setStep('generate')}
                     disabled={!canProceedToVideo}
                     rightIcon={<ArrowRight className="h-4 w-4" />}
                   >
-                    Continue to Video
+                    {t('quick_create.continue_to_video')}
                   </Button>
                 </div>
               </div>
@@ -572,7 +574,7 @@ export function QuickCreate() {
           <Card className="p-4 sm:p-6 lg:p-8">
             <div className="mb-6 flex items-center gap-3">
               <Video className="h-5 w-5 text-brand-500" />
-              <h2 className="text-xl font-semibold text-primary">Step 3: Generate Video</h2>
+              <h2 className="text-xl font-semibold text-primary">{t('quick_create.step_generate_title')}</h2>
             </div>
 
             {videoError && (
@@ -590,12 +592,12 @@ export function QuickCreate() {
                     </svg>
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-sm font-semibold text-emerald-800">Video Generation Started!</h3>
+                    <h3 className="text-sm font-semibold text-emerald-800">{t('quick_create.gen_start_title')}</h3>
                     <p className="mt-1 text-sm text-emerald-700">
-                      Your video is now being generated. This typically takes 1-3 minutes depending on the duration.
+                      {t('quick_create.gen_start_desc')}
                     </p>
                     <p className="mt-2 text-xs text-emerald-600">
-                      We'll automatically move to the next step when your video is ready!
+                      {t('quick_create.gen_start_sub')}
                     </p>
                   </div>
                 </div>
@@ -605,15 +607,15 @@ export function QuickCreate() {
             {videoStatus === 'pending' || videoStatus === 'generating' || videoStatus === 'failed' ? (
               <div className="space-y-6">
                 <div className="rounded-2xl border border-white/60 bg-white/70 p-6">
-                  <h3 className="mb-4 text-sm font-semibold text-primary">Script Preview</h3>
+                  <h3 className="mb-4 text-sm font-semibold text-primary">{t('quick_create.script_preview')}</h3>
                   <p className="whitespace-pre-wrap text-sm text-slate-600">{generatedScript}</p>
                 </div>
 
                 <div className="grid gap-6 lg:grid-cols-2">
                   <Select
-                    label="Video Style"
+                    label={t('quick_create.video_style')}
                     value={style}
-                    onChange={(e) => setStyle(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setStyle(e.target.value)}
                     options={[
                       { value: 'Cinematic', label: 'Cinematic' },
                       { value: 'Realistic', label: 'Realistic' },
@@ -634,7 +636,7 @@ export function QuickCreate() {
                       type="checkbox"
                       id="generateCaption"
                       checked={generateCaption}
-                      onChange={(e) => setGenerateCaption(e.target.checked)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGenerateCaption(e.target.checked)}
                       className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
                     />
                     <div className="flex-1">
@@ -642,10 +644,10 @@ export function QuickCreate() {
                         htmlFor="generateCaption"
                         className="text-sm font-semibold text-primary cursor-pointer"
                       >
-                        Generate Social Media Caption
+                        {t('quick_create.gen_caption_label')}
                       </label>
                       <p className="mt-1 text-xs text-slate-500">
-                        Automatically generate an engaging caption for your video when it's ready
+                        {t('quick_create.gen_caption_desc')}
                       </p>
                     </div>
                   </div>
@@ -666,7 +668,7 @@ export function QuickCreate() {
                     leftIcon={!generatingVideo ? <Video className="h-4 w-4" /> : undefined}
                     className="min-w-[160px]"
                   >
-                    {generatingVideo ? 'Generating...' : 'Generate Video'}
+                    {generatingVideo ? t('quick_create.generating_btn') : t('quick_create.step_generate')}
                   </Button>
                 </div>
               </div>
@@ -686,7 +688,7 @@ export function QuickCreate() {
             <Card className="p-4 sm:p-6">
               <div className="mb-4 flex items-center gap-3">
                 <Video className="h-5 w-5 text-brand-500" />
-                <h2 className="text-xl font-semibold text-primary">Your Video</h2>
+                <h2 className="text-xl font-semibold text-primary">{t('quick_create.your_video')}</h2>
               </div>
               <div
                 className="rounded-xl bg-slate-900 overflow-hidden mb-4"
@@ -704,7 +706,7 @@ export function QuickCreate() {
                 leftIcon={<Download className="h-4 w-4" />}
                 className="w-full"
               >
-                Download Video
+                {t('videos.download')}
               </Button>
             </Card>
 
@@ -712,7 +714,7 @@ export function QuickCreate() {
             <div className="space-y-4 sm:space-y-6">
               <Card className="p-4 sm:p-6">
                 <div className="mb-4 flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-primary">Social Media Description</h3>
+                  <h3 className="text-lg font-semibold text-primary">{t('quick_create.social_desc_title')}</h3>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -720,19 +722,19 @@ export function QuickCreate() {
                     loading={generatingDescription}
                     disabled={generatingDescription}
                   >
-                    Generate
+                    {t('quick_create.regenerate')}
                   </Button>
                 </div>
                 <Textarea
                   value={socialDescription}
-                  onChange={(e) => setSocialDescription(e.target.value)}
-                  placeholder="Write or generate a caption for your social media posts..."
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setSocialDescription(e.target.value)}
+                  placeholder={t('videos.prompt_placeholder')}
                   rows={6}
                 />
               </Card>
 
               <Card className="p-4 sm:p-6">
-                <h3 className="mb-4 text-base sm:text-lg font-semibold text-primary">Post to Social Media</h3>
+                <h3 className="mb-4 text-base sm:text-lg font-semibold text-primary">{t('quick_create.post_social_title')}</h3>
                 <div className="space-y-4">
                   <div className="flex flex-wrap gap-2">
                     {connectedPlatforms.map((platform) => {
@@ -757,7 +759,7 @@ export function QuickCreate() {
                   </div>
                   {connectedPlatforms.length === 0 && (
                     <p className="text-sm text-slate-500">
-                      No connected accounts. <a href="/social" className="text-brand-600 hover:underline">Connect accounts</a> to post videos.
+                      {t('videos.no_accounts_found')} <a href="/social" className="text-brand-600 hover:underline">{t('quick_create.connect_accounts')}</a> {t('quick_create.no_accounts_desc')}
                     </p>
                   )}
                   <Button
@@ -767,7 +769,7 @@ export function QuickCreate() {
                     leftIcon={<Share2 className="h-4 w-4" />}
                     className="w-full"
                   >
-                    Post to Selected Platforms
+                    {t('quick_create.post_selected')}
                   </Button>
                 </div>
               </Card>
@@ -778,7 +780,7 @@ export function QuickCreate() {
                   onClick={() => navigate('/videos')}
                   className="flex-1"
                 >
-                  Go to Videos
+                  {t('quick_create.go_to_videos')}
                 </Button>
                 <Button
                   variant="ghost"
@@ -792,7 +794,7 @@ export function QuickCreate() {
                   }}
                   className="flex-1"
                 >
-                  Create Another
+                  {t('quick_create.create_another')}
                 </Button>
               </div>
             </div>
@@ -806,15 +808,15 @@ export function QuickCreate() {
               setIsPostModalOpen(false)
             }
           }}
-          title={postStatus === 'posting' ? 'Posting Video...' : postStatus === 'success' ? 'Video Posted!' : 'Error'}
+          title={postStatus === 'posting' ? t('quick_create.posting_title') : postStatus === 'success' ? t('quick_create.posted_title') : 'Error'}
           size="md"
         >
           <div className="py-6 text-center">
             {postStatus === 'posting' && (
               <div className="space-y-4">
                 <Loader className="mx-auto h-12 w-12 animate-spin text-brand-500" />
-                <p className="text-lg font-medium text-slate-900">Your video is being posted</p>
-                <p className="text-sm text-slate-500">This may take a few moments...</p>
+                <p className="text-lg font-medium text-slate-900">{t('quick_create.posting_status')}</p>
+                <p className="text-sm text-slate-500">{t('quick_create.posting_wait')}</p>
               </div>
             )}
 
@@ -824,8 +826,8 @@ export function QuickCreate() {
                   <CheckCircle2 className="h-10 w-10 text-emerald-600" />
                 </div>
                 <div className="space-y-2">
-                  <p className="text-xl font-semibold text-slate-900">Success!</p>
-                  <p className="text-slate-500">Your video has been scheduled for posting to your selected platforms.</p>
+                  <p className="text-xl font-semibold text-slate-900">{t('quick_create.success_title')}</p>
+                  <p className="text-slate-500">{t('quick_create.success_desc')}</p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 pt-2">
                   <Button
@@ -833,13 +835,13 @@ export function QuickCreate() {
                     onClick={() => setIsPostModalOpen(false)}
                     className="flex-1"
                   >
-                    Ok, stay here
+                    {t('quick_create.ok_stay')}
                   </Button>
                   <Button
                     onClick={() => navigate('/posts')}
                     className="flex-1"
                   >
-                    View all posts
+                    {t('quick_create.view_posts')}
                   </Button>
                 </div>
               </div>
@@ -851,14 +853,14 @@ export function QuickCreate() {
                   <span className="text-4xl text-rose-600">!</span>
                 </div>
                 <div className="space-y-2">
-                  <p className="text-xl font-semibold text-slate-900">Failed to post</p>
-                  <p className="text-slate-500">There was an error scheduling your post. Please try again.</p>
+                  <p className="text-xl font-semibold text-slate-900">{t('quick_create.post_fail_title')}</p>
+                  <p className="text-slate-500">{t('quick_create.post_fail_desc')}</p>
                 </div>
                 <Button
                   onClick={() => setIsPostModalOpen(false)}
                   className="w-full"
                 >
-                  Close
+                  {t('common.cancel')}
                 </Button>
               </div>
             )}

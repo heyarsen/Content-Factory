@@ -13,35 +13,36 @@ import {
   MessagesSquare,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-
 import { useCredits } from '../../hooks/useCredits'
+import { useLanguage } from '../../contexts/LanguageContext'
 
 interface SidebarProps {
   isOpen: boolean
   onClose: () => void
 }
 
-const navigation = [
-  { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
-  { label: 'Create Video', to: '/create', icon: Zap },
-  // { label: 'Prompts', to: '/prompts', icon: Sparkles },
-  { label: 'Video Planning', to: '/planning', icon: Calendar },
-  { label: 'My Videos', to: '/videos', icon: Clapperboard },
-  { label: 'Social Accounts', to: '/social', icon: Share2 },
-  { label: 'Avatars', to: '/avatars', icon: User },
-  { label: 'Preferences', to: '/preferences', icon: Settings },
-]
-
-const adminNavigation = [
-  { label: 'Admin Dashboard', to: '/admin', icon: BarChart3 },
-  { label: 'Admin Support', to: '/admin/support', icon: MessagesSquare },
-]
-
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { user } = useAuth()
   const { credits, subscription, unlimited } = useCredits()
+  const { t } = useLanguage()
 
   const location = useLocation()
+
+  const navigation = [
+    { label: t('common.dashboard'), to: '/dashboard', icon: LayoutDashboard },
+    { label: t('dashboard.create_video'), to: '/create', icon: Zap },
+    // { label: 'Prompts', to: '/prompts', icon: Sparkles },
+    { label: t('common.planning') || 'Video Planning', to: '/planning', icon: Calendar },
+    { label: t('common.videos'), to: '/videos', icon: Clapperboard },
+    { label: t('common.social_accounts') || 'Social Accounts', to: '/social', icon: Share2 },
+    { label: t('common.avatars') || 'Avatars', to: '/avatars', icon: User },
+    { label: t('common.settings'), to: '/preferences', icon: Settings },
+  ]
+
+  const adminNavigation = [
+    { label: t('common.admin_dashboard') || 'Admin Dashboard', to: '/admin', icon: BarChart3 },
+    { label: t('common.admin_support') || 'Admin Support', to: '/admin/support', icon: MessagesSquare },
+  ]
 
   return (
     <Fragment>
