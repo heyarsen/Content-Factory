@@ -191,9 +191,24 @@ router.post('/topup', authenticate, async (req: AuthRequest, res: Response) => {
     // Auto-detect backend URL from request (works in prod where port may be 8080), but allow env override.
     const detectedBackendBaseUrl = `${req.protocol}://${req.get('host')}`
     const backendBaseUrl = process.env.BACKEND_URL || detectedBackendBaseUrl
+    const forcedAmountUsdRaw = process.env.WAYFORPAY_FORCE_AMOUNT_USD
+    const forcedAmountUsd = forcedAmountUsdRaw ? Number(forcedAmountUsdRaw) : null
+    const pkgAmountUsd = parseFloat(pkg.price_usd.toString())
+    const amountToCharge = forcedAmountUsd && Number.isFinite(forcedAmountUsd) && forcedAmountUsd > 0
+      ? forcedAmountUsd
+      : pkgAmountUsd
+
+    if (forcedAmountUsd && amountToCharge !== pkgAmountUsd) {
+      console.log('[Credits API] TOPUP WAYFORPAY_FORCE_AMOUNT_USD override active:', {
+        packageId,
+        pkgAmountUsd,
+        amountToCharge,
+      })
+    }
+
     const hostedForm = WayForPayService.createHostedPaymentForm({
       orderReference,
-      amount: parseFloat(pkg.price_usd.toString()),
+      amount: amountToCharge,
       currency: 'USD',
       productName: `Credits: ${pkg.display_name}`,
       clientAccountId: userId,
