@@ -50,6 +50,10 @@ const platformNames: Record<string, string> = {
 
 export function Preferences() {
   const { language, setLanguage, t } = useLanguage()
+  const { toast } = useToast()
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([])
   const [preferences, setPreferences] = useState<Preferences>({
     user_id: '',
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -136,8 +140,8 @@ export function Preferences() {
   }
 
   const connectedPlatforms = socialAccounts
-    .filter(acc => acc.status === 'connected')
-    .map(acc => acc.platform)
+    .filter((acc: SocialAccount) => acc.status === 'connected')
+    .map((acc: SocialAccount) => acc.platform)
 
   return (
     <Layout>
@@ -197,7 +201,7 @@ export function Preferences() {
               <h2 className="text-lg font-semibold text-primary">Connected Social Media</h2>
             </div>
             <div className="flex flex-wrap gap-3">
-              {connectedPlatforms.map((platform) => {
+              {connectedPlatforms.map((platform: string) => {
                 const Icon = platformIcons[platform] || Share2
                 return (
                   <div

@@ -608,7 +608,7 @@ export function Videos() {
                       style={{ aspectRatio: '9 / 16' }}
                     >
                       <video
-                        src={selectedVideo.video_url}
+                        src={selectedVideo.video_url || undefined}
                         className="w-full h-full object-cover"
                         controls
                       />
@@ -707,10 +707,10 @@ export function Videos() {
                       variant="secondary"
                       className="w-full"
                       onClick={() => {
-                        if (selectedVideo.url) {
+                        if (selectedVideo.video_url) {
                           const link = document.createElement('a')
-                          link.href = selectedVideo.url
-                          link.download = `video - ${selectedVideo.id}.mp4`
+                          link.href = selectedVideo.video_url
+                          link.download = `video-${selectedVideo.id}.mp4`
                           link.click()
                         }
                       }}
