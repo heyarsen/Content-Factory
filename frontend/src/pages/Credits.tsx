@@ -7,6 +7,8 @@ import { useCredits } from '../hooks/useCredits'
 import { useNotifications } from '../contexts/NotificationContext'
 import { Coins, CheckCircle2, XCircle, Clock, ArrowUpRight, ArrowDownRight, History, Crown, AlertCircle } from 'lucide-react'
 import api from '../lib/api'
+import { Modal } from '../components/ui/Modal'
+import { useLanguage } from '../contexts/LanguageContext'
 
 interface SubscriptionPlan {
   id: string
@@ -49,6 +51,7 @@ interface UserSubscription {
 export function Credits() {
   const { credits, unlimited, loading: creditsLoading, refreshCredits } = useCredits()
   const { addNotification } = useNotifications()
+  const { t } = useLanguage()
   const [plans, setPlans] = useState<SubscriptionPlan[]>([])
   const [loadingPlans, setLoadingPlans] = useState(true)
   const [purchasing, setPurchasing] = useState<string | null>(null)
@@ -60,6 +63,8 @@ export function Credits() {
   const [packages, setPackages] = useState<CreditPackage[]>([])
   const [loadingPackages, setLoadingPackages] = useState(true)
   const [toppingUp, setToppingUp] = useState<string | null>(null)
+  const [showCancelModal, setShowCancelModal] = useState(false)
+  const [pendingPlanId, setPendingPlanId] = useState<string | null>(null)
 
   useEffect(() => {
     loadPlans()
@@ -154,6 +159,24 @@ export function Credits() {
   }
 
   const handlePurchase = async (planId: string) => {
+    // If switching to free plan, show confirmation modal
+    if (planId === 'plan_free' && hasSubscription) {
+      setPendingPlanId('plan_free')
+      setShowCancelModal(true)
+      return
+    }
+
+    // If switching plans while having an active one, show confirmation modal
+    if (hasSubscription && planId !== subscription?.plan_id) {
+      setPendingPlanId(planId)
+      setShowCancelModal(true)
+      return
+    }
+
+    await executePurchase(planId)
+  }
+
+  const executePurchase = async (planId: string) => {
     try {
       setPurchasing(planId)
       const response = await api.post('/api/credits/subscribe', { planId })
@@ -223,11 +246,24 @@ export function Credits() {
     }
   }
 
-  const handleCancel = async () => {
-    if (!window.confirm('Are you sure you want to cancel your subscription? All your remaining credits will be removed.')) {
-      return
+  const handleCancelClick = () => {
+    setPendingPlanId('cancel')
+    setShowCancelModal(true)
+  }
+
+  const handleConfirmCancel = async () => {
+    setShowCancelModal(false)
+
+    if (pendingPlanId === 'cancel' || pendingPlanId === 'plan_free') {
+      await executeCancel()
+    } else if (pendingPlanId) {
+      await executePurchase(pendingPlanId)
     }
 
+    setPendingPlanId(null)
+  }
+
+  const executeCancel = async () => {
     try {
       setPurchasing('cancel')
       await api.post('/api/credits/cancel')
@@ -330,7 +366,7 @@ export function Credits() {
                   </p>
                 )}
                 <button
-                  onClick={handleCancel}
+                  onClick={handleCancelClick}
                   disabled={purchasing === 'cancel'}
                   className="text-sm text-red-600 hover:text-red-700 font-medium underline"
                 >
@@ -442,7 +478,7 @@ export function Credits() {
                         <span className="text-sm text-slate-500">USD</span>
                       </div>
                       <Button
-                        onClick={() => plan.id === 'plan_free' ? handleCancel() : handlePurchase(plan.id)}
+                        onClick={() => plan.id === 'plan_free' ? handleCancelClick() : handlePurchase(plan.id)}
                         disabled={purchasing === plan.id || isCurrentPlan}
                         className="w-full mt-auto"
                         variant={isCurrentPlan ? "ghost" : "primary"}
@@ -552,6 +588,39 @@ export function Credits() {
           )}
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      <Modal
+        isOpen={showCancelModal}
+        onClose={() => {
+          setShowCancelModal(false)
+          setPendingPlanId(null)
+        }}
+        title={t('credits.confirm_cancel_title')}
+      >
+        <div className="space-y-6">
+          <p className="text-slate-600">
+            {t('credits.confirm_cancel_msg')}
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowCancelModal(false)
+                setPendingPlanId(null)
+              }}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleConfirmCancel}
+            >
+              {t('credits.continue')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </Layout>
   )
 }

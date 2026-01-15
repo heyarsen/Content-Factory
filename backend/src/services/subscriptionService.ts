@@ -41,7 +41,7 @@ export class SubscriptionService {
       return []
     }
 
-    return data || []
+    return (data || []).filter(plan => plan.is_active !== false)
   }
 
   /**
@@ -114,12 +114,15 @@ export class SubscriptionService {
    * Get user's active subscription
    */
   static async getUserSubscription(userId: string): Promise<UserSubscription | null> {
+    console.log('[Subscription] Fetching active subscription for user:', userId)
+
+    // First, try to get active & completed subscription
     const { data, error } = await supabase
       .from('user_subscriptions')
       .select('*, plan:subscription_plans(*)')
       .eq('user_id', userId)
       .eq('status', 'active')
-      .eq('payment_status', 'completed') // Only return subscriptions with completed payment
+      .eq('payment_status', 'completed')
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
@@ -129,14 +132,35 @@ export class SubscriptionService {
       return null
     }
 
-    if (!data) {
-      console.log('[Subscription] No active subscription found for user:', userId)
-      return null
+    if (data) {
+      return data as any as UserSubscription
     }
 
-    // Cast the joined data to match expectation if needed, or just return as is
-    // The caller will need to handle the nested 'plan' object
-    return data as any as UserSubscription
+    // If not found, check if there's any active subscription that might have pending/failed payment
+    // that should have been completed.
+    const { data: anyActive } = await supabase
+      .from('user_subscriptions')
+      .select('id, status, payment_status, created_at')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (anyActive) {
+      console.warn('[Subscription] Found active subscription but with incorrect payment status:', {
+        userId,
+        subscriptionId: anyActive.id,
+        paymentStatus: anyActive.payment_status,
+      })
+      // If payment_status is null but it was activated, we might want to return it anyway
+      // to avoid breaking the UI for users who actually paid.
+      // For now, let's keep it strict but log it.
+    } else {
+      console.log('[Subscription] No active subscription records found for user:', userId)
+    }
+
+    return null
   }
 
   /**
