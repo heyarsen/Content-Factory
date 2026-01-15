@@ -160,10 +160,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-slate-900">
-                      {subscription?.plan_name || 'Free Plan'}
+                      {subscription?.plan_name || t('sidebar.free_plan')}
                     </p>
                     <p className="text-[10px] text-slate-500 font-medium">
-                      {unlimited ? 'Unlimited' : `${credits ?? 0} credits`}
+                      {unlimited ? t('sidebar.unlimited') : `${credits ?? 0} ${t('sidebar.credits')}`}
                     </p>
                   </div>
                 </div>
@@ -179,11 +179,19 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 </div>
               )}
 
-              {/* Top Up Button */}
-              {credits !== null && credits < 5 && !unlimited && (
-                <button className="mt-3 w-full rounded-xl bg-brand-600 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700">
-                  Top Up Credits
-                </button>
+              {/* Action Button */}
+              {!unlimited && (
+                <div className="mt-3">
+                  {!subscription ? (
+                    <button className="w-full rounded-xl bg-brand-600 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700">
+                      {t('sidebar.buy_subscription')}
+                    </button>
+                  ) : credits !== null && credits < 5 ? (
+                    <button className="w-full rounded-xl bg-brand-600 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700">
+                      {t('sidebar.top_up')}
+                    </button>
+                  ) : null}
+                </div>
               )}
             </Link>
           </div>

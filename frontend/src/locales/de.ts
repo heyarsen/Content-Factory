@@ -102,7 +102,14 @@ export const de = {
         post_success_title: "Erfolgreich gepostet",
         post_success_message: "Ihr Video wird gepostet auf",
         post_fail_title: "Posten fehlgeschlagen",
-        post_fail_message: "Beiträge konnten nicht geplant werden. Bitte überprüfen Sie Ihre sozialen Verbindungen.",
+        post_fail_message: "Fehler beim Planen Ihres Beitrags. Bitte überprüfen Sie Ihre sozialen Verbindungen.",
+    },
+    sidebar: {
+        free_plan: "Kostenloser Plan",
+        buy_subscription: "Abonnement kaufen",
+        top_up: "Credits aufladen",
+        unlimited: "Unbegrenzt",
+        credits: "Credits",
     },
     quick_create: {
         title: "Neues Video erstellen",

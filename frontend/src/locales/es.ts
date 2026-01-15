@@ -104,6 +104,13 @@ export const es = {
         post_fail_title: "Error al publicar",
         post_fail_message: "Error al programar tus publicaciones. Verifica tus conexiones sociales.",
     },
+    sidebar: {
+        free_plan: "Plan Gratuito",
+        buy_subscription: "Comprar Suscripción",
+        top_up: "Recargar Créditos",
+        unlimited: "Ilimitado",
+        credits: "créditos",
+    },
     quick_create: {
         title: "Crear un nuevo video",
         desc: "Describe tu idea, deja que la IA escriba el guion y luego genera tu video. Tan simple como eso.",

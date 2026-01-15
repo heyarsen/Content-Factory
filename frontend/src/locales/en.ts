@@ -154,5 +154,12 @@ export const en = {
         view_posts: "View all posts",
         post_fail_title: "Failed to post",
         post_fail_desc: "There was an error scheduling your post. Please try again.",
-    }
+    },
+    sidebar: {
+        free_plan: "Free Plan",
+        buy_subscription: "Buy Subscription",
+        top_up: "Top Up Credits",
+        unlimited: "Unlimited",
+        credits: "credits",
+    },
 }

@@ -102,7 +102,14 @@ export const ru = {
         post_success_title: "Опубликовано успешно",
         post_success_message: "Ваше видео публикуется в",
         post_fail_title: "Ошибка публикации",
-        post_fail_message: "Не удалось запланировать ваши публикации. Проверьте подключения к соцсетям.",
+        post_fail_message: "Не удалось запланировать пост. Пожалуйста, проверьте подключение соцсетей.",
+    },
+    sidebar: {
+        free_plan: "Бесплатный план",
+        buy_subscription: "Купить подписку",
+        top_up: "Пополнить кредиты",
+        unlimited: "Безлимитно",
+        credits: "кредитов",
     },
     quick_create: {
         title: "Создать новое видео",

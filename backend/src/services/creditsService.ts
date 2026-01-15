@@ -393,15 +393,14 @@ export class CreditsService {
   static async checkAndDeduct(userId: string, cost: number, operation: string): Promise<number | null> {
     const checkResult = await this.hasEnoughCredits(userId, cost)
 
-    if (!checkResult.hasSubscription) {
-      throw new Error('You need an active subscription to use this feature. Please purchase a subscription plan.')
-    }
-
     if (!checkResult.hasCredits) {
       const creditsDisplay = checkResult.credits === null ? 'unlimited' : checkResult.credits.toString()
       throw new Error(`Insufficient credits. You have ${creditsDisplay} credits but need ${cost} credits for ${operation}. You can top up credits or choose a different subscription plan.`)
     }
 
+    // Allow deduction if credits are available, even without a subscription
+    // Subscription is only strictly required if they want unlimited or some specific perks, 
+    // but for credit-based operations, the balance is what matters.
     return await this.deductCredits(userId, cost, operation)
   }
 
