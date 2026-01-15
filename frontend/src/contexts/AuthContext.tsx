@@ -117,33 +117,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         if (session?.user) {
-          // Don't clear safety timeout here immediately, let it run its course 
-          // or be cleared when logic finishes.
-          // Actually, we should probably clear it if we successfully loaded everything.
-
           try {
             const { data: profile } = await fetchProfileWithTimeout(session.user.id)
 
             if (mounted) {
-              setUser({
-                ...session.user,
-                role: profile?.role || 'user'
-              } as User)
+              setUser(prevUser => {
+                // Determine the new role: 
+                // 1. If we got a profile, use its role
+                // 2. If it's the same user as before, keep the existing role
+                // 3. Otherwise default to 'user'
+                const newRole = profile?.role || (prevUser?.id === session.user.id ? prevUser.role : 'user')
+
+                return {
+                  ...session.user,
+                  role: newRole
+                } as User
+              })
               localStorage.setItem('access_token', session.access_token)
             }
           } catch (profileError) {
             console.warn('[Auth] Auth change profile load failed/timed out:', profileError)
 
             if (mounted) {
-              // PRESERVE ROLE: If we already have a user with the same ID, keep their role
-              // instead of overwriting with 'user' on transient errors.
-              // This fixes the "Admin tab disappears" issue.
-              const existingRole = user?.id === session.user.id ? user.role : 'user'
-
-              setUser({
-                ...session.user,
-                role: existingRole
-              } as User)
+              setUser(prevUser => {
+                const existingRole = prevUser?.id === session.user.id ? prevUser.role : 'user'
+                return {
+                  ...session.user,
+                  role: existingRole
+                } as User
+              })
               localStorage.setItem('access_token', session.access_token)
             }
           }
