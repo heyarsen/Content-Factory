@@ -564,7 +564,7 @@ router.get('/check-status/:orderReference', authenticate, async (req: AuthReques
         .select('*')
         .eq('payment_id', orderReference)
         .eq('user_id', userId)
-        .single()
+        .maybeSingle()
 
       if (!subscription) {
         console.log('[Credits API] Subscription not found for order:', orderReference)
@@ -579,44 +579,31 @@ router.get('/check-status/:orderReference', authenticate, async (req: AuthReques
       })
 
       if (statusResponse.orderStatus === 'Approved' && subscription.payment_status !== 'completed') {
-        // Payment was approved, activate subscription
-        console.log('[Credits API] Payment approved, activating subscription')
-        try {
-          await SubscriptionService.activateSubscription(userId, orderReference)
-          console.log('[Credits API] Subscription activated successfully')
+        await SubscriptionService.activateSubscription(userId, orderReference)
 
-          // Fetch updated subscription
-          const { data: updatedSubscription } = await supabase
-            .from('user_subscriptions')
-            .select('*')
-            .eq('payment_id', orderReference)
-            .eq('user_id', userId)
-            .single()
+        // Fetch updated subscription after activation
+        const { data: updatedSub } = await supabase
+          .from('user_subscriptions')
+          .select('*')
+          .eq('payment_id', orderReference)
+          .single()
 
-          return res.json({
-            orderReference: statusResponse.orderReference,
-            status: 'completed',
-            amount: statusResponse.amount,
-            currency: statusResponse.currency,
-            type: 'subscription',
-            subscription: updatedSubscription,
-          })
-        } catch (activateError: any) {
-          console.error('[Credits API] Error activating subscription:', activateError)
-          return res.status(500).json({
-            error: 'Failed to activate subscription',
-            details: activateError.message
-          })
-        }
+        const credits = await CreditsService.getUserCredits(userId)
+
+        return res.json({
+          status: statusResponse.orderStatus,
+          subscription: updatedSub,
+          credits,
+          completed: true
+        })
       }
 
-      res.json({
-        orderReference: statusResponse.orderReference,
+      const credits = await CreditsService.getUserCredits(userId)
+      return res.json({
         status: statusResponse.orderStatus,
-        amount: statusResponse.amount,
-        currency: statusResponse.currency,
-        type: 'subscription',
         subscription,
+        credits,
+        completed: subscription.payment_status === 'completed'
       })
     } else {
       // Handle top-up status check
@@ -625,7 +612,7 @@ router.get('/check-status/:orderReference', authenticate, async (req: AuthReques
         .select('*')
         .eq('payment_id', orderReference)
         .eq('user_id', userId)
-        .single()
+        .maybeSingle()
 
       if (!transaction) {
         return res.status(404).json({ error: 'Transaction not found' })
@@ -653,15 +640,20 @@ router.get('/check-status/:orderReference', authenticate, async (req: AuthReques
               amount: packageData.credits,
             })
             .eq('id', transaction.id)
+
+          return res.json({
+            status: statusResponse.orderStatus,
+            credits: balanceAfter,
+            completed: true
+          })
         }
       }
 
-      res.json({
-        orderReference: statusResponse.orderReference,
+      const credits = await CreditsService.getUserCredits(userId)
+      return res.json({
         status: statusResponse.orderStatus,
-        amount: statusResponse.amount,
-        currency: statusResponse.currency,
-        type: 'topup',
+        credits,
+        completed: transaction.payment_status === 'completed'
       })
     }
   } catch (error: any) {

@@ -210,17 +210,21 @@ import { ErrorBoundary } from './components/ui/ErrorBoundary'
 
 // ... imports
 
+import { CreditProvider } from './contexts/CreditContext'
+
 function App() {
   return (
     <ErrorBoundary>
       <BrowserRouter>
         <LanguageProvider>
           <AuthProvider>
-            <NotificationProvider>
-              <BillingGateProvider>
-                <AppContent />
-              </BillingGateProvider>
-            </NotificationProvider>
+            <CreditProvider>
+              <NotificationProvider>
+                <BillingGateProvider>
+                  <AppContent />
+                </BillingGateProvider>
+              </NotificationProvider>
+            </CreditProvider>
           </AuthProvider>
         </LanguageProvider>
       </BrowserRouter>

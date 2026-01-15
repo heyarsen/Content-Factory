@@ -4,16 +4,34 @@ export interface DashboardStats {
     users: {
         total: number
         new: number
+        active: number
+    }
+    subscriptions: {
+        total: number
+        byPlan: Record<string, number>
+        revenue: number
     }
     videos: {
         total: number
         new: number
+        revenue: number
+    }
+    videos: {
+        total: number
+        new: number
+        processing: number
     }
     credits: {
         totalSpent: number
         totalPurchased: number
     }
     timestamp: string
+}
+
+interface SubscriptionData {
+    plan_id: string
+    status: string
+    price_paid: number
 }
 
 export class AdminService {
@@ -50,35 +68,47 @@ export class AdminService {
 
         const startISO = startDate?.toISOString()
 
-        // 1. Users count
+        // 1. Users stats
         const { count: totalUsers } = await supabase
             .from('user_profiles')
             .select('*', { count: 'exact', head: true })
 
-        const usersQuery = supabase
+        const { count: newUsers } = await supabase
             .from('user_profiles')
             .select('*', { count: 'exact', head: true })
+            .gte('created_at', startISO || '1970-01-01')
 
-        if (startISO) {
-            usersQuery.gte('created_at', startISO)
+        // 2. Subscriptions stats
+        const { data: subs } = await supabase
+            .from('user_subscriptions')
+            .select('plan_id, status, price_paid')
+            .eq('status', 'active')
+
+        const byPlan: Record<string, number> = {}
+        let revenue = 0
+        if (subs) {
+            (subs as any[]).forEach((s: SubscriptionData) => {
+                byPlan[s.plan_id] = (byPlan[s.plan_id] || 0) + 1
+                revenue += (s.price_paid || 0)
+            })
         }
-        const { count: newUsers } = await usersQuery
 
-        // 2. Videos count
+        // 3. Videos stats
         const { count: totalVideos } = await supabase
             .from('videos')
             .select('*', { count: 'exact', head: true })
 
-        const videosQuery = supabase
+        const { count: newVideos } = await supabase
             .from('videos')
             .select('*', { count: 'exact', head: true })
+            .gte('created_at', startISO || '1970-01-01')
 
-        if (startISO) {
-            videosQuery.gte('created_at', startISO)
-        }
-        const { count: newVideos } = await videosQuery
+        const { count: processingVideos } = await supabase
+            .from('videos')
+            .select('*', { count: 'exact', head: true })
+            .in('status', ['pending', 'processing', 'generating'])
 
-        // 3. Credits stats
+        // 4. Credits stats
         const creditsQuery = supabase
             .from('credit_transactions')
             .select('amount, type')
@@ -93,10 +123,11 @@ export class AdminService {
 
         if (transactions) {
             transactions.forEach((t: any) => {
+                const amount = Math.abs(t.amount)
                 if (t.type === 'usage' || (t.type === 'adjustment' && t.amount < 0)) {
-                    totalSpent += Math.abs(t.amount)
+                    totalSpent += amount
                 } else if (t.type === 'topup' || t.type === 'subscription' || (t.type === 'adjustment' && t.amount > 0)) {
-                    totalPurchased += t.amount
+                    totalPurchased += amount
                 }
             })
         }
@@ -104,11 +135,18 @@ export class AdminService {
         return {
             users: {
                 total: totalUsers || 0,
-                new: newUsers || 0
+                new: newUsers || 0,
+                active: totalUsers || 0 // Simplified for now
+            },
+            subscriptions: {
+                total: subs?.length || 0,
+                byPlan,
+                revenue
             },
             videos: {
                 total: totalVideos || 0,
-                new: newVideos || 0
+                new: newVideos || 0,
+                processing: processingVideos || 0
             },
             credits: {
                 totalSpent,

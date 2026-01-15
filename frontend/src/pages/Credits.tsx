@@ -286,11 +286,12 @@ export function Credits() {
     }
   }
 
-  const checkPaymentStatus = async (orderReference: string) => {
+  const checkPaymentStatus = async (orderReference: string, attempts = 0) => {
     try {
       const response = await api.get(`/api/credits/check-status/${orderReference}`)
-      const status = response.data.status
-      if (status === 'Approved' || status === 'completed') {
+      const { status, completed } = response.data
+
+      if (status === 'Approved' || status === 'completed' || completed) {
         addNotification({
           type: 'success',
           title: t('credits.payment_success'),
@@ -299,11 +300,24 @@ export function Credits() {
         refreshCredits()
         loadTransactionHistory()
         loadSubscriptionStatus()
+      } else if (attempts < 5) {
+        // If not approved yet, try again in 3 seconds (up to 5 times)
+        setTimeout(() => checkPaymentStatus(orderReference, attempts + 1), 3000)
+
+        // Only show "processing" on the first attempt
+        if (attempts === 0) {
+          addNotification({
+            type: 'info',
+            title: t('credits.payment_processing'),
+            message: t('credits.payment_processing_msg'),
+          })
+        }
       } else {
+        // Final attempt failed to get Approved
         addNotification({
-          type: 'info',
+          type: 'warning',
           title: t('credits.payment_processing'),
-          message: t('credits.payment_processing_msg'),
+          message: t('credits.payment_processing_msg_long') || t('credits.payment_processing_msg'),
         })
       }
     } catch (error: any) {

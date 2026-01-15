@@ -21,10 +21,17 @@ interface AdminStats {
   users: {
     total: number
     new: number
+    active: number
+  }
+  subscriptions: {
+    total: number
+    byPlan: Record<string, number>
+    revenue: number
   }
   videos: {
     total: number
     new: number
+    processing: number
   }
   credits: {
     totalSpent: number
@@ -179,15 +186,33 @@ export function AdminPanel() {
           </Card>
 
           <Card className="relative overflow-hidden">
+            <div className="absolute -right-12 -top-12 h-36 w-36 rounded-full bg-indigo-100/60 blur-3xl" />
+            <div className="relative z-10 flex items-start justify-between">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Active Subscriptions</p>
+                <div className="mt-3 flex items-baseline gap-2">
+                  <p className="text-4xl font-semibold text-primary">{stats?.subscriptions.total || 0}</p>
+                  <span className="text-xs font-medium text-brand-600">${stats?.subscriptions.revenue.toFixed(2)} rev.</span>
+                </div>
+              </div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+            </div>
+          </Card>
+
+          <Card className="relative overflow-hidden">
             <div className="absolute -right-12 -top-12 h-36 w-36 rounded-full bg-purple-100/60 blur-3xl" />
             <div className="relative z-10 flex items-start justify-between">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Total Videos</p>
                 <div className="mt-3 flex items-baseline gap-2">
                   <p className="text-4xl font-semibold text-primary">{stats?.videos.total || 0}</p>
-                  {stats?.videos.new !== undefined && stats.videos.new > 0 && (
+                  {stats?.videos.processing ? (
+                    <span className="text-xs font-medium text-amber-600">{stats.videos.processing} processing</span>
+                  ) : stats?.videos.new ? (
                     <span className="text-xs font-medium text-green-600">+{stats.videos.new} new</span>
-                  )}
+                  ) : null}
                 </div>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-purple-600">
@@ -197,27 +222,17 @@ export function AdminPanel() {
           </Card>
 
           <Card className="relative overflow-hidden">
-            <div className="absolute -right-12 -top-12 h-36 w-36 rounded-full bg-green-100/60 blur-3xl" />
+            <div className="absolute -right-12 -top-12 h-36 w-36 rounded-full bg-emerald-100/60 blur-3xl" />
             <div className="relative z-10 flex items-start justify-between">
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Credits Purchased</p>
-                <p className="mt-3 text-4xl font-semibold text-primary">{stats?.credits.totalPurchased || 0}</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Credits Usage</p>
+                <div className="mt-3">
+                  <p className="text-4xl font-semibold text-primary">{stats?.credits.totalPurchased || 0}</p>
+                  <p className="text-[10px] font-medium text-slate-400">Spent: {stats?.credits.totalSpent || 0}</p>
+                </div>
               </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-green-50 text-green-600">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
                 <BarChart3 className="h-5 w-5" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="relative overflow-hidden">
-            <div className="absolute -right-12 -top-12 h-36 w-36 rounded-full bg-amber-100/60 blur-3xl" />
-            <div className="relative z-10 flex items-start justify-between">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Credits Spent</p>
-                <p className="mt-3 text-4xl font-semibold text-primary">{stats?.credits.totalSpent || 0}</p>
-              </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
-                <ShieldCheck className="h-5 w-5" />
               </div>
             </div>
           </Card>
