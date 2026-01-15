@@ -6,8 +6,10 @@ import { Input } from '../components/ui/Input'
 import { Card } from '../components/ui/Card'
 import { Eye, EyeOff } from 'lucide-react'
 import api from '../lib/api'
+import { useLanguage } from '../contexts/LanguageContext'
 
 export function Signup() {
+  const { t } = useLanguage()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -23,7 +25,7 @@ export function Signup() {
 
   const handleResendVerification = async () => {
     if (!email) {
-      setError('Please enter your email address')
+      setError(t('auth.enter_email_error'))
       return
     }
 
@@ -33,7 +35,7 @@ export function Signup() {
       await api.post('/api/auth/verify-email', { email })
       setSuccess(true)
     } catch (resendErr: any) {
-      setError(resendErr.response?.data?.error || 'Failed to resend verification email')
+      setError(resendErr.response?.data?.error || t('auth.resend_failed'))
     } finally {
       setResending(false)
     }
@@ -44,12 +46,12 @@ export function Signup() {
     setError('')
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match')
+      setError(t('auth.passwords_not_match'))
       return
     }
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters')
+      setError(t('auth.password_too_short'))
       return
     }
 
@@ -61,8 +63,7 @@ export function Signup() {
       setErr(null)
     } catch (signupErr: any) {
       setErr(signupErr)
-      setError(signupErr.response?.data?.error || signupErr.response?.data?.message || 'Failed to sign up')
-      // Don't clear password on error - keep it so user can see what they typed
+      setError(signupErr.response?.data?.error || signupErr.response?.data?.message || t('auth.signup_failed'))
     } finally {
       setLoading(false)
     }
@@ -81,12 +82,12 @@ export function Signup() {
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-brand-500 text-white shadow-md">
               <span className="text-xl font-semibold">?</span>
             </div>
-            <h1 className="mt-6 text-3xl font-semibold text-primary">Check your inbox</h1>
+            <h1 className="mt-6 text-3xl font-semibold text-primary">{t('auth.check_inbox')}</h1>
             <p className="mt-3 text-sm text-slate-500">
-              We just sent a verification email to <span className="font-semibold text-primary">{email}</span>. Click the link to confirm your account and start shipping content.
+              {t('auth.verification_sent', { email })}
             </p>
             <Button onClick={() => navigate('/login')} className="mt-8 w-full">
-              Back to sign in
+              {t('auth.back_to_sign_in')}
             </Button>
           </Card>
         </div>
@@ -106,25 +107,25 @@ export function Signup() {
           <div className="hidden flex-col justify-between rounded-[32px] border border-white/40 bg-white/80 p-10 shadow-[0_55px_120px_-70px_rgba(79,70,229,0.8)] backdrop-blur-xl lg:flex">
             <div className="space-y-6">
               <div className="inline-flex items-center gap-3 rounded-2xl border border-white/50 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">
-                Join the studio
+                {t('auth.signup_title')}
               </div>
-              <h1 className="text-4xl font-semibold leading-tight text-primary">Build a resilient content engine together.</h1>
+              <h1 className="text-4xl font-semibold leading-tight text-primary">{t('auth.signup_title_main')}</h1>
               <p className="text-sm text-slate-500">
-                Collaborate with your team, templatize your best work, and automate the heavy lifting so you can focus on what matters.
+                {t('auth.signup_subtitle')}
               </p>
             </div>
             <div className="grid gap-4 text-sm text-slate-500">
               <div className="flex items-center gap-3">
                 <span className="inline-flex h-2.5 w-2.5 rounded-full bg-brand-400" />
-                Collaborative workspaces with creative guardrails
+                {t('auth.feature_collaboration')}
               </div>
               <div className="flex items-center gap-3">
                 <span className="inline-flex h-2.5 w-2.5 rounded-full bg-amber-400" />
-                Smart scheduling that respects channel algorithms
+                {t('auth.feature_scheduling')}
               </div>
               <div className="flex items-center gap-3">
                 <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                Built-in compliance and approvals for enterprise-ready teams
+                {t('auth.feature_compliance')}
               </div>
             </div>
           </div>
@@ -136,8 +137,8 @@ export function Signup() {
                 <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-indigo-500 text-white shadow-md">
                   <span className="text-xl font-semibold">N</span>
                 </div>
-                <h2 className="text-2xl font-semibold text-primary">Create your account</h2>
-                <p className="text-sm text-slate-500">Invite your team, align your content, and automate delivery.</p>
+                <h2 className="text-2xl font-semibold text-primary">{t('auth.create_account_title')}</h2>
+                <p className="text-sm text-slate-500">{t('auth.create_account_desc')}</p>
               </div>
 
               {error && (
@@ -149,7 +150,7 @@ export function Signup() {
                         to="/login"
                         className="inline-flex items-center text-sm font-semibold text-brand-600 underline hover:text-brand-700"
                       >
-                        Try logging in instead
+                        {t('auth.try_logging_in')}
                       </Link>
                       <button
                         type="button"
@@ -157,7 +158,7 @@ export function Signup() {
                         disabled={resending}
                         className="block text-left text-sm font-semibold text-brand-600 underline hover:text-brand-700 disabled:opacity-60"
                       >
-                        {resending ? 'Sending?' : 'Resend verification email'}
+                        {resending ? t('auth.sending_email') : t('auth.resend_verification')}
                       </button>
                     </div>
                   )}
@@ -169,7 +170,7 @@ export function Signup() {
                   type="email"
                   id="email"
                   name="email"
-                  label="Work email"
+                  label={t('auth.email_label')}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -180,7 +181,7 @@ export function Signup() {
                     type={showPassword ? 'text' : 'password'}
                     id="password"
                     name="password"
-                    label="Password"
+                    label={t('auth.password_label')}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -191,7 +192,7 @@ export function Signup() {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-[2.625rem] -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showPassword ? t('auth.hide_password') : t('auth.show_password')}
                   >
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
@@ -201,7 +202,7 @@ export function Signup() {
                     type={showConfirmPassword ? 'text' : 'password'}
                     id="confirmPassword"
                     name="confirmPassword"
-                    label="Confirm password"
+                    label={t('auth.confirm_password_label')}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
@@ -212,14 +213,14 @@ export function Signup() {
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="absolute right-3 top-[2.625rem] -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                    aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showConfirmPassword ? t('auth.hide_password') : t('auth.show_password')}
                   >
                     {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
 
                 <Button type="submit" className="w-full" loading={loading}>
-                  Create account
+                  {t('auth.create_account_button')}
                 </Button>
               </form>
 
@@ -228,7 +229,7 @@ export function Signup() {
                   <div className="w-full border-t border-slate-200" />
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="bg-white px-2 text-slate-500">Or continue with</span>
+                  <span className="bg-white px-2 text-slate-500">{t('auth.continue_with')}</span>
                 </div>
               </div>
 
@@ -258,14 +259,14 @@ export function Signup() {
                     />
                     <path d="M1 1h22v22H1z" fill="none" />
                   </svg>
-                  Google
+                  {t('auth.google')}
                 </Button>
               </div>
 
               <p className="mt-8 text-center text-sm text-slate-500">
-                Already onboarded?{' '}
+                {t('auth.already_onboarded')}{' '}
                 <Link to="/login" className="font-semibold text-brand-600 hover:text-brand-700">
-                  Sign in
+                  {t('auth.sign_in')}
                 </Link>
               </p>
             </div>

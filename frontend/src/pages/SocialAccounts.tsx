@@ -9,6 +9,7 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { Modal } from '../components/ui/Modal'
 import { Users, Link2, X, Instagram, Youtube, Facebook, Share2 } from 'lucide-react'
 import api from '../lib/api'
+import { useLanguage } from '../contexts/LanguageContext'
 
 interface SocialAccount {
   id: string
@@ -45,6 +46,7 @@ const platformNames = {
 }
 
 export function SocialAccounts() {
+  const { t } = useLanguage()
   const [accounts, setAccounts] = useState<SocialAccount[]>([])
   const [loading, setLoading] = useState(true)
   const [connectingPlatform, setConnectingPlatform] = useState<SocialAccount['platform'] | null>(null)
@@ -72,7 +74,7 @@ export function SocialAccounts() {
 
     if (connectedPlatform) {
       const platformLabel = platformNames[connectedPlatform] || connectedPlatform
-      alert(`Success! ${platformLabel} connected successfully.`)
+      alert(t('social_accounts.connect_success').replace('{platform}', platformLabel))
 
       const nextParams = new URLSearchParams(searchParams)
       nextParams.delete('connected')
@@ -136,17 +138,17 @@ export function SocialAccounts() {
     } catch (error: any) {
       console.error('Failed to connect:', error)
       const status = error.response?.status
-      let errorMessage = error.response?.data?.error || 
-                        error.response?.data?.details || 
-                        error.message || 
-                        'Failed to initiate connection'
-      
+      let errorMessage = error.response?.data?.error ||
+        error.response?.data?.details ||
+        error.message ||
+        t('social_accounts.initiate_failed')
+
       // Handle 429 rate limit specifically
       if (status === 429) {
         const retryAfter = error.response?.data?.retryAfter || 60
-        errorMessage = `Rate limit exceeded. Please wait ${retryAfter} seconds before trying again.`
+        errorMessage = t('social_accounts.rate_limit_error').replace('{seconds}', retryAfter.toString())
       }
-      
+
       console.error('Error details:', {
         message: errorMessage,
         fullResponse: error.response?.data,
@@ -178,7 +180,7 @@ export function SocialAccounts() {
       error: 'error',
       pending: 'default',
     }
-    return <Badge variant={variants[status] || 'default'}>{status}</Badge>
+    return <Badge variant={variants[status] || 'default'}>{t(`video_planning.${status}`)}</Badge>
   }
 
   const allPlatforms = ['instagram', 'tiktok', 'youtube', 'facebook', 'x', 'linkedin', 'pinterest', 'threads'] as const
@@ -206,18 +208,18 @@ export function SocialAccounts() {
     <Layout>
       <div className="space-y-10">
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Distribution</p>
-          <h1 className="text-3xl font-semibold text-primary">Social accounts</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('social_accounts.distribution')}</p>
+          <h1 className="text-3xl font-semibold text-primary">{t('social_accounts.title')}</h1>
           <p className="text-sm text-slate-500">
-            Connect channels to push finished videos live automatically. Secure OAuth flows keep credentials safe.
+            {t('social_accounts.subtitle')}
           </p>
         </div>
 
         {accounts.length === 0 && availablePlatforms.length === 0 ? (
           <EmptyState
             icon={<Users className="w-16 h-16" />}
-            title="No social accounts connected"
-            description="Connect your social media accounts to start posting your videos automatically."
+            title={t('social_accounts.no_accounts_title')}
+            description={t('social_accounts.no_accounts_desc')}
           />
         ) : (
           <div className="grid gap-6 md:grid-cols-2">
@@ -239,13 +241,13 @@ export function SocialAccounts() {
                       </div>
                     </div>
                     {isConnected && (
-                      <span className="text-xs font-medium uppercase tracking-wide text-emerald-500/80">Synced</span>
+                      <span className="text-xs font-medium uppercase tracking-wide text-emerald-500/80">{t('social_accounts.synced')}</span>
                     )}
                   </div>
 
                   {account?.status === 'pending' && (
                     <div className="rounded-2xl border border-amber-200/70 bg-amber-50/70 px-4 py-3 text-xs text-amber-600">
-                      Finish linking in the connection portal. If you closed it, click Connect again to reopen or use the saved link.
+                      {t('social_accounts.finish_linking')}
                     </div>
                   )}
 
@@ -254,8 +256,8 @@ export function SocialAccounts() {
                       {account.account_info && (account.account_info.username || account.account_info.avatar_url) && (
                         <div className="flex items-center gap-3 rounded-2xl border border-white/60 bg-white/70 px-4 py-3">
                           {account.account_info.avatar_url && (
-                            <img 
-                              src={account.account_info.avatar_url} 
+                            <img
+                              src={account.account_info.avatar_url}
                               alt={account.account_info.display_name || account.account_info.username || platformNames[platform]}
                               className="h-8 w-8 rounded-full object-cover"
                               onError={(e) => {
@@ -279,7 +281,7 @@ export function SocialAccounts() {
                         </div>
                       )}
                       <div className="rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-xs text-slate-500">
-                        Connected on {new Date(account.connected_at).toLocaleDateString()}.
+                        {t('social_accounts.connected_on').replace('{date}', new Date(account.connected_at).toLocaleDateString())}
                       </div>
                     </div>
                   )}
@@ -293,7 +295,7 @@ export function SocialAccounts() {
                         className="w-full border border-rose-200 bg-rose-50/70 text-rose-600 hover:border-rose-300 hover:bg-rose-50"
                       >
                         <X className="mr-2 h-4 w-4" />
-                        Disconnect
+                        {t('social_accounts.disconnect')}
                       </Button>
                     ) : (
                       <Button
@@ -304,7 +306,7 @@ export function SocialAccounts() {
                         className="w-full"
                       >
                         <Link2 className="mr-2 h-4 w-4" />
-                        Connect
+                        {t('social_accounts.connect')}
                       </Button>
                     )}
                   </div>
@@ -318,11 +320,11 @@ export function SocialAccounts() {
         <Modal
           isOpen={disconnectModal !== null}
           onClose={() => setDisconnectModal(null)}
-          title="Disconnect Account"
+          title={t('social_accounts.disconnect_title')}
           size="sm"
         >
           <p className="mb-4 text-sm text-slate-500">
-            Are you sure you want to disconnect this account? You won't be able to post to this platform until you reconnect.
+            {t('social_accounts.disconnect_confirm')}
           </p>
           <div className="flex gap-3 justify-end">
             <Button
@@ -330,14 +332,14 @@ export function SocialAccounts() {
               className="border border-white/60 bg-white/70 text-slate-500 hover:border-slate-200 hover:bg-white"
               onClick={() => setDisconnectModal(null)}
             >
-              Cancel
+              {t('social_accounts.cancel')}
             </Button>
             <Button
               variant="danger"
               onClick={() => disconnectModal && handleDisconnect(disconnectModal)}
               loading={disconnecting}
             >
-              Disconnect
+              {t('social_accounts.disconnect')}
             </Button>
           </div>
         </Modal>

@@ -11,6 +11,7 @@ import api from '../lib/api'
 import { useNotifications } from '../contexts/NotificationContext'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useLanguage } from '../contexts/LanguageContext'
 
 interface Ticket {
     id: string
@@ -31,6 +32,7 @@ interface Message {
 }
 
 export function Support() {
+    const { t } = useLanguage()
     const [tickets, setTickets] = useState<Ticket[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedTicket, setSelectedTicket] = useState<{ ticket: Ticket, messages: Message[] } | null>(null)
@@ -149,8 +151,8 @@ export function Support() {
             await api.post('/api/support/tickets', { subject, message, priority: 'medium' })
             addNotification({
                 type: 'success',
-                title: 'Ticket Created',
-                message: 'Your support ticket has been created successfully.',
+                title: t('support.ticket_created_title'),
+                message: t('support.ticket_created_msg'),
             })
             setSubject('')
             setMessage('')
@@ -160,8 +162,8 @@ export function Support() {
             console.error('Failed to create ticket:', error)
             addNotification({
                 type: 'error',
-                title: 'Error',
-                message: 'Failed to create support ticket.',
+                title: t('support.error_title'),
+                message: t('support.error_msg'),
             })
         } finally {
             setSending(false)
@@ -189,10 +191,10 @@ export function Support() {
 
     const getStatusBadge = (status: string) => {
         switch (status) {
-            case 'open': return <Badge variant="info">Open</Badge>
-            case 'in_progress': return <Badge variant="warning">In Progress</Badge>
-            case 'resolved': return <Badge variant="success">Resolved</Badge>
-            case 'closed': return <Badge variant="default">Closed</Badge>
+            case 'open': return <Badge variant="info">{t('support.status_open')}</Badge>
+            case 'in_progress': return <Badge variant="warning">{t('support.status_in_progress')}</Badge>
+            case 'resolved': return <Badge variant="success">{t('support.status_resolved')}</Badge>
+            case 'closed': return <Badge variant="default">{t('support.status_closed')}</Badge>
             default: return <Badge variant="default">{status}</Badge>
         }
     }
@@ -203,12 +205,12 @@ export function Support() {
                 {/* Sidebar - Ticket List */}
                 <div className="flex w-1/3 flex-col gap-4 overflow-hidden">
                     <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-semibold text-primary">Support Tickets</h2>
+                        <h2 className="text-xl font-semibold text-primary">{t('support.title')}</h2>
                         <div className="flex gap-2">
-                            <Button variant="ghost" size="sm" onClick={markAllSupportAsRead}>Mark all read</Button>
+                            <Button variant="ghost" size="sm" onClick={markAllSupportAsRead}>{t('support.mark_all_read')}</Button>
                             <Button size="sm" onClick={() => { setShowCreate(true); setSelectedTicket(null); }}>
                                 <Plus className="mr-2 h-4 w-4" />
-                                New Ticket
+                                {t('support.new_ticket')}
                             </Button>
                         </div>
                     </div>
@@ -221,7 +223,7 @@ export function Support() {
                         ) : tickets.length === 0 ? (
                             <div className="flex flex-col items-center justify-center p-10 text-center">
                                 <MessageSquare className="mb-4 h-12 w-12 text-slate-200" />
-                                <p className="text-sm text-slate-500">No support tickets found.</p>
+                                <p className="text-sm text-slate-500">{t('support.no_tickets')}</p>
                             </div>
                         ) : (
                             <div className="divide-y divide-slate-100">
@@ -238,7 +240,7 @@ export function Support() {
                                         <p className="font-medium text-slate-900 line-clamp-1">{ticket.subject}</p>
                                         <div className="mt-2 flex items-center text-xs text-slate-400">
                                             <Clock className="mr-1 h-3 w-3" />
-                                            Updated {new Date(ticket.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            {t('support.updated')} {new Date(ticket.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </div>
                                     </button>
                                 ))}
@@ -251,21 +253,21 @@ export function Support() {
                 <div className="flex flex-1 flex-col overflow-hidden">
                     {showCreate ? (
                         <Card className="flex h-full flex-col">
-                            <h3 className="mb-6 text-xl font-semibold text-primary">Create Support Ticket</h3>
+                            <h3 className="mb-6 text-xl font-semibold text-primary">{t('support.new_ticket')}</h3>
                             <form onSubmit={handleCreateTicket} className="space-y-4">
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-slate-700">Subject</label>
+                                    <label className="text-sm font-medium text-slate-700">{t('support.subject')}</label>
                                     <Input
-                                        placeholder="Briefly describe your issue"
+                                        placeholder={t('support.subject_placeholder')}
                                         value={subject}
                                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSubject(e.target.value)}
                                         required
                                     />
                                 </div>
                                 <div className="space-y-2 flex-1">
-                                    <label className="text-sm font-medium text-slate-700">Message</label>
+                                    <label className="text-sm font-medium text-slate-700">{t('support.message')}</label>
                                     <Textarea
-                                        placeholder="Tell us more details about what's happening..."
+                                        placeholder={t('support.message_placeholder')}
                                         value={message}
                                         onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setMessage(e.target.value)}
                                         className="min-h-[200px]"
@@ -273,8 +275,8 @@ export function Support() {
                                     />
                                 </div>
                                 <div className="flex justify-end gap-3 pt-4">
-                                    <Button variant="ghost" onClick={() => setShowCreate(false)}>Cancel</Button>
-                                    <Button type="submit" loading={sending}>Submit Ticket</Button>
+                                    <Button variant="ghost" onClick={() => setShowCreate(false)}>{t('common.cancel')}</Button>
+                                    <Button type="submit" loading={sending}>{t('support.submit_ticket')}</Button>
                                 </div>
                             </form>
                         </Card>
@@ -285,7 +287,7 @@ export function Support() {
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <h3 className="text-lg font-semibold text-primary">{selectedTicket.ticket.subject}</h3>
-                                        <p className="text-xs text-slate-400">Ticket ID: {selectedTicket.ticket.id}</p>
+                                        <p className="text-xs text-slate-400">{t('support.ticket_id')}: {selectedTicket.ticket.id}</p>
                                     </div>
                                     {getStatusBadge(selectedTicket.ticket.status)}
                                 </div>
@@ -309,7 +311,7 @@ export function Support() {
                             <div className="border-t border-slate-100 p-4">
                                 <form onSubmit={handleSendReply} className="flex gap-2">
                                     <Input
-                                        placeholder="Type your reply here..."
+                                        placeholder={t('support.reply_placeholder')}
                                         value={reply}
                                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => setReply(e.target.value)}
                                         disabled={selectedTicket.ticket.status === 'resolved' || selectedTicket.ticket.status === 'closed'}
@@ -320,7 +322,7 @@ export function Support() {
                                 </form>
                                 {(selectedTicket.ticket.status === 'resolved' || selectedTicket.ticket.status === 'closed') && (
                                     <p className="mt-2 text-center text-xs text-slate-400 italic">
-                                        This ticket is {selectedTicket.ticket.status} and cannot be replied to.
+                                        {t('support.closed_message').replace('{status}', t(`support.status_${selectedTicket.ticket.status}`))}
                                     </p>
                                 )}
                             </div>
@@ -330,9 +332,9 @@ export function Support() {
                             <div className="rounded-full bg-slate-50 p-6">
                                 <MessageSquare className="h-12 w-12 text-slate-300" />
                             </div>
-                            <h3 className="mt-4 text-lg font-semibold text-primary">Select a ticket</h3>
+                            <h3 className="mt-4 text-lg font-semibold text-primary">{t('support.select_ticket')}</h3>
                             <p className="mx-auto mt-2 max-w-xs text-sm text-slate-500">
-                                Choose a ticket from the left or create a new one to communicate with our support team.
+                                {t('support.select_ticket_desc')}
                             </p>
                         </div>
                     )}

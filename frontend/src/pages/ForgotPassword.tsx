@@ -4,8 +4,10 @@ import { useAuth } from '../contexts/AuthContext'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { Card } from '../components/ui/Card'
+import { useLanguage } from '../contexts/LanguageContext'
 
 export function ForgotPassword() {
+  const { t } = useLanguage()
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
@@ -21,7 +23,7 @@ export function ForgotPassword() {
       await resetPassword(email)
       setSuccess(true)
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to send reset email')
+      setError(err.response?.data?.error || t('auth.signup_failed')) // Fallback for reset failed
     } finally {
       setLoading(false)
     }
@@ -40,12 +42,12 @@ export function ForgotPassword() {
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-brand-500 text-white shadow-md">
               <span className="text-xl font-semibold">?</span>
             </div>
-            <h1 className="mt-6 text-3xl font-semibold text-primary">Check your email</h1>
+            <h1 className="mt-6 text-3xl font-semibold text-primary">{t('auth.reset_email_sent_title')}</h1>
             <p className="mt-3 text-sm text-slate-500">
-              We just sent a password reset link to <span className="font-semibold text-primary">{email}</span>. Use it within the next 20 minutes to choose a new password.
+              {t('auth.reset_email_sent_msg', { email })}
             </p>
             <Link to="/login">
-              <Button className="mt-8 w-full">Back to sign in</Button>
+              <Button className="mt-8 w-full">{t('auth.back_to_sign_in')}</Button>
             </Link>
           </Card>
         </div>
@@ -66,8 +68,8 @@ export function ForgotPassword() {
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-indigo-500 text-white shadow-md">
               <span className="text-xl font-semibold">N</span>
             </div>
-            <h1 className="text-2xl font-semibold text-primary">Reset your password</h1>
-            <p className="text-sm text-slate-500">We&apos;ll email you a secure link to pick a new password.</p>
+            <h1 className="text-2xl font-semibold text-primary">{t('auth.reset_password_title')}</h1>
+            <p className="text-sm text-slate-500">{t('auth.reset_password_desc')}</p>
           </div>
 
           {error && (
@@ -81,7 +83,7 @@ export function ForgotPassword() {
               type="email"
               id="email"
               name="email"
-              label="Work email"
+              label={t('auth.email_label')}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -89,13 +91,13 @@ export function ForgotPassword() {
             />
 
             <Button type="submit" className="w-full" loading={loading}>
-              Send reset link
+              {t('auth.send_reset_link')}
             </Button>
           </form>
 
           <p className="mt-8 text-center text-sm text-slate-500">
             <Link to="/login" className="font-semibold text-brand-600 hover:text-brand-700">
-              Back to sign in
+              {t('auth.back_to_sign_in')}
             </Link>
           </p>
         </Card>

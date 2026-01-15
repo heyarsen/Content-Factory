@@ -131,7 +131,7 @@ export function Dashboard() {
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{t('dashboard.total_videos')}</p>
                 <p className="mt-3 text-4xl font-semibold text-primary">{videoStats?.total || 0}</p>
-                <p className="mt-2 text-xs text-slate-400">{t('dashboard.total_videos_desc') || 'Across all styles and formats'}</p>
+                <p className="mt-2 text-xs text-slate-400">{t('dashboard.total_videos_desc')}</p>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
                 <Video className="h-5 w-5" />
@@ -149,7 +149,7 @@ export function Dashboard() {
                 </div>
                 <Badge variant="success">Live</Badge>
               </div>
-              <p className="mt-4 text-xs text-slate-400">{t('dashboard.completed_desc') || 'Ready to publish or distribute'}</p>
+              <p className="mt-4 text-xs text-slate-400">{t('dashboard.completed_desc')}</p>
             </div>
           </Card>
 
@@ -163,7 +163,7 @@ export function Dashboard() {
                 </div>
                 <Badge variant="info">In flight</Badge>
               </div>
-              <p className="mt-4 text-xs text-slate-400">{t('dashboard.generating_desc') || 'AI renderings actively producing assets'}</p>
+              <p className="mt-4 text-xs text-slate-400">{t('dashboard.generating_desc')}</p>
             </div>
           </Card>
 
@@ -178,7 +178,7 @@ export function Dashboard() {
                 <Calendar className="h-5 w-5 text-amber-500" />
               </div>
               <p className="mt-4 text-xs text-slate-400">
-                {postStats?.posted || 0} {t('dashboard.posted_desc') || 'published automatically last cycle'}
+                {postStats?.posted || 0} {t('dashboard.posted_desc')}
               </p>
             </div>
           </Card>
@@ -188,9 +188,9 @@ export function Dashboard() {
           <Card className="relative overflow-hidden">
             <div className="absolute inset-x-8 top-0 h-32 rounded-3xl bg-gradient-to-r from-brand-100/70 via-brand-50/50 to-transparent blur-3xl" />
             <div className="relative z-10">
-              <h2 className="text-lg font-semibold text-primary">Quick actions</h2>
+              <h2 className="text-lg font-semibold text-primary">{t('dashboard.quick_actions')}</h2>
               <p className="mt-2 text-sm text-slate-500">
-                Create new videos, connect social accounts, and schedule posts all from one place.
+                {t('dashboard.quick_actions_desc')}
               </p>
 
               <div className="mt-6 grid gap-4">
@@ -203,11 +203,11 @@ export function Dashboard() {
                       <Zap className="h-5 w-5" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-primary">Create Video</p>
-                      <p className="text-xs text-slate-400">Create videos in 3 simple steps</p>
+                      <p className="text-sm font-semibold text-primary">{t('dashboard.create_video')}</p>
+                      <p className="text-xs text-slate-400">{t('dashboard.create_video_desc')}</p>
                     </div>
                   </div>
-                  <span className="text-sm font-semibold text-brand-600 opacity-0 transition group-hover:opacity-100">Start {'->'}</span>
+                  <span className="text-sm font-semibold text-brand-600 opacity-0 transition group-hover:opacity-100">{t('common.start')} {'->'}</span>
                 </Link>
 
                 <Link
@@ -219,11 +219,11 @@ export function Dashboard() {
                       <Users className="h-5 w-5" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-primary">Connect social accounts</p>
-                      <p className="text-xs text-slate-400">Sync destinations for automated posting</p>
+                      <p className="text-sm font-semibold text-primary">{t('dashboard.connect_social')}</p>
+                      <p className="text-xs text-slate-400">{t('dashboard.connect_social_desc')}</p>
                     </div>
                   </div>
-                  <span className="text-sm font-semibold text-brand-600 opacity-0 transition group-hover:opacity-100">Manage {'->'}</span>
+                  <span className="text-sm font-semibold text-brand-600 opacity-0 transition group-hover:opacity-100">{t('common.manage')} {'->'}</span>
                 </Link>
               </div>
             </div>
@@ -233,12 +233,12 @@ export function Dashboard() {
             <div className="absolute inset-x-12 top-0 h-28 rounded-3xl bg-gradient-to-r from-slate-200/70 via-slate-100/50 to-transparent blur-3xl" />
             <div className="relative z-10 h-full">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-primary">Recent activity</h2>
-                <Badge variant="default">Live feed</Badge>
+                <h2 className="text-lg font-semibold text-primary">{t('dashboard.recent_activity')}</h2>
+                <Badge variant="default">{t('dashboard.live_feed')}</Badge>
               </div>
               <div className="mt-6 space-y-4 text-sm text-slate-500">
-                <p>No new automation alerts in the last 24 hours.</p>
-                <p className="text-xs text-slate-400">Keep shipping! Activity will populate here as audiences engage.</p>
+                <p>{t('dashboard.no_activity')}</p>
+                <p className="text-xs text-slate-400">{t('dashboard.keep_shipping')}</p>
               </div>
             </div>
           </Card>

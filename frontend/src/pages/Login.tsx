@@ -5,8 +5,10 @@ import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { Card } from '../components/ui/Card'
 import { Eye, EyeOff } from 'lucide-react'
+import { useLanguage } from '../contexts/LanguageContext'
 
 export function Login() {
+  const { t } = useLanguage()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -37,7 +39,7 @@ export function Login() {
         }
       } catch (healthError) {
         console.error('Backend health check failed:', healthError)
-        setError(`Unable to connect to server at ${API_URL}. Please ensure the backend server is running.`)
+        setError(t('auth.server_error'))
         setLoading(false)
         return
       }
@@ -46,18 +48,9 @@ export function Login() {
       navigate('/dashboard')
     } catch (err: any) {
       console.error('Login error:', err)
-      console.error('Login error details:', {
-        message: err.message,
-        response: err.response?.data,
-        status: err.response?.status,
-        statusText: err.response?.statusText,
-        url: err.config?.url,
-        baseURL: err.config?.baseURL,
-        fullURL: err.config?.url ? `${err.config.baseURL}${err.config.url}` : 'unknown',
-      })
 
       // Extract error message from various possible error formats
-      let errorMessage = 'Failed to sign in'
+      let errorMessage = t('auth.login_failed')
       if (err.response?.data?.error) {
         errorMessage = err.response.data.error
       } else if (err.response?.data?.message) {
@@ -65,29 +58,23 @@ export function Login() {
       } else if (err.message) {
         errorMessage = err.message
       } else if (err.request && !err.response) {
-        errorMessage = 'Unable to connect to server. Please check your connection and ensure the backend server is running.'
+        errorMessage = t('auth.server_error')
       } else if (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT') {
-        errorMessage = 'Request timed out. The server may be overloaded or unavailable.'
+        errorMessage = t('auth.server_error')
       } else if (err.code === 'ERR_NETWORK') {
-        errorMessage = 'Network error. Please check your internet connection and ensure the backend server is running.'
+        errorMessage = t('auth.server_error')
       }
 
       // Handle 503 Service Unavailable (Supabase down or circuit breaker open)
       if (err.response?.status === 503) {
         const retryAfter = err.response?.data?.retryAfter || 30
-        errorMessage = `Authentication service is temporarily unavailable. Please try again in ${retryAfter} seconds.`
-        console.error('503 Service Unavailable - Backend response:', err.response?.data)
+        errorMessage = t('auth.retry_after', { retryAfter })
       } else if (err.response?.status === 401) {
         // Handle 401 Unauthorized (invalid credentials)
-        if (!errorMessage || errorMessage === 'Request failed with status code 401') {
-          errorMessage = 'Invalid email or password. Please check your credentials and try again.'
-        }
-        // Log the actual backend error for debugging
-        console.error('401 Unauthorized - Backend response:', err.response?.data)
+        errorMessage = t('auth.invalid_credentials')
       }
 
       setError(errorMessage)
-      // Don't clear password on error - keep it so user can see what they typed
     } finally {
       setLoading(false)
     }
@@ -107,24 +94,23 @@ export function Login() {
               <div className="inline-flex items-center gap-3 rounded-2xl border border-white/50 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">
                 NovaCreate
               </div>
-              <h1 className="text-4xl font-semibold leading-tight text-primary">The modern studio for teams shipping video at scale.</h1>
+              <h1 className="text-4xl font-semibold leading-tight text-primary">{t('auth.login_title')}</h1>
               <p className="text-sm text-slate-500">
-                Automate production, approvals, and distribution without sacrificing craft. Your audience experiences
-                cohesive storytelling every time.
+                {t('auth.login_subtitle')}
               </p>
             </div>
             <div className="grid gap-4 text-sm text-slate-500">
               <div className="flex items-center gap-3">
                 <span className="inline-flex h-2.5 w-2.5 rounded-full bg-brand-400" />
-                Real-time rendering progress across every workflow
+                {t('auth.feature_rendering')}
               </div>
               <div className="flex items-center gap-3">
                 <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                Instant distribution to every connected channel
+                {t('auth.feature_distribution')}
               </div>
               <div className="flex items-center gap-3">
                 <span className="inline-flex h-2.5 w-2.5 rounded-full bg-sky-400" />
-                AI-assisted scripting that still sounds on-brand
+                {t('auth.feature_scripting')}
               </div>
             </div>
           </div>
@@ -136,8 +122,8 @@ export function Login() {
                 <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-indigo-500 text-white shadow-md">
                   <span className="text-xl font-semibold">N</span>
                 </div>
-                <h2 className="text-2xl font-semibold text-primary">Welcome back</h2>
-                <p className="text-sm text-slate-500">Log in to orchestrate your next campaign.</p>
+                <h2 className="text-2xl font-semibold text-primary">{t('auth.welcome_back')}</h2>
+                <p className="text-sm text-slate-500">{t('auth.login_desc')}</p>
               </div>
 
               {error && (
@@ -151,7 +137,7 @@ export function Login() {
                   type="email"
                   id="email"
                   name="email"
-                  label="Work email"
+                  label={t('auth.email_label')}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -162,7 +148,7 @@ export function Login() {
                     type={showPassword ? 'text' : 'password'}
                     id="password"
                     name="password"
-                    label="Password"
+                    label={t('auth.password_label')}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -173,7 +159,7 @@ export function Login() {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-[2.625rem] -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showPassword ? t('auth.hide_password') : t('auth.show_password')}
                   >
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
@@ -184,12 +170,12 @@ export function Login() {
                     to="/forgot-password"
                     className="font-semibold text-brand-600 transition hover:text-brand-700"
                   >
-                    Forgot password?
+                    {t('auth.forgot_password')}
                   </Link>
                 </div>
 
                 <Button type="submit" className="w-full" loading={loading}>
-                  Sign in
+                  {t('auth.sign_in')}
                 </Button>
               </form>
 
@@ -198,7 +184,7 @@ export function Login() {
                   <div className="w-full border-t border-slate-200" />
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="bg-white px-2 text-slate-500">Or continue with</span>
+                  <span className="bg-white px-2 text-slate-500">{t('auth.continue_with')}</span>
                 </div>
               </div>
 
@@ -228,14 +214,14 @@ export function Login() {
                     />
                     <path d="M1 1h22v22H1z" fill="none" />
                   </svg>
-                  Google
+                  {t('auth.google')}
                 </Button>
               </div>
 
               <p className="mt-8 text-center text-sm text-slate-500">
-                Don&apos;t have an account?{' '}
+                {t('auth.no_account')}{' '}
                 <Link to="/signup" className="font-semibold text-brand-600 hover:text-brand-700">
-                  Create one
+                  {t('auth.create_one')}
                 </Link>
               </p>
             </div>

@@ -93,8 +93,8 @@ export function Credits() {
       console.error('Failed to load plans:', error)
       addNotification({
         type: 'error',
-        title: 'Error',
-        message: 'Failed to load subscription plans',
+        title: t('common.error'),
+        message: t('credits.load_plans_failed'),
       })
     } finally {
       setLoadingPlans(false)
@@ -184,8 +184,8 @@ export function Credits() {
       if (response.data.type === 'free' || response.data.success) {
         addNotification({
           type: 'success',
-          title: 'Plan Activated',
-          message: response.data.message || 'Plan activated successfully!',
+          title: t('credits.plan_activated'),
+          message: response.data.message || t('credits.plan_activated_msg'),
         })
         refreshCredits()
         loadSubscriptionStatus()
@@ -195,8 +195,8 @@ export function Credits() {
       } else {
         addNotification({
           type: 'error',
-          title: 'Payment Error',
-          message: 'Failed to initiate payment',
+          title: t('credits.payment_error'),
+          message: t('credits.initiate_payment_failed'),
         })
         setPurchasing(null)
       }
@@ -204,8 +204,8 @@ export function Credits() {
       console.error('Purchase error:', error)
       addNotification({
         type: 'error',
-        title: 'Purchase Error',
-        message: error.response?.data?.error || 'Failed to initiate purchase',
+        title: t('credits.purchase_error'),
+        message: error.response?.data?.error || t('credits.initiate_purchase_failed'),
       })
       setPurchasing(null)
     }
@@ -216,8 +216,8 @@ export function Credits() {
       if (!hasSubscription) {
         addNotification({
           type: 'warning',
-          title: 'Subscription Required',
-          message: 'You need an active subscription before you can top up credits.',
+          title: t('credits.sub_required_title'),
+          message: t('credits.sub_required_msg'),
         })
         return
       }
@@ -230,16 +230,16 @@ export function Credits() {
       } else {
         addNotification({
           type: 'error',
-          title: 'Payment Error',
-          message: 'Failed to initiate top-up payment',
+          title: t('credits.payment_error'),
+          message: t('credits.initiate_topup_failed'),
         })
       }
     } catch (error: any) {
       console.error('Top up error:', error)
       addNotification({
         type: 'error',
-        title: 'Top Up Error',
-        message: error.response?.data?.error || 'Failed to initiate top-up',
+        title: t('credits.topup_error'),
+        message: error.response?.data?.error || t('credits.initiate_topup_failed'),
       })
     } finally {
       setToppingUp(null)
@@ -269,8 +269,8 @@ export function Credits() {
       await api.post('/api/credits/cancel')
       addNotification({
         type: 'success',
-        title: 'Subscription Cancelled',
-        message: 'Your subscription has been cancelled and credits removed.',
+        title: t('credits.sub_cancelled'),
+        message: t('credits.sub_cancelled_msg'),
       })
       refreshCredits()
       loadSubscriptionStatus()
@@ -278,8 +278,8 @@ export function Credits() {
       console.error('Cancel error:', error)
       addNotification({
         type: 'error',
-        title: 'Error',
-        message: error.response?.data?.error || 'Failed to cancel subscription',
+        title: t('common.error'),
+        message: error.response?.data?.error || t('credits.cancel_failed'),
       })
     } finally {
       setPurchasing(null)
@@ -293,8 +293,8 @@ export function Credits() {
       if (status === 'Approved' || status === 'completed') {
         addNotification({
           type: 'success',
-          title: 'Payment Successful',
-          message: 'Subscription activated! Credits have been added to your account.',
+          title: t('credits.payment_success'),
+          message: t('credits.sub_activated_msg'),
         })
         refreshCredits()
         loadTransactionHistory()
@@ -302,8 +302,8 @@ export function Credits() {
       } else {
         addNotification({
           type: 'info',
-          title: 'Payment Processing',
-          message: 'Payment is being processed. Please check back in a moment.',
+          title: t('credits.payment_processing'),
+          message: t('credits.payment_processing_msg'),
         })
       }
     } catch (error: any) {
@@ -339,7 +339,8 @@ export function Credits() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', {
+    const { language } = useLanguage()
+    return date.toLocaleDateString(language === 'en' ? 'en-US' : language === 'ru' ? 'ru-RU' : language === 'uk' ? 'uk-UA' : language === 'es' ? 'es-ES' : 'de-DE', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -356,13 +357,13 @@ export function Credits() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Credits & Subscription</h1>
-            <p className="mt-2 text-slate-600">Manage your subscription and view credit history</p>
+            <h1 className="text-3xl font-bold text-slate-900">{t('credits.title')}</h1>
+            <p className="mt-2 text-slate-600">{t('credits.subtitle')}</p>
             {hasSubscription && subscription?.status === 'active' && (
               <div className="mt-2 flex items-center gap-4">
                 {subscription.expires_at && (
                   <p className="text-sm text-slate-500">
-                    Subscription renews in {Math.ceil((new Date(subscription.expires_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days
+                    {t('credits.renews_in').replace('{days}', Math.ceil((new Date(subscription.expires_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)).toString())}
                   </p>
                 )}
                 <button
@@ -370,7 +371,7 @@ export function Credits() {
                   disabled={purchasing === 'cancel'}
                   className="text-sm text-red-600 hover:text-red-700 font-medium underline"
                 >
-                  Cancel Subscription
+                  {t('credits.cancel_subscription')}
                 </button>
               </div>
             )}
@@ -378,10 +379,10 @@ export function Credits() {
           <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-6 py-4 shadow-sm">
             <Coins className="h-6 w-6 text-amber-500" />
             <div>
-              <p className="text-xs text-slate-500">Current Balance</p>
+              <p className="text-xs text-slate-500">{t('credits.current_balance')}</p>
               <p className="text-2xl font-bold text-slate-900">
-                {creditsLoading ? '...' : unlimited ? 'Unlimited' : credits ?? 0}
-                {!unlimited && <span className="ml-2 text-sm font-normal text-slate-500">credits</span>}
+                {creditsLoading ? '...' : unlimited ? t('credits.unlimited') : credits ?? 0}
+                {!unlimited && <span className="ml-2 text-sm font-normal text-slate-500">{t('credits.credits_unit')}</span>}
               </p>
             </div>
           </div>
@@ -398,10 +399,10 @@ export function Credits() {
                   <Crown className="h-6 w-6" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-slate-700">Active Subscription</p>
+                  <p className="text-sm font-semibold text-slate-700">{t('credits.active_subscription')}</p>
                   <p className="text-lg font-bold text-slate-900">{currentPlan?.display_name || 'Subscription'}</p>
                   <p className="text-xs text-slate-600 mt-1">
-                    {subscription.credits_remaining !== undefined ? `${subscription.credits_remaining} credits remaining` : 'Plan active'}
+                    {subscription.credits_remaining !== undefined ? t('credits.remaining_credits').replace('{count}', subscription.credits_remaining.toString()) : t('credits.plan_active')}
                   </p>
                 </div>
               </div>
@@ -412,7 +413,7 @@ export function Credits() {
                 }}
                 variant="primary"
               >
-                Change Plan
+                {t('credits.change_plan')}
               </Button>
             </div>
           </Card>
@@ -421,9 +422,9 @@ export function Credits() {
             <div className="flex items-center gap-3">
               <AlertCircle className="h-5 w-5 text-amber-600" />
               <div>
-                <p className="font-semibold text-slate-900">No Active Subscription</p>
+                <p className="font-semibold text-slate-900">{t('credits.no_active_sub')}</p>
                 <p className="text-sm text-slate-600 mt-1">
-                  You need an active subscription to use platform features. Choose a plan below to get started.
+                  {t('credits.no_active_sub_desc')}
                 </p>
               </div>
             </div>
@@ -433,7 +434,7 @@ export function Credits() {
         {/* Subscription Plans */}
         <div id="subscription-plans">
           <h2 className="mb-4 text-xl font-semibold text-slate-900">
-            {hasSubscription ? 'Change Subscription Plan' : 'Choose a Subscription Plan'}
+            {hasSubscription ? t('credits.change_sub_plan') : t('credits.choose_sub_plan')}
           </h2>
           {loadingPlans ? (
             <div className="grid gap-4 md:grid-cols-4">
@@ -451,7 +452,7 @@ export function Credits() {
                       {isCurrentPlan && (
                         <div className="mb-3 flex items-center gap-2 text-brand-600">
                           <CheckCircle2 className="h-4 w-4" />
-                          <span className="text-xs font-semibold uppercase">Current Plan</span>
+                          <span className="text-xs font-semibold uppercase">{t('credits.current_plan_label')}</span>
                         </div>
                       )}
                       <div className="mb-4">
@@ -465,11 +466,11 @@ export function Credits() {
                           <span className="text-3xl font-bold text-slate-900">
                             {plan.id === 'plan_free' ? '3' : plan.credits}
                           </span>
-                          <span className="text-sm text-slate-500">credits</span>
+                          <span className="text-sm text-slate-500">{t('credits.credits_unit')}</span>
                         </div>
                         {plan.id === 'plan_free' && (
                           <p className="mt-1 text-[10px] text-slate-500 italic">
-                            (New accounts/Signup only)
+                            {t('credits.new_accounts_only')}
                           </p>
                         )}
                       </div>
@@ -483,7 +484,7 @@ export function Credits() {
                         className="w-full mt-auto"
                         variant={isCurrentPlan ? "ghost" : "primary"}
                       >
-                        {isCurrentPlan ? 'Current Plan' : purchasing === plan.id ? 'Processing...' : hasSubscription ? 'Switch Plan' : 'Subscribe Now'}
+                        {isCurrentPlan ? t('credits.current_plan_label') : purchasing === plan.id ? t('credits.processing') : hasSubscription ? t('credits.switch_plan') : t('credits.subscribe_now')}
                       </Button>
                     </div>
                   </Card>
@@ -495,11 +496,11 @@ export function Credits() {
 
         {/* Credit Top-ups */}
         <div>
-          <h2 className="mb-2 text-xl font-semibold text-slate-900">Top up credits</h2>
+          <h2 className="mb-2 text-xl font-semibold text-slate-900">{t('credits.top_up_title')}</h2>
           <p className="mb-4 text-sm text-slate-600">
             {hasSubscription
-              ? 'Buy additional credits for your active subscription.'
-              : 'Top-ups are available after you purchase a subscription.'}
+              ? t('credits.top_up_active_sub')
+              : t('credits.top_up_sub_required')}
           </p>
 
           {loadingPackages ? (
@@ -513,7 +514,7 @@ export function Credits() {
               {packages.map((pkg) => (
                 <Card key={pkg.id} className={`p-4 ${!hasSubscription ? 'opacity-60' : ''}`}>
                   <div className="flex flex-col gap-2">
-                    <div className="text-lg font-bold text-slate-900">{pkg.credits} credits</div>
+                    <div className="text-lg font-bold text-slate-900">{pkg.credits} {t('credits.credits_unit')}</div>
                     <div className="text-sm text-slate-600">{pkg.description || pkg.display_name}</div>
                     <div className="text-xl font-bold text-brand-600">${pkg.price_usd.toFixed(2)}</div>
                     <Button
@@ -522,7 +523,7 @@ export function Credits() {
                       variant={!hasSubscription ? 'ghost' : 'secondary'}
                       className="w-full"
                     >
-                      {!hasSubscription ? 'Subscribe first' : toppingUp === pkg.id ? 'Processing...' : 'Top up'}
+                      {!hasSubscription ? t('credits.subscribe_first') : toppingUp === pkg.id ? t('credits.processing') : t('credits.top_up_btn')}
                     </Button>
                   </div>
                 </Card>
@@ -533,7 +534,7 @@ export function Credits() {
 
         {/* Transaction History */}
         <div>
-          <h2 className="mb-4 text-xl font-semibold text-slate-900">Transaction History</h2>
+          <h2 className="mb-4 text-xl font-semibold text-slate-900">{t('credits.history_title')}</h2>
           {loadingTransactions ? (
             <div className="space-y-3">
               {[1, 2, 3, 4, 5].map((i) => (
@@ -543,8 +544,8 @@ export function Credits() {
           ) : transactions.length === 0 ? (
             <Card className="p-12 text-center">
               <History className="mx-auto h-12 w-12 text-slate-400" />
-              <p className="mt-4 text-slate-600">No transactions yet</p>
-              <p className="mt-2 text-sm text-slate-500">Your credit transactions will appear here</p>
+              <p className="mt-4 text-slate-600">{t('credits.no_transactions')}</p>
+              <p className="mt-2 text-sm text-slate-500">{t('credits.history_empty_desc')}</p>
             </Card>
           ) : (
             <div className="space-y-3">
@@ -571,11 +572,11 @@ export function Credits() {
                             }`}
                         >
                           {(transaction.type === 'topup' || transaction.type === 'refund' || (transaction.type === 'adjustment' && transaction.amount > 0)) ? '+' : ''}
-                          {transaction.amount} credits
+                          {transaction.amount} {t('credits.credits_unit')}
                         </p>
                         {transaction.balance_after !== null && (
                           <p className="text-xs text-slate-500">
-                            Balance: {transaction.balance_after} credits
+                            {t('credits.balance_after').replace('{count}', transaction.balance_after.toString())}
                           </p>
                         )}
                       </div>
