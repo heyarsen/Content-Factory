@@ -34,7 +34,7 @@ export function AdminSupport() {
     const [selectedTicket, setSelectedTicket] = useState<{ ticket: Ticket, messages: Message[] } | null>(null)
     const [reply, setReply] = useState('')
     const [sending, setSending] = useState(false)
-    const { addNotification, refreshSupportCount } = useNotifications()
+    const { addNotification, refreshSupportCount, markAllSupportAsRead } = useNotifications()
     // We can assume admin user is logged in
 
     // Real-time subscription
@@ -191,7 +191,10 @@ export function AdminSupport() {
                 <div className="flex w-1/3 flex-col gap-4 overflow-hidden">
                     <div className="flex items-center justify-between">
                         <h2 className="text-xl font-semibold text-primary">Support Inbox</h2>
-                        <Button variant="ghost" size="sm" onClick={loadTickets}>Refresh</Button>
+                        <div className="flex gap-2">
+                            <Button variant="ghost" size="sm" onClick={markAllSupportAsRead}>Mark all read</Button>
+                            <Button variant="ghost" size="sm" onClick={loadTickets}>Refresh</Button>
+                        </div>
                     </div>
 
                     <Card className="flex-1 overflow-y-auto p-0">

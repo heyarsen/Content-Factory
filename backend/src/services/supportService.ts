@@ -224,12 +224,12 @@ export class SupportService {
     /**
      * Mark messages as read
      */
-    static async markAsRead(ticketId: string, userId: string, userToken?: string): Promise<void> {
-        const client = this.getClient(userToken)
-
-        // If user is reading, mark admin replies as read
-        // If admin is reading, mark user messages as read (logic needs to know who is reading)
-        // For simplicity: Mark all messages in this ticket NOT sent by me as read.
+    static async markAsRead(ticketId: string, userId: string, _userToken?: string): Promise<void> {
+        // Use the service role client (supabase) instead of the user client to ensure 
+        // read status updates always succeed regardless of RLS update policies.
+        // This is safe because we've already verified the user has access to the ticket 
+        // in the route handler.
+        const client = supabase
 
         const { error } = await client
             .from('support_messages')
@@ -242,5 +242,37 @@ export class SupportService {
             console.error('[Support] Error marking messages as read:', error)
             // Don't throw, just log
         }
+    }
+
+    /**
+     * Mark all messages for a user/admin as read
+     */
+    static async markAllAsRead(userId: string, role: string): Promise<void> {
+        let query = supabase
+            .from('support_messages')
+            .update({ is_read: true })
+            .eq('is_read', false)
+
+        if (role === 'admin') {
+            // Admin marks all user messages as read
+            query = query.eq('is_admin_reply', false)
+        } else {
+            // User marks all admin replies as read
+            // Need to filter by tickets owned by this user
+            const { data: tickets } = await supabase
+                .from('support_tickets')
+                .select('id')
+                .eq('user_id', userId)
+
+            if (tickets && tickets.length > 0) {
+                const ticketIds = tickets.map((t: any) => t.id)
+                query = query.in('ticket_id', ticketIds).eq('is_admin_reply', true)
+            } else {
+                return
+            }
+        }
+
+        const { error } = await query
+        if (error) console.error('[Support] Error marking all as read:', error)
     }
 }

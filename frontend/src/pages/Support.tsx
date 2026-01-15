@@ -40,7 +40,7 @@ export function Support() {
     const [message, setMessage] = useState('')
     const [reply, setReply] = useState('')
     const [sending, setSending] = useState(false)
-    const { addNotification, refreshSupportCount } = useNotifications()
+    const { addNotification, refreshSupportCount, markAllSupportAsRead } = useNotifications()
     const { user } = useAuth() // Need user ID for subscription filtering if desired, or just use ticket ID
 
     // Use a ref to track the currently selected ticket without triggering re-renders or stale closures in the effect
@@ -204,10 +204,13 @@ export function Support() {
                 <div className="flex w-1/3 flex-col gap-4 overflow-hidden">
                     <div className="flex items-center justify-between">
                         <h2 className="text-xl font-semibold text-primary">Support Tickets</h2>
-                        <Button size="sm" onClick={() => { setShowCreate(true); setSelectedTicket(null); }}>
-                            <Plus className="mr-2 h-4 w-4" />
-                            New Ticket
-                        </Button>
+                        <div className="flex gap-2">
+                            <Button variant="ghost" size="sm" onClick={markAllSupportAsRead}>Mark all read</Button>
+                            <Button size="sm" onClick={() => { setShowCreate(true); setSelectedTicket(null); }}>
+                                <Plus className="mr-2 h-4 w-4" />
+                                New Ticket
+                            </Button>
+                        </div>
                     </div>
 
                     <Card className="flex-1 overflow-y-auto p-0">
