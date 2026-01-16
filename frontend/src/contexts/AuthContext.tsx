@@ -28,19 +28,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    // Failsafe: If nothing happens within 15 seconds, stop loading
+    // Failsafe: If nothing happens within 5 seconds, stop loading
     const safetyTimeout = setTimeout(() => {
       if (mounted && loading) {
         console.warn('[Auth] Initialization timed out, forcing loading to false')
         setLoading(false)
       }
-    }, 15000)
+    }, 5000)
 
     const fetchProfileWithTimeout = async (userId: string, retries = 3): Promise<{ data: { role?: 'user' | 'admin' } | null, error: any }> => {
       const attemptFetch = async (attempt: number): Promise<any> => {
         try {
           const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Profile fetch timed out')), 15000)
+            setTimeout(() => reject(new Error('Profile fetch timed out')), 8000)
           })
 
           console.log(`[Auth] Fetching profile for ${userId} (attempt ${4 - attempt})...`)
