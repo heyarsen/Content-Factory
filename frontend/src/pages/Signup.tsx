@@ -7,9 +7,10 @@ import { Card } from '../components/ui/Card'
 import { Eye, EyeOff } from 'lucide-react'
 import api from '../lib/api'
 import { useLanguage } from '../contexts/LanguageContext'
+import { LanguageSelector } from '../components/LanguageSelector'
 
 export function Signup() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -58,7 +59,7 @@ export function Signup() {
     setLoading(true)
 
     try {
-      await signUp(email, password)
+      await signUp(email, password, language)
       setSuccess(true)
       setErr(null)
     } catch (signupErr: any) {
@@ -139,6 +140,11 @@ export function Signup() {
                 </div>
                 <h2 className="text-2xl font-semibold text-primary">{t('auth.create_account_title')}</h2>
                 <p className="text-sm text-slate-500">{t('auth.create_account_desc')}</p>
+              </div>
+
+              {/* Language Selector */}
+              <div className="mb-6">
+                <LanguageSelector showLabel={true} />
               </div>
 
               {error && (

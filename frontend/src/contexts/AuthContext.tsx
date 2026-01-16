@@ -12,7 +12,7 @@ interface User {
 interface AuthContextType {
   user: User | null
   loading: boolean
-  signUp: (email: string, password: string) => Promise<void>
+  signUp: (email: string, password: string, preferredLanguage?: string) => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
   signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
@@ -197,8 +197,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const signUp = async (email: string, password: string) => {
-    await api.post('/api/auth/signup', { email, password })
+  const signUp = async (email: string, password: string, preferredLanguage?: string) => {
+    await api.post('/api/auth/signup', { email, password, preferredLanguage })
     // User will be confirmed via email verification
   }
 

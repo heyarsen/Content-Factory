@@ -8,7 +8,7 @@ const router = Router()
 // Signup
 router.post('/signup', authLimiter, async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body
+    const { email, password, preferredLanguage } = req.body
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' })
@@ -21,6 +21,9 @@ router.post('/signup', authLimiter, async (req: Request, res: Response) => {
       password,
       options: {
         emailRedirectTo: `${redirectUrl}/verify-email`,
+        data: {
+          preferred_language: preferredLanguage || 'en',
+        },
       },
     })
 
@@ -38,6 +41,14 @@ router.post('/signup', authLimiter, async (req: Request, res: Response) => {
       }
 
       return res.status(400).json({ error: error.message })
+    }
+
+    // Update user_profiles with preferred language
+    if (data.user) {
+      await supabase
+        .from('user_profiles')
+        .update({ preferred_language: preferredLanguage || 'en' })
+        .eq('id', data.user.id)
     }
 
     res.json({
@@ -531,6 +542,40 @@ router.patch('/profile', authenticate, async (req: AuthRequest, res: Response) =
     return res.status(400).json({ error: 'Invalid request' })
   } catch (error: any) {
     console.error('Update profile exception:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// Update user language preference
+router.patch('/language', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { language } = req.body
+
+    if (!language) {
+      return res.status(400).json({ error: 'Language is required' })
+    }
+
+    // Validate language code
+    const validLanguages = ['en', 'ru', 'uk', 'de', 'es']
+    if (!validLanguages.includes(language)) {
+      return res.status(400).json({ error: 'Invalid language code' })
+    }
+
+    // Update user_profiles
+    const { error } = await supabase
+      .from('user_profiles')
+      .update({ preferred_language: language })
+      .eq('id', userId)
+
+    if (error) {
+      console.error('Update language error:', error)
+      return res.status(500).json({ error: 'Failed to update language preference' })
+    }
+
+    res.json({ message: 'Language preference updated successfully', language })
+  } catch (error: any) {
+    console.error('Update language exception:', error)
     return res.status(500).json({ error: 'Internal server error' })
   }
 })
