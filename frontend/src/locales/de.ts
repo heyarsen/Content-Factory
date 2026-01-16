@@ -250,15 +250,6 @@ export const de = {
         post_fail_title: "Posten fehlgeschlagen",
         post_fail_desc: "Beim Planen Ihres Beitrags ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
     },
-    common: {
-        save: "Speichern",
-        cancel: "Abbrechen",
-        delete: "Löschen",
-        edit: "Bearbeiten",
-        loading: "Laden...",
-        error: "Fehler",
-        success: "Erfolg",
-    },
     credits: {
         title: "Guthaben & Abonnement",
         subtitle: "Verwalten Sie Ihr Abonnement und sehen Sie den Guthabenverlauf ein",

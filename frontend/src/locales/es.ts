@@ -250,15 +250,6 @@ export const es = {
         post_fail_title: "Error al publicar",
         post_fail_desc: "Hubo un error al programar tu publicación. Por favor, inténtalo de nuevo.",
     },
-    common: {
-        save: "Guardar",
-        cancel: "Cancelar",
-        delete: "Eliminar",
-        edit: "Editar",
-        loading: "Cargando...",
-        error: "Error",
-        success: "Éxito",
-    },
     credits: {
         title: "Créditos y Suscripción",
         subtitle: "Administra tu suscripción y consulta el historial de créditos",

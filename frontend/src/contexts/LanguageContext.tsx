@@ -4,7 +4,7 @@ import { translations, Language } from '../locales'
 interface LanguageContextType {
     language: Language
     setLanguage: (lang: Language) => void
-    t: (path: string) => string
+    t: (path: string, variables?: Record<string, string | number>) => string
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined)
@@ -20,7 +20,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         localStorage.setItem('user_language', lang)
     }
 
-    const t = (path: string): string => {
+    const t = (path: string, variables?: Record<string, string | number>): string => {
         const keys = path.split('.')
         let current: any = translations[language as keyof typeof translations]
 
@@ -32,7 +32,15 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             }
         }
 
-        return typeof current === 'string' ? current : path
+        let translation = typeof current === 'string' ? current : path
+
+        if (variables) {
+            Object.entries(variables).forEach(([key, value]) => {
+                translation = translation.replace(`{${key}}`, String(value))
+            })
+        }
+
+        return translation
     }
 
     return (

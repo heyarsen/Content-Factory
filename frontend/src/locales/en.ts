@@ -295,7 +295,6 @@ export const en = {
         sub_cancelled_msg: "Your subscription has been cancelled and credits removed.",
         payment_success: "Payment Successful",
         sub_activated_msg: "Subscription activated! Credits have been added to your account.",
-        sub_activated_msg: "Subscription activated! Credits have been added to your account.",
         payment_processing: "Payment Processing",
         payment_processing_msg: "Payment is being processed. Please check back in a moment.",
         load_plans_failed: "Failed to load subscription plans",
