@@ -14,11 +14,6 @@ export interface DashboardStats {
     videos: {
         total: number
         new: number
-        revenue: number
-    }
-    videos: {
-        total: number
-        new: number
         processing: number
     }
     credits: {
