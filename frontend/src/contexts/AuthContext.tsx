@@ -200,11 +200,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     // Clear all Supabase session keys from both storages
     const keysToRemove = Array.from({ length: sessionStorage.length }, (_, i) => sessionStorage.key(i))
-      .filter(key => key && (key.startsWith('sb-') || key === 'supabase.auth.token'))
+      .filter((key): key is string => key !== null && (key.startsWith('sb-') || key === 'supabase.auth.token'))
     keysToRemove.forEach(key => sessionStorage.removeItem(key))
     
     const localKeysToRemove = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i))
-      .filter(key => key && (key.startsWith('sb-') || key === 'supabase.auth.token'))
+      .filter((key): key is string => key !== null && (key.startsWith('sb-') || key === 'supabase.auth.token'))
     localKeysToRemove.forEach(key => localStorage.removeItem(key))
   }
 
