@@ -27,186 +27,82 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
-    let hasCompletedInitialization = false;
 
-    // Fallback: If nothing happens within 3 seconds, still keep user logged in if token exists
-    const safetyTimeout = setTimeout(() => {
-      if (mounted && !hasCompletedInitialization && loading) {
-        const token = localStorage.getItem('access_token')
-        console.warn('[Auth] Initialization timed out after 3s, checking for stored token')
-        if (token) {
-          // Keep loading false but maintain logged in state with previously stored user data
-          setLoading(false)
-        }
+    // FIRST: Check our own storage - this is the source of truth
+    const token = localStorage.getItem('access_token')
+    const storedUser = localStorage.getItem('auth_user')
+    
+    console.log('[Auth] Init: Checking storage...', { hasToken: !!token, hasStoredUser: !!storedUser })
+
+    if (token && storedUser) {
+      // Restore immediately from our storage
+      try {
+        const user = JSON.parse(storedUser)
+        console.log('[Auth] Restored user from localStorage:', user.email)
+        setUser(user)
+        setLoading(false)
+        
+        // Optionally sync with Supabase in the background (non-blocking)
+        supabase.auth.setSession({
+          access_token: token,
+          refresh_token: token,
+        }).catch(err => console.warn('[Auth] Supabase sync failed (non-blocking):', err.message))
+      } catch (e) {
+        console.error('[Auth] Failed to parse stored user:', e)
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('auth_user')
+        setLoading(false)
       }
-    }, 3000)
-
-    const fetchProfileWithTimeout = async (userId: string, retries = 2): Promise<{ data: { role?: 'user' | 'admin' } | null, error: any }> => {
-      const attemptFetch = async (attempt: number): Promise<any> => {
-        try {
-          const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Profile fetch timed out')), 3000)
-          })
-
-          console.log(`[Auth] Fetching profile for ${userId} (attempt ${3 - attempt})...`)
-          const fetchPromise = supabase
-            .from('user_profiles')
-            .select('role')
-            .eq('id', userId)
-            .single()
-
-          const result: any = await Promise.race([fetchPromise, timeoutPromise])
-          if (result.error) throw result.error
-          return result
-        } catch (error: any) {
-          if (attempt > 0) {
-            console.warn(`[Auth] Profile fetch attempt ${3 - attempt} failed, retrying...`, error.message)
-            await new Promise(r => setTimeout(r, 500))
-            return attemptFetch(attempt - 1)
+    } else {
+      // No stored session, check Supabase as fallback
+      console.log('[Auth] No stored session, checking Supabase...')
+      supabase.auth.getSession()
+        .then(({ data: { session } }) => {
+          if (mounted && session?.user) {
+            console.log('[Auth] Found Supabase session, storing it...')
+            const user = {
+              ...session.user,
+              role: 'user'
+            } as User
+            localStorage.setItem('access_token', session.access_token)
+            localStorage.setItem('auth_user', JSON.stringify(user))
+            setUser(user)
+          } else {
+            console.log('[Auth] No session found')
           }
-          throw error
-        }
-      }
-
-      return attemptFetch(retries)
+        })
+        .catch(err => console.error('[Auth] Session check error:', err.message))
+        .finally(() => {
+          if (mounted) setLoading(false)
+        })
     }
 
-    // Check for existing session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      try {
-        if (mounted && session?.user) {
-          console.log('[Auth] Supabase session found, restoring user...')
-          // Immediately set user without role to unblock UI
-          setUser({
-            ...session.user,
-            role: 'user' // default role
-          } as User)
-          localStorage.setItem('access_token', session.access_token)
-
-          // Fetch role in the background
-          try {
-            const { data: profile } = await fetchProfileWithTimeout(session.user.id)
-            if (mounted) {
-              setUser(prevUser => ({
-                ...prevUser!,
-                role: profile?.role || 'user'
-              }))
-            }
-          } catch (profileError) {
-            console.warn('[Auth] Profile fetch failed, keeping default role:', profileError)
-            // User is already set with default role, no need to update
-          }
-        } else {
-          // Fallback: Check if there's a token in localStorage (from custom backend)
-          const token = localStorage.getItem('access_token')
-          const storedUser = sessionStorage.getItem('auth_user')
-          
-          if (token && storedUser) {
-            console.log('[Auth] No Supabase session, but found stored token and user data - restoring...')
-            try {
-              const user = JSON.parse(storedUser)
-              setUser(user)
-              
-              // Fetch role in the background
-              try {
-                const { data: profile } = await fetchProfileWithTimeout(user.id)
-                if (mounted) {
-                  setUser(prevUser => ({
-                    ...prevUser!,
-                    role: profile?.role || 'user'
-                  }))
-                }
-              } catch (profileError) {
-                console.warn('[Auth] Profile fetch failed, keeping stored role:', profileError)
-              }
-            } catch (e) {
-              console.warn('[Auth] Failed to parse stored user data')
-              localStorage.removeItem('access_token')
-              sessionStorage.removeItem('auth_user')
-            }
-          } else {
-            console.log('[Auth] No session or stored user found on reload')
-          }
-        }
-      } catch (error) {
-        console.error('Error loading initial session:', error)
-      } finally {
-        if (mounted) {
-          hasCompletedInitialization = true
-          setLoading(false)
-          clearTimeout(safetyTimeout)
-        }
-      }
-    }).catch((err: any) => {
-      console.error('Get session error:', err)
-      
-      // Last resort fallback: Check localStorage for token
-      const token = localStorage.getItem('access_token')
-      const storedUser = sessionStorage.getItem('auth_user')
-      if (token && storedUser) {
-        console.warn('[Auth] Supabase session check failed, using stored token')
-        try {
-          const user = JSON.parse(storedUser)
-          setUser(user)
-        } catch (e) {
-          console.error('[Auth] Failed to parse stored user on fallback')
-        }
-      }
+    // Listen for auth changes from Supabase
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[Auth] Auth state change event:', event, session?.user?.id)
       
       if (mounted) {
-        hasCompletedInitialization = true
-        setLoading(false)
-        clearTimeout(safetyTimeout)
-      }
-    })
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log(`[Auth] Auth state change: ${event}`, session?.user?.id)
-
-      try {
         if (session?.user) {
-          // Immediately set user with default role to unblock UI
-          setUser(prevUser => ({
+          const user = {
             ...session.user,
-            role: prevUser?.role || 'user'
-          } as User))
+            role: 'user'
+          } as User
           localStorage.setItem('access_token', session.access_token)
-
-          // Fetch role in the background
-          try {
-            const { data: profile } = await fetchProfileWithTimeout(session.user.id)
-            if (mounted) {
-              setUser(prevUser => ({
-                ...prevUser!,
-                role: profile?.role || prevUser?.role || 'user'
-              }))
-            }
-          } catch (profileError) {
-            console.warn('[Auth] Auth change profile load failed/timed out:', profileError)
-            // User already set with role, no action needed
-          }
-        } else if (mounted) {
-          console.log('[Auth] No session user, clearing state')
-          setUser(null)
-          localStorage.removeItem('access_token')
-        }
-      } catch (error) {
-        console.error('Error handling auth change:', error)
-      } finally {
-        if (mounted) {
-          hasCompletedInitialization = true
+          localStorage.setItem('auth_user', JSON.stringify(user))
+          setUser(user)
           setLoading(false)
-          clearTimeout(safetyTimeout)
+        } else {
+          console.log('[Auth] onAuthStateChange: clearing user')
+          localStorage.removeItem('access_token')
+          localStorage.removeItem('auth_user')
+          setUser(null)
+          setLoading(false)
         }
       }
     })
 
     return () => {
       mounted = false
-      clearTimeout(safetyTimeout)
       subscription.unsubscribe()
     }
   }, [])
@@ -228,8 +124,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (data.access_token) {
         localStorage.setItem('access_token', data.access_token)
-        // Also store user data for session restoration on reload
-        sessionStorage.setItem('auth_user', JSON.stringify(data.user))
+        // Store user data for persistent session
+        localStorage.setItem('auth_user', JSON.stringify(data.user))
         setUser(data.user)
 
         // Log before setting session
@@ -298,7 +194,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setUser(null)
     localStorage.removeItem('access_token')
-    sessionStorage.removeItem('auth_user')
+    localStorage.removeItem('auth_user')
   }
 
   const signInWithGoogle = async () => {
