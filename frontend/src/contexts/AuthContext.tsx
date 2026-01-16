@@ -27,23 +27,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    let hasCompletedInitialization = false;
 
-    // Failsafe: If nothing happens within 5 seconds, stop loading
+    // Fallback: If nothing happens within 3 seconds, still keep user logged in if token exists
     const safetyTimeout = setTimeout(() => {
-      if (mounted && loading) {
-        console.warn('[Auth] Initialization timed out, forcing loading to false')
-        setLoading(false)
+      if (mounted && !hasCompletedInitialization && loading) {
+        const token = localStorage.getItem('access_token')
+        console.warn('[Auth] Initialization timed out after 3s, checking for stored token')
+        if (token) {
+          // Keep loading false but maintain logged in state with previously stored user data
+          setLoading(false)
+        }
       }
-    }, 5000)
+    }, 3000)
 
-    const fetchProfileWithTimeout = async (userId: string, retries = 3): Promise<{ data: { role?: 'user' | 'admin' } | null, error: any }> => {
+    const fetchProfileWithTimeout = async (userId: string, retries = 2): Promise<{ data: { role?: 'user' | 'admin' } | null, error: any }> => {
       const attemptFetch = async (attempt: number): Promise<any> => {
         try {
           const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Profile fetch timed out')), 8000)
+            setTimeout(() => reject(new Error('Profile fetch timed out')), 3000)
           })
 
-          console.log(`[Auth] Fetching profile for ${userId} (attempt ${4 - attempt})...`)
+          console.log(`[Auth] Fetching profile for ${userId} (attempt ${3 - attempt})...`)
           const fetchPromise = supabase
             .from('user_profiles')
             .select('role')
@@ -55,8 +60,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return result
         } catch (error: any) {
           if (attempt > 0) {
-            console.warn(`[Auth] Profile fetch failed, retrying...`, error)
-            await new Promise(r => setTimeout(r, 1500))
+            console.warn(`[Auth] Profile fetch attempt ${3 - attempt} failed, retrying...`, error.message)
+            await new Promise(r => setTimeout(r, 500))
             return attemptFetch(attempt - 1)
           }
           throw error
@@ -70,47 +75,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       try {
         if (mounted && session?.user) {
-          // Primary source of truth for role: Backend API (uses service role)
-          try {
-            console.log('[Auth] Fetching user profile from backend API...')
-            const { data } = await api.get('/api/auth/me')
-            if (mounted && data.user) {
-              setUser(data.user)
-              localStorage.setItem('access_token', session.access_token)
-              setLoading(false)
-              clearTimeout(safetyTimeout)
-              return
-            }
-          } catch (apiError) {
-            console.warn('[Auth] Backend profile fetch failed, falling back to direct Supabase query:', apiError)
-          }
+          console.log('[Auth] Session found, setting user and fetching role...')
+          // Immediately set user without role to unblock UI
+          setUser({
+            ...session.user,
+            role: 'user' // default role
+          } as User)
+          localStorage.setItem('access_token', session.access_token)
 
-          // Fallback: Direct Supabase query
+          // Fetch role in the background
           try {
             const { data: profile } = await fetchProfileWithTimeout(session.user.id)
-
             if (mounted) {
-              setUser({
-                ...session.user,
+              setUser(prevUser => ({
+                ...prevUser!,
                 role: profile?.role || 'user'
-              } as User)
-              localStorage.setItem('access_token', session.access_token)
+              }))
             }
           } catch (profileError) {
-            console.warn('[Auth] All profile fetch attempts failed, using default role:', profileError)
-            if (mounted) {
-              setUser({
-                ...session.user,
-                role: 'user'
-              } as User)
-              localStorage.setItem('access_token', session.access_token)
-            }
+            console.warn('[Auth] Profile fetch failed, keeping default role:', profileError)
+            // User is already set with default role, no need to update
           }
+        } else {
+          console.log('[Auth] No session found on reload')
         }
       } catch (error) {
         console.error('Error loading initial session:', error)
       } finally {
         if (mounted) {
+          hasCompletedInitialization = true
           setLoading(false)
           clearTimeout(safetyTimeout)
         }
@@ -118,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }).catch((err: any) => {
       console.error('Get session error:', err)
       if (mounted) {
+        hasCompletedInitialization = true
         setLoading(false)
         clearTimeout(safetyTimeout)
       }
@@ -131,49 +125,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         if (session?.user) {
+          // Immediately set user with default role to unblock UI
+          setUser(prevUser => ({
+            ...session.user,
+            role: prevUser?.role || 'user'
+          } as User))
+          localStorage.setItem('access_token', session.access_token)
+
+          // Fetch role in the background
           try {
-            // First try backend API (service role bypass)
-            try {
-              const { data } = await api.get('/api/auth/me')
-              if (mounted && data.user) {
-                setUser(data.user)
-                localStorage.setItem('access_token', session.access_token)
-                return
-              }
-            } catch (error) {
-              console.warn('[Auth] Auth change profile API fetch failed, falling back to direct query')
-            }
-
             const { data: profile } = await fetchProfileWithTimeout(session.user.id)
-
             if (mounted) {
-              setUser(prevUser => {
-                // Determine the new role: 
-                // 1. If we got a profile, use its role
-                // 2. If it's the same user as before, keep the existing role
-                // 3. Otherwise default to 'user'
-                const newRole = profile?.role || (prevUser?.id === session.user.id ? prevUser.role : 'user')
-
-                return {
-                  ...session.user,
-                  role: newRole
-                } as User
-              })
-              localStorage.setItem('access_token', session.access_token)
+              setUser(prevUser => ({
+                ...prevUser!,
+                role: profile?.role || prevUser?.role || 'user'
+              }))
             }
           } catch (profileError) {
             console.warn('[Auth] Auth change profile load failed/timed out:', profileError)
-
-            if (mounted) {
-              setUser(prevUser => {
-                const existingRole = prevUser?.id === session.user.id ? prevUser.role : 'user'
-                return {
-                  ...session.user,
-                  role: existingRole
-                } as User
-              })
-              localStorage.setItem('access_token', session.access_token)
-            }
+            // User already set with role, no action needed
           }
         } else if (mounted) {
           console.log('[Auth] No session user, clearing state')
@@ -184,6 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('Error handling auth change:', error)
       } finally {
         if (mounted) {
+          hasCompletedInitialization = true
           setLoading(false)
           clearTimeout(safetyTimeout)
         }
