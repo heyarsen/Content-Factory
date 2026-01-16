@@ -436,10 +436,10 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
 
       console.log('[WayForPay] Topup user ID:', userId, 'Status:', transactionStatus)
 
-      // Check if transaction already exists
-      const { data: existingTransaction } = await supabase
+      // Check if transaction already exists and lock it
+      const { data: existingTransaction, error: fetchError } = await supabase
         .from('credit_transactions')
-        .select('id, status, payment_status')
+        .select('id, status, payment_status, amount')
         .eq('payment_id', orderReference)
         .maybeSingle()
 
@@ -455,6 +455,23 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
       // If payment approved, add credits immediately
       if (transactionStatus === 'Approved') {
         console.log('[WayForPay] Topup payment approved, adding credits immediately')
+
+        // CRITICAL: Atomically mark transaction as processing before adding credits
+        // This prevents race conditions where multiple webhook calls process the same topup
+        if (existingTransaction) {
+          const { data: updated, error: updateError } = await supabase
+            .from('credit_transactions')
+            .update({ status: 'processing' })
+            .eq('id', existingTransaction.id)
+            .eq('status', 'pending') // Only update if still pending
+            .select('id')
+            .maybeSingle()
+
+          if (!updated) {
+            console.log('[WayForPay] Transaction is already being processed or completed, skipping')
+            return res.json({ status: 'ok' })
+          }
+        }
 
         // Find the package by amount from callback
         const amount = parseFloat(callbackData.amount) || 0
@@ -488,18 +505,10 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
           }
         }
         
-        // Fallback: check if there's a transaction already created with the amount
-        if (creditsToAdd === 0) {
-          const { data: transaction } = await supabase
-            .from('credit_transactions')
-            .select('amount')
-            .eq('payment_id', orderReference)
-            .maybeSingle()
-          
-          if (transaction?.amount) {
-            creditsToAdd = transaction.amount
-            console.log('[WayForPay] Using amount from transaction:', creditsToAdd)
-          }
+        // Fallback: use the amount from the existing transaction
+        if (creditsToAdd === 0 && existingTransaction?.amount) {
+          creditsToAdd = existingTransaction.amount
+          console.log('[WayForPay] Using amount from existing transaction:', creditsToAdd)
         }
 
         if (creditsToAdd > 0) {
@@ -546,10 +555,30 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
             }
           } catch (creditsError: any) {
             console.error('[WayForPay] Error adding credits:', creditsError)
+            // Mark as failed if credit addition failed
+            if (existingTransaction) {
+              await supabase
+                .from('credit_transactions')
+                .update({
+                  status: 'failed',
+                  payment_status: 'failed',
+                })
+                .eq('id', existingTransaction.id)
+            }
             // Still return success to WayForPay so it doesn't retry
           }
         } else {
           console.warn('[WayForPay] Could not determine credits to add, amount:', amount)
+          // Mark as failed since we couldn't find credits to add
+          if (existingTransaction) {
+            await supabase
+              .from('credit_transactions')
+              .update({
+                status: 'failed',
+                payment_status: 'failed',
+              })
+              .eq('id', existingTransaction.id)
+          }
         }
       } else {
         // Payment not approved, mark transaction as failed
