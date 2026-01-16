@@ -75,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       try {
         if (mounted && session?.user) {
-          console.log('[Auth] Session found, setting user and fetching role...')
+          console.log('[Auth] Supabase session found, restoring user...')
           // Immediately set user without role to unblock UI
           setUser({
             ...session.user,
@@ -97,7 +97,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // User is already set with default role, no need to update
           }
         } else {
-          console.log('[Auth] No session found on reload')
+          // Fallback: Check if there's a token in localStorage (from custom backend)
+          const token = localStorage.getItem('access_token')
+          const storedUser = sessionStorage.getItem('auth_user')
+          
+          if (token && storedUser) {
+            console.log('[Auth] No Supabase session, but found stored token and user data - restoring...')
+            try {
+              const user = JSON.parse(storedUser)
+              setUser(user)
+              
+              // Fetch role in the background
+              try {
+                const { data: profile } = await fetchProfileWithTimeout(user.id)
+                if (mounted) {
+                  setUser(prevUser => ({
+                    ...prevUser!,
+                    role: profile?.role || 'user'
+                  }))
+                }
+              } catch (profileError) {
+                console.warn('[Auth] Profile fetch failed, keeping stored role:', profileError)
+              }
+            } catch (e) {
+              console.warn('[Auth] Failed to parse stored user data')
+              localStorage.removeItem('access_token')
+              sessionStorage.removeItem('auth_user')
+            }
+          } else {
+            console.log('[Auth] No session or stored user found on reload')
+          }
         }
       } catch (error) {
         console.error('Error loading initial session:', error)
@@ -110,6 +139,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }).catch((err: any) => {
       console.error('Get session error:', err)
+      
+      // Last resort fallback: Check localStorage for token
+      const token = localStorage.getItem('access_token')
+      const storedUser = sessionStorage.getItem('auth_user')
+      if (token && storedUser) {
+        console.warn('[Auth] Supabase session check failed, using stored token')
+        try {
+          const user = JSON.parse(storedUser)
+          setUser(user)
+        } catch (e) {
+          console.error('[Auth] Failed to parse stored user on fallback')
+        }
+      }
+      
       if (mounted) {
         hasCompletedInitialization = true
         setLoading(false)
@@ -185,6 +228,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (data.access_token) {
         localStorage.setItem('access_token', data.access_token)
+        // Also store user data for session restoration on reload
+        sessionStorage.setItem('auth_user', JSON.stringify(data.user))
         setUser(data.user)
 
         // Log before setting session
@@ -253,6 +298,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setUser(null)
     localStorage.removeItem('access_token')
+    sessionStorage.removeItem('auth_user')
   }
 
   const signInWithGoogle = async () => {
