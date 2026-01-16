@@ -8,12 +8,10 @@ import { Input } from '../components/ui/Input'
 import { useToast } from '../hooks/useToast'
 import { User, Lock, Mail, LogOut } from 'lucide-react'
 import api from '../lib/api'
-import { useLanguage } from '../contexts/LanguageContext'
 
 export function ProfileSettings() {
   const { user, signOut } = useAuth()
   const { toast } = useToast()
-  const { t } = useLanguage()
   const navigate = useNavigate()
   const [emailForm, setEmailForm] = useState({
     email: '',
