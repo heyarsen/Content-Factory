@@ -78,7 +78,8 @@ export function Credits() {
     const orderRef = params.get('order')
 
     if (status === 'success' && orderRef) {
-      checkPaymentStatus(orderRef)
+      // Start aggressive polling immediately after returning from payment
+      checkPaymentStatusAggressive(orderRef)
       // Clean up URL
       window.history.replaceState({}, '', '/credits')
     }
@@ -324,6 +325,53 @@ export function Credits() {
       }
     } catch (error: any) {
       console.error('Status check error:', error)
+    }
+  }
+
+  const checkPaymentStatusAggressive = async (orderReference: string, attempts = 0) => {
+    try {
+      const response = await api.get(`/api/credits/check-status/${orderReference}`)
+      const { status, completed } = response.data
+
+      if (status === 'Approved' || status === 'completed' || completed) {
+        // Payment successful - show success and refresh data immediately
+        addNotification({
+          type: 'success',
+          title: t('credits.payment_success'),
+          message: t('credits.credits_added_immediately'),
+        })
+        // Refresh immediately
+        await refreshCredits()
+        await loadTransactionHistory()
+        await loadSubscriptionStatus()
+      } else if (attempts < 10) {
+        // Aggressive polling: check every 1 second for up to 10 seconds
+        setTimeout(() => checkPaymentStatusAggressive(orderReference, attempts + 1), 1000)
+
+        // Only show "processing" on the first attempt
+        if (attempts === 0) {
+          addNotification({
+            type: 'info',
+            title: t('credits.payment_processing'),
+            message: t('credits.payment_processing_msg'),
+          })
+        }
+      } else {
+        // Final attempt - switch to standard polling
+        addNotification({
+          type: 'warning',
+          title: t('credits.payment_processing'),
+          message: t('credits.please_wait_processing'),
+        })
+        // Continue with slower polling
+        checkPaymentStatus(orderReference, 0)
+      }
+    } catch (error: any) {
+      console.error('Status check error:', error)
+      // Retry even on error
+      if (attempts < 10) {
+        setTimeout(() => checkPaymentStatusAggressive(orderReference, attempts + 1), 1000)
+      }
     }
   }
 

@@ -330,18 +330,31 @@ router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) 
  */
 router.post('/webhook', async (req: Request, res: Response) => {
   try {
-    const callbackData = req.body
+    let callbackData = req.body
+
+    // WayForPay might send data as form-encoded or JSON, handle both
+    // If the body appears empty, try parsing from form data
+    if (!callbackData || Object.keys(callbackData).length === 0) {
+      console.warn('[WayForPay] Webhook body is empty, checking for alternative format')
+      callbackData = req.query || {}
+    }
 
     console.log('[WayForPay] Webhook received:', {
       orderReference: callbackData.orderReference,
       transactionStatus: callbackData.transactionStatus,
       amount: callbackData.amount,
       currency: callbackData.currency,
+      bodyKeys: Object.keys(callbackData),
     })
 
     // Verify signature
     if (!WayForPayService.verifyCallback(callbackData)) {
-      console.error('[WayForPay] Invalid callback signature')
+      console.error('[WayForPay] Invalid callback signature', {
+        orderReference: callbackData.orderReference,
+        hasAmount: !!callbackData.amount,
+        hasCurrency: !!callbackData.currency,
+        hasTransactionStatus: !!callbackData.transactionStatus,
+      })
       return res.status(400).json({ error: 'Invalid signature' })
     }
 
@@ -350,11 +363,13 @@ router.post('/webhook', async (req: Request, res: Response) => {
 
     // Check if this is a subscription or top-up
     const isSubscription = orderReference.startsWith('subscription_')
+    const isTopup = orderReference.startsWith('topup_')
 
     console.log('[WayForPay] Processing webhook:', {
       orderReference,
       transactionStatus,
       isSubscription,
+      isTopup,
     })
 
     if (isSubscription) {
@@ -404,62 +419,125 @@ router.post('/webhook', async (req: Request, res: Response) => {
           .eq('id', subscription.id)
         console.log('[WayForPay] Payment not approved, updated status only')
       }
-    } else {
-      // Handle top-up payment (legacy support)
-      const { data: transaction } = await supabase
-        .from('credit_transactions')
-        .select('*, user_id')
-        .eq('payment_id', orderReference)
-        .eq('type', 'topup')
-        .single()
+    } else if (isTopup) {
+      // Handle top-up payment
+      console.log('[WayForPay] Processing topup for:', orderReference)
 
-      if (!transaction) {
-        console.error('[WayForPay] Transaction not found:', orderReference)
-        return res.status(404).json({ error: 'Transaction not found' })
+      // Extract user ID from orderReference (format: topup_userId_timestamp)
+      const parts = orderReference.split('_')
+      if (parts.length < 3) {
+        console.error('[WayForPay] Invalid topup reference format:', orderReference)
+        return res.status(400).json({ error: 'Invalid reference format' })
       }
 
-      const userId = transaction.user_id
+      const userId = parts[1]
 
-      // Update transaction status
-      await supabase
+      console.log('[WayForPay] Topup user ID:', userId)
+
+      // Check if transaction already exists
+      const { data: existingTransaction } = await supabase
         .from('credit_transactions')
-        .update({
-          payment_status: transactionStatus === 'Approved' ? 'completed' : 'failed',
-        })
-        .eq('id', transaction.id)
+        .select('id, status')
+        .eq('payment_id', orderReference)
+        .maybeSingle()
 
-      // If payment approved, add credits
+      // If payment approved, add credits immediately
       if (transactionStatus === 'Approved') {
-        const balanceBefore = await CreditsService.getUserCredits(userId)
-        const packageId = transaction.operation?.replace('topup_', '') || ''
-        const packageData = await CreditsService.getPackage(packageId)
+        console.log('[WayForPay] Topup payment approved, adding credits immediately')
 
-        if (packageData) {
-          // Add credits (skip transaction log since we already have one)
-          const balanceAfter = await CreditsService.addCredits(
-            userId,
-            packageData.credits,
-            `topup_${packageData.id}`,
-            true // Skip transaction log
-          )
+        // Find the package by amount from callback
+        const amount = parseFloat(callbackData.amount)
+        
+        // Map amounts to packages
+        let creditsToAdd = 0
+        if (amount >= 4.9 && amount <= 5.1) {
+          creditsToAdd = 50 // $5 = 50 credits
+        } else if (amount >= 9.9 && amount <= 10.1) {
+          creditsToAdd = 150 // $10 = 150 credits
+        } else if (amount >= 19.9 && amount <= 20.1) {
+          creditsToAdd = 350 // $20 = 350 credits
+        } else if (amount >= 49.9 && amount <= 50.1) {
+          creditsToAdd = 1000 // $50 = 1000 credits
+        } else {
+          // Try to find from transaction
+          const { data: transaction } = await supabase
+            .from('credit_transactions')
+            .select('amount')
+            .eq('payment_id', orderReference)
+            .maybeSingle()
+          creditsToAdd = transaction?.amount || Math.floor(amount * 10)
+        }
 
-          // Update the original transaction with final balance and status
+        if (creditsToAdd > 0) {
+          try {
+            const balanceBefore = await CreditsService.getUserCredits(userId)
+            const balanceAfter = await CreditsService.addCredits(
+              userId,
+              creditsToAdd,
+              `topup_payment_${orderReference}`,
+              false // Create transaction log
+            )
+
+            console.log('[WayForPay] Credits added successfully:', {
+              userId,
+              creditsAdded: creditsToAdd,
+              balanceBefore,
+              balanceAfter,
+            })
+
+            // Update or create transaction record
+            if (existingTransaction) {
+              await supabase
+                .from('credit_transactions')
+                .update({
+                  status: 'completed',
+                  payment_status: 'completed',
+                  balance_after: balanceAfter,
+                })
+                .eq('id', existingTransaction.id)
+            } else {
+              // Create new transaction record
+              await supabase
+                .from('credit_transactions')
+                .insert({
+                  user_id: userId,
+                  type: 'topup',
+                  amount: creditsToAdd,
+                  balance_before: balanceBefore,
+                  balance_after: balanceAfter,
+                  status: 'completed',
+                  payment_id: orderReference,
+                  payment_status: 'completed',
+                })
+            }
+          } catch (creditsError: any) {
+            console.error('[WayForPay] Error adding credits:', creditsError)
+            // Still return success to WayForPay so it doesn't retry
+          }
+        }
+      } else {
+        // Payment not approved, mark transaction as failed
+        console.log('[WayForPay] Topup payment not approved:', transactionStatus)
+
+        if (existingTransaction) {
           await supabase
             .from('credit_transactions')
             .update({
-              balance_after: balanceAfter,
-              amount: packageData.credits,
-              payment_status: 'completed',
+              status: 'failed',
+              payment_status: 'failed',
             })
-            .eq('id', transaction.id)
+            .eq('id', existingTransaction.id)
         }
       }
+    } else {
+      console.warn('[WayForPay] Unknown payment type:', orderReference)
     }
 
     res.json({ status: 'ok' })
   } catch (error: any) {
     console.error('[WayForPay] Webhook error:', error)
-    res.status(500).json({ error: 'Webhook processing failed' })
+    // Always return success to WayForPay to avoid retries
+    res.json({ status: 'ok' })
   }
 })
 

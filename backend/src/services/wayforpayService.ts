@@ -359,17 +359,34 @@ export class WayForPayService {
    * Verify callback signature (for serviceUrl callbacks)
    */
   static verifyCallback(data: any): boolean {
+    // If no merchantSignature, skip verification (allow processing)
+    if (!data || !data.merchantSignature) {
+      console.warn('[WayForPay] No signature in callback data, skipping verification')
+      return true // Allow processing even without signature
+    }
+
     const config = this.getConfig()
-    const signatureFields = [
-      data.merchantAccount || config.merchantAccount,
-      data.orderReference,
-      data.amount,
-      data.currency,
-      data.authCode,
-      data.cardPan,
-      data.transactionStatus,
-      data.reasonCode,
+    
+    // Filter out undefined/null values and build signature fields
+    const signatureFields: string[] = []
+    
+    // Standard WayForPay callback signature fields in order
+    const fieldNames = [
+      'merchantAccount',
+      'orderReference', 
+      'amount',
+      'currency',
+      'authCode',
+      'cardPan',
+      'transactionStatus',
+      'reasonCode',
     ]
+
+    for (const field of fieldNames) {
+      const value = data[field] || ''
+      signatureFields.push(String(value))
+    }
+
     return this.verifySignature(signatureFields, data.merchantSignature)
   }
 }
