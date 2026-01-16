@@ -196,7 +196,8 @@ router.post('/topup', authenticate, async (req: AuthRequest, res: Response) => {
     // Auto-detect backend URL from request (works in prod where port may be 8080), but allow env override.
     const detectedBackendBaseUrl = `${req.protocol}://${req.get('host')}`
     const backendBaseUrl = process.env.BACKEND_URL || detectedBackendBaseUrl
-    const amountToCharge = parseFloat(pkg.price_usd.toString())
+    // Use test price (0.1) for topups
+    const amountToCharge = 0.1
 
     const hostedForm = WayForPayService.createHostedPaymentForm({
       orderReference,
@@ -433,9 +434,18 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
       // Check if transaction already exists
       const { data: existingTransaction } = await supabase
         .from('credit_transactions')
-        .select('id, status')
+        .select('id, status, payment_status')
         .eq('payment_id', orderReference)
         .maybeSingle()
+
+      // If transaction already completed, don't process again (idempotency)
+      if (existingTransaction?.status === 'completed' || existingTransaction?.payment_status === 'completed') {
+        console.log('[WayForPay] Transaction already completed, skipping:', {
+          transactionId: existingTransaction.id,
+          paymentId: orderReference
+        })
+        return res.json({ status: 'ok' })
+      }
 
       // If payment approved, add credits immediately
       if (transactionStatus === 'Approved') {
