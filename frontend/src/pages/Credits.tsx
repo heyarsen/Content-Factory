@@ -133,7 +133,11 @@ export function Credits() {
       const response = await api.get('/api/credits/history', {
         params: { limit: 100 },
       })
-      setTransactions(response.data.transactions || [])
+      // Filter out failed topups - don't show them in the UI
+      const filteredTransactions = (response.data.transactions || []).filter(
+        (tx: CreditTransaction) => !(tx.type === 'topup' && tx.payment_status === 'failed')
+      )
+      setTransactions(filteredTransactions)
     } catch (error: any) {
       console.error('Failed to load transaction history:', error)
     } finally {
