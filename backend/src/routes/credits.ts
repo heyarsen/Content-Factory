@@ -507,9 +507,23 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
         }
         
         // Fallback: use the amount from the existing transaction
-        if (creditsToAdd === 0 && existingTransaction?.amount) {
-          creditsToAdd = existingTransaction.amount
-          console.log('[WayForPay] Using amount from existing transaction:', creditsToAdd)
+        if (creditsToAdd === 0) {
+          if (existingTransaction?.amount) {
+            creditsToAdd = existingTransaction.amount
+            console.log('[WayForPay] Using credits from existing transaction:', {
+              transactionId: existingTransaction.id,
+              credits: creditsToAdd
+            })
+          } else {
+            console.warn('[WayForPay] No existing transaction with amount found:', {
+              existingTransaction: existingTransaction ? {
+                id: existingTransaction.id,
+                status: existingTransaction.status,
+                payment_status: existingTransaction.payment_status,
+                amount: existingTransaction.amount
+              } : null
+            })
+          }
         }
 
         if (creditsToAdd > 0) {
