@@ -217,12 +217,11 @@ export function ProfileSettings() {
                 onClick={async () => {
                   try {
                     await signOut()
-                    navigate('/login')
                   } catch (error) {
                     console.error('Sign out error:', error)
-                    // Force navigation even if signOut fails
-                    navigate('/login')
                   }
+                  // Always navigate to login, regardless of errors
+                  navigate('/login')
                 }}
                 leftIcon={<LogOut className="h-4 w-4" />}
               >

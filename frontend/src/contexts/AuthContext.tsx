@@ -180,32 +180,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async () => {
-    try {
-      await api.post('/api/auth/logout')
-    } catch (error) {
-      console.error('Logout API error:', error)
-      // Continue with sign out even if API call fails
-    }
-    try {
-      await supabase.auth.signOut()
-    } catch (error) {
-      console.error('Supabase sign out error:', error)
-      // Continue with cleanup even if Supabase sign out fails
-    }
+    console.log('[Auth] Starting sign out...')
     
-    // Clear our auth storage
+    // Step 1: Clear our state immediately
     setUser(null)
+    
+    // Step 2: Clear our auth storage
     localStorage.removeItem('access_token')
     localStorage.removeItem('auth_user')
     
-    // Clear all Supabase session keys from both storages
-    const keysToRemove = Array.from({ length: sessionStorage.length }, (_, i) => sessionStorage.key(i))
-      .filter((key): key is string => key !== null && (key.startsWith('sb-') || key === 'supabase.auth.token'))
-    keysToRemove.forEach(key => sessionStorage.removeItem(key))
+    // Step 3: Clear Supabase storage by collecting keys first (to avoid length issues)
+    const sessionKeys = Array.from({ length: sessionStorage.length }, (_, i) => sessionStorage.key(i) || '')
+      .filter(key => key && (key.startsWith('sb-') || key === 'supabase.auth.token'))
+    sessionKeys.forEach(key => sessionStorage.removeItem(key))
     
-    const localKeysToRemove = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i))
-      .filter((key): key is string => key !== null && (key.startsWith('sb-') || key === 'supabase.auth.token'))
-    localKeysToRemove.forEach(key => localStorage.removeItem(key))
+    const localStorageKeys = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i) || '')
+      .filter(key => key && (key.startsWith('sb-') || key === 'supabase.auth.token'))
+    localStorageKeys.forEach(key => localStorage.removeItem(key))
+    
+    // Step 4: Sign out from Supabase (non-blocking)
+    try {
+      await supabase.auth.signOut()
+    } catch (error) {
+      console.warn('[Auth] Supabase sign out warning:', error)
+    }
+    
+    // Step 5: Call logout API (non-blocking)
+    try {
+      await api.post('/api/auth/logout')
+    } catch (error) {
+      console.warn('[Auth] Logout API warning:', error)
+    }
+    
+    console.log('[Auth] Sign out complete')
   }
 
   const signInWithGoogle = async () => {
