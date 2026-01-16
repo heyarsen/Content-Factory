@@ -196,8 +196,7 @@ router.post('/topup', authenticate, async (req: AuthRequest, res: Response) => {
     // Auto-detect backend URL from request (works in prod where port may be 8080), but allow env override.
     const detectedBackendBaseUrl = `${req.protocol}://${req.get('host')}`
     const backendBaseUrl = process.env.BACKEND_URL || detectedBackendBaseUrl
-    // Use test price (0.1) for topups
-    const amountToCharge = 0.1
+    const amountToCharge = parseFloat(pkg.price_usd.toString())
 
     const hostedForm = WayForPayService.createHostedPaymentForm({
       orderReference,
