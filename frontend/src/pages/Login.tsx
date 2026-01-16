@@ -6,6 +6,7 @@ import { Input } from '../components/ui/Input'
 import { Card } from '../components/ui/Card'
 import { Eye, EyeOff } from 'lucide-react'
 import { useLanguage } from '../contexts/LanguageContext'
+import { LanguageSelector } from '../components/LanguageSelector'
 
 export function Login() {
   const { t } = useLanguage()
@@ -124,6 +125,11 @@ export function Login() {
                 </div>
                 <h2 className="text-2xl font-semibold text-primary">{t('auth.welcome_back')}</h2>
                 <p className="text-sm text-slate-500">{t('auth.login_desc')}</p>
+              </div>
+
+              {/* Language Selector */}
+              <div className="mb-6">
+                <LanguageSelector showLabel={true} />
               </div>
 
               {error && (
