@@ -440,7 +440,7 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
       // Check if transaction already exists and lock it
       const { data: existingTransaction, error: fetchError } = await supabase
         .from('credit_transactions')
-        .select('id, status, payment_status, amount')
+        .select('id, payment_status, amount')
         .eq('payment_id', orderReference)
         .maybeSingle()
       
@@ -458,10 +458,11 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
       }
 
       // If transaction already completed, don't process again (idempotency)
-      if (existingTransaction?.status === 'completed' || existingTransaction?.payment_status === 'completed') {
-        console.log('[WayForPay] Transaction already completed, skipping:', {
+      if (existingTransaction?.payment_status === 'completed' || existingTransaction?.payment_status === 'processing') {
+        console.log('[WayForPay] Transaction already completed or processing, skipping:', {
           transactionId: existingTransaction.id,
-          paymentId: orderReference
+          paymentId: orderReference,
+          paymentStatus: existingTransaction.payment_status
         })
         return res.json({ status: 'ok' })
       }
@@ -475,9 +476,9 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
         if (existingTransaction) {
           const { data: updated, error: updateError } = await supabase
             .from('credit_transactions')
-            .update({ status: 'processing' })
+            .update({ payment_status: 'processing' })
             .eq('id', existingTransaction.id)
-            .eq('status', 'pending') // Only update if still pending
+            .eq('payment_status', 'pending') // Only update if still pending
             .select('id')
             .maybeSingle()
 
@@ -531,7 +532,6 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
             console.warn('[WayForPay] No existing transaction with amount found:', {
               existingTransaction: existingTransaction ? {
                 id: existingTransaction.id,
-                status: existingTransaction.status,
                 payment_status: existingTransaction.payment_status,
                 amount: existingTransaction.amount
               } : null
@@ -561,7 +561,6 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
               await supabase
                 .from('credit_transactions')
                 .update({
-                  status: 'completed',
                   payment_status: 'completed',
                   balance_after: balanceAfter,
                 })
@@ -576,7 +575,6 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
                   amount: creditsToAdd,
                   balance_before: balanceBefore,
                   balance_after: balanceAfter,
-                  status: 'completed',
                   payment_id: orderReference,
                   payment_status: 'completed',
                 })
@@ -588,7 +586,6 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
               await supabase
                 .from('credit_transactions')
                 .update({
-                  status: 'failed',
                   payment_status: 'failed',
                 })
                 .eq('id', existingTransaction.id)
@@ -602,7 +599,6 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
             await supabase
               .from('credit_transactions')
               .update({
-                status: 'failed',
                 payment_status: 'failed',
               })
               .eq('id', existingTransaction.id)
@@ -616,7 +612,6 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
           await supabase
             .from('credit_transactions')
             .update({
-              status: 'failed',
               payment_status: 'failed',
             })
             .eq('id', existingTransaction.id)
