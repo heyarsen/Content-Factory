@@ -407,14 +407,20 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
           // Still return success to WayForPay, but log the error
         }
       } else {
-        // Update payment status only
-        await supabase
-          .from('user_subscriptions')
-          .update({
-            payment_status: transactionStatus === 'Approved' ? 'completed' : 'failed',
-          })
-          .eq('id', subscription.id)
-        console.log('[WayForPay] Payment not approved, updated status only')
+        // IMPORTANT: Only update failed status for NEW (pending) subscriptions
+        // If subscription is already 'active' with 'completed' payment, ignore refund/expired notifications
+        // This prevents subscriptions from being randomly removed due to late refund/expired webhooks
+        if (subscription.status === 'pending' || subscription.payment_status !== 'completed') {
+          await supabase
+            .from('user_subscriptions')
+            .update({
+              payment_status: 'failed',
+            })
+            .eq('id', subscription.id)
+          console.log('[WayForPay] Pending payment not approved, marked as failed')
+        } else {
+          console.log('[WayForPay] Ignoring failed payment for already-active subscription (likely a refund/expiration after activation)')
+        }
       }
     } else if (isTopup) {
       // Handle top-up payment

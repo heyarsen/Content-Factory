@@ -116,7 +116,7 @@ export class SubscriptionService {
   static async getUserSubscription(userId: string): Promise<UserSubscription | null> {
     console.log('[Subscription] Fetching active subscription for user:', userId)
 
-    // First, try to get active & completed subscription
+    // First, try to get active subscription with completed payment
     const { data, error } = await supabase
       .from('user_subscriptions')
       .select('*, plan:subscription_plans(*)')
@@ -136,30 +136,32 @@ export class SubscriptionService {
       return data as any as UserSubscription
     }
 
-    // If not found, check if there's any active subscription that might have pending/failed payment
-    // that should have been completed.
-    const { data: anyActive } = await supabase
+    // If not found, check if there's any active subscription with failed payment status
+    // This can happen if a refund/expired webhook arrives after activation.
+    // These subscriptions should still be considered active if they were activated before.
+    const { data: failedPaymentSub } = await supabase
       .from('user_subscriptions')
-      .select('id, status, payment_status, created_at')
+      .select('*, plan:subscription_plans(*)')
       .eq('user_id', userId)
       .eq('status', 'active')
+      .eq('payment_status', 'failed')
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
 
-    if (anyActive) {
-      console.warn('[Subscription] Found active subscription but with incorrect payment status:', {
+    if (failedPaymentSub) {
+      console.warn('[Subscription] Found active subscription with failed payment status (likely late refund webhook):', {
         userId,
-        subscriptionId: anyActive.id,
-        paymentStatus: anyActive.payment_status,
+        subscriptionId: failedPaymentSub.id,
+        paymentStatus: failedPaymentSub.payment_status,
       })
-      // If payment_status is null but it was activated, we might want to return it anyway
-      // to avoid breaking the UI for users who actually paid.
-      // For now, let's keep it strict but log it.
-    } else {
-      console.log('[Subscription] No active subscription records found for user:', userId)
+      // IMPORTANT: Return the subscription anyway since it was activated and user paid.
+      // The failed status is from a late refund/expiration webhook that shouldn't affect
+      // the subscription that's already active.
+      return failedPaymentSub as any as UserSubscription
     }
 
+    console.log('[Subscription] No active subscription records found for user:', userId)
     return null
   }
 
