@@ -226,13 +226,16 @@ export function Credits() {
       const response = await api.post('/api/credits/topup', { packageId })
 
       if (response.data.paymentUrl && response.data.paymentFields) {
+        // Don't clear loading state - let the redirect happen while button stays in loading state
         submitWayForPayForm(response.data.paymentUrl, response.data.paymentFields)
       } else {
+        // Only clear loading state if payment initiation failed
         addNotification({
           type: 'error',
           title: t('credits.payment_error'),
           message: t('credits.initiate_topup_failed'),
         })
+        setToppingUp(null)
       }
     } catch (error: any) {
       console.error('Top up error:', error)
@@ -241,7 +244,6 @@ export function Credits() {
         title: t('credits.topup_error'),
         message: error.response?.data?.error || t('credits.initiate_topup_failed'),
       })
-    } finally {
       setToppingUp(null)
     }
   }
