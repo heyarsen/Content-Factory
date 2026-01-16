@@ -27,6 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    let timeoutId: NodeJS.Timeout | null = null
 
     // FIRST: Check our own storage - this is the source of truth
     const token = localStorage.getItem('access_token')
@@ -54,10 +55,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false)
       }
     } else {
-      // No stored session, check Supabase as fallback
+      // No stored session, check Supabase as fallback with timeout
       console.log('[Auth] No stored session, checking Supabase...')
+      
+      // Set a 3 second timeout - if we don't get a response, assume logged out
+      timeoutId = setTimeout(() => {
+        if (mounted) {
+          console.log('[Auth] Supabase session check timed out, assuming logged out')
+          setLoading(false)
+        }
+      }, 3000)
+      
       supabase.auth.getSession()
         .then(({ data: { session } }) => {
+          if (timeoutId) clearTimeout(timeoutId)
+          
           if (mounted && session?.user) {
             console.log('[Auth] Found Supabase session, storing it...')
             const user = {
@@ -70,9 +82,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           } else {
             console.log('[Auth] No session found')
           }
+          if (mounted) setLoading(false)
         })
-        .catch(err => console.error('[Auth] Session check error:', err.message))
-        .finally(() => {
+        .catch(err => {
+          if (timeoutId) clearTimeout(timeoutId)
+          console.error('[Auth] Session check error:', err.message)
           if (mounted) setLoading(false)
         })
     }
@@ -103,6 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       mounted = false
+      if (timeoutId) clearTimeout(timeoutId)
       subscription.unsubscribe()
     }
   }, [])
