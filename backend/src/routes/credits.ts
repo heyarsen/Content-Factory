@@ -472,28 +472,48 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
 
         // Find the package by amount from callback
         const amount = parseFloat(callbackData.amount) || 0
+        console.log('[WayForPay] Payment amount:', amount)
         
-        // Map amounts to packages - these are the charge amounts in test mode
+        // Try to find matching package from database by price
+        const { data: matchingPackage } = await supabase
+          .from('credit_packages')
+          .select('credits, price_usd')
+          .eq('is_active', true)
+          .order('price_usd', { ascending: true })
+          .limit(10)
+        
         let creditsToAdd = 0
-        if (amount >= 0.09 && amount <= 0.11) {
-          // $0.10 test charge = $10 package = 150 credits
-          creditsToAdd = 150
-        } else if (amount >= 4.9 && amount <= 5.1) {
-          creditsToAdd = 50 // $5 = 50 credits
-        } else if (amount >= 9.9 && amount <= 10.1) {
-          creditsToAdd = 150 // $10 = 150 credits
-        } else if (amount >= 19.9 && amount <= 20.1) {
-          creditsToAdd = 350 // $20 = 350 credits
-        } else if (amount >= 49.9 && amount <= 50.1) {
-          creditsToAdd = 1000 // $50 = 1000 credits
-        } else {
-          // Try to find from transaction or estimate
+        
+        if (matchingPackage && matchingPackage.length > 0) {
+          // Find closest matching package by price (with 10% tolerance)
+          const tolerance = amount * 0.1
+          const closestPackage = matchingPackage.find(pkg => {
+            const pkgPrice = parseFloat(pkg.price_usd.toString())
+            return Math.abs(pkgPrice - amount) <= tolerance
+          })
+          
+          if (closestPackage) {
+            creditsToAdd = closestPackage.credits
+            console.log('[WayForPay] Matched package by price:', {
+              amount,
+              packagePrice: closestPackage.price_usd,
+              credits: creditsToAdd
+            })
+          }
+        }
+        
+        // Fallback: check if there's a transaction already created with the amount
+        if (creditsToAdd === 0) {
           const { data: transaction } = await supabase
             .from('credit_transactions')
             .select('amount')
             .eq('payment_id', orderReference)
             .maybeSingle()
-          creditsToAdd = transaction?.amount || Math.floor(amount * 10)
+          
+          if (transaction?.amount) {
+            creditsToAdd = transaction.amount
+            console.log('[WayForPay] Using amount from transaction:', creditsToAdd)
+          }
         }
 
         if (creditsToAdd > 0) {
