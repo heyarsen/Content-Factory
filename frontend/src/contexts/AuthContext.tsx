@@ -192,9 +192,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Supabase sign out error:', error)
       // Continue with cleanup even if Supabase sign out fails
     }
+    
+    // Clear our auth storage
     setUser(null)
     localStorage.removeItem('access_token')
     localStorage.removeItem('auth_user')
+    
+    // Clear all Supabase session keys from both storages
+    const keysToRemove = Array.from({ length: sessionStorage.length }, (_, i) => sessionStorage.key(i))
+      .filter(key => key && (key.startsWith('sb-') || key === 'supabase.auth.token'))
+    keysToRemove.forEach(key => sessionStorage.removeItem(key))
+    
+    const localKeysToRemove = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i))
+      .filter(key => key && (key.startsWith('sb-') || key === 'supabase.auth.token'))
+    localKeysToRemove.forEach(key => localStorage.removeItem(key))
   }
 
   const signInWithGoogle = async () => {
