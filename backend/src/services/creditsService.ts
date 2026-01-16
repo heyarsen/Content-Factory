@@ -132,7 +132,7 @@ export class CreditsService {
     paymentStatus?: string
   ): Promise<void> {
     try {
-      await supabase.from('credit_transactions').insert({
+      const { data, error } = await supabase.from('credit_transactions').insert({
         user_id: userId,
         type,
         amount,
@@ -142,7 +142,20 @@ export class CreditsService {
         description,
         payment_id: paymentId,
         payment_status: paymentStatus,
-      })
+      }).select('id')
+      
+      if (error) {
+        console.error('[Credits] Error creating transaction record:', error)
+      } else {
+        console.log('[Credits] Transaction created successfully:', {
+          userId,
+          type,
+          amount,
+          paymentId,
+          paymentStatus,
+          transactionId: data?.[0]?.id
+        })
+      }
     } catch (error) {
       console.error('[Credits] Error creating transaction record:', error)
       // Don't throw - transaction logging shouldn't break the main flow

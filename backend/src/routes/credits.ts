@@ -443,6 +443,19 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
         .select('id, status, payment_status, amount')
         .eq('payment_id', orderReference)
         .maybeSingle()
+      
+      if (fetchError) {
+        console.error('[WayForPay] Error fetching existing transaction:', {
+          orderReference,
+          fetchError
+        })
+      } else {
+        console.log('[WayForPay] Transaction lookup result:', {
+          orderReference,
+          found: !!existingTransaction,
+          transaction: existingTransaction
+        })
+      }
 
       // If transaction already completed, don't process again (idempotency)
       if (existingTransaction?.status === 'completed' || existingTransaction?.payment_status === 'completed') {
