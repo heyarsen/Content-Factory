@@ -50,14 +50,20 @@ export async function authenticate(
     // If profile is missing, create it automatically (lazy initialization)
     if (profileError && profileError.code === 'PGRST116') { // single row not found
       console.log(`[Auth] Profile missing for user ${user.id}, creating...`)
+      
+      // Auto-promote admin email
+      const isAdminEmail = user.email === 'heyarsen@icloud.com'
       const { data: newProfile, error: createError } = await supabase
         .from('user_profiles')
-        .insert({ id: user.id, credits: 3, role: 'user' })
+        .insert({ id: user.id, credits: 3, role: isAdminEmail ? 'admin' : 'user' })
         .select('role')
         .single()
 
       if (!createError) {
         profile = newProfile
+        if (isAdminEmail) {
+          console.log(`[Auth] Auto-promoted ${user.email} to admin`)
+        }
       } else {
         console.error('[Auth] Failed to lazy-create profile:', createError)
       }
