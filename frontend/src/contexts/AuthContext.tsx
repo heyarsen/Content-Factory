@@ -60,30 +60,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               // Token is valid, restore user
               if (mounted) {
                 setUser(user)
+                console.log('[Auth] Token valid, fetching role for user:', user.id)
                 
                 // Fetch actual role from database in the background
-                Promise.resolve(
+                const rolePromise = Promise.resolve(
                   supabase
                     .from('user_profiles')
                     .select('role')
                     .eq('id', user.id)
                     .single()
-                ).then(({ data: profile, error }) => {
+                )
+                
+                console.log('[Auth] Role promise created, awaiting response...')
+                
+                rolePromise.then((result) => {
+                  console.log('[Auth] Role query result:', result)
+                  const { data: profile, error } = result
                   if (error) {
-                    console.warn('[Auth] Failed to fetch role:', error.message)
+                    console.error('[Auth] Role fetch error:', error.code, error.message)
                     return
                   }
                   if (!profile) {
                     console.warn('[Auth] No profile found for user')
                     return
                   }
+                  console.log('[Auth] Profile found, role =', profile.role)
                   if (profile?.role && mounted) {
                     const updatedUser = { ...user, role: profile.role as 'user' | 'admin' }
                     localStorage.setItem('auth_user', JSON.stringify(updatedUser))
                     setUser(updatedUser)
-                    console.log('[Auth] Updated user role from database:', profile.role)
+                    console.log('[Auth] ✅ Updated user role from database:', profile.role)
                   }
-                }).catch((err: any) => console.warn('[Auth] Failed to fetch role:', err?.message))
+                }).catch((err: any) => {
+                  console.error('[Auth] Role promise catch error:', err)
+                })
                 
                 setLoading(false)
               }
