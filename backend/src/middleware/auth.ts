@@ -104,3 +104,30 @@ export async function isAdmin(
   }
   next()
 }
+
+export async function requireSubscription(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const userId = req.userId!
+    
+    // Import SubscriptionService to check subscription status
+    const { SubscriptionService } = await import('../services/subscriptionService.js')
+    
+    const hasActiveSubscription = await SubscriptionService.hasActiveSubscription(userId)
+    
+    if (!hasActiveSubscription) {
+      return res.status(403).json({ 
+        error: 'Active subscription required to connect social media accounts',
+        code: 'SUBSCRIPTION_REQUIRED'
+      })
+    }
+    
+    next()
+  } catch (error: any) {
+    console.error('Subscription check error:', error)
+    return res.status(500).json({ error: 'Failed to verify subscription status' })
+  }
+}

@@ -7,6 +7,7 @@ interface User {
   email: string
   email_confirmed_at?: string
   role?: 'user' | 'admin'
+  hasActiveSubscription?: boolean
 }
 
 interface AuthContextType {
@@ -42,35 +43,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log('[Auth] Restored user from localStorage:', { email: parsedUser.email, role: parsedUser.role })
         setUser(parsedUser)
         
-        // Fetch actual role from database in the background
-        const fetchRole = async () => {
+        // Fetch actual role and subscription status from database in the background
+        const fetchRoleAndSubscription = async () => {
           try {
             const { data: profile, error } = await supabase
               .from('user_profiles')
-              .select('role')
+              .select('role, has_active_subscription')
               .eq('id', parsedUser.id)
               .maybeSingle()
             
             if (error) {
-              console.error('[Auth] Role fetch error:', error.code, error.message)
+              console.error('[Auth] Role/Subscription fetch error:', error.code, error.message)
               return
             }
             if (!profile) {
               console.warn('[Auth] No profile found for user')
               return
             }
-            console.log('[Auth] Profile found, role =', profile.role)
-            if (profile?.role && mounted) {
-              const updatedUser = { ...parsedUser, role: profile.role as 'user' | 'admin' }
+            console.log('[Auth] Profile found, role =', profile.role, 'subscription =', profile.has_active_subscription)
+            if (mounted) {
+              const updatedUser = { 
+                ...parsedUser, 
+                role: profile.role as 'user' | 'admin',
+                hasActiveSubscription: profile.has_active_subscription || false
+              }
               localStorage.setItem('auth_user', JSON.stringify(updatedUser))
               setUser(updatedUser)
-              console.log('[Auth] ✅ Updated user role from database:', profile.role)
+              console.log('[Auth] ✅ Updated user role and subscription from database')
             }
           } catch (err: any) {
-            console.error('[Auth] Role fetch error:', err)
+            console.error('[Auth] Role/Subscription fetch error:', err)
           }
         }
-        fetchRole()
+        fetchRoleAndSubscription()
         
         setLoading(false)
       } catch (e) {
@@ -99,17 +104,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.log('[Auth] Found Supabase session, fetching user role...')
             
             let role: 'user' | 'admin' = 'user'
+            let profile: any = null
             
             // Try to fetch from user_profiles first
             try {
-              const { data: profile, error } = await supabase
+              const { data: profileData, error } = await supabase
                 .from('user_profiles')
-                .select('role')
+                .select('role, has_active_subscription')
                 .eq('id', session.user.id)
                 .maybeSingle()
               
-              if (!error && profile?.role) {
-                role = profile.role as 'user' | 'admin'
+              if (!error && profileData?.role) {
+                role = profileData.role as 'user' | 'admin'
+                profile = profileData
                 console.log('[Auth] User role fetched from user_profiles:', role)
               } else if (error) {
                 console.warn('[Auth] Could not fetch role from user_profiles:', error.message)
@@ -120,7 +127,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             
             const user = {
               ...session.user,
-              role
+              role,
+              hasActiveSubscription: profile?.has_active_subscription || false
             } as User
             localStorage.setItem('access_token', session.access_token)
             localStorage.setItem('auth_user', JSON.stringify(user))
@@ -144,17 +152,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (mounted) {
         if (session?.user) {
           let role: 'user' | 'admin' = 'user'
+          let profile: any = null
           
           // Try to fetch from user_profiles
           try {
-            const { data: profile, error } = await supabase
+            const { data: profileData, error } = await supabase
               .from('user_profiles')
-              .select('role')
+              .select('role, has_active_subscription')
               .eq('id', session.user.id)
               .maybeSingle()
             
-            if (!error && profile?.role) {
-              role = profile.role as 'user' | 'admin'
+            if (!error && profileData?.role) {
+              role = profileData.role as 'user' | 'admin'
+              profile = profileData
               console.log('[Auth] User role fetched on state change:', role)
             } else if (error) {
               console.warn('[Auth] Could not fetch role:', error.message)
@@ -165,7 +175,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           
           const user = {
             ...session.user,
-            role
+            role,
+            hasActiveSubscription: profile?.has_active_subscription || false
           } as User
           localStorage.setItem('access_token', session.access_token)
           localStorage.setItem('auth_user', JSON.stringify(user))
@@ -225,18 +236,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.log('[Auth] RPC failed, trying direct query')
             const { data: profile, error } = await supabase
               .from('user_profiles')
-              .select('role')
+              .select('role, has_active_subscription')
               .eq('id', data.user.id)
               .maybeSingle()
             
             console.log('[Auth] Direct query result:', { profile, error })
             
             if (!error && profile?.role) {
-              userWithRole = { ...data.user, role: profile.role as 'user' | 'admin' }
+              userWithRole = { 
+                ...data.user, 
+                role: profile.role as 'user' | 'admin',
+                hasActiveSubscription: profile.has_active_subscription || false
+              }
               console.log('[Auth] User role fetched via direct query:', profile.role)
             } else {
               console.log('[Auth] No user profile found, defaulting to user role')
-              userWithRole = { ...data.user, role: 'user' as const }
+              userWithRole = { ...data.user, role: 'user' as const, hasActiveSubscription: false }
             }
           }
         } catch (err) {

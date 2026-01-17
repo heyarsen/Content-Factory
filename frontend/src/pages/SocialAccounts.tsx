@@ -7,9 +7,10 @@ import { Badge } from '../components/ui/Badge'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Modal } from '../components/ui/Modal'
-import { Users, Link2, X, Instagram, Youtube, Facebook, Share2 } from 'lucide-react'
+import { Users, Link2, X, Instagram, Youtube, Facebook, Share2, Crown, Lock } from 'lucide-react'
 import api from '../lib/api'
 import { useLanguage } from '../contexts/LanguageContext'
+import { useAuth } from '../contexts/AuthContext'
 
 interface SocialAccount {
   id: string
@@ -47,6 +48,7 @@ const platformNames = {
 
 export function SocialAccounts() {
   const { t } = useLanguage()
+  const { user } = useAuth()
   const [accounts, setAccounts] = useState<SocialAccount[]>([])
   const [loading, setLoading] = useState(true)
   const [connectingPlatform, setConnectingPlatform] = useState<SocialAccount['platform'] | null>(null)
@@ -87,6 +89,12 @@ export function SocialAccounts() {
 
 
   const handleConnect = async (platform: SocialAccount['platform']) => {
+    // Check if user has active subscription
+    if (!user?.hasActiveSubscription) {
+      alert('You need an active subscription to connect social media accounts. Please upgrade your plan to continue.')
+      return
+    }
+
     setConnectingPlatform(platform)
     try {
       const response = await api.post('/api/social/connect', { platform })
@@ -147,6 +155,11 @@ export function SocialAccounts() {
       if (status === 429) {
         const retryAfter = error.response?.data?.retryAfter || 60
         errorMessage = t('social_accounts.rate_limit_error').replace('{seconds}', retryAfter.toString())
+      }
+
+      // Handle subscription required error specifically
+      if (status === 403 && error.response?.data?.code === 'SUBSCRIPTION_REQUIRED') {
+        errorMessage = 'You need an active subscription to connect social media accounts. Please upgrade your plan to continue.'
       }
 
       console.error('Error details:', {
@@ -213,6 +226,18 @@ export function SocialAccounts() {
           <p className="text-sm text-slate-500">
             {t('social_accounts.subtitle')}
           </p>
+          {user?.hasActiveSubscription && (
+            <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-2">
+              <Crown className="h-4 w-4 text-emerald-600" />
+              <span className="text-sm font-medium text-emerald-600">Premium Plan Active</span>
+            </div>
+          )}
+          {!user?.hasActiveSubscription && (
+            <div className="flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-2">
+              <Lock className="h-4 w-4 text-amber-600" />
+              <span className="text-sm font-medium text-amber-600">Subscription Required for Social Media Connections</span>
+            </div>
+          )}
         </div>
 
         {accounts.length === 0 && availablePlatforms.length === 0 ? (
@@ -299,14 +324,15 @@ export function SocialAccounts() {
                       </Button>
                     ) : (
                       <Button
-                        variant="primary"
+                        variant={user?.hasActiveSubscription ? "primary" : "ghost"}
                         size="sm"
                         onClick={() => handleConnect(platform)}
                         loading={connectingPlatform === platform}
-                        className="w-full"
+                        disabled={!user?.hasActiveSubscription}
+                        className={`w-full ${!user?.hasActiveSubscription ? 'border border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed' : ''}`}
                       >
                         <Link2 className="mr-2 h-4 w-4" />
-                        {t('social_accounts.connect')}
+                        {user?.hasActiveSubscription ? t('social_accounts.connect') : 'Subscribe to Connect'}
                       </Button>
                     )}
                   </div>
