@@ -69,7 +69,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     .eq('id', user.id)
                     .single()
                 ).then(({ data: profile, error }) => {
-                  if (!error && profile?.role && mounted) {
+                  if (error) {
+                    console.warn('[Auth] Failed to fetch role:', error.message)
+                    return
+                  }
+                  if (!profile) {
+                    console.warn('[Auth] No profile found for user')
+                    return
+                  }
+                  if (profile?.role && mounted) {
                     const updatedUser = { ...user, role: profile.role as 'user' | 'admin' }
                     localStorage.setItem('auth_user', JSON.stringify(updatedUser))
                     setUser(updatedUser)
