@@ -209,33 +209,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Fetch user role from database to complete user object
         let userWithRole = data.user
         try {
-          console.log('[Auth] Querying user profile for ID:', data.user.id)
+          console.log('[Auth] Getting user role for ID:', data.user.id)
           
-          // First, let's try to see if we can access the table at all
-          const { data: allProfiles, error: allError } = await supabase
-            .from('user_profiles')
-            .select('id, role')
-            .limit(5)
+          // Try RPC first to bypass RLS
+          const { data: rpcResult, error: rpcError } = await supabase
+            .rpc('get_user_role', { user_id: data.user.id })
           
-          console.log('[Auth] All profiles query result:', { allProfiles, allError })
+          console.log('[Auth] RPC result:', { rpcResult, rpcError })
           
-          const { data: profile, error } = await supabase
-            .from('user_profiles')
-            .select('role')
-            .eq('id', data.user.id)
-            .maybeSingle()
-          
-          console.log('[Auth] Profile query result:', { profile, error })
-          
-          if (!error && profile?.role) {
-            userWithRole = { ...data.user, role: profile.role as 'user' | 'admin' }
-            console.log('[Auth] User role fetched after login:', profile.role)
-          } else if (error) {
-            console.warn('[Auth] Could not fetch role after login:', error.message)
-            userWithRole = { ...data.user, role: 'user' as const }
+          if (!rpcError && rpcResult) {
+            userWithRole = { ...data.user, role: rpcResult as 'user' | 'admin' }
+            console.log('[Auth] User role fetched via RPC:', rpcResult)
           } else {
-            console.log('[Auth] No user profile found, defaulting to user role')
-            userWithRole = { ...data.user, role: 'user' as const }
+            // Fallback to direct query
+            console.log('[Auth] RPC failed, trying direct query')
+            const { data: profile, error } = await supabase
+              .from('user_profiles')
+              .select('role')
+              .eq('id', data.user.id)
+              .maybeSingle()
+            
+            console.log('[Auth] Direct query result:', { profile, error })
+            
+            if (!error && profile?.role) {
+              userWithRole = { ...data.user, role: profile.role as 'user' | 'admin' }
+              console.log('[Auth] User role fetched via direct query:', profile.role)
+            } else {
+              console.log('[Auth] No user profile found, defaulting to user role')
+              userWithRole = { ...data.user, role: 'user' as const }
+            }
           }
         } catch (err) {
           console.warn('[Auth] Failed to fetch user role after login:', err)
