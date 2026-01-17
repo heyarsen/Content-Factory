@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Try to restore from localStorage
       try {
         const parsedUser = JSON.parse(storedUser)
-        console.log('[Auth] Restored user from localStorage:', parsedUser.email)
+        console.log('[Auth] Restored user from localStorage:', { email: parsedUser.email, role: parsedUser.role })
         setUser(parsedUser)
         
         // Fetch actual role from database in the background
@@ -205,9 +205,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (data.access_token) {
         localStorage.setItem('access_token', data.access_token)
-        // Store user data for persistent session
-        localStorage.setItem('auth_user', JSON.stringify(data.user))
-        setUser(data.user)
+        
+        // Fetch user role from database to complete user object
+        let userWithRole = data.user
+        try {
+          const { data: profile, error } = await supabase
+            .from('user_profiles')
+            .select('role')
+            .eq('id', data.user.id)
+            .single()
+          
+          if (!error && profile?.role) {
+            userWithRole = { ...data.user, role: profile.role as 'user' | 'admin' }
+            console.log('[Auth] User role fetched after login:', profile.role)
+          } else if (error) {
+            console.warn('[Auth] Could not fetch role after login:', error.message)
+            userWithRole = { ...data.user, role: 'user' as const }
+          }
+        } catch (err) {
+          console.warn('[Auth] Failed to fetch user role after login:', err)
+          userWithRole = { ...data.user, role: 'user' as const }
+        }
+        
+        // Store complete user data for persistent session
+        console.log('[Auth] Storing user data with role:', userWithRole)
+        localStorage.setItem('auth_user', JSON.stringify(userWithRole))
+        setUser(userWithRole)
 
         // Log before setting session
         console.log('[Auth] Setting Supabase session...')
