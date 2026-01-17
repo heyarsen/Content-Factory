@@ -119,4 +119,44 @@ router.post('/tickets/mark-all-read', authenticate, isAdmin, async (req: AuthReq
     }
 })
 
+/**
+ * POST /api/admin/setup/make-admin/:email
+ * Setup endpoint to make a user an admin (development only - no auth required for bootstrap)
+ */
+router.post('/setup/make-admin/:email', async (req: AuthRequest, res: Response) => {
+    try {
+        const { email } = req.params
+        
+        // Get user from auth
+        const { data: { users }, error: listError } = await supabase.auth.admin.listUsers()
+        if (listError || !users) {
+            return res.status(500).json({ error: 'Failed to list users' })
+        }
+
+        const targetUser = users.find((u) => u.email === email)
+        if (!targetUser) {
+            return res.status(404).json({ error: `User ${email} not found` })
+        }
+
+        // Update user_profiles to set role as admin
+        const { data, error } = await supabase
+            .from('user_profiles')
+            .update({ role: 'admin' })
+            .eq('id', targetUser.id)
+            .select()
+            .single()
+
+        if (error) {
+            console.error('Error updating user role:', error)
+            return res.status(500).json({ error: 'Failed to update user role', details: error.message })
+        }
+
+        res.json({ success: true, message: `User ${email} is now an admin`, data })
+    } catch (error: any) {
+        console.error('[Admin Setup] Error:', error)
+        res.status(500).json({ error: 'Internal server error', details: error.message })
+    }
+})
+
+
 export default router
