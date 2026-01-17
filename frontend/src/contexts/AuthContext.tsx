@@ -35,8 +35,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     console.log('[Auth] Init: Checking storage...', { hasToken: !!token, hasStoredUser: !!storedUser })
 
-    if (token && storedUser) {
-      // Restore immediately from our storage
+    if (storedUser) {
+      // Try to restore from localStorage, but validate with Supabase
       try {
         const user = JSON.parse(storedUser)
         console.log('[Auth] Restored user from localStorage:', user.email)
@@ -60,11 +60,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         setLoading(false)
         
-        // Optionally sync with Supabase in the background (non-blocking)
-        supabase.auth.setSession({
-          access_token: token,
-          refresh_token: token,
-        }).catch(err => console.warn('[Auth] Supabase sync failed (non-blocking):', err.message))
+        // Validate the stored token is still valid by checking Supabase session
+        supabase.auth.getSession()
+          .then(({ data: { session } }) => {
+            if (!session && mounted) {
+              console.warn('[Auth] Stored token is stale, clearing localStorage')
+              localStorage.removeItem('access_token')
+              localStorage.removeItem('auth_user')
+              setUser(null)
+            }
+          })
+          .catch(err => console.warn('[Auth] Failed to validate session:', err.message))
       } catch (e) {
         console.error('[Auth] Failed to parse stored user:', e)
         localStorage.removeItem('access_token')
