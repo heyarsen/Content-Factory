@@ -70,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setUser(null)
             }
           })
-          .catch(err => console.warn('[Auth] Failed to validate session:', err.message))
+          .catch((err: any) => console.warn('[Auth] Failed to validate session:', err?.message))
       } catch (e) {
         console.error('[Auth] Failed to parse stored user:', e)
         localStorage.removeItem('access_token')
