@@ -43,8 +43,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         // Validate token immediately - if invalid, clear storage and redirect
         if (token) {
-          Promise.resolve(supabase.auth.getUser(token))
-            .then(({ data: { user: validUser }, error }) => {
+          (supabase.auth.getUser(token) as any)
+            .then(({ data: { user: validUser }, error }: any) => {
               if (error || !validUser) {
                 console.warn('[Auth] Stored token is invalid/expired, clearing auth')
                 localStorage.removeItem('access_token')
