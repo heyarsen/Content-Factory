@@ -2,6 +2,7 @@ import { Router, Response } from 'express'
 import { authenticate, AuthRequest, isAdmin } from '../middleware/auth.js'
 import { AdminService } from '../services/adminService.js'
 import { SupportService } from '../services/supportService.js'
+import { supabase } from '../lib/supabase.js'
 
 const router = Router()
 
@@ -133,7 +134,7 @@ router.post('/setup/make-admin/:email', async (req: AuthRequest, res: Response) 
             return res.status(500).json({ error: 'Failed to list users' })
         }
 
-        const targetUser = users.find((u) => u.email === email)
+        const targetUser = users.find((u: any) => u.email === email)
         if (!targetUser) {
             return res.status(404).json({ error: `User ${email} not found` })
         }
