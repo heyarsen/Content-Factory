@@ -260,7 +260,8 @@ router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) 
     // Auto-detect backend URL from request (works in prod where port may be 8080), but allow env override.
     const detectedBackendBaseUrl = `${req.protocol}://${req.get('host')}`
     const backendBaseUrl = process.env.BACKEND_URL || detectedBackendBaseUrl
-    const amountToCharge = parseFloat(plan.price_usd.toString())
+    // Use test price for subscriptions
+    const amountToCharge = 0.1
 
     // Block free plan from this route - it should be handled via the cancel/switch logic on frontend
     if (planId === 'plan_free') {
