@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               .from('user_profiles')
               .select('role')
               .eq('id', parsedUser.id)
-              .single()
+              .maybeSingle()
             
             if (error) {
               console.error('[Auth] Role fetch error:', error.code, error.message)
@@ -106,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 .from('user_profiles')
                 .select('role')
                 .eq('id', session.user.id)
-                .single()
+                .maybeSingle()
               
               if (!error && profile?.role) {
                 role = profile.role as 'user' | 'admin'
@@ -151,7 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               .from('user_profiles')
               .select('role')
               .eq('id', session.user.id)
-              .single()
+              .maybeSingle()
             
             if (!error && profile?.role) {
               role = profile.role as 'user' | 'admin'
@@ -209,17 +209,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Fetch user role from database to complete user object
         let userWithRole = data.user
         try {
+          console.log('[Auth] Querying user profile for ID:', data.user.id)
+          
+          // First, let's try to see if we can access the table at all
+          const { data: allProfiles, error: allError } = await supabase
+            .from('user_profiles')
+            .select('id, role')
+            .limit(5)
+          
+          console.log('[Auth] All profiles query result:', { allProfiles, allError })
+          
           const { data: profile, error } = await supabase
             .from('user_profiles')
             .select('role')
             .eq('id', data.user.id)
-            .single()
+            .maybeSingle()
+          
+          console.log('[Auth] Profile query result:', { profile, error })
           
           if (!error && profile?.role) {
             userWithRole = { ...data.user, role: profile.role as 'user' | 'admin' }
             console.log('[Auth] User role fetched after login:', profile.role)
           } else if (error) {
             console.warn('[Auth] Could not fetch role after login:', error.message)
+            userWithRole = { ...data.user, role: 'user' as const }
+          } else {
+            console.log('[Auth] No user profile found, defaulting to user role')
             userWithRole = { ...data.user, role: 'user' as const }
           }
         } catch (err) {
