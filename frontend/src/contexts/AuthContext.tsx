@@ -67,18 +67,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }, 3000)
       
       supabase.auth.getSession()
-        .then(({ data: { session } }) => {
+        .then(async ({ data: { session } }) => {
           if (timeoutId) clearTimeout(timeoutId)
           
           if (mounted && session?.user) {
-            console.log('[Auth] Found Supabase session, storing it...')
-            const user = {
-              ...session.user,
-              role: 'user'
-            } as User
-            localStorage.setItem('access_token', session.access_token)
-            localStorage.setItem('auth_user', JSON.stringify(user))
-            setUser(user)
+            console.log('[Auth] Found Supabase session, fetching user role...')
+            
+            // Fetch user role from user_profiles
+            try {
+              const { data: profile } = await supabase
+                .from('user_profiles')
+                .select('role')
+                .eq('id', session.user.id)
+                .single()
+              
+              const user = {
+                ...session.user,
+                role: (profile?.role || 'user') as 'user' | 'admin'
+              } as User
+              localStorage.setItem('access_token', session.access_token)
+              localStorage.setItem('auth_user', JSON.stringify(user))
+              setUser(user)
+              console.log('[Auth] User role fetched:', user.role)
+            } catch (err) {
+              console.error('[Auth] Failed to fetch user role:', err)
+              const user = {
+                ...session.user,
+                role: 'user'
+              } as User
+              localStorage.setItem('access_token', session.access_token)
+              localStorage.setItem('auth_user', JSON.stringify(user))
+              setUser(user)
+            }
           } else {
             console.log('[Auth] No session found')
           }
@@ -97,13 +117,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (mounted) {
         if (session?.user) {
-          const user = {
-            ...session.user,
-            role: 'user'
-          } as User
-          localStorage.setItem('access_token', session.access_token)
-          localStorage.setItem('auth_user', JSON.stringify(user))
-          setUser(user)
+          try {
+            // Fetch user role from user_profiles
+            const { data: profile } = await supabase
+              .from('user_profiles')
+              .select('role')
+              .eq('id', session.user.id)
+              .single()
+            
+            const user = {
+              ...session.user,
+              role: (profile?.role || 'user') as 'user' | 'admin'
+            } as User
+            localStorage.setItem('access_token', session.access_token)
+            localStorage.setItem('auth_user', JSON.stringify(user))
+            setUser(user)
+            console.log('[Auth] Auth state changed, user role:', user.role)
+          } catch (err) {
+            console.error('[Auth] Failed to fetch user role on state change:', err)
+            const user = {
+              ...session.user,
+              role: 'user'
+            } as User
+            localStorage.setItem('access_token', session.access_token)
+            localStorage.setItem('auth_user', JSON.stringify(user))
+            setUser(user)
+          }
           setLoading(false)
         } else {
           console.log('[Auth] onAuthStateChange: clearing user')
