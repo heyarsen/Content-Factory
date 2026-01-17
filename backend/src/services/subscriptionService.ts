@@ -346,11 +346,11 @@ export class SubscriptionService {
 
       const { CreditsService } = await import('./creditsService.js')
       const balanceBefore = await CreditsService.getUserCredits(userId)
-      const balanceAfter = await CreditsService.setCredits(userId, plan.credits, `subscription_${plan.id}`)
+      const balanceAfter = await CreditsService.addCredits(userId, plan.credits, `subscription_${plan.id}`)
 
-      console.log('[Subscription] Credits reset to plan amount successfully:', {
+      console.log('[Subscription] Credits added successfully:', {
         userId,
-        planCredits: plan.credits,
+        creditsAdded: plan.credits,
         balanceBefore,
         balanceAfter,
       })
