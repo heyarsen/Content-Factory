@@ -41,6 +41,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const user = JSON.parse(storedUser)
         console.log('[Auth] Restored user from localStorage:', user.email)
         setUser(user)
+        
+        // Fetch actual role from database in the background
+        supabase
+          .from('user_profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+          .then(({ data: profile, error }) => {
+            if (!error && profile?.role && mounted) {
+              const updatedUser = { ...user, role: profile.role as 'user' | 'admin' }
+              localStorage.setItem('auth_user', JSON.stringify(updatedUser))
+              setUser(updatedUser)
+              console.log('[Auth] Updated user role from database:', profile.role)
+            }
+          })
+          .catch(err => console.warn('[Auth] Failed to fetch role:', err.message))
+        
         setLoading(false)
         
         // Optionally sync with Supabase in the background (non-blocking)
