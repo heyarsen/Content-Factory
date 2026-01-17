@@ -63,11 +63,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 console.log('[Auth] Token valid, fetching role for user:', user.id)
                 
                 // Fetch actual role from database in the background
-                supabase
+                (supabase
                   .from('user_profiles')
                   .select('role')
                   .eq('id', user.id)
-                  .single()
+                  .single() as any)
                   .then((result: any) => {
                     console.log('[Auth] Role query result:', result)
                     const { data: profile, error } = result
