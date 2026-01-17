@@ -63,37 +63,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 console.log('[Auth] Token valid, fetching role for user:', user.id)
                 
                 // Fetch actual role from database in the background
-                const rolePromise = Promise.resolve(
-                  supabase
-                    .from('user_profiles')
-                    .select('role')
-                    .eq('id', user.id)
-                    .single()
-                )
-                
-                console.log('[Auth] Role promise created, awaiting response...')
-                
-                rolePromise.then((result) => {
-                  console.log('[Auth] Role query result:', result)
-                  const { data: profile, error } = result
-                  if (error) {
-                    console.error('[Auth] Role fetch error:', error.code, error.message)
-                    return
-                  }
-                  if (!profile) {
-                    console.warn('[Auth] No profile found for user')
-                    return
-                  }
-                  console.log('[Auth] Profile found, role =', profile.role)
-                  if (profile?.role && mounted) {
-                    const updatedUser = { ...user, role: profile.role as 'user' | 'admin' }
-                    localStorage.setItem('auth_user', JSON.stringify(updatedUser))
-                    setUser(updatedUser)
-                    console.log('[Auth] ✅ Updated user role from database:', profile.role)
-                  }
-                }).catch((err: any) => {
-                  console.error('[Auth] Role promise catch error:', err)
-                })
+                supabase
+                  .from('user_profiles')
+                  .select('role')
+                  .eq('id', user.id)
+                  .single()
+                  .then((result: any) => {
+                    console.log('[Auth] Role query result:', result)
+                    const { data: profile, error } = result
+                    if (error) {
+                      console.error('[Auth] Role fetch error:', error.code, error.message)
+                      return
+                    }
+                    if (!profile) {
+                      console.warn('[Auth] No profile found for user')
+                      return
+                    }
+                    console.log('[Auth] Profile found, role =', profile.role)
+                    if (profile?.role && mounted) {
+                      const updatedUser = { ...user, role: profile.role as 'user' | 'admin' }
+                      localStorage.setItem('auth_user', JSON.stringify(updatedUser))
+                      setUser(updatedUser)
+                      console.log('[Auth] ✅ Updated user role from database:', profile.role)
+                    }
+                  })
+                  .catch((err: any) => {
+                    console.error('[Auth] Role fetch error:', err)
+                  })
                 
                 setLoading(false)
               }
