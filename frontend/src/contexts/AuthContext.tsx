@@ -40,35 +40,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const user = JSON.parse(storedUser)
         console.log('[Auth] Restored user from localStorage:', user.email)
-        setUser(user)
         
-        // Fetch actual role from database in the background
-        Promise.resolve(
-          supabase
-            .from('user_profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single()
-        ).then(({ data: profile, error }) => {
-          if (!error && profile?.role && mounted) {
-            const updatedUser = { ...user, role: profile.role as 'user' | 'admin' }
-            localStorage.setItem('auth_user', JSON.stringify(updatedUser))
-            setUser(updatedUser)
-            console.log('[Auth] Updated user role from database:', profile.role)
-          }
-        }).catch((err: any) => console.warn('[Auth] Failed to fetch role:', err?.message))
-        
-        setLoading(false)
-        
-        // Validate the stored token is still valid by checking Supabase session
-        Promise.resolve(supabase.auth.getSession()).then(({ data: { session } }) => {
-          if (!session && mounted) {
-            console.warn('[Auth] Stored token is stale, clearing localStorage')
-            localStorage.removeItem('access_token')
-            localStorage.removeItem('auth_user')
-            setUser(null)
-          }
-        }).catch((err: any) => console.warn('[Auth] Failed to validate session:', err?.message))
+        // Validate token immediately - if invalid, clear storage and redirect
+        if (token) {
+          Promise.resolve(supabase.auth.getUser(token))
+            .then(({ data: { user: validUser }, error }) => {
+              if (error || !validUser) {
+                console.warn('[Auth] Stored token is invalid/expired, clearing auth')
+                localStorage.removeItem('access_token')
+                localStorage.removeItem('auth_user')
+                setUser(null)
+                setLoading(false)
+                if (mounted && !window.location.pathname.includes('/login')) {
+                  window.location.href = '/login'
+                }
+                return
+              }
+              
+              // Token is valid, restore user
+              if (mounted) {
+                setUser(user)
+                
+                // Fetch actual role from database in the background
+                Promise.resolve(
+                  supabase
+                    .from('user_profiles')
+                    .select('role')
+                    .eq('id', user.id)
+                    .single()
+                ).then(({ data: profile, error }) => {
+                  if (!error && profile?.role && mounted) {
+                    const updatedUser = { ...user, role: profile.role as 'user' | 'admin' }
+                    localStorage.setItem('auth_user', JSON.stringify(updatedUser))
+                    setUser(updatedUser)
+                    console.log('[Auth] Updated user role from database:', profile.role)
+                  }
+                }).catch((err: any) => console.warn('[Auth] Failed to fetch role:', err?.message))
+                
+                setLoading(false)
+              }
+            })
+            .catch((err: any) => {
+              console.warn('[Auth] Token validation failed:', err?.message)
+              localStorage.removeItem('access_token')
+              localStorage.removeItem('auth_user')
+              setLoading(false)
+            })
+        } else {
+          setUser(user)
+          setLoading(false)
+        }
       } catch (e) {
         console.error('[Auth] Failed to parse stored user:', e)
         localStorage.removeItem('access_token')
