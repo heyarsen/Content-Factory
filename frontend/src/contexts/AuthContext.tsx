@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               console.log('[Auth] Updated user role from database:', profile.role)
             }
           })
-          .catch(err => console.warn('[Auth] Failed to fetch role:', err.message))
+          .catch((err: any) => console.warn('[Auth] Failed to fetch role:', err?.message))
         
         setLoading(false)
         
