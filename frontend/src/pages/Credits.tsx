@@ -45,7 +45,6 @@ interface UserSubscription {
   status: string
   credits_remaining: number
   started_at: string
-  expires_at: string | null
 }
 
 export function Credits() {
@@ -429,11 +428,6 @@ export function Credits() {
             <p className="mt-2 text-slate-600">{t('credits.subtitle')}</p>
             {hasSubscription && subscription?.status === 'active' && (
               <div className="mt-2 flex items-center gap-4">
-                {subscription.expires_at && (
-                  <p className="text-sm text-slate-500">
-                    {t('credits.renews_in').replace('{days}', Math.ceil((new Date(subscription.expires_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)).toString())}
-                  </p>
-                )}
                 <button
                   onClick={handleCancelClick}
                   disabled={purchasing === 'cancel'}

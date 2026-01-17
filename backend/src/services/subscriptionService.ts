@@ -46,51 +46,11 @@ export class SubscriptionService {
 
   /**
    * Expire subscriptions that have passed their expires_at date
+   * NOTE: This function is deprecated as subscriptions are now ongoing until canceled
    */
   static async expireSubscriptions(): Promise<void> {
-    const now = new Date().toISOString()
-
-    // 1. Find subscriptions that just expired
-    const { data: expiredSubs, error: findError } = await supabase
-      .from('user_subscriptions')
-      .select('id, user_id, plan_id')
-      .eq('status', 'active')
-      .lt('expires_at', now)
-
-    if (findError) {
-      console.error('[Subscription] Error finding expired subscriptions:', findError)
-      return
-    }
-
-    if (!expiredSubs || expiredSubs.length === 0) {
-      return
-    }
-
-    console.log(`[Subscription] Expiring ${expiredSubs.length} subscriptions`)
-
-    for (const sub of expiredSubs) {
-      try {
-        // Update subscription status
-        await supabase
-          .from('user_subscriptions')
-          .update({ status: 'expired' })
-          .eq('id', sub.id)
-
-        // Update user profile
-        await supabase
-          .from('user_profiles')
-          .update({ has_active_subscription: false })
-          .eq('id', sub.user_id)
-
-        // Reset credits to 0 (or a base amount)
-        const { CreditsService } = await import('./creditsService.js')
-        await CreditsService.setCredits(sub.user_id, 0, `subscription_expired_${sub.plan_id}`)
-
-        console.log(`[Subscription] Expired subscription ${sub.id} for user ${sub.user_id}`)
-      } catch (error) {
-        console.error(`[Subscription] Error processing expiry for sub ${sub.id}:`, error)
-      }
-    }
+    console.log('[Subscription] expireSubscriptions called but subscriptions are now ongoing until canceled')
+    // No-op - subscriptions no longer expire
   }
   /**
    * Get plan by ID
@@ -218,7 +178,7 @@ export class SubscriptionService {
         payment_id: orderReference,
         payment_status: paymentStatus,
         started_at: new Date().toISOString(),
-        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days for monthly subscription
+        expires_at: null, // No expiration - ongoing until canceled
       })
       .select()
       .single()
@@ -313,7 +273,7 @@ export class SubscriptionService {
         status: 'active',
         payment_status: 'completed',
         started_at: new Date().toISOString(),
-        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days for monthly subscription
+        expires_at: null, // No expiration - ongoing until canceled
       })
       .eq('id', subscription.id)
 
