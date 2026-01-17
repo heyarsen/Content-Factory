@@ -43,34 +43,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(user)
         
         // Fetch actual role from database in the background
-        supabase
-          .from('user_profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single()
-          .then(({ data: profile, error }) => {
-            if (!error && profile?.role && mounted) {
-              const updatedUser = { ...user, role: profile.role as 'user' | 'admin' }
-              localStorage.setItem('auth_user', JSON.stringify(updatedUser))
-              setUser(updatedUser)
-              console.log('[Auth] Updated user role from database:', profile.role)
-            }
-          })
-          .catch((err: any) => console.warn('[Auth] Failed to fetch role:', err?.message))
+        Promise.resolve(
+          supabase
+            .from('user_profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+        ).then(({ data: profile, error }) => {
+          if (!error && profile?.role && mounted) {
+            const updatedUser = { ...user, role: profile.role as 'user' | 'admin' }
+            localStorage.setItem('auth_user', JSON.stringify(updatedUser))
+            setUser(updatedUser)
+            console.log('[Auth] Updated user role from database:', profile.role)
+          }
+        }).catch((err: any) => console.warn('[Auth] Failed to fetch role:', err?.message))
         
         setLoading(false)
         
         // Validate the stored token is still valid by checking Supabase session
-        supabase.auth.getSession()
-          .then(({ data: { session } }) => {
-            if (!session && mounted) {
-              console.warn('[Auth] Stored token is stale, clearing localStorage')
-              localStorage.removeItem('access_token')
-              localStorage.removeItem('auth_user')
-              setUser(null)
-            }
-          })
-          .catch((err: any) => console.warn('[Auth] Failed to validate session:', err?.message))
+        Promise.resolve(supabase.auth.getSession()).then(({ data: { session } }) => {
+          if (!session && mounted) {
+            console.warn('[Auth] Stored token is stale, clearing localStorage')
+            localStorage.removeItem('access_token')
+            localStorage.removeItem('auth_user')
+            setUser(null)
+          }
+        }).catch((err: any) => console.warn('[Auth] Failed to validate session:', err?.message))
       } catch (e) {
         console.error('[Auth] Failed to parse stored user:', e)
         localStorage.removeItem('access_token')
