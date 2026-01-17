@@ -72,7 +72,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           })
         
         setLoading(false)
-              setLoading(false)
       } catch (e) {
         console.error('[Auth] Failed to parse stored user:', e)
         localStorage.removeItem('access_token')
