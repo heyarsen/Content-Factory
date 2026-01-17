@@ -14,15 +14,13 @@ import {
   UserPlus,
   UserMinus,
   TrendingUp,
-  TrendingDown,
   Clock,
   CheckCircle,
   XCircle,
   AlertTriangle,
   Zap,
   Activity,
-  Search,
-  Filter
+  Search
 } from 'lucide-react'
 import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
@@ -263,8 +261,8 @@ export function AdminPanel() {
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-500">Churn</span>
-                    <span className={`font-medium ${stats?.subscriptions.churnRate > 5 ? 'text-rose-600' : 'text-green-600'}`}>
-                      {stats?.subscriptions.churnRate.toFixed(1)}%
+                    <span className={`font-medium ${(stats?.subscriptions.churnRate || 0) > 5 ? 'text-rose-600' : 'text-green-600'}`}>
+                      {(stats?.subscriptions.churnRate || 0).toFixed(1)}%
                     </span>
                   </div>
                 </div>
@@ -340,8 +338,8 @@ export function AdminPanel() {
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-500">Error Rate</span>
-                    <span className={`font-medium ${stats?.system.errorRate > 5 ? 'text-rose-600' : 'text-green-600'}`}>
-                      {stats?.system.errorRate.toFixed(1)}%
+                    <span className={`font-medium ${(stats?.system.errorRate || 0) > 5 ? 'text-rose-600' : 'text-green-600'}`}>
+                      {(stats?.system.errorRate || 0).toFixed(1)}%
                     </span>
                   </div>
                 </div>
