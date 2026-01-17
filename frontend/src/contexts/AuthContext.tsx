@@ -38,19 +38,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (storedUser) {
       // Try to restore from localStorage
       try {
-        const user = JSON.parse(storedUser)
-        console.log('[Auth] Restored user from localStorage:', user.email)
-        setUser(user)
+        const parsedUser = JSON.parse(storedUser)
+        console.log('[Auth] Restored user from localStorage:', parsedUser.email)
+        setUser(parsedUser)
         
         // Fetch actual role from database in the background
-        (supabase
-          .from('user_profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single() as any)
-          .then((result: any) => {
-            console.log('[Auth] Role query result:', result)
-            const { data: profile, error } = result
+        const fetchRole = async () => {
+          try {
+            const { data: profile, error } = await supabase
+              .from('user_profiles')
+              .select('role')
+              .eq('id', parsedUser.id)
+              .single()
+            
             if (error) {
               console.error('[Auth] Role fetch error:', error.code, error.message)
               return
@@ -61,15 +61,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
             console.log('[Auth] Profile found, role =', profile.role)
             if (profile?.role && mounted) {
-              const updatedUser = { ...user, role: profile.role as 'user' | 'admin' }
+              const updatedUser = { ...parsedUser, role: profile.role as 'user' | 'admin' }
               localStorage.setItem('auth_user', JSON.stringify(updatedUser))
               setUser(updatedUser)
               console.log('[Auth] ✅ Updated user role from database:', profile.role)
             }
-          })
-          .catch((err: any) => {
+          } catch (err: any) {
             console.error('[Auth] Role fetch error:', err)
-          })
+          }
+        }
+        fetchRole()
         
         setLoading(false)
       } catch (e) {
