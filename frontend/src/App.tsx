@@ -3,6 +3,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import { NotificationProvider } from './contexts/NotificationContext'
 import { BillingGateProvider } from './contexts/BillingGateContext'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
+import { AdminRoute } from './components/auth/AdminRoute'
 import { AuthHashHandler } from './components/auth/AuthHashHandler'
 import { LanguageProvider } from './contexts/LanguageContext'
 import { ToastContainer } from './components/ui/Toast'
@@ -144,17 +145,17 @@ function AppContent() {
         <Route
           path="/admin"
           element={
-            <ProtectedRoute>
+            <AdminRoute>
               <AdminPanel />
-            </ProtectedRoute>
+            </AdminRoute>
           }
         />
         <Route
           path="/admin/support"
           element={
-            <ProtectedRoute>
+            <AdminRoute>
               <AdminSupport />
-            </ProtectedRoute>
+            </AdminRoute>
           }
         />
         <Route

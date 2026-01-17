@@ -28,6 +28,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const location = useLocation()
 
+  console.log('[Sidebar] User check:', { user: user?.email, role: user?.role, isAdmin: user?.role === 'admin' })
+
   const navigation = [
     { label: t('common.dashboard'), to: '/dashboard', icon: LayoutDashboard },
     { label: t('dashboard.create_video'), to: '/create', icon: Zap },
