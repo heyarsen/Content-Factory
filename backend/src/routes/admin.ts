@@ -121,6 +121,122 @@ router.post('/tickets/mark-all-read', authenticate, isAdmin, async (req: AuthReq
 })
 
 /**
+ * GET /api/admin/users
+ * Get all users with pagination and search
+ */
+router.get('/users', authenticate, isAdmin, async (req: AuthRequest, res: Response) => {
+    try {
+        const page = parseInt(req.query.page as string) || 1
+        const limit = parseInt(req.query.limit as string) || 50
+        const search = req.query.search as string || ''
+        const offset = (page - 1) * limit
+
+        let query = supabase
+            .from('user_profiles')
+            .select(`
+                id,
+                email,
+                created_at,
+                last_sign_in_at,
+                email_confirmed_at,
+                user_roles!inner(
+                    role
+                )
+            `, { count: 'exact' })
+            .order('created_at', { ascending: false })
+            .range(offset, offset + limit - 1)
+
+        if (search) {
+            query = query.ilike('email', `%${search}%`)
+        }
+
+        const { data: users, count, error } = await query
+
+        if (error) {
+            console.error('Error fetching users:', error)
+            return res.status(500).json({ error: 'Failed to fetch users' })
+        }
+
+        const formattedUsers = users?.map(user => ({
+            id: user.id,
+            email: user.email,
+            createdAt: user.created_at,
+            lastSignIn: user.last_sign_in_at,
+            emailConfirmed: !!user.email_confirmed_at,
+            roles: user.user_roles?.map((ur: any) => ur.role) || []
+        })) || []
+
+        res.json({
+            users: formattedUsers,
+            pagination: {
+                page,
+                limit,
+                total: count || 0,
+                totalPages: Math.ceil((count || 0) / limit)
+            }
+        })
+    } catch (error: any) {
+        console.error('Admin users error:', error)
+        res.status(500).json({ error: 'Failed to get users' })
+    }
+})
+
+/**
+ * POST /api/admin/users/:userId/assign-admin
+ * Assign admin role to user
+ */
+router.post('/users/:userId/assign-admin', authenticate, isAdmin, async (req: AuthRequest, res: Response) => {
+    try {
+        const { userId } = req.params
+        
+        const { error } = await supabase
+            .from('user_roles')
+            .upsert({
+                user_id: userId,
+                role: 'admin'
+            }, {
+                onConflict: 'user_id,role'
+            })
+
+        if (error) {
+            console.error('Error assigning admin role:', error)
+            return res.status(500).json({ error: 'Failed to assign admin role' })
+        }
+
+        res.json({ success: true })
+    } catch (error: any) {
+        console.error('Admin assign role error:', error)
+        res.status(500).json({ error: 'Failed to assign admin role' })
+    }
+})
+
+/**
+ * POST /api/admin/users/:userId/remove-admin
+ * Remove admin role from user
+ */
+router.post('/users/:userId/remove-admin', authenticate, isAdmin, async (req: AuthRequest, res: Response) => {
+    try {
+        const { userId } = req.params
+        
+        const { error } = await supabase
+            .from('user_roles')
+            .delete()
+            .eq('user_id', userId)
+            .eq('role', 'admin')
+
+        if (error) {
+            console.error('Error removing admin role:', error)
+            return res.status(500).json({ error: 'Failed to remove admin role' })
+        }
+
+        res.json({ success: true })
+    } catch (error: any) {
+        console.error('Admin remove role error:', error)
+        res.status(500).json({ error: 'Failed to remove admin role' })
+    }
+})
+
+/**
  * POST /api/admin/setup/make-admin/:email
  * Setup endpoint to make a user an admin (development only - no auth required for bootstrap)
  */
