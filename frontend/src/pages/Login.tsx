@@ -15,6 +15,7 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [optimisticLoading, setOptimisticLoading] = useState(false)
   const { signIn, signInWithGoogle } = useAuth()
   const navigate = useNavigate()
 
@@ -22,13 +23,14 @@ export function Login() {
     e.preventDefault()
     setError('')
     setLoading(true)
+    setOptimisticLoading(true) // Immediate loading feedback
 
     try {
-      // Check backend connectivity first
+      // Quick backend connectivity check with shorter timeout (optional for speed)
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
       try {
         const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 2000) // Reduced to 2 seconds
 
         const healthCheck = await fetch(`${API_URL}/health`, {
           signal: controller.signal
@@ -36,18 +38,18 @@ export function Login() {
         clearTimeout(timeoutId)
 
         if (!healthCheck.ok) {
-          throw new Error('Backend server is not responding correctly')
+          console.warn('Backend health check failed, proceeding anyway')
         }
       } catch (healthError) {
-        console.error('Backend health check failed:', healthError)
-        setError(t('auth.server_error'))
-        setLoading(false)
-        return
+        console.warn('Backend health check failed, proceeding anyway:', healthError)
+        // Don't block login on health check failure
       }
 
       await signIn(email, password)
+      setOptimisticLoading(false)
       navigate('/dashboard')
     } catch (err: any) {
+      setOptimisticLoading(false)
       console.error('Login error:', err)
 
       // Extract error message from various possible error formats
@@ -180,7 +182,7 @@ export function Login() {
                   </Link>
                 </div>
 
-                <Button type="submit" className="w-full" loading={loading}>
+                <Button type="submit" className="w-full" loading={loading || optimisticLoading}>
                   {t('auth.sign_in')}
                 </Button>
               </form>

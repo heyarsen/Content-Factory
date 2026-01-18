@@ -1,6 +1,10 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import api from '../lib/api'
+
+// Cache for user profile data to avoid repeated fetches
+const profileCache = new Map<string, { data: any; timestamp: number }>()
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
 interface User {
   id: string
@@ -21,6 +25,45 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+// Optimized function to fetch user role and subscription with caching
+const fetchUserRoleAndSubscription = async (userId: string) => {
+  // Check cache first
+  const cached = profileCache.get(userId)
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    console.log('[Auth] Using cached profile data')
+    return cached.data
+  }
+
+  try {
+    // Use RPC for faster role lookup (bypasses RLS)
+    const { data: rpcResult, error: rpcError } = await supabase
+      .rpc('get_user_role', { user_id: userId })
+    
+    if (!rpcError && rpcResult) {
+      const profileData = { role: rpcResult, has_active_subscription: false }
+      profileCache.set(userId, { data: profileData, timestamp: Date.now() })
+      return profileData
+    }
+
+    // Fallback to direct query
+    const { data: profile, error } = await supabase
+      .from('user_profiles')
+      .select('role, has_active_subscription')
+      .eq('id', userId)
+      .maybeSingle()
+    
+    if (!error && profile) {
+      profileCache.set(userId, { data: profile, timestamp: Date.now() })
+      return profile
+    }
+    
+    return { role: 'user', has_active_subscription: false }
+  } catch (err) {
+    console.error('[Auth] Role/Subscription fetch error:', err)
+    return { role: 'user', has_active_subscription: false }
+  }
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -43,39 +86,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log('[Auth] Restored user from localStorage:', { email: parsedUser.email, role: parsedUser.role })
         setUser(parsedUser)
         
-        // Fetch actual role and subscription status from database in the background
-        const fetchRoleAndSubscription = async () => {
-          try {
-            const { data: profile, error } = await supabase
-              .from('user_profiles')
-              .select('role, has_active_subscription')
-              .eq('id', parsedUser.id)
-              .maybeSingle()
-            
-            if (error) {
-              console.error('[Auth] Role/Subscription fetch error:', error.code, error.message)
-              return
+        // Fetch actual role and subscription status from database in background (non-blocking)
+        fetchUserRoleAndSubscription(parsedUser.id).then(profile => {
+          if (mounted) {
+            const updatedUser = { 
+              ...parsedUser, 
+              role: profile.role as 'user' | 'admin',
+              hasActiveSubscription: profile.has_active_subscription || false
             }
-            if (!profile) {
-              console.warn('[Auth] No profile found for user')
-              return
-            }
-            console.log('[Auth] Profile found, role =', profile.role, 'subscription =', profile.has_active_subscription)
-            if (mounted) {
-              const updatedUser = { 
-                ...parsedUser, 
-                role: profile.role as 'user' | 'admin',
-                hasActiveSubscription: profile.has_active_subscription || false
-              }
-              localStorage.setItem('auth_user', JSON.stringify(updatedUser))
-              setUser(updatedUser)
-              console.log('[Auth] ✅ Updated user role and subscription from database')
-            }
-          } catch (err: any) {
-            console.error('[Auth] Role/Subscription fetch error:', err)
+            localStorage.setItem('auth_user', JSON.stringify(updatedUser))
+            setUser(updatedUser)
+            console.log('[Auth] ✅ Updated user role and subscription from database')
           }
-        }
-        fetchRoleAndSubscription()
+        })
         
         setLoading(false)
       } catch (e) {
@@ -88,13 +111,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // No stored session, check Supabase as fallback with timeout
       console.log('[Auth] No stored session, checking Supabase...')
       
-      // Set a 3 second timeout - if we don't get a response, assume logged out
+      // Set a 1 second timeout - faster fallback for better UX
       timeoutId = setTimeout(() => {
         if (mounted) {
           console.log('[Auth] Supabase session check timed out, assuming logged out')
           setLoading(false)
         }
-      }, 3000)
+      }, 1000)
       
       supabase.auth.getSession()
         .then(async ({ data: { session } }) => {
@@ -103,32 +126,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (mounted && session?.user) {
             console.log('[Auth] Found Supabase session, fetching user role...')
             
-            let role: 'user' | 'admin' = 'user'
-            let profile: any = null
+            // Fetch role and subscription in parallel with session
+            const [profileResult] = await Promise.allSettled([
+              fetchUserRoleAndSubscription(session.user.id)
+            ])
             
-            // Try to fetch from user_profiles first
-            try {
-              const { data: profileData, error } = await supabase
-                .from('user_profiles')
-                .select('role, has_active_subscription')
-                .eq('id', session.user.id)
-                .maybeSingle()
-              
-              if (!error && profileData?.role) {
-                role = profileData.role as 'user' | 'admin'
-                profile = profileData
-                console.log('[Auth] User role fetched from user_profiles:', role)
-              } else if (error) {
-                console.warn('[Auth] Could not fetch role from user_profiles:', error.message)
-              }
-            } catch (err) {
-              console.warn('[Auth] Failed to fetch user role:', err)
+            let role: 'user' | 'admin' = 'user'
+            let hasActiveSubscription = false
+            
+            if (profileResult.status === 'fulfilled') {
+              role = profileResult.value.role as 'user' | 'admin'
+              hasActiveSubscription = profileResult.value.has_active_subscription || false
+              console.log('[Auth] User profile fetched in parallel:', { role, hasActiveSubscription })
+            } else {
+              console.warn('[Auth] Profile fetch failed, using defaults')
             }
             
             const user = {
               ...session.user,
               role,
-              hasActiveSubscription: profile?.has_active_subscription || false
+              hasActiveSubscription
             } as User
             localStorage.setItem('access_token', session.access_token)
             localStorage.setItem('auth_user', JSON.stringify(user))
@@ -151,32 +168,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (mounted) {
         if (session?.user) {
-          let role: 'user' | 'admin' = 'user'
-          let profile: any = null
-          
-          // Try to fetch from user_profiles
-          try {
-            const { data: profileData, error } = await supabase
-              .from('user_profiles')
-              .select('role, has_active_subscription')
-              .eq('id', session.user.id)
-              .maybeSingle()
-            
-            if (!error && profileData?.role) {
-              role = profileData.role as 'user' | 'admin'
-              profile = profileData
-              console.log('[Auth] User role fetched on state change:', role)
-            } else if (error) {
-              console.warn('[Auth] Could not fetch role:', error.message)
-            }
-          } catch (err) {
-            console.warn('[Auth] Failed to fetch user role on state change:', err)
-          }
+        // Fetch role and subscription in parallel for faster auth state changes
+        const [profileResult] = await Promise.allSettled([
+          fetchUserRoleAndSubscription(session.user.id)
+        ])
+        
+        let role: 'user' | 'admin' = 'user'
+        let hasActiveSubscription = false
+        
+        if (profileResult.status === 'fulfilled') {
+          role = profileResult.value.role as 'user' | 'admin'
+          hasActiveSubscription = profileResult.value.has_active_subscription || false
+          console.log('[Auth] User profile fetched on state change:', { role, hasActiveSubscription })
+        } else {
+          console.warn('[Auth] Profile fetch failed on state change, using defaults')
+        }
           
           const user = {
             ...session.user,
             role,
-            hasActiveSubscription: profile?.has_active_subscription || false
+            hasActiveSubscription
           } as User
           localStorage.setItem('access_token', session.access_token)
           localStorage.setItem('auth_user', JSON.stringify(user))
@@ -210,54 +221,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
       console.log('[Auth] API URL:', API_URL)
 
-      // Use a shorter timeout for login specifically (15 seconds)
-      const { data } = await api.post('/api/auth/login', { email, password }, { timeout: 15000 })
+      // Use a shorter timeout for login specifically (10 seconds)
+      const { data } = await api.post('/api/auth/login', { email, password }, { timeout: 10000 })
       console.log('[Auth] Login response received:', { hasToken: !!data.access_token, hasUser: !!data.user })
 
       if (data.access_token) {
         localStorage.setItem('access_token', data.access_token)
         
-        // Fetch user role from database to complete user object
+        // Fetch user role using optimized cached function
         let userWithRole = data.user
-        try {
-          console.log('[Auth] Getting user role for ID:', data.user.id)
-          
-          // Try RPC first to bypass RLS
-          const { data: rpcResult, error: rpcError } = await supabase
-            .rpc('get_user_role', { user_id: data.user.id })
-          
-          console.log('[Auth] RPC result:', { rpcResult, rpcError })
-          
-          if (!rpcError && rpcResult) {
-            userWithRole = { ...data.user, role: rpcResult as 'user' | 'admin' }
-            console.log('[Auth] User role fetched via RPC:', rpcResult)
-          } else {
-            // Fallback to direct query
-            console.log('[Auth] RPC failed, trying direct query')
-            const { data: profile, error } = await supabase
-              .from('user_profiles')
-              .select('role, has_active_subscription')
-              .eq('id', data.user.id)
-              .maybeSingle()
-            
-            console.log('[Auth] Direct query result:', { profile, error })
-            
-            if (!error && profile?.role) {
-              userWithRole = { 
-                ...data.user, 
-                role: profile.role as 'user' | 'admin',
-                hasActiveSubscription: profile.has_active_subscription || false
-              }
-              console.log('[Auth] User role fetched via direct query:', profile.role)
-            } else {
-              console.log('[Auth] No user profile found, defaulting to user role')
-              userWithRole = { ...data.user, role: 'user' as const, hasActiveSubscription: false }
-            }
-          }
-        } catch (err) {
-          console.warn('[Auth] Failed to fetch user role after login:', err)
-          userWithRole = { ...data.user, role: 'user' as const }
+        const profile = await fetchUserRoleAndSubscription(data.user.id)
+        userWithRole = { 
+          ...data.user, 
+          role: profile.role as 'user' | 'admin',
+          hasActiveSubscription: profile.has_active_subscription || false
         }
+        console.log('[Auth] User role fetched via optimized function:', profile.role)
         
         // Store complete user data for persistent session
         console.log('[Auth] Storing user data with role:', userWithRole)
@@ -267,7 +246,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Log before setting session
         console.log('[Auth] Setting Supabase session...')
 
-        // Set session in Supabase client with a timeout race
+        // Set session in Supabase client with shorter timeout (non-blocking)
         try {
           const sessionPromise = supabase.auth.setSession({
             access_token: data.access_token,
@@ -275,20 +254,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           })
 
           const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Supabase session set timeout')), 8000)
+            setTimeout(() => reject(new Error('Supabase session set timeout')), 3000)
           )
 
-          await Promise.race([sessionPromise, timeoutPromise])
+          // Fire and forget - don't block login on session set
+          Promise.race([sessionPromise, timeoutPromise])
             .then((result: any) => {
               if (result?.error) console.error('[Auth] Failed to set Supabase session:', result.error)
               else console.log('[Auth] Supabase session set successfully')
             })
             .catch(err => {
               console.warn('[Auth] Supabase session set warning:', err)
-              // Don't fail login if session set fails/times out, we have the token
             })
 
-          console.log('[Auth] Session setup complete, returning control to component')
+          console.log('[Auth] Session setup initiated, login complete')
 
         } catch (error) {
           console.error('[Auth] Unexpected error setting session:', error)
@@ -317,6 +296,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     console.log('[Auth] Starting sign out...')
+    
+    // Clear cache on sign out
+    if (user?.id) {
+      profileCache.delete(user.id)
+    }
     
     // Step 1: Clear our state immediately
     setUser(null)
