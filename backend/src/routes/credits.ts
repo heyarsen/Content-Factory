@@ -283,12 +283,14 @@ router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) 
       serviceUrl: `${process.env.BACKEND_URL || backendBaseUrl}/api/credits/webhook`,
     })
 
-    // Add recurring fields to make WayForPay treat this as subscription
+    // Add recurring fields for subscription payments
     // Documentation: https://wiki.wayforpay.com/view/852478
     hostedForm.fields.regularOn = 'Y'
     hostedForm.fields.regularMode = 'monthly'
     hostedForm.fields.regularAmount = String(amountToCharge)
     hostedForm.fields.regularCount = '0' // 0 = unlimited recurring iterations
+    // Add field to skip date selection
+    hostedForm.fields.regularStartDate = new Date().toISOString().split('T')[0] // Start today
 
     res.json({
       orderReference,
