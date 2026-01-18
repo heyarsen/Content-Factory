@@ -26,25 +26,6 @@ export function Login() {
     setOptimisticLoading(true) // Immediate loading feedback
 
     try {
-      // Quick backend connectivity check with shorter timeout (optional for speed)
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
-      try {
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 2000) // Reduced to 2 seconds
-
-        const healthCheck = await fetch(`${API_URL}/health`, {
-          signal: controller.signal
-        })
-        clearTimeout(timeoutId)
-
-        if (!healthCheck.ok) {
-          console.warn('Backend health check failed, proceeding anyway')
-        }
-      } catch (healthError) {
-        console.warn('Backend health check failed, proceeding anyway:', healthError)
-        // Don't block login on health check failure
-      }
-
       await signIn(email, password)
       setOptimisticLoading(false)
       navigate('/dashboard')

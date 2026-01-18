@@ -85,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const parsedUser = JSON.parse(storedUser)
         console.log('[Auth] Restored user from localStorage:', { email: parsedUser.email, role: parsedUser.role })
         setUser(parsedUser)
+        setLoading(false) // Set loading false immediately
         
         // Fetch actual role and subscription status from database in background (non-blocking)
         fetchUserRoleAndSubscription(parsedUser.id).then(profile => {
@@ -99,8 +100,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.log('[Auth] ✅ Updated user role and subscription from database')
           }
         })
-        
-        setLoading(false)
       } catch (e) {
         console.error('[Auth] Failed to parse stored user:', e)
         localStorage.removeItem('access_token')
@@ -221,27 +220,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
       console.log('[Auth] API URL:', API_URL)
 
-      // Use a shorter timeout for login specifically (10 seconds)
-      const { data } = await api.post('/api/auth/login', { email, password }, { timeout: 10000 })
+      // Use a shorter timeout for login specifically (5 seconds)
+      const { data } = await api.post('/api/auth/login', { email, password }, { timeout: 5000 })
       console.log('[Auth] Login response received:', { hasToken: !!data.access_token, hasUser: !!data.user })
 
       if (data.access_token) {
         localStorage.setItem('access_token', data.access_token)
         
-        // Fetch user role using optimized cached function
-        let userWithRole = data.user
-        const profile = await fetchUserRoleAndSubscription(data.user.id)
-        userWithRole = { 
-          ...data.user, 
-          role: profile.role as 'user' | 'admin',
-          hasActiveSubscription: profile.has_active_subscription || false
-        }
-        console.log('[Auth] User role fetched via optimized function:', profile.role)
-        
-        // Store complete user data for persistent session
-        console.log('[Auth] Storing user data with role:', userWithRole)
-        localStorage.setItem('auth_user', JSON.stringify(userWithRole))
+        // Set user immediately with basic data, fetch role in background
+        let userWithRole = { ...data.user, role: 'user' as const, hasActiveSubscription: false }
         setUser(userWithRole)
+        localStorage.setItem('auth_user', JSON.stringify(userWithRole))
+        
+        // Fetch role in background (non-blocking)
+        fetchUserRoleAndSubscription(data.user.id).then(profile => {
+          const updatedUser = { 
+            ...data.user, 
+            role: profile.role as 'user' | 'admin',
+            hasActiveSubscription: profile.has_active_subscription || false
+          }
+          localStorage.setItem('auth_user', JSON.stringify(updatedUser))
+          setUser(updatedUser)
+          console.log('[Auth] ✅ Background role fetch complete:', profile.role)
+        }).catch(err => {
+          console.warn('[Auth] Background role fetch failed, using default:', err)
+        })
+
+        console.log('[Auth] Login complete, user set with defaults')
 
         // Log before setting session
         console.log('[Auth] Setting Supabase session...')
