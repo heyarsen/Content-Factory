@@ -285,74 +285,10 @@ export class SubscriptionService {
         cancelled_at: new Date().toISOString(),
       })
       .eq('id', sub.id)
-      .eq('status', 'active')
-      .select('id')
-      .single()
-
-    if (updateError) {
-      console.error('[Subscription] Error updating subscription status:', updateError)
-    } else {
-      subscriptionUpdated = true
-      console.log('[Subscription] Subscription status updated to cancelled')
-    }
-  } catch (error) {
-    console.error('[Subscription] Failed to update subscription status:', error)
-  }
-
-  // 2. Try to delete recurring payment from WayForPay
-  let recurringDeleted = false
-  if (sub.payment_id) {
-    try {
-      const { RecurringPaymentService } = await import('./recurringPaymentService.js')
-      recurringDeleted = await RecurringPaymentService.deleteRecurringPayment(sub.payment_id)
-      
-      console.log('[Subscription] Recurring payment deletion attempt:', {
-        paymentId: sub.payment_id,
-        deleted: recurringDeleted,
-        subscriptionStatusBefore: sub.status,
-      })
-      
-      if (!recurringDeleted) {
-        console.warn('[Subscription] Failed to delete recurring payment from WayForPay, but continuing with local cancellation')
-      } else {
-        console.log('[Subscription] Recurring payment deleted successfully from WayForPay')
-      }
-    } catch (recurringError: any) {
-      console.error('[Subscription] Failed to delete recurring payment:', recurringError.message)
-      console.warn('[Subscription] Continuing with local cancellation despite WayForPay deletion failure')
-    }
   } else {
-    console.log('[Subscription] No payment_id found for recurring payment deletion (subscription might not have WayForPay recurring payment)')
+    subscriptionUpdated = true
+    console.log('[Subscription] Subscription status updated to cancelled')
   }
-
-  // 3. Update user profile
-  try {
-    await supabase
-      .from('user_profiles')
-      .update({ 
-        has_active_subscription: false,
-        current_subscription_id: null 
-      })
-      .eq('id', userId)
-
-    console.log('[Subscription] User profile updated to inactive')
-  } catch (profileError) {
-    console.error('[Subscription] Error updating user profile:', profileError)
-  }
-
-  // 4. Burn all credits (only if subscription was successfully cancelled)
-  if (subscriptionUpdated) {
-    try {
-      const { CreditsService } = await import('./creditsService.js')
-      await CreditsService.setCredits(userId, 0, `subscription_cancelled_${sub.plan_id}`)
-      console.log('[Subscription] All credits burned due to subscription cancellation')
-    } catch (creditError) {
-      console.error('[Subscription] Failed to burn credits after cancellation:', creditError)
-    }
-  } else {
-    console.warn('[Subscription] Subscription was not properly cancelled, skipping credit burning')
-  }
-
-  console.log('[Subscription] Subscription cancellation process completed for user:', userId)
-  return subscriptionUpdated
+} catch (error) {
+  console.error('[Subscription] Error updating subscription status:', error)
 }
