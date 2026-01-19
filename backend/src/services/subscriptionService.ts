@@ -336,7 +336,7 @@ export class SubscriptionService {
       })
       .eq('user_id', userId)
       .eq('status', 'active')
-      .select('id, plan_id')
+      .select('id, plan_id, payment_id')
       .single()
 
     if (updateError) {
@@ -344,13 +344,28 @@ export class SubscriptionService {
       throw new Error('Failed to cancel subscription')
     }
 
-    // 2. Update user profile
+    // 2. Try to delete recurring payment from WayForPay
+    if (sub?.payment_id) {
+      try {
+        const { RecurringPaymentService } = await import('./recurringPaymentService.js')
+        const recurringDeleted = await RecurringPaymentService.deleteRecurringPayment(sub.payment_id)
+        console.log('[Subscription] Recurring payment deletion result:', {
+          paymentId: sub.payment_id,
+          deleted: recurringDeleted
+        })
+      } catch (recurringError: any) {
+        console.warn('[Subscription] Failed to delete recurring payment:', recurringError.message)
+        // Continue with cancellation even if recurring deletion fails
+      }
+    }
+
+    // 3. Update user profile
     await supabase
       .from('user_profiles')
       .update({ has_active_subscription: false })
       .eq('id', userId)
 
-    // 3. Burn all credits
+    // 4. Burn all credits
     const { CreditsService } = await import('./creditsService.js')
     await CreditsService.setCredits(userId, 0, `subscription_cancelled_${sub.plan_id}`)
 

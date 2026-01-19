@@ -422,7 +422,15 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
         })
       }
 
-      if (transactionStatus === 'Approved') {
+      // Handle payment status according to WayForPay documentation
+      // Valid statuses: Approved, Declined, Expired, Refunded, InProcessing, WaitingAuthComplete, Pending
+      const isApproved = transactionStatus === 'Approved'
+      const isDeclined = transactionStatus === 'Declined'
+      const isExpired = transactionStatus === 'Expired'
+      const isRefunded = transactionStatus === 'Refunded' || transactionStatus === 'Voided'
+      const isFailed = isDeclined || isExpired || isRefunded
+
+      if (isApproved) {
         console.log('[WayForPay] Payment approved, processing subscription')
         try {
           const { CreditsService } = await import('../services/creditsService.js')
@@ -513,9 +521,12 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
           }
         }
       } else {
-        // Handle declined/failed payment
+        // Handle declined/failed payment according to WayForPay documentation
         console.log('[WayForPay] Payment declined/failed:', {
           transactionStatus,
+          isDeclined,
+          isExpired,
+          isRefunded,
           isRenewal,
           subscriptionId: subscription.id,
         })
@@ -583,7 +594,7 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
             p_credits_before: creditsBefore,
             p_credits_after: creditsAfter,
             p_credits_added: null,
-            p_error_message: `Payment ${transactionStatus}`,
+            p_error_message: `Payment ${transactionStatus}: ${callbackData.reason || 'Unknown reason'}`,
             p_metadata: {
               orderReference,
               transactionStatus,
@@ -591,6 +602,7 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
               authCode: callbackData.authCode,
               cardPan: callbackData.cardPan,
               reasonCode: callbackData.reasonCode,
+              reason: callbackData.reason,
               processingDate: new Date().toISOString()
             }
           })
