@@ -30,19 +30,22 @@ export class RecurringPaymentService {
    */
   static async getRecurringStatus(orderReference: string): Promise<RecurringPaymentStatus | null> {
     try {
-      const config = WayForPayService.getConfig()
+      // Use environment variables directly since getConfig is private
+      const merchantAccount = process.env.WAYFORPAY_MERCHANT_ACCOUNT || 'test_merch_n1'
+      const merchantSecretKey = process.env.WAYFORPAY_MERCHANT_SECRET_KEY || 'flk3409refn54t54t*FNJRET'
+      const apiUrl = process.env.WAYFORPAY_API_URL || 'https://api.wayforpay.com/api'
       
       const requestBody = {
         requestType: 'STATUS',
-        merchantAccount: config.merchantAccount,
-        merchantPassword: config.merchantSecretKey, // Note: Some APIs use password instead of signature
+        merchantAccount,
+        merchantPassword: merchantSecretKey, // Note: Some APIs use password instead of signature
         orderReference,
       }
 
       console.log('[RecurringPayment] Checking status:', { orderReference })
 
       const response = await axios.post(
-        `${config.apiUrl}/status`,
+        `${apiUrl}/status`,
         requestBody,
         {
           headers: {
@@ -71,19 +74,22 @@ export class RecurringPaymentService {
    */
   static async suspendRecurringPayment(orderReference: string): Promise<boolean> {
     try {
-      const config = WayForPayService.getConfig()
+      // Use environment variables directly since getConfig is private
+      const merchantAccount = process.env.WAYFORPAY_MERCHANT_ACCOUNT || 'test_merch_n1'
+      const merchantSecretKey = process.env.WAYFORPAY_MERCHANT_SECRET_KEY || 'flk3409refn54t54t*FNJRET'
+      const apiUrl = process.env.WAYFORPAY_API_URL || 'https://api.wayforpay.com/api'
       
       const requestBody = {
         requestType: 'SUSPEND',
-        merchantAccount: config.merchantAccount,
-        merchantPassword: config.merchantSecretKey,
+        merchantAccount,
+        merchantPassword: merchantSecretKey,
         orderReference,
       }
 
       console.log('[RecurringPayment] Suspending:', { orderReference })
 
       const response = await axios.post(
-        `${config.apiUrl}/suspend`,
+        `${apiUrl}/suspend`,
         requestBody,
         {
           headers: {
@@ -115,19 +121,22 @@ export class RecurringPaymentService {
    */
   static async resumeRecurringPayment(orderReference: string): Promise<boolean> {
     try {
-      const config = WayForPayService.getConfig()
+      // Use environment variables directly since getConfig is private
+      const merchantAccount = process.env.WAYFORPAY_MERCHANT_ACCOUNT || 'test_merch_n1'
+      const merchantSecretKey = process.env.WAYFORPAY_MERCHANT_SECRET_KEY || 'flk3409refn54t54t*FNJRET'
+      const apiUrl = process.env.WAYFORPAY_API_URL || 'https://api.wayforpay.com/api'
       
       const requestBody = {
         requestType: 'RESUME',
-        merchantAccount: config.merchantAccount,
-        merchantPassword: config.merchantSecretKey,
+        merchantAccount,
+        merchantPassword: merchantSecretKey,
         orderReference,
       }
 
       console.log('[RecurringPayment] Resuming:', { orderReference })
 
       const response = await axios.post(
-        `${config.apiUrl}/resume`,
+        `${apiUrl}/resume`,
         requestBody,
         {
           headers: {
@@ -159,19 +168,22 @@ export class RecurringPaymentService {
    */
   static async deleteRecurringPayment(orderReference: string): Promise<boolean> {
     try {
-      const config = WayForPayService.getConfig()
+      // Use environment variables directly since getConfig is private
+      const merchantAccount = process.env.WAYFORPAY_MERCHANT_ACCOUNT || 'test_merch_n1'
+      const merchantSecretKey = process.env.WAYFORPAY_MERCHANT_SECRET_KEY || 'flk3409refn54t54t*FNJRET'
+      const apiUrl = process.env.WAYFORPAY_API_URL || 'https://api.wayforpay.com/api'
       
       const requestBody = {
         requestType: 'REMOVE',
-        merchantAccount: config.merchantAccount,
-        merchantPassword: config.merchantSecretKey,
+        merchantAccount,
+        merchantPassword: merchantSecretKey,
         orderReference,
       }
 
       console.log('[RecurringPayment] Deleting:', { orderReference })
 
       const response = await axios.post(
-        `${config.apiUrl}/remove`,
+        `${apiUrl}/remove`,
         requestBody,
         {
           headers: {
