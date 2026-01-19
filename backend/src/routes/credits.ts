@@ -284,19 +284,19 @@ router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) 
     })
 
     // Add recurring fields for subscription payments
-    // Documentation: https://wiki.wayforpay.com/view/852478
-    hostedForm.fields.regularOn = 'Y'
-    hostedForm.fields.regularMode = 'monthly'
-    hostedForm.fields.regularAmount = String(amountToCharge)
-    hostedForm.fields.regularCount = '0' // 0 = unlimited recurring iterations
-    // Add field to skip date selection and prevent editing
-    hostedForm.fields.regularStartDate = new Date().toISOString().split('T')[0] // Start today
-    // Set expiration date to very large number (100 years from now) to prevent editing
+    // Documentation: https://wiki.wayforpay.com/en/view/852102
+    hostedForm.fields.regularOn = '1' // When passing value = 1, the checkbox "make payment regular" is enabled, the regularAmount field is locked for editing
+    hostedForm.fields.regularMode = 'monthly' // Frequency of regular charges
+    hostedForm.fields.regularAmount = String(amountToCharge) // Amount of regular payment
+    hostedForm.fields.regularBehavior = 'preset' // So that the client cannot edit the parameters of the regular payment on the payment page
+    // Set dateNext to tomorrow for first regular payment
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    hostedForm.fields.dateNext = tomorrow.toLocaleDateString('en-GB').replace(/\//g, '.') // Format: DD.MM.YYYY
+    // Set dateEnd to very far future (100 years from now) for ongoing subscription
     const expirationDate = new Date()
     expirationDate.setFullYear(expirationDate.getFullYear() + 100)
-    hostedForm.fields.regularExpirationDate = expirationDate.toISOString().split('T')[0]
-    // Prevent editing of recurring parameters
-    hostedForm.fields.regularEditable = 'N'
+    hostedForm.fields.dateEnd = expirationDate.toLocaleDateString('en-GB').replace(/\//g, '.') // Format: DD.MM.YYYY
 
     res.json({
       orderReference,
