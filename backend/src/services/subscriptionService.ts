@@ -282,4 +282,53 @@ export class SubscriptionService {
 
     console.log('[Subscription] Subscription status updated successfully (no credit changes)')
   }
+
+  /**
+   * Cancel user's active subscription
+   */
+  static async cancelSubscription(userId: string): Promise<void> {
+    console.log('[Subscription] Cancelling subscription for user:', userId)
+
+    const { data: subscription, error: fetchError } = await supabase
+      .from('user_subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .single()
+
+    if (fetchError || !subscription) {
+      console.error('[Subscription] No active subscription found:', { userId, error: fetchError })
+      throw new Error('No active subscription found')
+    }
+
+    // Update subscription status to cancelled
+    const { error: updateError } = await supabase
+      .from('user_subscriptions')
+      .update({
+        status: 'cancelled',
+        cancelled_at: new Date().toISOString(),
+      })
+      .eq('id', subscription.id)
+
+    if (updateError) {
+      console.error('[Subscription] Error cancelling subscription:', updateError)
+      throw new Error('Failed to cancel subscription')
+    }
+
+    // Update user profile
+    const { error: profileError } = await supabase
+      .from('user_profiles')
+      .update({
+        has_active_subscription: false,
+        current_subscription_id: null,
+      })
+      .eq('id', userId)
+
+    if (profileError) {
+      console.error('[Subscription] Error updating user profile:', profileError)
+      throw new Error('Failed to update user profile')
+    }
+
+    console.log('[Subscription] Subscription cancelled successfully:', { userId, subscriptionId: subscription.id })
+  }
 }
