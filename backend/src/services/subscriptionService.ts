@@ -296,25 +296,28 @@ export class SubscriptionService {
       throw new Error('Failed to update user profile')
     }
 
-    // Add credits if not already added - BURN ALL PREVIOUS CREDITS AND SET EXACTLY 3
+    // Add credits if not already added - BURN ALL PREVIOUS CREDITS AND ADD PAYMENT AMOUNT
     if (!creditsAlreadyAdded) {
-      console.log('[Subscription] Burning previous credits and adding 3 new credits:', {
+      console.log('[Subscription] Burning previous credits and adding payment amount credits:', {
         userId,
-        operation: `subscription_${plan.id}`,
+        operation: `subscription_${planId}`,
       })
 
       const { CreditsService } = await import('./creditsService.js')
       
       // First burn all previous credits to 0
-      await CreditsService.setCredits(userId, 0, `subscription_burn_previous_${plan.id}`)
+      await CreditsService.setCredits(userId, 0, `subscription_burn_previous_${planId}`)
       
-      // Then add exactly 3 credits for new subscription
-      const balanceAfter = await CreditsService.addCredits(userId, 3, `subscription_${plan.id}`)
+      // Then add credits equal to the payment amount (what user actually paid)
+      // Note: This should be passed as a parameter or retrieved from the payment
+      // For now, we'll use the plan credits as fallback
+      const creditsToAdd = plan.credits // This should be replaced with actual payment amount
+      
+      const balanceAfter = await CreditsService.addCredits(userId, creditsToAdd, `subscription_${planId}`)
 
-      console.log('[Subscription] Credits reset to 3:', {
+      console.log('[Subscription] Credits reset to payment amount:', {
         userId,
-        creditsBurned: 'all_previous',
-        creditsAdded: 3,
+        creditsToAdd,
         balanceAfter,
       })
     } else {

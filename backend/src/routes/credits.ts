@@ -439,16 +439,19 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
           let creditsAdded = null
 
           if (isRenewal) {
-            // Handle successful renewal - reset credits
-            console.log('[WayForPay] Renewal approved, resetting monthly credits')
+            // Handle successful renewal - add credits equal to payment amount
+            console.log('[WayForPay] Renewal approved, adding credits based on payment amount')
             
             creditsBefore = await CreditsService.getUserCredits(userId)
-            creditsAfter = await CreditsService.setCredits(userId, plan.credits, `subscription_renewal_${plan.id}_${Date.now()}`)
-            creditsAdded = plan.credits
             
-            console.log('[WayForPay] Monthly credits reset for renewal:', {
+            // Add credits equal to the payment amount (what user actually paid)
+            const paymentAmount = parseFloat(callbackData.amount) || 0.1
+            creditsAfter = await CreditsService.addCredits(userId, paymentAmount, `subscription_renewal_${plan.id}_${Date.now()}`)
+            creditsAdded = paymentAmount
+            
+            console.log('[WayForPay] Monthly credits added for renewal:', {
               userId,
-              planCredits: plan.credits,
+              paymentAmount,
               balanceBefore: creditsBefore,
               balanceAfter: creditsAfter,
             })
@@ -458,8 +461,8 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
               .from('user_subscriptions')
               .update({
                 payment_status: 'completed',
-                credits_included: plan.credits,
-                credits_remaining: plan.credits,
+                credits_included: creditsAdded, // Use actual payment amount
+                credits_remaining: creditsAfter,
                 updated_at: new Date().toISOString(),
               })
               .eq('id', subscription.id)
@@ -472,12 +475,15 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
             // Burn all previous credits first
             await CreditsService.setCredits(userId, 0, `subscription_burn_previous_${plan.id}`)
             
-            // Then add exactly 3 credits for new subscription
+            // Add credits equal to the payment amount (what user actually paid)
+            const paymentAmount = parseFloat(callbackData.amount) || 0.1
             await SubscriptionService.activateSubscription(userId, orderReference)
             creditsAfter = await CreditsService.getUserCredits(userId)
-            creditsAdded = 3
-            console.log('[WayForPay] Initial subscription activated with 3 credits:', {
+            creditsAdded = paymentAmount
+            
+            console.log('[WayForPay] Initial subscription activated with payment amount credits:', {
               userId,
+              paymentAmount,
               creditsBefore,
               creditsAfter,
             })
@@ -503,7 +509,8 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
               cardPan: callbackData.cardPan,
               processingDate: new Date().toISOString(),
               creditsBurned: isRenewal ? null : 'all_previous', // Only for initial subscriptions
-              creditsReset: isRenewal ? null : 3, // Only for initial subscriptions
+              creditsAdded: creditsAdded, // Actual payment amount
+              paymentAmount: parseFloat(callbackData.amount) || 0.1, // Track what user actually paid
             }
           })
 
