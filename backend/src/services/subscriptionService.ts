@@ -281,14 +281,84 @@ export class SubscriptionService {
     }
 
     console.log('[Subscription] Subscription status updated successfully (no credit changes)')
-        status: 'cancelled',
-        cancelled_at: new Date().toISOString(),
-      })
-      .eq('id', sub.id)
   } else {
-    subscriptionUpdated = true
-    console.log('[Subscription] Subscription status updated to cancelled')
+    console.log('[Subscription] Payment pending, subscription created but not activated yet')
   }
+
+  return data
+}
+
+/**
+ * Activate subscription after payment
+ * NOTE: Credits are now added in the webhook handler, so this function only updates status
+ */
+static async activateSubscription(
+  userId: string,
+  orderReference: string
+): Promise<void> {
+  console.log('[Subscription] Activating subscription:', { userId, orderReference })
+
+  const { data: subscription, error: fetchError } = await supabase
+    .from('user_subscriptions')
+    .select('*, plan:subscription_plans(*)')
+    .eq('payment_id', orderReference)
+    .eq('user_id', userId)
+    .single()
+
+  if (fetchError || !subscription) {
+    console.error('[Subscription] Subscription not found:', { orderReference, error: fetchError })
+    throw new Error('Subscription not found')
+  }
+
+  const plan = subscription.plan as SubscriptionPlan
+  if (!plan) {
+    console.error('[Subscription] Plan not found for subscription:', subscription.plan_id)
+    throw new Error('Plan not found')
+  }
+
+  console.log('[Subscription] Found subscription:', {
+    subscriptionId: subscription.id,
+    planId: plan.id,
+    credits: plan.credits,
+    currentStatus: subscription.status,
+    currentPaymentStatus: subscription.payment_status,
+  })
+
+  // Update subscription status (NO CREDIT CHANGES - handled in webhook)
+  const { error: updateError } = await supabase
+    .from('user_subscriptions')
+    .update({
+      status: 'active',
+      payment_status: 'completed',
+    })
+    .eq('id', subscription.id)
+
+  if (updateError) {
+    console.error('[Subscription] Error updating subscription status:', updateError)
+    throw new Error('Failed to update subscription status')
+  }
+
+  // Update user profile (NO CREDIT CHANGES - handled in webhook)
+  const { error: profileError } = await supabase
+    .from('user_profiles')
+    .update({
+      has_active_subscription: true,
+      current_subscription_id: subscription.id,
+    })
+    .eq('id', userId)
+
+  if (profileError) {
+    console.error('[Subscription] Error updating user profile:', profileError)
+    throw new Error('Failed to update user profile')
+  }
+
+  console.log('[Subscription] Subscription status updated successfully (no credit changes)')
+}
+
+// ... rest of the code ...
+
 } catch (error) {
   console.error('[Subscription] Error updating subscription status:', error)
 }
+
+// Added closing bracket here
