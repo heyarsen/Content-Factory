@@ -218,6 +218,7 @@ export class SubscriptionService {
 
   /**
    * Activate subscription after payment
+   * NOTE: Credits are now added in the webhook handler, so this function only updates status
    */
   static async activateSubscription(
     userId: string,
@@ -251,29 +252,12 @@ export class SubscriptionService {
       currentPaymentStatus: subscription.payment_status,
     })
 
-    // Check if credits were already added for this specific payment
-    const { data: existingTransaction } = await supabase
-      .from('credit_transactions')
-      .select('id')
-      .eq('payment_id', orderReference)
-      .limit(1)
-      .maybeSingle()
-
-    const creditsAlreadyAdded = !!existingTransaction
-
-    console.log('[Subscription] Credits check:', {
-      creditsAlreadyAdded,
-      transactionId: existingTransaction?.id,
-    })
-
-    // Update subscription status
+    // Update subscription status (NO CREDIT CHANGES - handled in webhook)
     const { error: updateError } = await supabase
       .from('user_subscriptions')
       .update({
         status: 'active',
         payment_status: 'completed',
-        started_at: new Date().toISOString(),
-        expires_at: null, // No expiration - ongoing until canceled
       })
       .eq('id', subscription.id)
 
@@ -282,7 +266,7 @@ export class SubscriptionService {
       throw new Error('Failed to update subscription status')
     }
 
-    // Update user profile
+    // Update user profile (NO CREDIT CHANGES - handled in webhook)
     const { error: profileError } = await supabase
       .from('user_profiles')
       .update({
@@ -296,35 +280,7 @@ export class SubscriptionService {
       throw new Error('Failed to update user profile')
     }
 
-    // Add credits if not already added - BURN ALL PREVIOUS CREDITS AND ADD PAYMENT AMOUNT
-    if (!creditsAlreadyAdded) {
-      console.log('[Subscription] Burning previous credits and adding payment amount credits:', {
-        userId,
-        operation: `subscription_${planId}`,
-      })
-
-      const { CreditsService } = await import('./creditsService.js')
-      
-      // First burn all previous credits to 0
-      await CreditsService.setCredits(userId, 0, `subscription_burn_previous_${planId}`)
-      
-      // Then add credits equal to the payment amount (what user actually paid)
-      // Note: This should be passed as a parameter or retrieved from the payment
-      // For now, we'll use the plan credits as fallback
-      const creditsToAdd = plan.credits // This should be replaced with actual payment amount
-      
-      const balanceAfter = await CreditsService.addCredits(userId, creditsToAdd, `subscription_${planId}`)
-
-      console.log('[Subscription] Credits reset to payment amount:', {
-        userId,
-        creditsToAdd,
-        balanceAfter,
-      })
-    } else {
-      console.log('[Subscription] Credits already added, skipping credit reset')
-    }
-
-    console.log('[Subscription] Subscription activated successfully')
+    console.log('[Subscription] Subscription status updated successfully (no credit changes)')
   }
 
   /**
