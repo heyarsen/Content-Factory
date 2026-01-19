@@ -296,26 +296,29 @@ export class SubscriptionService {
       throw new Error('Failed to update user profile')
     }
 
-    // Add credits if not already added
+    // Add credits if not already added - BURN ALL PREVIOUS CREDITS AND SET EXACTLY 3
     if (!creditsAlreadyAdded) {
-      console.log('[Subscription] Adding credits to user account:', {
+      console.log('[Subscription] Burning previous credits and adding 3 new credits:', {
         userId,
-        credits: plan.credits,
         operation: `subscription_${plan.id}`,
       })
 
       const { CreditsService } = await import('./creditsService.js')
-      const balanceBefore = await CreditsService.getUserCredits(userId)
-      const balanceAfter = await CreditsService.addCredits(userId, plan.credits, `subscription_${plan.id}`)
+      
+      // First burn all previous credits to 0
+      await CreditsService.setCredits(userId, 0, `subscription_burn_previous_${plan.id}`)
+      
+      // Then add exactly 3 credits for new subscription
+      const balanceAfter = await CreditsService.addCredits(userId, 3, `subscription_${plan.id}`)
 
-      console.log('[Subscription] Credits added successfully:', {
+      console.log('[Subscription] Credits reset to 3:', {
         userId,
-        creditsAdded: plan.credits,
-        balanceBefore,
+        creditsBurned: 'all_previous',
+        creditsAdded: 3,
         balanceAfter,
       })
     } else {
-      console.log('[Subscription] Credits already added, skipping')
+      console.log('[Subscription] Credits already added, skipping credit reset')
     }
 
     console.log('[Subscription] Subscription activated successfully')

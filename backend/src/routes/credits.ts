@@ -468,10 +468,19 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
           } else {
             // Handle initial subscription activation
             creditsBefore = await CreditsService.getUserCredits(userId)
+            
+            // Burn all previous credits first
+            await CreditsService.setCredits(userId, 0, `subscription_burn_previous_${plan.id}`)
+            
+            // Then add exactly 3 credits for new subscription
             await SubscriptionService.activateSubscription(userId, orderReference)
             creditsAfter = await CreditsService.getUserCredits(userId)
-            creditsAdded = plan.credits
-            console.log('[WayForPay] Initial subscription activated successfully')
+            creditsAdded = 3
+            console.log('[WayForPay] Initial subscription activated with 3 credits:', {
+              userId,
+              creditsBefore,
+              creditsAfter,
+            })
           }
 
           // Record payment history
@@ -485,13 +494,16 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
             p_credits_before: creditsBefore,
             p_credits_after: creditsAfter,
             p_credits_added: creditsAdded,
+            p_error_message: null,
             p_metadata: {
               orderReference,
               transactionStatus,
               merchantAccount: callbackData.merchantAccount,
               authCode: callbackData.authCode,
               cardPan: callbackData.cardPan,
-              processingDate: new Date().toISOString()
+              processingDate: new Date().toISOString(),
+              creditsBurned: isRenewal ? null : 'all_previous', // Only for initial subscriptions
+              creditsReset: isRenewal ? null : 3, // Only for initial subscriptions
             }
           })
 
