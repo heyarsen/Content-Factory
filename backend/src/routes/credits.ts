@@ -289,8 +289,14 @@ router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) 
     hostedForm.fields.regularMode = 'monthly'
     hostedForm.fields.regularAmount = String(amountToCharge)
     hostedForm.fields.regularCount = '0' // 0 = unlimited recurring iterations
-    // Add field to skip date selection
+    // Add field to skip date selection and prevent editing
     hostedForm.fields.regularStartDate = new Date().toISOString().split('T')[0] // Start today
+    // Set expiration date to very large number (100 years from now) to prevent editing
+    const expirationDate = new Date()
+    expirationDate.setFullYear(expirationDate.getFullYear() + 100)
+    hostedForm.fields.regularExpirationDate = expirationDate.toISOString().split('T')[0]
+    // Prevent editing of recurring parameters
+    hostedForm.fields.regularEditable = 'N'
 
     res.json({
       orderReference,
@@ -373,10 +379,10 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
     })
 
     if (isSubscription) {
-      // Handle subscription payment
+      // Handle subscription payment (initial or renewal)
       const { data: subscription, error: subError } = await supabase
         .from('user_subscriptions')
-        .select('*, user_id')
+        .select('*, user_id, plan:subscription_plans(*)')
         .eq('payment_id', orderReference)
         .maybeSingle()
 
@@ -391,38 +397,207 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
       }
 
       const userId = subscription.user_id
+      const plan = subscription.plan as any
 
       console.log('[WayForPay] Found subscription:', {
         subscriptionId: subscription.id,
         userId,
         currentStatus: subscription.status,
         currentPaymentStatus: subscription.payment_status,
+        transactionStatus,
       })
 
-      // If payment approved, activate subscription (this will update status and add credits)
+      // Determine if this is a renewal vs initial payment
+      const isRenewal = subscription.status === 'active' && subscription.payment_status === 'completed'
+      
+      if (isRenewal) {
+        console.log('[WayForPay] Processing monthly renewal payment:', {
+          subscriptionId: subscription.id,
+          transactionStatus,
+        })
+      } else {
+        console.log('[WayForPay] Processing initial subscription payment:', {
+          subscriptionId: subscription.id,
+          transactionStatus,
+        })
+      }
+
       if (transactionStatus === 'Approved') {
-        console.log('[WayForPay] Payment approved, activating subscription')
+        console.log('[WayForPay] Payment approved, processing subscription')
         try {
-          await SubscriptionService.activateSubscription(userId, orderReference)
-          console.log('[WayForPay] Subscription activated successfully')
+          const { CreditsService } = await import('../services/creditsService.js')
+          let creditsBefore = null
+          let creditsAfter = null
+          let creditsAdded = null
+
+          if (isRenewal) {
+            // Handle successful renewal - reset credits
+            console.log('[WayForPay] Renewal approved, resetting monthly credits')
+            
+            creditsBefore = await CreditsService.getUserCredits(userId)
+            creditsAfter = await CreditsService.setCredits(userId, plan.credits, `subscription_renewal_${plan.id}_${Date.now()}`)
+            creditsAdded = plan.credits
+            
+            console.log('[WayForPay] Monthly credits reset for renewal:', {
+              userId,
+              planCredits: plan.credits,
+              balanceBefore: creditsBefore,
+              balanceAfter: creditsAfter,
+            })
+
+            // Update subscription with renewal info
+            await supabase
+              .from('user_subscriptions')
+              .update({
+                payment_status: 'completed',
+                credits_included: plan.credits,
+                credits_remaining: plan.credits,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', subscription.id)
+
+            console.log('[WayForPay] Subscription renewal processed successfully')
+          } else {
+            // Handle initial subscription activation
+            creditsBefore = await CreditsService.getUserCredits(userId)
+            await SubscriptionService.activateSubscription(userId, orderReference)
+            creditsAfter = await CreditsService.getUserCredits(userId)
+            creditsAdded = plan.credits
+            console.log('[WayForPay] Initial subscription activated successfully')
+          }
+
+          // Record payment history
+          await supabase.rpc('record_subscription_payment', {
+            p_subscription_id: subscription.id,
+            p_payment_id: orderReference,
+            p_payment_type: isRenewal ? 'renewal' : 'initial',
+            p_transaction_status: 'Approved',
+            p_amount: parseFloat(callbackData.amount) || 0.1,
+            p_currency: callbackData.currency || 'USD',
+            p_credits_before: creditsBefore,
+            p_credits_after: creditsAfter,
+            p_credits_added: creditsAdded,
+            p_metadata: {
+              orderReference,
+              transactionStatus,
+              merchantAccount: callbackData.merchantAccount,
+              authCode: callbackData.authCode,
+              cardPan: callbackData.cardPan,
+              processingDate: new Date().toISOString()
+            }
+          })
+
+          console.log('[WayForPay] Payment history recorded successfully')
         } catch (activateError: any) {
-          console.error('[WayForPay] Error activating subscription:', activateError)
-          // Still return success to WayForPay, but log the error
+          console.error('[WayForPay] Error processing subscription:', activateError)
+          
+          // Record failed payment history
+          try {
+            await supabase.rpc('record_subscription_payment', {
+              p_subscription_id: subscription.id,
+              p_payment_id: orderReference,
+              p_payment_type: isRenewal ? 'renewal' : 'initial',
+              p_transaction_status: 'Approved',
+              p_amount: parseFloat(callbackData.amount) || 0.1,
+              p_currency: callbackData.currency || 'USD',
+              p_error_message: activateError.message,
+              p_metadata: {
+                orderReference,
+                transactionStatus,
+                error: 'processing_failed',
+                processingDate: new Date().toISOString()
+              }
+            })
+          } catch (historyError: any) {
+            console.error('[WayForPay] Failed to record payment history:', historyError)
+          }
         }
       } else {
-        // IMPORTANT: Only update failed status for NEW (pending) subscriptions
-        // If subscription is already 'active' with 'completed' payment, ignore refund/expired notifications
-        // This prevents subscriptions from being randomly removed due to late refund/expired webhooks
-        if (subscription.status === 'pending' || subscription.payment_status !== 'completed') {
-          await supabase
-            .from('user_subscriptions')
-            .update({
-              payment_status: 'failed',
-            })
-            .eq('id', subscription.id)
-          console.log('[WayForPay] Pending payment not approved, marked as failed')
-        } else {
-          console.log('[WayForPay] Ignoring failed payment for already-active subscription (likely a refund/expiration after activation)')
+        // Handle declined/failed payment
+        console.log('[WayForPay] Payment declined/failed:', {
+          transactionStatus,
+          isRenewal,
+          subscriptionId: subscription.id,
+        })
+
+        try {
+          const { CreditsService } = await import('../services/creditsService.js')
+          let creditsBefore = null
+          let creditsAfter = null
+
+          if (isRenewal) {
+            // For renewals: cancel subscription and burn credits on payment decline
+            console.log('[WayForPay] Renewal payment failed, cancelling subscription and burning credits')
+            
+            creditsBefore = await CreditsService.getUserCredits(userId)
+            
+            // Cancel subscription
+            await supabase
+              .from('user_subscriptions')
+              .update({
+                status: 'cancelled',
+                payment_status: 'failed',
+                cancelled_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', subscription.id)
+
+            // Update user profile
+            await supabase
+              .from('user_profiles')
+              .update({ 
+                has_active_subscription: false,
+                current_subscription_id: null 
+              })
+              .eq('id', userId)
+
+            // Burn all credits
+            await CreditsService.setCredits(userId, 0, `subscription_renewal_failed_${plan.id}_${Date.now()}`)
+            creditsAfter = 0
+
+            console.log('[WayForPay] Subscription cancelled and credits burned due to failed renewal')
+          } else {
+            // For initial payments: only update status if still pending
+            if (subscription.status === 'pending' || subscription.payment_status !== 'completed') {
+              await supabase
+                .from('user_subscriptions')
+                .update({
+                  payment_status: 'failed',
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', subscription.id)
+              console.log('[WayForPay] Pending initial payment not approved, marked as failed')
+            } else {
+              console.log('[WayForPay] Ignoring failed payment for already-active subscription (likely a refund/expiration after activation)')
+            }
+          }
+
+          // Record failed payment history
+          await supabase.rpc('record_subscription_payment', {
+            p_subscription_id: subscription.id,
+            p_payment_id: orderReference,
+            p_payment_type: isRenewal ? 'renewal' : 'initial',
+            p_transaction_status: transactionStatus,
+            p_amount: parseFloat(callbackData.amount) || 0.1,
+            p_currency: callbackData.currency || 'USD',
+            p_credits_before: creditsBefore,
+            p_credits_after: creditsAfter,
+            p_credits_added: null,
+            p_error_message: `Payment ${transactionStatus}`,
+            p_metadata: {
+              orderReference,
+              transactionStatus,
+              merchantAccount: callbackData.merchantAccount,
+              authCode: callbackData.authCode,
+              cardPan: callbackData.cardPan,
+              reasonCode: callbackData.reasonCode,
+              processingDate: new Date().toISOString()
+            }
+          })
+
+          console.log('[WayForPay] Failed payment history recorded')
+        } catch (cancelError: any) {
+          console.error('[WayForPay] Error handling failed payment:', cancelError)
         }
       }
     } else if (isTopup) {
