@@ -426,10 +426,16 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
       }
 
       // Determine if this is a renewal vs initial payment
-      // Only process renewals for subscriptions that are truly active (not cancelled)
+      // A true renewal must have:
+      // 1. Subscription already active and completed BEFORE this webhook
+      // 2. Created at least 25 days ago (to avoid treating initial payment as renewal)
+      const subscriptionAge = Date.now() - new Date(subscription.created_at).getTime()
+      const daysSinceCreation = subscriptionAge / (1000 * 60 * 60 * 24)
+      
       const isRenewal = subscription.status === 'active' && 
                        subscription.payment_status === 'completed' &&
-                       !subscription.cancelled_at // Exclude cancelled subscriptions
+                       !subscription.cancelled_at && // Exclude cancelled subscriptions
+                       daysSinceCreation >= 25 // Only treat as renewal if subscription is at least 25 days old
       
       // Reject payments for cancelled subscriptions
       if (subscription.cancelled_at) {
@@ -464,11 +470,15 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
         console.log('[WayForPay] Processing monthly renewal payment:', {
           subscriptionId: subscription.id,
           transactionStatus,
+          daysSinceCreation: Math.round(daysSinceCreation * 100) / 100,
         })
       } else {
         console.log('[WayForPay] Processing initial subscription payment:', {
           subscriptionId: subscription.id,
           transactionStatus,
+          daysSinceCreation: Math.round(daysSinceCreation * 100) / 100,
+          currentStatus: subscription.status,
+          currentPaymentStatus: subscription.payment_status,
         })
       }
 
