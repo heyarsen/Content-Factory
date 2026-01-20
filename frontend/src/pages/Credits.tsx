@@ -9,6 +9,7 @@ import { Coins, CheckCircle2, XCircle, Clock, ArrowUpRight, ArrowDownRight, Hist
 import api from '../lib/api'
 import { Modal } from '../components/ui/Modal'
 import { useLanguage } from '../contexts/LanguageContext'
+import { useAuth } from '../contexts/AuthContext'
 
 interface SubscriptionPlan {
   id: string
