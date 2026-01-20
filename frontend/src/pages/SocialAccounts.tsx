@@ -48,7 +48,7 @@ const platformNames = {
 
 export function SocialAccounts() {
   const { t } = useLanguage()
-  const { user } = useAuth()
+  const { user, refreshSubscriptionStatus } = useAuth()
   const [accounts, setAccounts] = useState<SocialAccount[]>([])
   const [loading, setLoading] = useState(true)
   const [connectingPlatform, setConnectingPlatform] = useState<SocialAccount['platform'] | null>(null)
@@ -71,6 +71,13 @@ export function SocialAccounts() {
     loadAccounts()
   }, [loadAccounts])
 
+  // Refresh subscription status when component mounts
+  useEffect(() => {
+    if (user?.id) {
+      refreshSubscriptionStatus()
+    }
+  }, [user?.id, refreshSubscriptionStatus])
+
   useEffect(() => {
     const connectedPlatform = searchParams.get('connected') as SocialAccount['platform'] | null
 
@@ -89,9 +96,12 @@ export function SocialAccounts() {
 
 
   const handleConnect = async (platform: SocialAccount['platform']) => {
-    // Check if user has active subscription
+    // Refresh subscription status first to get latest data
+    await refreshSubscriptionStatus()
+    
+    // Check if user has active subscription after refresh
     if (!user?.hasActiveSubscription) {
-      alert('You need an active subscription to connect social media accounts. Please upgrade your plan to continue.')
+      alert(t('social_accounts.subscription_needed_alert'))
       return
     }
 
@@ -159,7 +169,7 @@ export function SocialAccounts() {
 
       // Handle subscription required error specifically
       if (status === 403 && error.response?.data?.code === 'SUBSCRIPTION_REQUIRED') {
-        errorMessage = 'You need an active subscription to connect social media accounts. Please upgrade your plan to continue.'
+        errorMessage = t('social_accounts.subscription_needed_alert')
       }
 
       console.error('Error details:', {
@@ -229,13 +239,13 @@ export function SocialAccounts() {
           {user?.hasActiveSubscription && (
             <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-2">
               <Crown className="h-4 w-4 text-emerald-600" />
-              <span className="text-sm font-medium text-emerald-600">Premium Plan Active</span>
+              <span className="text-sm font-medium text-emerald-600">{t('social_accounts.premium_plan_active')}</span>
             </div>
           )}
           {!user?.hasActiveSubscription && (
             <div className="flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-2">
               <Lock className="h-4 w-4 text-amber-600" />
-              <span className="text-sm font-medium text-amber-600">Subscription Required for Social Media Connections</span>
+              <span className="text-sm font-medium text-amber-600">{t('social_accounts.subscription_required')}</span>
             </div>
           )}
         </div>
@@ -332,7 +342,7 @@ export function SocialAccounts() {
                         className={`w-full ${!user?.hasActiveSubscription ? 'border border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed' : ''}`}
                       >
                         <Link2 className="mr-2 h-4 w-4" />
-                        {user?.hasActiveSubscription ? t('social_accounts.connect') : 'Subscribe to Connect'}
+                        {user?.hasActiveSubscription ? t('social_accounts.connect') : t('social_accounts.subscribe_to_connect')}
                       </Button>
                     )}
                   </div>

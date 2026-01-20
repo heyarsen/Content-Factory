@@ -22,17 +22,24 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
+  refreshSubscriptionStatus: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 // Optimized function to fetch user role and subscription with caching
-const fetchUserRoleAndSubscription = async (userId: string) => {
-  // Check cache first
+const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolean = false) => {
+  // Check cache first (unless force refresh is requested)
   const cached = profileCache.get(userId)
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+  if (!forceRefresh && cached && Date.now() - cached.timestamp < CACHE_DURATION) {
     console.log('[Auth] Using cached profile data')
     return cached.data
+  }
+
+  // Clear cache if force refresh
+  if (forceRefresh && userId) {
+    profileCache.delete(userId)
+    console.log('[Auth] Cache cleared for force refresh')
   }
 
   try {
@@ -354,8 +361,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await api.post('/api/auth/reset-password', { email })
   }
 
+  const refreshSubscriptionStatus = async () => {
+    if (!user?.id) {
+      console.warn('[Auth] Cannot refresh subscription status: no user ID')
+      return
+    }
+
+    console.log('[Auth] Refreshing subscription status for user:', user.id)
+    
+    try {
+      // Force refresh subscription status
+      const profile = await fetchUserRoleAndSubscription(user.id, true)
+      
+      const updatedUser = { 
+        ...user, 
+        role: profile.role as 'user' | 'admin',
+        hasActiveSubscription: profile.has_active_subscription || false
+      }
+      
+      localStorage.setItem('auth_user', JSON.stringify(updatedUser))
+      setUser(updatedUser)
+      
+      console.log('[Auth] ✅ Subscription status refreshed:', {
+        role: profile.role,
+        hasActiveSubscription: profile.has_active_subscription
+      })
+    } catch (error) {
+      console.error('[Auth] Failed to refresh subscription status:', error)
+    }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, signUp, signIn, signInWithGoogle, signOut, resetPassword }}>
+    <AuthContext.Provider value={{ user, loading, signUp, signIn, signInWithGoogle, signOut, resetPassword, refreshSubscriptionStatus }}>
       {children}
     </AuthContext.Provider>
   )

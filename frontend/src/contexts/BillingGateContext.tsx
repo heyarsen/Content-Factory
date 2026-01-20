@@ -3,6 +3,7 @@ import { Modal } from '../components/ui/Modal'
 import { Button } from '../components/ui/Button'
 import { useNavigate } from 'react-router-dom'
 import { installBillingGateInterceptor, setBillingGateHandler } from '../lib/apiBillingGate'
+import { useLanguage } from './LanguageContext'
 
 type BillingGateState = {
   isOpen: boolean
@@ -20,9 +21,10 @@ const BillingGateContext = createContext<BillingGateContextValue | undefined>(un
 
 export function BillingGateProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
+  const { t } = useLanguage()
   const [state, setState] = useState<BillingGateState>({
     isOpen: false,
-    title: 'Action required',
+    title: t('billing_gate.action_required'),
     message: '',
     needsSubscription: false,
   })
@@ -35,14 +37,14 @@ export function BillingGateProvider({ children }: { children: ReactNode }) {
     const message =
       error?.response?.data?.error ||
       error?.message ||
-      'You need an active subscription and enough credits to use this feature.'
+      t('billing_gate.need_subscription_credits')
 
     const msg = typeof message === 'string' ? message : String(message ?? '')
     const needsSubscription = msg.toLowerCase().includes('subscription')
 
     setState({
       isOpen: true,
-      title: needsSubscription ? 'Subscription required' : 'Not enough credits',
+      title: needsSubscription ? t('billing_gate.subscription_required') : t('billing_gate.not_enough_credits'),
       message: msg,
       needsSubscription,
     })
@@ -60,7 +62,7 @@ export function BillingGateProvider({ children }: { children: ReactNode }) {
         <div className="space-y-4">
           <p className="text-sm text-slate-700">{state.message}</p>
           <p className="text-xs text-slate-500">
-            If you already paid for a subscription but still see this error, contact us at{' '}
+            {t('billing_gate.contact_support')}{' '}
             <a className="text-brand-600 hover:underline" href="mailto:support@contentfabrica.com">
               support@contentfabrica.com
             </a>
@@ -74,7 +76,7 @@ export function BillingGateProvider({ children }: { children: ReactNode }) {
                 navigate('/credits')
               }}
             >
-              {state.needsSubscription ? 'Buy subscription' : 'Top up credits'}
+              {state.needsSubscription ? t('billing_gate.buy_subscription') : t('billing_gate.top_up_credits')}
             </Button>
             <Button
               variant="primary"
@@ -83,7 +85,7 @@ export function BillingGateProvider({ children }: { children: ReactNode }) {
                 navigate('/credits')
               }}
             >
-              Manage billing
+              {t('billing_gate.manage_billing')}
             </Button>
           </div>
         </div>

@@ -51,6 +51,7 @@ export function Credits() {
   const { credits, unlimited, loading: creditsLoading, refreshCredits } = useCredits()
   const { addNotification } = useNotifications()
   const { t } = useLanguage()
+  const { refreshSubscriptionStatus } = useAuth()
   const [plans, setPlans] = useState<SubscriptionPlan[]>([])
   const [loadingPlans, setLoadingPlans] = useState(true)
   const [purchasing, setPurchasing] = useState<string | null>(null)
@@ -345,6 +346,7 @@ export function Credits() {
         })
         // Refresh immediately
         await refreshCredits()
+        await refreshSubscriptionStatus() // Refresh auth context subscription status
         await loadTransactionHistory()
         await loadSubscriptionStatus()
       } else if (attempts < 10) {

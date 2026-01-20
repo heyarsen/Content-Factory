@@ -78,20 +78,20 @@ export function ProfileSettings() {
         confirm_password: '',
       })
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to update password')
+      toast.error(error.response?.data?.error || t('preferences.password_update_error'))
     } finally {
       setSaving(false)
     }
   }
 
   const handleDeleteAccount = async () => {
-    const confirmed = window.confirm('This will permanently delete your account and associated data. Continue?')
+    const confirmed = window.confirm(t('preferences.delete_account_confirm'))
     if (!confirmed) return
 
     setDeleting(true)
     try {
       await api.delete('/api/auth/account')
-      toast.success('Account deleted')
+      toast.success(t('preferences.account_deleted'))
       await signOut()
       navigate('/login')
     } catch (error: any) {
@@ -106,10 +106,10 @@ export function ProfileSettings() {
       <div className="space-y-8">
         {/* Header */}
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Settings</p>
-          <h1 className="text-3xl font-semibold text-primary">Profile Settings</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('preferences.settings')}</p>
+          <h1 className="text-3xl font-semibold text-primary">{t('preferences.profile_settings')}</h1>
           <p className="text-sm text-slate-500">
-            Manage your account information and security settings.
+            {t('preferences.profile_settings_desc')}
           </p>
         </div>
 
@@ -117,22 +117,22 @@ export function ProfileSettings() {
         <Card className="p-6">
           <div className="mb-6 flex items-center gap-3">
             <Mail className="h-5 w-5 text-slate-400" />
-            <h2 className="text-lg font-semibold text-primary">Email Address</h2>
+            <h2 className="text-lg font-semibold text-primary">{t('preferences.email_address')}</h2>
           </div>
           <div className="space-y-4">
             <Input
-              label="Current Email"
+              label={t('preferences.current_email')}
               type="email"
               value={emailForm.email}
               onChange={(e) => setEmailForm({ email: e.target.value })}
               placeholder="your@email.com"
             />
             <p className="text-xs text-slate-500">
-              After changing your email, you'll receive a confirmation email at the new address.
+              {t('preferences.email_change_note')}
             </p>
             <div className="flex justify-end">
               <Button onClick={handleEmailUpdate} loading={saving} disabled={emailForm.email === user?.email}>
-                Update Email
+                {t('preferences.update_email')}
               </Button>
             </div>
           </div>
@@ -142,36 +142,36 @@ export function ProfileSettings() {
         <Card className="p-6">
           <div className="mb-6 flex items-center gap-3">
             <Lock className="h-5 w-5 text-slate-400" />
-            <h2 className="text-lg font-semibold text-primary">Change Password</h2>
+            <h2 className="text-lg font-semibold text-primary">{t('preferences.change_password')}</h2>
           </div>
           <div className="space-y-4">
             <Input
-              label="Current Password"
+              label={t('preferences.current_password')}
               type="password"
               value={passwordForm.old_password}
               onChange={(e) => setPasswordForm({ ...passwordForm, old_password: e.target.value })}
               placeholder="Enter current password"
             />
             <Input
-              label="New Password"
+              label={t('preferences.new_password')}
               type="password"
               value={passwordForm.new_password}
               onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
               placeholder="Enter new password"
             />
             <Input
-              label="Confirm New Password"
+              label={t('preferences.confirm_new_password')}
               type="password"
               value={passwordForm.confirm_password}
               onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })}
               placeholder="Confirm new password"
             />
             <p className="text-xs text-slate-500">
-              Password must be at least 6 characters long.
+              {t('preferences.password_requirement')}
             </p>
             <div className="flex justify-end">
               <Button onClick={handlePasswordUpdate} loading={saving}>
-                Update Password
+                {t('preferences.update_password')}
               </Button>
             </div>
           </div>
@@ -181,19 +181,19 @@ export function ProfileSettings() {
         <Card className="p-6">
           <div className="mb-6 flex items-center gap-3">
             <User className="h-5 w-5 text-slate-400" />
-            <h2 className="text-lg font-semibold text-primary">Account Information</h2>
+            <h2 className="text-lg font-semibold text-primary">{t('preferences.account_information')}</h2>
           </div>
           <div className="space-y-3">
             <div className="flex justify-between border-b border-slate-200 pb-3">
-              <span className="text-sm font-medium text-slate-600">User ID</span>
+              <span className="text-sm font-medium text-slate-600">{t('preferences.user_id')}</span>
               <span className="text-sm text-slate-500 font-mono">{user?.id}</span>
             </div>
             <div className="flex justify-between border-b border-slate-200 pb-3">
-              <span className="text-sm font-medium text-slate-600">Email</span>
+              <span className="text-sm font-medium text-slate-600">{t('common.email')}</span>
               <span className="text-sm text-slate-500">{user?.email}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-sm font-medium text-slate-600">Email Verified</span>
+              <span className="text-sm font-medium text-slate-600">{t('preferences.email_verified')}</span>
               <span className="text-sm text-slate-500">
                 {user?.email_confirmed_at ? 'Yes' : 'No'}
               </span>
@@ -205,11 +205,11 @@ export function ProfileSettings() {
         <Card className="p-6">
           <div className="mb-6 flex items-center gap-3">
             <LogOut className="h-5 w-5 text-slate-400" />
-            <h2 className="text-lg font-semibold text-primary">Sign Out</h2>
+            <h2 className="text-lg font-semibold text-primary">{t('preferences.sign_out')}</h2>
           </div>
           <div className="space-y-4">
             <p className="text-sm text-slate-600">
-              Sign out of your account. You'll need to sign in again to access your workspace.
+              {t('preferences.sign_out_desc')}
             </p>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <Button
@@ -225,7 +225,7 @@ export function ProfileSettings() {
                 }}
                 leftIcon={<LogOut className="h-4 w-4" />}
               >
-                Sign Out
+                {t('preferences.sign_out')}
               </Button>
               <Button
                 variant="secondary"
@@ -233,11 +233,11 @@ export function ProfileSettings() {
                 onClick={handleDeleteAccount}
                 loading={deleting}
               >
-                Delete Account
+                {t('preferences.delete_account')}
               </Button>
             </div>
             <p className="text-xs text-slate-500">
-              Deleting your account removes your profile and related data permanently.
+              {t('preferences.delete_account_desc')}
             </p>
           </div>
         </Card>
