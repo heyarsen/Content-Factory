@@ -413,6 +413,23 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
                        subscription.payment_status === 'completed' &&
                        !subscription.cancelled_at // Exclude cancelled subscriptions
       
+      // Check for duplicate payment processing
+      const { data: existingPayment } = await supabase
+        .from('subscription_payment_history')
+        .select('*')
+        .eq('payment_id', orderReference)
+        .eq('transaction_status', 'Approved')
+        .maybeSingle()
+      
+      if (existingPayment) {
+        console.log('[WayForPay] Duplicate payment detected, skipping:', {
+          orderReference,
+          existingPaymentId: existingPayment.id,
+          processedAt: existingPayment.created_at,
+        })
+        return res.json({ status: 'duplicate', message: 'Payment already processed' })
+      }
+      
       // Reject payments for cancelled subscriptions
       if (subscription.cancelled_at) {
         console.log('[WayForPay] Rejecting payment for cancelled subscription:', {
