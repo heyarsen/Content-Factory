@@ -123,7 +123,18 @@ router.get('/plans', authenticate, async (req: AuthRequest, res: Response) => {
 router.post('/cancel', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
-    await SubscriptionService.cancelSubscription(userId)
+    const { RecurringPaymentService } = await import('../services/recurringPaymentService.js')
+    
+    console.log('[Credits API] Cancelling subscription for user:', userId)
+    
+    // Use RecurringPaymentService to properly cancel WayForPay recurring payment
+    const success = await RecurringPaymentService.cancelSubscription(userId)
+    
+    if (!success) {
+      console.error('[Credits API] Failed to cancel subscription for user:', userId)
+      return res.status(500).json({ error: 'Failed to cancel subscription' })
+    }
+    
     res.json({ message: 'Subscription cancelled successfully' })
   } catch (error: any) {
     console.error('Cancel subscription error:', error)
