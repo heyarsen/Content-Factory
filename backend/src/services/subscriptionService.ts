@@ -200,9 +200,9 @@ export class SubscriptionService {
         })
         .eq('id', userId)
 
-      // Add credits to user account (Reset to plan amount)
+      // Add credits to user account (Add to existing balance)
       const { CreditsService } = await import('./creditsService.js')
-      const balanceAfter = await CreditsService.setCredits(userId, plan.credits, `subscription_${planId}`)
+      const balanceAfter = await CreditsService.addCredits(userId, plan.credits, `subscription_${planId}`)
 
       console.log('[Subscription] Credits added:', {
         userId,

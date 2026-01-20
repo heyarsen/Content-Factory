@@ -153,18 +153,18 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             <Link
               to="/credits"
               onClick={onClose}
-              className="group block rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5 shadow-sm transition-all hover:border-brand-200 hover:shadow-md hover:from-brand-50/50 hover:to-white"
+              className="group block rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-6 shadow-lg transition-all hover:border-brand-200 hover:shadow-xl hover:from-brand-50/50 hover:to-white"
             >
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${credits !== null && credits < 5 && !unlimited ? 'bg-amber-100 text-amber-600' : 'bg-brand-100 text-brand-600'}`}>
-                    <Sparkles className="h-5 w-5" />
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-4">
+                  <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${credits !== null && credits < 5 && !unlimited ? 'bg-amber-100 text-amber-600' : 'bg-brand-100 text-brand-600'}`}>
+                    <Sparkles className="h-6 w-6" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">
+                    <p className="text-base font-bold text-slate-900">
                       {subscription?.plan_name || t('sidebar.free_plan')}
                     </p>
-                    <p className="text-sm text-slate-500 font-medium">
+                    <p className="text-base font-semibold text-slate-600">
                       {unlimited ? t('sidebar.unlimited') : `${credits ?? 0} ${t('sidebar.credits')}`}
                     </p>
                   </div>
@@ -173,7 +173,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
               {/* Progress Bar (Visual flair) */}
               {!unlimited && subscription?.credits_included && (
-                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
                   <div
                     className="h-full bg-brand-500 transition-all duration-500"
                     style={{ width: `${Math.min(100, ((credits ?? 0) / subscription.credits_included) * 100)}%` }}
@@ -183,13 +183,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
               {/* Action Button */}
               {!unlimited && (
-                <div className="mt-4">
+                <div className="mt-5">
                   {!subscription ? (
-                    <button className="w-full rounded-xl bg-brand-600 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700">
+                    <button className="w-full rounded-xl bg-brand-600 py-3 text-base font-bold text-white transition-colors hover:bg-brand-700">
                       {t('sidebar.buy_subscription')}
                     </button>
                   ) : credits !== null && credits < 5 ? (
-                    <button className="w-full rounded-xl bg-brand-600 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700">
+                    <button className="w-full rounded-xl bg-brand-600 py-3 text-base font-bold text-white transition-colors hover:bg-brand-700">
                       {t('sidebar.top_up')}
                     </button>
                   ) : null}

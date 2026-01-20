@@ -74,7 +74,11 @@ export function SocialAccounts() {
   // Refresh subscription status when component mounts
   useEffect(() => {
     if (user?.id) {
+      // Refresh subscription status immediately and then again after 1 second
       refreshSubscriptionStatus()
+      setTimeout(() => {
+        refreshSubscriptionStatus()
+      }, 1000)
     }
   }, [user?.id, refreshSubscriptionStatus])
 
@@ -98,6 +102,9 @@ export function SocialAccounts() {
   const handleConnect = async (platform: SocialAccount['platform']) => {
     // Refresh subscription status first to get latest data
     await refreshSubscriptionStatus()
+    
+    // Add a small delay to ensure state is updated
+    await new Promise(resolve => setTimeout(resolve, 500))
     
     // Check if user has active subscription after refresh
     if (!user?.hasActiveSubscription) {
