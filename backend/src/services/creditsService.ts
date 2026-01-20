@@ -186,6 +186,34 @@ export class CreditsService {
   }
 
   /**
+   * Calculate user's top-up credits (credits purchased separately from subscription)
+   */
+  static async getTopupCredits(userId: string): Promise<number> {
+    const { data, error } = await supabase
+      .from('credit_transactions')
+      .select('amount')
+      .eq('user_id', userId)
+      .eq('type', 'topup')
+      .eq('payment_status', 'completed')
+
+    if (error) {
+      console.error('[Credits] Error fetching top-up transactions:', error)
+      return 0
+    }
+
+    // Sum all top-up amounts (they are stored as positive numbers)
+    const topupTotal = data?.reduce((sum, transaction) => sum + transaction.amount, 0) || 0
+    
+    console.log('[Credits] User top-up credits calculated:', {
+      userId,
+      topupTotal,
+      transactionCount: data?.length || 0
+    })
+
+    return topupTotal
+  }
+
+  /**
    * Deduct credits from user account
    * Returns the new credit balance (null if unlimited)
    * Does nothing if user has unlimited credits (null)

@@ -499,21 +499,21 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
           let creditsAdded = null
 
           if (isRenewal) {
-            // Handle successful renewal - burn old credits and add new ones based on subscription plan
-            console.log('[WayForPay] Renewal approved, burning old credits and adding new subscription credits')
+            // Handle successful renewal - burn all credits and add new ones based on subscription plan
+            console.log('[WayForPay] Renewal approved, burning all credits and adding new subscription credits')
             
             creditsBefore = await CreditsService.getUserCredits(userId)
             
-            // First, burn all existing credits (from previous subscription + top-ups)
+            // Burn all existing credits (from previous subscription + top-ups)
             await CreditsService.setCredits(userId, 0, `subscription_renewal_burn_${plan.id}_${Date.now()}`)
             
-            // Then add credits equal to the plan's credit allocation (NOT the payment amount)
+            // Add credits equal to the plan's credit allocation (NOT the payment amount)
             // Ensure planCredits is an integer to prevent database errors
             const planCredits = Math.round(Number(plan.credits) || 0)
             creditsAfter = await CreditsService.setCredits(userId, planCredits, `subscription_renewal_${plan.id}_${Date.now()}`)
             creditsAdded = planCredits
             
-            console.log('[WayForPay] Renewal credits processed (burn + add):', {
+            console.log('[WayForPay] Renewal credits processed (burn all + add plan):', {
               userId,
               planCredits,
               balanceBefore: creditsBefore,
@@ -528,7 +528,7 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
                 payment_status: 'completed',
                 credits_included: creditsAdded, // Use plan credit allocation
                 credits_remaining: creditsAfter,
-                credits_burned: creditsBefore, // Track burned credits for transparency
+                credits_burned: creditsBefore, // Track all credits burned
                 updated_at: new Date().toISOString(),
               })
               .eq('id', subscription.id)
@@ -538,7 +538,7 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
             // Handle initial subscription activation
             creditsBefore = await CreditsService.getUserCredits(userId)
             
-            // Burn all previous credits first
+            // Burn all previous credits first (including top-ups)
             await CreditsService.setCredits(userId, 0, `subscription_burn_previous_${plan.id}`)
             
             // Add credits equal to the plan's credit allocation (NOT the payment amount)
