@@ -499,22 +499,26 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
           let creditsAdded = null
 
           if (isRenewal) {
-            // Handle successful renewal - add credits based on subscription plan
-            console.log('[WayForPay] Renewal approved, adding credits based on subscription plan')
+            // Handle successful renewal - burn old credits and add new ones based on subscription plan
+            console.log('[WayForPay] Renewal approved, burning old credits and adding new subscription credits')
             
             creditsBefore = await CreditsService.getUserCredits(userId)
             
-            // Add credits equal to the plan's credit allocation (NOT the payment amount)
+            // First, burn all existing credits (from previous subscription + top-ups)
+            await CreditsService.setCredits(userId, 0, `subscription_renewal_burn_${plan.id}_${Date.now()}`)
+            
+            // Then add credits equal to the plan's credit allocation (NOT the payment amount)
             // Ensure planCredits is an integer to prevent database errors
             const planCredits = Math.round(Number(plan.credits) || 0)
-            creditsAfter = await CreditsService.addCredits(userId, planCredits, `subscription_renewal_${plan.id}_${Date.now()}`)
+            creditsAfter = await CreditsService.setCredits(userId, planCredits, `subscription_renewal_${plan.id}_${Date.now()}`)
             creditsAdded = planCredits
             
-            console.log('[WayForPay] Monthly credits added for renewal:', {
+            console.log('[WayForPay] Renewal credits processed (burn + add):', {
               userId,
               planCredits,
               balanceBefore: creditsBefore,
               balanceAfter: creditsAfter,
+              creditsBurned: creditsBefore, // All previous credits burned
             })
 
             // Update subscription with renewal info
@@ -524,6 +528,7 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
                 payment_status: 'completed',
                 credits_included: creditsAdded, // Use plan credit allocation
                 credits_remaining: creditsAfter,
+                credits_burned: creditsBefore, // Track burned credits for transparency
                 updated_at: new Date().toISOString(),
               })
               .eq('id', subscription.id)
