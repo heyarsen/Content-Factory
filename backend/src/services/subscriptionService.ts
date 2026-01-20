@@ -329,6 +329,17 @@ export class SubscriptionService {
       throw new Error('Failed to update user profile')
     }
 
+    // Burn all credits when subscription is cancelled
+    const { CreditsService } = await import('./creditsService.js')
+    const creditsBefore = await CreditsService.getUserCredits(userId)
+    await CreditsService.setCredits(userId, 0, `subscription_cancelled_${subscription.id}`)
+    
+    console.log('[Subscription] Credits burned due to cancellation:', {
+      userId,
+      subscriptionId: subscription.id,
+      creditsBurned: creditsBefore,
+    })
+
     console.log('[Subscription] Subscription cancelled successfully:', { userId, subscriptionId: subscription.id })
   }
 }
