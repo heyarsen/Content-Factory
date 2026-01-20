@@ -123,18 +123,7 @@ router.get('/plans', authenticate, async (req: AuthRequest, res: Response) => {
 router.post('/cancel', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
-    const { RecurringPaymentService } = await import('../services/recurringPaymentService.js')
-    
-    console.log('[Credits API] Cancelling subscription for user:', userId)
-    
-    // Use RecurringPaymentService to properly cancel WayForPay recurring payment
-    const success = await RecurringPaymentService.cancelSubscription(userId)
-    
-    if (!success) {
-      console.error('[Credits API] Failed to cancel subscription for user:', userId)
-      return res.status(500).json({ error: 'Failed to cancel subscription' })
-    }
-    
+    await SubscriptionService.cancelSubscription(userId)
     res.json({ message: 'Subscription cancelled successfully' })
   } catch (error: any) {
     console.error('Cancel subscription error:', error)
@@ -419,7 +408,39 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
       })
 
       // Determine if this is a renewal vs initial payment
-      const isRenewal = subscription.status === 'active' && subscription.payment_status === 'completed'
+      // Only process renewals for subscriptions that are truly active (not cancelled)
+      const isRenewal = subscription.status === 'active' && 
+                       subscription.payment_status === 'completed' &&
+                       !subscription.cancelled_at // Exclude cancelled subscriptions
+      
+      // Reject payments for cancelled subscriptions
+      if (subscription.cancelled_at) {
+        console.log('[WayForPay] Rejecting payment for cancelled subscription:', {
+          subscriptionId: subscription.id,
+          userId,
+          cancelledAt: subscription.cancelled_at,
+          transactionStatus,
+        })
+        
+        // Record rejected payment in history
+        await supabase.rpc('record_subscription_payment', {
+          p_subscription_id: subscription.id,
+          p_payment_id: orderReference,
+          p_payment_type: 'renewal',
+          p_transaction_status: 'Rejected',
+          p_amount: parseFloat(callbackData.amount) || 0.1,
+          p_currency: callbackData.currency || 'USD',
+          p_error_message: 'Subscription was cancelled, payment rejected',
+          p_metadata: {
+            orderReference,
+            transactionStatus,
+            cancelledAt: subscription.cancelled_at,
+            rejectionReason: 'subscription_cancelled',
+          }
+        })
+        
+        return res.json({ status: 'rejected', reason: 'Subscription cancelled' })
+      }
       
       if (isRenewal) {
         console.log('[WayForPay] Processing monthly renewal payment:', {
@@ -456,7 +477,8 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
             creditsBefore = await CreditsService.getUserCredits(userId)
             
             // Add credits equal to the plan's credit allocation (NOT the payment amount)
-            const planCredits = plan.credits || 0
+            // Ensure planCredits is an integer to prevent database errors
+            const planCredits = Math.round(Number(plan.credits) || 0)
             creditsAfter = await CreditsService.addCredits(userId, planCredits, `subscription_renewal_${plan.id}_${Date.now()}`)
             creditsAdded = planCredits
             
@@ -487,7 +509,8 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
             await CreditsService.setCredits(userId, 0, `subscription_burn_previous_${plan.id}`)
             
             // Add credits equal to the plan's credit allocation (NOT the payment amount)
-            const planCredits = plan.credits || 0
+            // Ensure planCredits is an integer to prevent database errors
+            const planCredits = Math.round(Number(plan.credits) || 0)
             await SubscriptionService.activateSubscription(userId, orderReference)
             creditsAfter = await CreditsService.setCredits(userId, planCredits, `subscription_initial_${plan.id}`)
             creditsAdded = planCredits
