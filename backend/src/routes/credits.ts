@@ -404,16 +404,11 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
         userId,
         currentStatus: subscription.status,
         currentPaymentStatus: subscription.payment_status,
+        cancelledAt: subscription.cancelled_at,
         transactionStatus,
       })
 
-      // Determine if this is a renewal vs initial payment
-      // Only process renewals for subscriptions that are truly active (not cancelled)
-      const isRenewal = subscription.status === 'active' && 
-                       subscription.payment_status === 'completed' &&
-                       !subscription.cancelled_at // Exclude cancelled subscriptions
-      
-      // Check for duplicate payment processing
+      // Check for duplicate payment processing FIRST (before any other logic)
       const { data: existingPayment } = await supabase
         .from('subscription_payment_history')
         .select('*')
@@ -429,6 +424,12 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
         })
         return res.json({ status: 'duplicate', message: 'Payment already processed' })
       }
+
+      // Determine if this is a renewal vs initial payment
+      // Only process renewals for subscriptions that are truly active (not cancelled)
+      const isRenewal = subscription.status === 'active' && 
+                       subscription.payment_status === 'completed' &&
+                       !subscription.cancelled_at // Exclude cancelled subscriptions
       
       // Reject payments for cancelled subscriptions
       if (subscription.cancelled_at) {
