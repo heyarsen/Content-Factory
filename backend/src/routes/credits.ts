@@ -944,9 +944,28 @@ router.all('/return', async (req: Request, res: Response) => {
               transactionStatus: (statusResp as any)?.transactionStatus,
             })
 
+            // Handle successful payment
             if (approved && sub.payment_status !== 'completed') {
               await SubscriptionService.activateSubscription(sub.user_id, orderReference)
               console.log('[WayForPay] Subscription activated via returnUrl:', orderReference)
+            }
+            // Handle cancelled/failed payment
+            else if (!approved && sub.payment_status === 'pending') {
+              const failedStatus = (statusResp as any)?.transactionStatus || 'failed'
+              await supabase
+                .from('user_subscriptions')
+                .update({
+                  status: 'failed',
+                  payment_status: 'failed',
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', sub.id)
+              
+              console.log('[WayForPay] Subscription marked as failed via returnUrl:', {
+                orderReference,
+                subscriptionId: sub.id,
+                failedStatus,
+              })
             }
           } else {
             console.warn('[WayForPay] No subscription found for returnUrl orderReference:', orderReference)
@@ -958,7 +977,12 @@ router.all('/return', async (req: Request, res: Response) => {
       }
 
       // We always redirect as GET so frontend can show status and refresh state.
-      const redirectUrl = `${baseUrl}/credits?status=success&order=${encodeURIComponent(orderReference)}`
+      // Determine status based on transaction status
+      let status = 'success'
+      if (transactionStatus && ['Declined', 'Expired', 'Refunded', 'Voided', 'failed', 'cancelled'].includes(String(transactionStatus))) {
+        status = 'failed'
+      }
+      const redirectUrl = `${baseUrl}/credits?status=${status}&order=${encodeURIComponent(orderReference)}`
       return res.redirect(302, redirectUrl)
     }
 
