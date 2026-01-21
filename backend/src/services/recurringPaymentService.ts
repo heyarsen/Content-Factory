@@ -1,4 +1,5 @@
 import axios from 'axios'
+import crypto from 'crypto'
 import { WayForPayService } from './wayforpayService.js'
 import { supabase } from '../lib/supabase.js'
 
@@ -173,7 +174,7 @@ export class RecurringPaymentService {
       const merchantSecretKey = process.env.WAYFORPAY_MERCHANT_SECRET_KEY || 'flk3409refn54t54t*FNJRET'
 
       // According to Wayforpay docs, merchantPassword should be MD5 hash of the secret key
-      const merchantPassword = require('crypto')
+      const merchantPassword = crypto
         .createHash('md5')
         .update(merchantSecretKey)
         .digest('hex')
