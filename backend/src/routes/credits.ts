@@ -538,31 +538,69 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
           } else {
             // Handle initial subscription activation
             creditsBefore = await CreditsService.getUserCredits(userId)
-            const topupCredits = await CreditsService.getTopupCredits(userId)
-            const currentCredits = creditsBefore ?? 0
-            const subscriptionCreditsToBurn = Math.max(0, currentCredits - topupCredits)
             
-            // Burn only subscription credits, preserve top-up credits
-            if (subscriptionCreditsToBurn > 0) {
-              await CreditsService.setCredits(userId, topupCredits, `subscription_burn_previous_${plan.id}`)
+            // Check if user has had any previous subscriptions (cancelled or completed)
+            const { data: previousSubscriptions } = await supabase
+              .from('user_subscriptions')
+              .select('id, status, created_at')
+              .eq('user_id', userId)
+              .neq('id', subscription.id) // Exclude current subscription
+              .limit(1)
+            
+            const isFirstEverSubscription = !previousSubscriptions || previousSubscriptions.length === 0
+            
+            if (isFirstEverSubscription) {
+              // First subscription ever - preserve top-up credits
+              const topupCredits = await CreditsService.getTopupCredits(userId)
+              const currentCredits = creditsBefore ?? 0
+              const subscriptionCreditsToBurn = Math.max(0, currentCredits - topupCredits)
+              
+              // Burn only subscription credits, preserve top-up credits
+              if (subscriptionCreditsToBurn > 0) {
+                await CreditsService.setCredits(userId, topupCredits, `subscription_burn_previous_${plan.id}`)
+              }
+              
+              // Add credits equal to the plan's credit allocation
+              const planCredits = Math.round(Number(plan.credits) || 0)
+              await SubscriptionService.activateSubscription(userId, orderReference)
+              creditsAfter = await CreditsService.setCredits(userId, topupCredits + planCredits, `subscription_initial_${plan.id}`)
+              creditsAdded = planCredits
+              
+              console.log('[WayForPay] First subscription activated with preserved top-up credits:', {
+                userId,
+                planCredits,
+                topupCredits,
+                balanceBefore: currentCredits,
+                balanceAfter: creditsAfter,
+                subscriptionCreditsBurned: subscriptionCreditsToBurn,
+                topupCreditsPreserved: topupCredits,
+                isFirstEverSubscription,
+              })
+            } else {
+              // Not the first subscription - burn all credits (user cancelled before)
+              console.log('[WayForPay] Not first subscription, burning all credits:', {
+                userId,
+                previousSubscriptionsCount: previousSubscriptions?.length || 0,
+              })
+              
+              // Burn all existing credits (from previous subscription + top-ups)
+              await CreditsService.setCredits(userId, 0, `subscription_burn_all_${plan.id}`)
+              
+              // Add credits equal to the plan's credit allocation
+              const planCredits = Math.round(Number(plan.credits) || 0)
+              await SubscriptionService.activateSubscription(userId, orderReference)
+              creditsAfter = await CreditsService.setCredits(userId, planCredits, `subscription_initial_${plan.id}`)
+              creditsAdded = planCredits
+              
+              console.log('[WayForPay] Subscription activated with all credits burned:', {
+                userId,
+                planCredits,
+                balanceBefore: creditsBefore,
+                balanceAfter: creditsAfter,
+                creditsBurned: creditsBefore,
+                isFirstEverSubscription: false,
+              })
             }
-            
-            // Add credits equal to the plan's credit allocation (NOT the payment amount)
-            // Ensure planCredits is an integer to prevent database errors
-            const planCredits = Math.round(Number(plan.credits) || 0)
-            await SubscriptionService.activateSubscription(userId, orderReference)
-            creditsAfter = await CreditsService.setCredits(userId, topupCredits + planCredits, `subscription_initial_${plan.id}`)
-            creditsAdded = planCredits
-            
-            console.log('[WayForPay] Initial subscription activated with preserved top-up credits:', {
-              userId,
-              planCredits,
-              topupCredits,
-              balanceBefore: currentCredits,
-              balanceAfter: creditsAfter,
-              subscriptionCreditsBurned: subscriptionCreditsToBurn,
-              topupCreditsPreserved: topupCredits,
-            })
           }
 
           // Record payment history
