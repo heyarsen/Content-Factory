@@ -114,8 +114,16 @@ export async function requireSubscription(
     const userId = req.userId!
     const userRole = (req as any).role
 
+    console.log('[Subscription Middleware] Checking subscription:', {
+      userId,
+      userRole,
+      endpoint: req.path,
+      method: req.method
+    })
+
     // Allow admins to bypass subscription check
     if (userRole === 'admin') {
+      console.log('[Subscription Middleware] Admin bypass for user:', userId)
       return next()
     }
 
@@ -124,16 +132,31 @@ export async function requireSubscription(
 
     const hasActiveSubscription = await SubscriptionService.hasActiveSubscription(userId)
 
+    console.log('[Subscription Middleware] Subscription check result:', {
+      userId,
+      hasActiveSubscription,
+      userRole
+    })
+
     if (!hasActiveSubscription) {
+      console.log('[Subscription Middleware] Access denied: No active subscription', {
+        userId,
+        userRole,
+        endpoint: req.path
+      })
       return res.status(403).json({
         error: 'Active subscription required to connect social media accounts',
         code: 'SUBSCRIPTION_REQUIRED'
       })
     }
 
+    console.log('[Subscription Middleware] Access granted: Active subscription found', {
+      userId,
+      endpoint: req.path
+    })
     next()
   } catch (error: any) {
-    console.error('Subscription check error:', error)
+    console.error('[Subscription Middleware] Subscription check error:', error)
     return res.status(500).json({ error: 'Failed to verify subscription status' })
   }
 }

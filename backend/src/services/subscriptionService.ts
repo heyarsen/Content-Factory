@@ -129,8 +129,75 @@ export class SubscriptionService {
    * Check if user has active subscription
    */
   static async hasActiveSubscription(userId: string): Promise<boolean> {
-    const subscription = await this.getUserSubscription(userId)
-    return subscription !== null
+    console.log('[Subscription] Checking active subscription for user:', userId)
+
+    // First check user_profiles table for cached subscription status
+    const { data: profile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('has_active_subscription')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (!profileError && profile?.has_active_subscription) {
+      console.log('[Subscription] Found active subscription in user_profiles:', userId)
+      return true
+    }
+
+    // Fallback: Check user_subscriptions table directly with multiple queries (matches frontend logic)
+    const results = await Promise.allSettled([
+      // Active subscription with completed payment
+      supabase
+        .from('user_subscriptions')
+        .select('id, status, payment_status')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .eq('payment_status', 'completed')
+        .limit(1)
+        .maybeSingle(),
+      // Active subscription with failed payment (late refund webhook fallback)
+      supabase
+        .from('user_subscriptions')
+        .select('id, status, payment_status')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .eq('payment_status', 'failed')
+        .limit(1)
+        .maybeSingle(),
+      // Pending subscription (lenient for slow gateways)
+      supabase
+        .from('user_subscriptions')
+        .select('id, status, payment_status')
+        .eq('user_id', userId)
+        .eq('status', 'pending')
+        .limit(1)
+        .maybeSingle()
+    ])
+
+    const completedSub = results[0].status === 'fulfilled' ? (results[0].value as any).data : null
+    const failedSub = results[1].status === 'fulfilled' ? (results[1].value as any).data : null
+    const pendingSub = results[2].status === 'fulfilled' ? (results[2].value as any).data : null
+
+    const hasActiveSub = !!(completedSub || failedSub || pendingSub)
+    
+    console.log('[Subscription] Subscription check result:', {
+      userId,
+      hasActiveSub,
+      profileHasActive: profile?.has_active_subscription,
+      completedSub: completedSub?.id,
+      failedSub: failedSub?.id,
+      pendingSub: pendingSub?.id
+    })
+
+    // If we found an active subscription but profile doesn't reflect it, update the profile
+    if (hasActiveSub && profile && !profile.has_active_subscription) {
+      console.log('[Subscription] Updating user profile to reflect active subscription:', userId)
+      await supabase
+        .from('user_profiles')
+        .update({ has_active_subscription: true })
+        .eq('id', userId)
+    }
+
+    return hasActiveSub
   }
 
   /**
