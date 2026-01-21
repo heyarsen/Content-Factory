@@ -22,7 +22,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
-  refreshSubscriptionStatus: () => Promise<void>
+  refreshSubscriptionStatus: () => Promise<boolean>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -356,7 +356,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshSubscriptionStatus = async () => {
     if (!user?.id) {
       console.warn('[Auth] Cannot refresh subscription status: no user ID')
-      return
+      return false
     }
 
     console.log('[Auth] Refreshing subscription status for user:', user.id)
@@ -365,10 +365,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Force refresh subscription status
       const profile = await fetchUserRoleAndSubscription(user.id, true)
 
+      const hasActive = profile.has_active_subscription || false
       const updatedUser = {
         ...user,
         role: profile.role as 'user' | 'admin',
-        hasActiveSubscription: profile.has_active_subscription || false
+        hasActiveSubscription: hasActive
       }
 
       localStorage.setItem('auth_user', JSON.stringify(updatedUser))
@@ -376,10 +377,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       console.log('[Auth] ✅ Subscription status refreshed:', {
         role: profile.role,
-        hasActiveSubscription: profile.has_active_subscription
+        hasActiveSubscription: hasActive
       })
+
+      return hasActive
     } catch (error) {
       console.error('[Auth] Failed to refresh subscription status:', error)
+      return false
     }
   }
 

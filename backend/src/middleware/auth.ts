@@ -50,7 +50,7 @@ export async function authenticate(
     // If profile is missing, create it automatically (lazy initialization)
     if (profileError && profileError.code === 'PGRST116') { // single row not found
       console.log(`[Auth] Profile missing for user ${user.id}, creating...`)
-      
+
       // Auto-promote admin email
       const isAdminEmail = user.email === 'heyarsen@icloud.com'
       const { data: newProfile, error: createError } = await supabase
@@ -112,19 +112,25 @@ export async function requireSubscription(
 ) {
   try {
     const userId = req.userId!
-    
+    const userRole = (req as any).role
+
+    // Allow admins to bypass subscription check
+    if (userRole === 'admin') {
+      return next()
+    }
+
     // Import SubscriptionService to check subscription status
     const { SubscriptionService } = await import('../services/subscriptionService.js')
-    
+
     const hasActiveSubscription = await SubscriptionService.hasActiveSubscription(userId)
-    
+
     if (!hasActiveSubscription) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: 'Active subscription required to connect social media accounts',
         code: 'SUBSCRIPTION_REQUIRED'
       })
     }
-    
+
     next()
   } catch (error: any) {
     console.error('Subscription check error:', error)
