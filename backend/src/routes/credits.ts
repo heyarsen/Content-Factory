@@ -438,6 +438,18 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
                        !subscription.cancelled_at && // Exclude cancelled subscriptions
                        daysSinceCreation >= 15 // Only treat as renewal if subscription is at least 15 days old
       
+      // Check if this payment has already been processed
+      if (subscription.payment_status === 'completed' && subscription.status === 'active') {
+        console.log('[WayForPay] Payment already processed, ignoring duplicate webhook:', {
+          orderReference,
+          subscriptionId: subscription.id,
+          currentStatus: subscription.status,
+          currentPaymentStatus: subscription.payment_status,
+          daysSinceCreation,
+        })
+        return res.json({ message: 'Payment already processed' })
+      }
+      
       // Reject payments for cancelled subscriptions
       if (subscription.cancelled_at) {
         console.log('[WayForPay] Rejecting payment for cancelled subscription:', {
