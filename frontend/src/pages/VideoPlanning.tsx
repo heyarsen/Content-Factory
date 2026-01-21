@@ -1109,7 +1109,7 @@ export function VideoPlanning() {
     if (!time) return ''
     const [hours, minutes] = time.split(':')
     const hour = parseInt(hours)
-    const ampm = hour >= 12 ? 'PM' : 'AM'
+    const ampm = hour >= 12 ? t('video_planning.pm') : t('video_planning.am')
     const displayHour = hour % 12 || 12
     return `${displayHour}:${minutes} ${ampm}`
   }
@@ -1144,6 +1144,7 @@ export function VideoPlanning() {
           <Button
             onClick={() => setCreateModal(true)}
             leftIcon={<Plus className="h-4 w-4" />}
+            className="w-full md:w-auto"
           >
             {t('video_planning.new_plan')}
           </Button>
@@ -1280,15 +1281,16 @@ export function VideoPlanning() {
 
             {/* Calendar Grid */}
             <Card className="p-6">
-              <div className="mb-6 flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-primary">
+              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <h2 className="text-xl font-semibold text-primary text-center sm:text-left">
                   {formatMonthYear(currentMonth)}
                 </h2>
-                <div className="flex gap-2">
+                <div className="flex justify-center gap-2">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => navigateMonth('prev')}
+                    className="flex-1 sm:flex-none"
                   >
                     ← {t('video_planning.prev')}
                   </Button>
@@ -1296,6 +1298,7 @@ export function VideoPlanning() {
                     variant="ghost"
                     size="sm"
                     onClick={() => setCurrentMonth(new Date())}
+                    className="flex-1 sm:flex-none"
                   >
                     {t('video_planning.today')}
                   </Button>
@@ -1303,6 +1306,7 @@ export function VideoPlanning() {
                     variant="ghost"
                     size="sm"
                     onClick={() => navigateMonth('next')}
+                    className="flex-1 sm:flex-none"
                   >
                     {t('video_planning.next')} →
                   </Button>

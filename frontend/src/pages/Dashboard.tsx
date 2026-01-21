@@ -93,7 +93,7 @@ export function Dashboard() {
   return (
     <Layout>
       <div className="space-y-10">
-        <section className="relative overflow-hidden rounded-[32px] border border-white/30 bg-gradient-to-br from-brand-600 via-brand-500 to-indigo-500 p-8 text-white shadow-[0_60px_120px_-70px_rgba(79,70,229,0.9)]">
+        <section className="relative overflow-hidden rounded-[32px] border border-white/30 bg-gradient-to-br from-brand-600 via-brand-500 to-indigo-500 p-6 sm:p-8 text-white shadow-[0_60px_120px_-70px_rgba(79,70,229,0.9)]">
           <div className="absolute -left-16 top-1/2 h-56 w-56 -translate-y-1/2 rounded-full bg-white/10 blur-3xl" />
           <div className="absolute -right-16 top-8 h-44 w-44 rounded-full bg-cyan-400/30 blur-3xl" />
           <div className="relative z-10 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
@@ -104,17 +104,17 @@ export function Dashboard() {
                 {t('dashboard.description')}
               </p>
             </div>
-            <div className="flex flex-wrap gap-3 text-sm font-medium">
-              <Link to="/create">
-                <Button className="border border-white/20 bg-white/20 text-white backdrop-blur hover:bg-white/30 hover:text-white shadow-lg">
+            <div className="flex flex-col sm:flex-row gap-3 text-sm font-medium">
+              <Link to="/create" className="w-full sm:w-auto">
+                <Button className="w-full sm:w-auto border border-white/20 bg-white/20 text-white backdrop-blur hover:bg-white/30 hover:text-white shadow-lg">
                   <Zap className="mr-2 h-4 w-4" />
                   {t('dashboard.create_video')}
                 </Button>
               </Link>
-              <Link to="/videos">
+              <Link to="/videos" className="w-full sm:w-auto">
                 <Button
                   variant="ghost"
-                  className="border border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/20 hover:text-white"
+                  className="w-full sm:w-auto border border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/20 hover:text-white"
                 >
                   <Video className="mr-2 h-4 w-4" />
                   {t('dashboard.library')}

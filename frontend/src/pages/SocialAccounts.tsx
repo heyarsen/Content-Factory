@@ -210,7 +210,7 @@ export function SocialAccounts() {
       error: 'error',
       pending: 'default',
     }
-    return <Badge variant={variants[status] || 'default'}>{t(`video_planning.${status}`)}</Badge>
+    return <Badge variant={variants[status] || 'default'}>{t(`social_accounts.status_${status}`)}</Badge>
   }
 
   const allPlatforms = ['instagram', 'tiktok', 'youtube', 'facebook', 'x', 'linkedin', 'pinterest', 'threads'] as const
@@ -343,8 +343,8 @@ export function SocialAccounts() {
                       <Button
                         variant={user?.hasActiveSubscription ? "primary" : "ghost"}
                         size="sm"
-                        onClick={() => handleConnect(platform)}
-                        loading={connectingPlatform === platform}
+                        onClick={() => handleConnect(platform.id)}
+                        loading={connectingPlatform === platform.id}
                         disabled={!user?.hasActiveSubscription}
                         className={`w-full ${!user?.hasActiveSubscription ? 'border border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed' : ''}`}
                       >

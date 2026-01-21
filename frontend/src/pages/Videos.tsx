@@ -407,8 +407,8 @@ export function Videos() {
             <h1 className="text-3xl font-semibold text-primary">{t('videos.library_title')}</h1>
             <p className="text-sm text-slate-500">{t('videos.library_desc')}</p>
           </div>
-          <Link to="/create">
-            <Button className="shadow-[0_20px_45px_-25px_rgba(99,102,241,0.6)]">
+          <Link to="/create" className="w-full md:w-auto">
+            <Button className="w-full md:w-auto shadow-[0_20px_45px_-25px_rgba(99,102,241,0.6)]">
               <VideoIcon className="mr-2 h-4 w-4" />
               {t('videos.create_video')}
             </Button>

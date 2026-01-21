@@ -162,7 +162,7 @@ export function Preferences() {
             <Globe className="h-5 w-5 text-slate-400" />
             <h2 className="text-lg font-semibold text-primary">{t('preferences.language')}</h2>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
             {[
               { code: 'en', name: 'English', flag: '🇺🇸' },
               { code: 'ru', name: 'Русский', flag: '🇷🇺' },

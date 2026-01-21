@@ -513,6 +513,8 @@ export const en = {
         thu: "Thu",
         fri: "Fri",
         sat: "Sat",
+        am: "AM",
+        pm: "PM",
         daily_trigger: "Daily at specific time",
         time_based_trigger: "Based on scheduled post times",
         manual_trigger: "Manual only",
@@ -558,10 +560,10 @@ export const en = {
         subscribe_to_connect: "Subscribe to Connect",
         premium_plan_active: "Premium Plan Active",
         subscription_needed_alert: "You need an active subscription to connect social media accounts. Please upgrade your plan to continue.",
-    },
-    avatars: {
-        title: "Avatars Coming Soon",
-        description: "We are currently building the custom AI Avatars feature. Check back soon for updates!",
+        status_connected: "Connected",
+        status_disconnected: "Disconnected",
+        status_error: "Error",
+        status_pending: "Pending",
     },
     platforms: {
         instagram: "Instagram",
@@ -572,6 +574,10 @@ export const en = {
         linkedin: "LinkedIn",
         pinterest: "Pinterest",
         threads: "Threads",
+    },
+    avatars: {
+        title: "Avatars Coming Soon",
+        description: "We are currently building the custom AI Avatars feature. Check back soon for updates!",
     },
     workflows: {
         title: "Workflows",
