@@ -428,14 +428,14 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
       // Determine if this is a renewal vs initial payment
       // A true renewal must have:
       // 1. Subscription already active and completed BEFORE this webhook
-      // 2. Created at least 25 days ago (to avoid treating initial payment as renewal)
+      // 2. Created at least 15 days ago (to avoid treating initial payment as renewal)
       const subscriptionAge = Date.now() - new Date(subscription.created_at).getTime()
       const daysSinceCreation = subscriptionAge / (1000 * 60 * 60 * 24)
       
       const isRenewal = subscription.status === 'active' && 
                        subscription.payment_status === 'completed' &&
                        !subscription.cancelled_at && // Exclude cancelled subscriptions
-                       daysSinceCreation >= 25 // Only treat as renewal if subscription is at least 25 days old
+                       daysSinceCreation >= 15 // Only treat as renewal if subscription is at least 15 days old
       
       // Reject payments for cancelled subscriptions
       if (subscription.cancelled_at) {
@@ -499,32 +499,26 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
           let creditsAdded = null
 
           if (isRenewal) {
-            // Handle successful renewal - preserve top-up credits, only burn subscription credits
-            console.log('[WayForPay] Renewal approved, preserving top-up credits and renewing subscription credits')
+            // Handle successful renewal - burn all credits and add new ones based on subscription plan
+            console.log('[WayForPay] Renewal approved, burning all credits and adding new subscription credits')
             
             creditsBefore = await CreditsService.getUserCredits(userId)
-            const topupCredits = await CreditsService.getTopupCredits(userId)
-            const subscriptionCreditsToBurn = Math.max(0, creditsBefore - topupCredits)
             
-            // Burn only subscription credits, preserve top-up credits
-            if (subscriptionCreditsToBurn > 0) {
-              await CreditsService.setCredits(userId, topupCredits, `subscription_renewal_burn_${plan.id}_${Date.now()}`)
-            }
+            // Burn all existing credits (from previous subscription + top-ups)
+            await CreditsService.setCredits(userId, 0, `subscription_renewal_burn_${plan.id}_${Date.now()}`)
             
-            // Add new subscription credits to preserved top-up credits
+            // Add credits equal to the plan's credit allocation (NOT the payment amount)
             // Ensure planCredits is an integer to prevent database errors
             const planCredits = Math.round(Number(plan.credits) || 0)
-            creditsAfter = await CreditsService.setCredits(userId, topupCredits + planCredits, `subscription_renewal_${plan.id}_${Date.now()}`)
+            creditsAfter = await CreditsService.setCredits(userId, planCredits, `subscription_renewal_${plan.id}_${Date.now()}`)
             creditsAdded = planCredits
             
-            console.log('[WayForPay] Renewal credits processed (preserve top-up + add plan):', {
+            console.log('[WayForPay] Renewal credits processed (burn all + add plan):', {
               userId,
               planCredits,
-              topupCredits,
               balanceBefore: creditsBefore,
               balanceAfter: creditsAfter,
-              subscriptionCreditsBurned: subscriptionCreditsToBurn,
-              topupCreditsPreserved: topupCredits,
+              creditsBurned: creditsBefore, // All previous credits burned
             })
 
             // Update subscription with renewal info
@@ -534,7 +528,7 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
                 payment_status: 'completed',
                 credits_included: creditsAdded, // Use plan credit allocation
                 credits_remaining: creditsAfter,
-                credits_burned: subscriptionCreditsToBurn, // Only track subscription credits burned
+                credits_burned: creditsBefore, // Track all credits burned
                 updated_at: new Date().toISOString(),
               })
               .eq('id', subscription.id)
