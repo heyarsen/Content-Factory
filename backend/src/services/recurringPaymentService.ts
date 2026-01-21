@@ -173,10 +173,16 @@ export class RecurringPaymentService {
       const merchantAccount = process.env.WAYFORPAY_MERCHANT_ACCOUNT || 'test_merch_n1'
       const merchantSecretKey = process.env.WAYFORPAY_MERCHANT_SECRET_KEY || 'flk3409refn54t54t*FNJRET'
 
+      // According to Wayforpay docs, merchantPassword must be MD5 hash (32 chars)
+      const merchantPassword = crypto
+        .createHash('md5')
+        .update(merchantSecretKey)
+        .digest('hex')
+
       const requestBody = {
         requestType: 'REMOVE',
         merchantAccount,
-        merchantPassword: merchantSecretKey,
+        merchantPassword,
         orderReference,
       }
 
