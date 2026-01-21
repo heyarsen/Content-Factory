@@ -1419,4 +1419,66 @@ export class VideoService {
 
     return data
   }
+
+  /**
+   * Refresh status of all videos that are currently in generating or pending status.
+   * This is used by a background worker to ensure video statuses are updated even
+   * if the user is not actively polling.
+   */
+  static async refreshAllGeneratingVideos(): Promise<{ processed: number; updated: number }> {
+    console.log('[VideoStatusWorker] Starting background status refresh for all generating videos...')
+
+    // Fetch all videos with generating/pending status
+    const { data: generatingVideos, error } = await supabase
+      .from('videos')
+      .select('*')
+      .in('status', ['generating', 'pending'])
+      .not('heygen_video_id', 'is', null)
+      .limit(50) // Process in chunks to avoid overwhelming API
+
+    if (error) {
+      console.error('[VideoStatusWorker] Error fetching generating videos:', error)
+      return { processed: 0, updated: 0 }
+    }
+
+    if (!generatingVideos || generatingVideos.length === 0) {
+      return { processed: 0, updated: 0 }
+    }
+
+    console.log(`[VideoStatusWorker] Found ${generatingVideos.length} videos to check status...`)
+
+    let updatedCount = 0
+    const { getVideoStatus } = await import('../lib/heygen.js')
+
+    for (const video of generatingVideos) {
+      try {
+        const status = await getVideoStatus(video.heygen_video_id)
+        const mappedStatus = mapHeygenStatus(status.status)
+
+        // Only update if status or video_url has changed
+        if (mappedStatus !== video.status || (status.video_url && status.video_url !== video.video_url)) {
+          const { error: updateError } = await supabase
+            .from('videos')
+            .update({
+              status: mappedStatus,
+              video_url: status.video_url || video.video_url,
+              error_message: status.error || null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', video.id)
+
+          if (updateError) {
+            console.error(`[VideoStatusWorker] Error updating status for video ${video.id}:`, updateError)
+          } else {
+            console.log(`[VideoStatusWorker] Updated video ${video.id} status to ${mappedStatus}`)
+            updatedCount++
+          }
+        }
+      } catch (err: any) {
+        console.error(`[VideoStatusWorker] Error checking status for video ${video.id}:`, err?.message)
+      }
+    }
+
+    return { processed: generatingVideos.length, updated: updatedCount }
+  }
 }

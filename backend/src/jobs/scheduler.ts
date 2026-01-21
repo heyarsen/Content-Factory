@@ -222,6 +222,20 @@ export function initializeScheduler(): void {
     }
   })
 
+  // Video status background refresher: Runs every 30 seconds
+  // Refreshes status of ALL videos in generating/pending status across all users
+  cron.schedule('*/30 * * * * *', async () => {
+    try {
+      const { VideoService } = await import('../services/videoService.js')
+      const result = await VideoService.refreshAllGeneratingVideos()
+      if (result.processed > 0) {
+        console.log(`[Cron] Video status refresher: Processed ${result.processed} videos, updated ${result.updated}`)
+      }
+    } catch (error: any) {
+      console.error('[Video Status Refresher] Error:', error)
+    }
+  })
+
   console.log('Job scheduler initialized successfully')
 }
 

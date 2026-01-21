@@ -14,6 +14,7 @@ import { Video as VideoIcon, Search, Trash2, RefreshCw, Download, Share2, Sparkl
 import { useNotifications } from '../contexts/NotificationContext'
 import { useLanguage } from '../contexts/LanguageContext'
 import api from '../lib/api'
+import { supabase } from '../lib/supabase'
 import {
   listVideos,
   deleteVideo,
@@ -167,10 +168,58 @@ export function Videos() {
     }
   }, [searchParams, videos, selectedVideo, loading, loadingVideo, setSearchParams, addNotification])
 
+  // Subscribe to Real-time updates for videos
+  useEffect(() => {
+    console.log('[Real-time] Setting up subscription for videos...')
+
+    const subscription = supabase
+      .channel('video_status_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'videos',
+        },
+        async (payload) => {
+          const updatedVideo = payload.new as VideoRecord
+          console.log('[Real-time] Video update received:', updatedVideo.id, updatedVideo.status)
+
+          if (mountedRef.current) {
+            setVideos((prev) =>
+              prev.map((v) => (v.id === updatedVideo.id ? updatedVideo : v))
+            )
+
+            // If this is the selected video, update it too
+            setSelectedVideo((prev) =>
+              prev?.id === updatedVideo.id ? updatedVideo : prev
+            )
+
+            // Notify if video completed
+            if (updatedVideo.status === 'completed' && !notifiedVideosRef.current.has(updatedVideo.id)) {
+              notifiedVideosRef.current.add(updatedVideo.id)
+              addNotification({
+                type: 'success',
+                title: t('videos.video_ready_title'),
+                message: `"${updatedVideo.topic}" ${t('videos.video_ready_message')} `,
+                link: `/videos`,
+              })
+            }
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      console.log('[Real-time] Cleaning up subscription...')
+      supabase.removeChannel(subscription)
+    }
+  }, [addNotification, t, videos, selectedVideo])
+
   useEffect(() => {
     // Poll for status updates on generating videos with rate limit handling
     let pollTimeout: NodeJS.Timeout
-    let pollDelay = 3000 // Start with 3 seconds
+    let pollDelay = 10000 // Increased to 10 seconds since we have Real-time
     let consecutiveErrors = 0
     let isActive = true
 
