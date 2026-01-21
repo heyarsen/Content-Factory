@@ -39,50 +39,7 @@ export class CreditsService {
     return data?.credits ?? 0
   }
 
-  /**
-   * Add credits to user's balance
-   * (Used for subscription purchases, top-ups, etc.)
-   */
-  static async addCredits(userId: string, amount: number, reason?: string): Promise<number | null> {
-    console.log(`[Credits] Adding ${amount} credits to user ${userId}. Reason: ${reason}`)
-
-    const { data: currentUser } = await supabase
-      .from('user_profiles')
-      .select('credits')
-      .eq('id', userId)
-      .single()
-
-    const currentCredits = currentUser?.credits ?? 0
-
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .update({
-        credits: currentCredits + amount,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', userId)
-      .select('credits')
-      .single()
-
-    if (error) {
-      console.error('[Credits] Error adding credits:', error)
-      throw new Error('Failed to add credits')
-    }
-
-    // Log transaction
-    await this.createTransaction(
-      userId,
-      'topup',
-      amount,
-      currentCredits,
-      currentCredits + amount,
-      reason,
-      reason || `Added ${amount} credits`
-    )
-
-    return data.credits
-  }
-
+  
   /**
    * Set user's credit balance to a specific amount
    * (Used for subscription renewals or resets)
