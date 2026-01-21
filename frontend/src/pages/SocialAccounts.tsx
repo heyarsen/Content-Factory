@@ -242,13 +242,15 @@ export function SocialAccounts() {
           <p className="text-sm text-slate-500">
             {t('social_accounts.subtitle')}
           </p>
-          {user?.hasActiveSubscription && (
+          {(user?.hasActiveSubscription || user?.role === 'admin') && (
             <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-2">
               <Crown className="h-4 w-4 text-emerald-600" />
-              <span className="text-sm font-medium text-emerald-600">{t('social_accounts.premium_plan_active')}</span>
+              <span className="text-sm font-medium text-emerald-600">
+                {user?.role === 'admin' ? t('social_accounts.premium_plan_active') : t('social_accounts.premium_plan_active')}
+              </span>
             </div>
           )}
-          {!user?.hasActiveSubscription && (
+          {(!user?.hasActiveSubscription && user?.role !== 'admin') && (
             <div className="flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-2">
               <Lock className="h-4 w-4 text-amber-600" />
               <span className="text-sm font-medium text-amber-600">{t('social_accounts.subscription_required')}</span>
@@ -340,15 +342,15 @@ export function SocialAccounts() {
                       </Button>
                     ) : (
                       <Button
-                        variant={user?.hasActiveSubscription ? "primary" : "ghost"}
+                        variant={(user?.hasActiveSubscription || user?.role === 'admin') ? "primary" : "ghost"}
                         size="sm"
                         onClick={() => handleConnect(platform)}
                         loading={connectingPlatform === platform}
-                        disabled={!user?.hasActiveSubscription}
-                        className={`w-full ${!user?.hasActiveSubscription ? 'border border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed' : ''}`}
+                        disabled={!user?.hasActiveSubscription && user?.role !== 'admin'}
+                        className={`w-full ${(!user?.hasActiveSubscription && user?.role !== 'admin') ? 'border border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed' : ''}`}
                       >
                         <Link2 className="mr-2 h-4 w-4" />
-                        {user?.hasActiveSubscription ? t('social_accounts.connect') : t('social_accounts.subscribe_to_connect')}
+                        {(user?.hasActiveSubscription || user?.role === 'admin') ? t('social_accounts.connect') : t('social_accounts.subscribe_to_connect')}
                       </Button>
                     )}
                   </div>

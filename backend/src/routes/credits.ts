@@ -332,7 +332,7 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
     } else if (typeof req.body === 'object' && req.body !== null) {
       // Body is already an object
       callbackData = req.body
-      
+
       // If it's an object with a single key that looks like JSON, try to parse it
       const keys = Object.keys(callbackData)
       if (keys.length === 1 && keys[0].startsWith('{')) {
@@ -416,7 +416,7 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
         .eq('payment_id', orderReference)
         .eq('transaction_status', 'Approved')
         .maybeSingle()
-      
+
       if (existingPayment) {
         console.log('[WayForPay] Duplicate payment detected, skipping:', {
           orderReference,
@@ -432,12 +432,12 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
       // 2. Created at least 15 days ago (to avoid treating initial payment as renewal)
       const subscriptionAge = Date.now() - new Date(subscription.created_at).getTime()
       const daysSinceCreation = subscriptionAge / (1000 * 60 * 60 * 24)
-      
-      const isRenewal = subscription.status === 'active' && 
-                       subscription.payment_status === 'completed' &&
-                       !subscription.cancelled_at && // Exclude cancelled subscriptions
-                       daysSinceCreation >= 15 // Only treat as renewal if subscription is at least 15 days old
-      
+
+      const isRenewal = subscription.status === 'active' &&
+        subscription.payment_status === 'completed' &&
+        !subscription.cancelled_at && // Exclude cancelled subscriptions
+        daysSinceCreation >= 15 // Only treat as renewal if subscription is at least 15 days old
+
       // Check if this payment has already been processed
       if (subscription.payment_status === 'completed' && subscription.status === 'active') {
         console.log('[WayForPay] Payment already processed, ignoring duplicate webhook:', {
@@ -449,7 +449,7 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
         })
         return res.json({ message: 'Payment already processed' })
       }
-      
+
       // Reject payments for cancelled subscriptions
       if (subscription.cancelled_at) {
         console.log('[WayForPay] Rejecting payment for cancelled subscription:', {
@@ -458,7 +458,7 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
           cancelledAt: subscription.cancelled_at,
           transactionStatus,
         })
-        
+
         // Record rejected payment in history
         await supabase.rpc('record_subscription_payment', {
           p_subscription_id: subscription.id,
@@ -475,10 +475,10 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
             rejectionReason: 'subscription_cancelled',
           }
         })
-        
+
         return res.json({ status: 'rejected', reason: 'Subscription cancelled' })
       }
-      
+
       if (isRenewal) {
         console.log('[WayForPay] Processing monthly renewal payment:', {
           subscriptionId: subscription.id,
@@ -514,18 +514,18 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
           if (isRenewal) {
             // Handle successful renewal - burn all credits and add new ones based on subscription plan
             console.log('[WayForPay] Renewal approved, burning all credits and adding new subscription credits')
-            
+
             creditsBefore = await CreditsService.getUserCredits(userId)
-            
+
             // Burn all existing credits (from previous subscription + top-ups)
             await CreditsService.setCredits(userId, 0, `subscription_renewal_burn_${plan.id}_${Date.now()}`)
-            
+
             // Add credits equal to the plan's credit allocation (NOT the payment amount)
             // Ensure planCredits is an integer to prevent database errors
             const planCredits = Math.round(Number(plan.credits) || 0)
             creditsAfter = await CreditsService.setCredits(userId, planCredits, `subscription_renewal_${plan.id}_${Date.now()}`)
             creditsAdded = planCredits
-            
+
             console.log('[WayForPay] Renewal credits processed (burn all + add plan):', {
               userId,
               planCredits,
@@ -546,11 +546,21 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
               })
               .eq('id', subscription.id)
 
+            // Update user profile to ensure sync
+            await supabase
+              .from('user_profiles')
+              .update({
+                has_active_subscription: true,
+                current_subscription_id: subscription.id,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', userId)
+
             console.log('[WayForPay] Subscription renewal processed successfully')
           } else {
             // Handle initial subscription activation
             creditsBefore = await CreditsService.getUserCredits(userId)
-            
+
             // Check if user has had any previous subscriptions (cancelled or completed)
             const { data: previousSubscriptions } = await supabase
               .from('user_subscriptions')
@@ -558,26 +568,26 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
               .eq('user_id', userId)
               .neq('id', subscription.id) // Exclude current subscription
               .limit(1)
-            
+
             const isFirstEverSubscription = !previousSubscriptions || previousSubscriptions.length === 0
-            
+
             if (isFirstEverSubscription) {
               // First subscription ever - preserve top-up credits
               const topupCredits = await CreditsService.getTopupCredits(userId)
               const currentCredits = creditsBefore ?? 0
               const subscriptionCreditsToBurn = Math.max(0, currentCredits - topupCredits)
-              
+
               // Burn only subscription credits, preserve top-up credits
               if (subscriptionCreditsToBurn > 0) {
                 await CreditsService.setCredits(userId, topupCredits, `subscription_burn_previous_${plan.id}`)
               }
-              
+
               // Add credits equal to the plan's credit allocation
               const planCredits = Math.round(Number(plan.credits) || 0)
               await SubscriptionService.activateSubscription(userId, orderReference)
               creditsAfter = await CreditsService.setCredits(userId, topupCredits + planCredits, `subscription_initial_${plan.id}`)
               creditsAdded = planCredits
-              
+
               console.log('[WayForPay] First subscription activated with preserved top-up credits:', {
                 userId,
                 planCredits,
@@ -594,16 +604,16 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
                 userId,
                 previousSubscriptionsCount: previousSubscriptions?.length || 0,
               })
-              
+
               // Burn all existing credits (from previous subscription + top-ups)
               await CreditsService.setCredits(userId, 0, `subscription_burn_all_${plan.id}`)
-              
+
               // Add credits equal to the plan's credit allocation
               const planCredits = Math.round(Number(plan.credits) || 0)
               await SubscriptionService.activateSubscription(userId, orderReference)
               creditsAfter = await CreditsService.setCredits(userId, planCredits, `subscription_initial_${plan.id}`)
               creditsAdded = planCredits
-              
+
               console.log('[WayForPay] Subscription activated with all credits burned:', {
                 userId,
                 planCredits,
@@ -644,7 +654,7 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
           console.log('[WayForPay] Payment history recorded successfully')
         } catch (activateError: any) {
           console.error('[WayForPay] Error processing subscription:', activateError)
-          
+
           // Record failed payment history
           try {
             await supabase.rpc('record_subscription_payment', {
@@ -685,9 +695,9 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
           if (isRenewal) {
             // For renewals: cancel subscription and burn credits on payment decline
             console.log('[WayForPay] Renewal payment failed, cancelling subscription and burning credits')
-            
+
             creditsBefore = await CreditsService.getUserCredits(userId)
-            
+
             // Cancel subscription
             await supabase
               .from('user_subscriptions')
@@ -702,9 +712,9 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
             // Update user profile
             await supabase
               .from('user_profiles')
-              .update({ 
+              .update({
                 has_active_subscription: false,
-                current_subscription_id: null 
+                current_subscription_id: null
               })
               .eq('id', userId)
 
@@ -779,7 +789,7 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
         .select('id, payment_status, amount')
         .eq('payment_id', orderReference)
         .maybeSingle()
-      
+
       if (fetchError) {
         console.error('[WayForPay] Error fetching existing transaction:', {
           orderReference,
@@ -827,7 +837,7 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
         // Find the package by amount from callback
         const amount = parseFloat(callbackData.amount) || 0
         console.log('[WayForPay] Payment amount:', amount)
-        
+
         // Try to find matching package from database by price
         const { data: matchingPackage } = await supabase
           .from('credit_packages')
@@ -835,9 +845,9 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
           .eq('is_active', true)
           .order('price_usd', { ascending: true })
           .limit(10)
-        
+
         let creditsToAdd = 0
-        
+
         if (matchingPackage && matchingPackage.length > 0) {
           // Find closest matching package by price (with 10% tolerance)
           const tolerance = amount * 0.1
@@ -845,7 +855,7 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
             const pkgPrice = parseFloat(pkg.price_usd.toString())
             return Math.abs(pkgPrice - amount) <= tolerance
           })
-          
+
           if (closestPackage) {
             creditsToAdd = closestPackage.credits
             console.log('[WayForPay] Matched package by price:', {
@@ -855,7 +865,7 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
             })
           }
         }
-        
+
         // Fallback: use the amount from the existing transaction
         if (creditsToAdd === 0) {
           if (existingTransaction?.amount) {
@@ -1035,7 +1045,7 @@ router.all('/return', async (req: Request, res: Response) => {
                   updated_at: new Date().toISOString(),
                 })
                 .eq('id', sub.id)
-              
+
               console.log('[WayForPay] Subscription marked as failed via returnUrl:', {
                 orderReference,
                 subscriptionId: sub.id,

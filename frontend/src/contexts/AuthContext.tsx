@@ -81,6 +81,14 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
     let role = profile?.role || 'user'
     if (isAdminEmail) role = 'admin'
 
+    console.log(`[Auth] Determined for ${userId}:`, {
+      role,
+      hasActiveSubscription,
+      profileHasSub: profile?.has_active_subscription,
+      dbSubscription: !!subscription,
+      isAdminEmail
+    })
+
     const result = { role, has_active_subscription: hasActiveSubscription }
 
     console.log('[Auth] Robust profile check completed:', {
