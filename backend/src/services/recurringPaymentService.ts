@@ -34,7 +34,7 @@ export class RecurringPaymentService {
       const merchantAccount = process.env.WAYFORPAY_MERCHANT_ACCOUNT || 'test_merch_n1'
       const merchantSecretKey = process.env.WAYFORPAY_MERCHANT_SECRET_KEY || 'flk3409refn54t54t*FNJRET'
       const apiUrl = process.env.WAYFORPAY_API_URL || 'https://api.wayforpay.com/api'
-      
+
       const requestBody = {
         requestType: 'STATUS',
         merchantAccount,
@@ -78,7 +78,7 @@ export class RecurringPaymentService {
       const merchantAccount = process.env.WAYFORPAY_MERCHANT_ACCOUNT || 'test_merch_n1'
       const merchantSecretKey = process.env.WAYFORPAY_MERCHANT_SECRET_KEY || 'flk3409refn54t54t*FNJRET'
       const apiUrl = process.env.WAYFORPAY_API_URL || 'https://api.wayforpay.com/api'
-      
+
       const requestBody = {
         requestType: 'SUSPEND',
         merchantAccount,
@@ -125,7 +125,7 @@ export class RecurringPaymentService {
       const merchantAccount = process.env.WAYFORPAY_MERCHANT_ACCOUNT || 'test_merch_n1'
       const merchantSecretKey = process.env.WAYFORPAY_MERCHANT_SECRET_KEY || 'flk3409refn54t54t*FNJRET'
       const apiUrl = process.env.WAYFORPAY_API_URL || 'https://api.wayforpay.com/api'
-      
+
       const requestBody = {
         requestType: 'RESUME',
         merchantAccount,
@@ -171,32 +171,25 @@ export class RecurringPaymentService {
       // Use environment variables directly since getConfig is private
       const merchantAccount = process.env.WAYFORPAY_MERCHANT_ACCOUNT || 'test_merch_n1'
       const merchantSecretKey = process.env.WAYFORPAY_MERCHANT_SECRET_KEY || 'flk3409refn54t54t*FNJRET'
-      const apiUrl = process.env.WAYFORPAY_API_URL || 'https://api.wayforpay.com/api'
-      
-      // Generate signature for DELETE request
-      const signatureString = [
-        merchantAccount,
-        merchantSecretKey,
-        orderReference
-      ].join(';')
-      
-      const merchantSignature = require('crypto')
+
+      // According to Wayforpay docs, merchantPassword should be MD5 hash of the secret key
+      const merchantPassword = require('crypto')
         .createHash('md5')
-        .update(signatureString)
+        .update(merchantSecretKey)
         .digest('hex')
-      
+
       const requestBody = {
         requestType: 'REMOVE',
         merchantAccount,
-        merchantPassword: merchantSecretKey,
+        merchantPassword,
         orderReference,
-        merchantSignature, // Add required signature
       }
 
       console.log('[RecurringPayment] Deleting:', { orderReference })
 
+      // IMPORTANT: Use regularApi endpoint for recurring payment operations
       const response = await axios.post(
-        apiUrl, // Use base API URL, not /remove endpoint
+        'https://api.wayforpay.com/regularApi',
         requestBody,
         {
           headers: {
@@ -311,7 +304,7 @@ export class RecurringPaymentService {
       // If recurring payment is removed/deleted, cancel subscription
       if (status.status === 'Removed' && subscription.status === 'active') {
         console.log('[RecurringPayment] Recurring payment removed, cancelling subscription:', orderReference)
-        
+
         await supabase
           .from('user_subscriptions')
           .update({

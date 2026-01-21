@@ -7,7 +7,6 @@ export const en = {
         logout: "Logout",
         save: "Save",
         cancel: "Cancel",
-        preferences: "Preferences",
         planning: "Video Planning",
         social_accounts: "Social Accounts",
         avatars: "Avatars",
