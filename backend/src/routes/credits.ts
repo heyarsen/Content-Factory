@@ -289,10 +289,10 @@ router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) 
     hostedForm.fields.regularMode = 'monthly' // Frequency of regular charges
     hostedForm.fields.regularAmount = String(amountToCharge) // Amount of regular payment
     hostedForm.fields.regularBehavior = 'preset' // So that the client cannot edit the parameters of the regular payment on the payment page
-    // Set dateNext to tomorrow for first regular payment
-    const tomorrow = new Date()
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    hostedForm.fields.dateNext = tomorrow.toLocaleDateString('en-GB').replace(/\//g, '.') // Format: DD.MM.YYYY
+    // Set dateNext to 1 month from now for first regular payment
+    const nextMonth = new Date()
+    nextMonth.setMonth(nextMonth.getMonth() + 1)
+    hostedForm.fields.dateNext = nextMonth.toLocaleDateString('en-GB').replace(/\//g, '.') // Format: DD.MM.YYYY
     // Set dateEnd to very far future (100 years from now) for ongoing subscription
     const expirationDate = new Date()
     expirationDate.setFullYear(expirationDate.getFullYear() + 100)
