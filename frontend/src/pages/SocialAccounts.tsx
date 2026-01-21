@@ -343,8 +343,8 @@ export function SocialAccounts() {
                       <Button
                         variant={user?.hasActiveSubscription ? "primary" : "ghost"}
                         size="sm"
-                        onClick={() => handleConnect(platform.id)}
-                        loading={connectingPlatform === platform.id}
+                        onClick={() => handleConnect(platform)}
+                        loading={connectingPlatform === platform}
                         disabled={!user?.hasActiveSubscription}
                         className={`w-full ${!user?.hasActiveSubscription ? 'border border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed' : ''}`}
                       >
