@@ -22,7 +22,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
-  refreshSubscriptionStatus: () => Promise<boolean>
+  refreshSubscriptionStatus: () => Promise<{ hasActiveSubscription: boolean; role: string }>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -43,23 +43,62 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
   }
 
   try {
-    // Query user_profiles directly to get both role AND subscription status
-    const { data: profile, error } = await supabase
-      .from('user_profiles')
-      .select('role, has_active_subscription')
-      .eq('id', userId)
-      .maybeSingle()
+    console.log('[Auth] Fetching robust profile for user:', userId)
 
-    if (!error && profile) {
-      console.log('[Auth] Fetched profile from database:', profile)
-      profileCache.set(userId, { data: profile, timestamp: Date.now() })
-      return profile
-    }
+    // 1. Get user email from Supabase Auth to check for admin
+    const { data: { user: authUser } } = await supabase.auth.getUser()
+    const userEmail = authUser?.email
+    const isAdminEmail = userEmail === 'heyarsen@icloud.com'
 
-    console.warn('[Auth] Profile query failed or not found, using defaults:', error?.message)
-    return { role: 'user', has_active_subscription: false }
+    // 2. Query user_profiles and user_subscriptions in parallel for robustness
+    const [profileResult, subscriptionResult] = await Promise.all([
+      supabase
+        .from('user_profiles')
+        .select('role, has_active_subscription')
+        .eq('id', userId)
+        .maybeSingle(),
+      supabase
+        .from('user_subscriptions')
+        .select('status, payment_status')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .eq('payment_status', 'completed')
+        .limit(1)
+        .maybeSingle()
+    ])
+
+    const profile = profileResult.data
+    const subscription = subscriptionResult.data
+
+    // A user has an active subscription if:
+    // - user_profiles says so OR
+    // - they have an 'active' record in user_subscriptions with 'completed' payment
+    const hasActiveSubscription = !!(profile?.has_active_subscription || subscription)
+
+    // A user is an admin if:
+    // - their email is the admin email OR
+    // - user_profiles says they are an admin
+    let role = profile?.role || 'user'
+    if (isAdminEmail) role = 'admin'
+
+    const result = { role, has_active_subscription: hasActiveSubscription }
+
+    console.log('[Auth] Robust profile check completed:', {
+      userId,
+      role,
+      hasActiveSubscription,
+      source: {
+        profileHasSub: !!profile?.has_active_subscription,
+        subscriptionTableHasSub: !!subscription,
+        profileRole: profile?.role,
+        isAdminEmail
+      }
+    })
+
+    profileCache.set(userId, { data: result, timestamp: Date.now() })
+    return result
   } catch (err) {
-    console.error('[Auth] Role/Subscription fetch error:', err)
+    console.error('[Auth] Robust Role/Subscription fetch error:', err)
     return { role: 'user', has_active_subscription: false }
   }
 }
@@ -356,7 +395,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshSubscriptionStatus = async () => {
     if (!user?.id) {
       console.warn('[Auth] Cannot refresh subscription status: no user ID')
-      return false
+      return { hasActiveSubscription: false, role: 'user' }
     }
 
     console.log('[Auth] Refreshing subscription status for user:', user.id)
@@ -366,9 +405,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const profile = await fetchUserRoleAndSubscription(user.id, true)
 
       const hasActive = profile.has_active_subscription || false
+      const role = profile.role as 'user' | 'admin'
+
       const updatedUser = {
         ...user,
-        role: profile.role as 'user' | 'admin',
+        role: role,
         hasActiveSubscription: hasActive
       }
 
@@ -376,14 +417,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(updatedUser)
 
       console.log('[Auth] ✅ Subscription status refreshed:', {
-        role: profile.role,
+        role: role,
         hasActiveSubscription: hasActive
       })
 
-      return hasActive
+      return { hasActiveSubscription: hasActive, role: role }
     } catch (error) {
       console.error('[Auth] Failed to refresh subscription status:', error)
-      return false
+      return { hasActiveSubscription: false, role: user?.role || 'user' }
     }
   }
 

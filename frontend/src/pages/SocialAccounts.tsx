@@ -100,11 +100,13 @@ export function SocialAccounts() {
 
 
   const handleConnect = async (platform: SocialAccount['platform']) => {
-    // Refresh subscription status first to get latest data
-    const hasActiveSubscription = await refreshSubscriptionStatus()
+    // Refresh subscription status first to get latest data from database
+    const { hasActiveSubscription, role } = await refreshSubscriptionStatus()
+
+    console.log('[SocialAccounts] Connecting platform check:', { hasActiveSubscription, role })
 
     // Check if user has active subscription (or is admin)
-    if (!hasActiveSubscription && user?.role !== 'admin') {
+    if (!hasActiveSubscription && role !== 'admin') {
       alert(t('social_accounts.subscription_needed_alert'))
       return
     }
