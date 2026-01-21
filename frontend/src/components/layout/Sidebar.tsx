@@ -153,35 +153,35 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             <Link
               to="/credits"
               onClick={onClose}
-              className="group block rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 shadow-lg transition-all hover:border-brand-200 hover:shadow-xl hover:from-brand-50/50 hover:to-white"
+              className="group block rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-3 shadow-md transition-all hover:border-brand-200 hover:shadow-lg hover:from-brand-50/50 hover:to-white"
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${credits !== null && credits < 5 && !unlimited ? 'bg-amber-100 text-amber-600' : 'bg-brand-100 text-brand-600'}`}>
-                    <Sparkles className="h-5 w-5" />
+                <div className="flex items-center gap-2">
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${credits !== null && credits < 5 && !unlimited ? 'bg-amber-100 text-amber-600' : 'bg-brand-100 text-brand-600'}`}>
+                    <Sparkles className="h-4 w-4" />
                   </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-900">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium text-slate-600">
                       {subscription?.plan_name || t('sidebar.free_plan')}
                     </p>
-                    <p className="text-lg font-bold text-primary">
+                    <p className="text-base font-bold text-primary leading-tight">
                       {unlimited ? t('sidebar.unlimited') : `${credits ?? 0}`}
                     </p>
                   </div>
                 </div>
                 {!unlimited && (
-                  <div className="text-right">
-                    <p className="text-xs font-medium text-slate-500">{t('sidebar.credits')}</p>
+                  <div className="flex-shrink-0 text-right">
+                    <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">{t('sidebar.credits')}</p>
                     {subscription?.credits_included && (
-                      <p className="text-xs text-slate-400">/ {subscription.credits_included}</p>
+                      <p className="text-[10px] text-slate-400">/ {subscription.credits_included}</p>
                     )}
                   </div>
                 )}
               </div>
 
-              {/* Compact Progress Bar */}
+              {/* Minimal Progress Bar */}
               {!unlimited && subscription?.credits_included && (
-                <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
                   <div
                     className="h-full bg-brand-500 transition-all duration-500"
                     style={{ width: `${Math.min(100, ((credits ?? 0) / subscription.credits_included) * 100)}%` }}
@@ -191,13 +191,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
               {/* Compact Action Button */}
               {!unlimited && (
-                <div className="mt-3">
+                <div className="mt-2">
                   {!subscription ? (
-                    <button className="w-full rounded-lg bg-brand-600 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700">
+                    <button className="w-full rounded-md bg-brand-600 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700">
                       {t('sidebar.buy_subscription')}
                     </button>
                   ) : credits !== null && credits < 5 ? (
-                    <button className="w-full rounded-lg bg-brand-600 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700">
+                    <button className="w-full rounded-md bg-brand-600 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700">
                       {t('sidebar.top_up')}
                     </button>
                   ) : null}
