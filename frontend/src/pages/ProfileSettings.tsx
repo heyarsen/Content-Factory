@@ -34,7 +34,7 @@ export function ProfileSettings() {
 
   const handleEmailUpdate = async () => {
     if (!emailForm.email || emailForm.email === user?.email) {
-      toast.error('Please enter a new email address')
+      toast.error(t('preferences.new_email_required'))
       return
     }
 
@@ -43,9 +43,9 @@ export function ProfileSettings() {
       await api.patch('/api/auth/profile', {
         email: emailForm.email,
       })
-      toast.success('Email update initiated. Please check your email to confirm.')
+      toast.success(t('preferences.email_update_initiated'))
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to update email')
+      toast.error(error.response?.data?.error || t('preferences.email_update_failed'))
     } finally {
       setSaving(false)
     }
@@ -53,17 +53,17 @@ export function ProfileSettings() {
 
   const handlePasswordUpdate = async () => {
     if (!passwordForm.old_password || !passwordForm.new_password) {
-      toast.error('Please fill in all password fields')
+      toast.error(t('preferences.fill_all_fields'))
       return
     }
 
     if (passwordForm.new_password !== passwordForm.confirm_password) {
-      toast.error('New passwords do not match')
+      toast.error(t('preferences.passwords_not_match'))
       return
     }
 
     if (passwordForm.new_password.length < 6) {
-      toast.error('Password must be at least 6 characters')
+      toast.error(t('preferences.password_too_short'))
       return
     }
 
@@ -73,7 +73,7 @@ export function ProfileSettings() {
         old_password: passwordForm.old_password,
         new_password: passwordForm.new_password,
       })
-      toast.success('Password updated successfully')
+      toast.success(t('preferences.password_updated'))
       setPasswordForm({
         old_password: '',
         new_password: '',
@@ -97,7 +97,7 @@ export function ProfileSettings() {
       await signOut()
       navigate('/login')
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to delete account')
+      toast.error(error.response?.data?.error || t('profile_settings.account_delete_failed'))
     } finally {
       setDeleting(false)
     }
@@ -108,7 +108,7 @@ export function ProfileSettings() {
       <div className="space-y-8">
         {/* Header */}
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('preferences.settings')}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('common.settings')}</p>
           <h1 className="text-3xl font-semibold text-primary">{t('preferences.profile_settings')}</h1>
           <p className="text-sm text-slate-500">
             {t('preferences.profile_settings_desc')}
@@ -152,21 +152,21 @@ export function ProfileSettings() {
               type="password"
               value={passwordForm.old_password}
               onChange={(e) => setPasswordForm({ ...passwordForm, old_password: e.target.value })}
-              placeholder="Enter current password"
+              placeholder={t('profile_settings.current_password_placeholder')}
             />
             <Input
               label={t('preferences.new_password')}
               type="password"
               value={passwordForm.new_password}
               onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
-              placeholder="Enter new password"
+              placeholder={t('profile_settings.new_password_placeholder')}
             />
             <Input
               label={t('preferences.confirm_new_password')}
               type="password"
               value={passwordForm.confirm_password}
               onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })}
-              placeholder="Confirm new password"
+              placeholder={t('profile_settings.confirm_password_placeholder')}
             />
             <p className="text-xs text-slate-500">
               {t('preferences.password_requirement')}
@@ -197,7 +197,7 @@ export function ProfileSettings() {
             <div className="flex justify-between">
               <span className="text-sm font-medium text-slate-600">{t('preferences.email_verified')}</span>
               <span className="text-sm text-slate-500">
-                {user?.email_confirmed_at ? 'Yes' : 'No'}
+                {user?.email_confirmed_at ? t('preferences.yes') : t('preferences.no')}
               </span>
             </div>
           </div>

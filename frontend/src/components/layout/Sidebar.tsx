@@ -166,15 +166,17 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     </p>
                     <p className="text-base font-bold text-primary leading-tight">
                       {unlimited ? t('sidebar.unlimited') : `${credits ?? 0}`}
+                      {!unlimited && (
+                        <span className="ml-1 text-[10px] font-medium text-slate-500 uppercase tracking-wide">
+                          {t('sidebar.credits')}
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>
-                {!unlimited && (
+                {!unlimited && subscription?.credits_included && (
                   <div className="flex-shrink-0 text-right">
-                    <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">{t('sidebar.credits')}</p>
-                    {subscription?.credits_included && (
-                      <p className="text-[10px] text-slate-400">/ {subscription.credits_included}</p>
-                    )}
+                    <p className="text-[10px] text-slate-400">/ {subscription.credits_included}</p>
                   </div>
                 )}
               </div>

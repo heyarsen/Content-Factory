@@ -106,15 +106,10 @@ export function Preferences() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      const payload = {
-        ...preferences,
-      }
-
-      await api.put('/api/preferences', payload)
-
-      toast.success('Preferences saved successfully')
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to save preferences')
+      await api.patch('/api/auth/preferences', preferences)
+      toast.success(t('preferences.preferences_saved'))
+    } catch (error) {
+      toast.error(t('preferences.preferences_save_failed'))
     } finally {
       setSaving(false)
     }
@@ -151,9 +146,9 @@ export function Preferences() {
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('common.settings')}</p>
-            <h1 className="text-3xl font-semibold text-primary">{t('common.preferences') || 'Preferences'}</h1>
+            <h1 className="text-3xl font-semibold text-primary">{t('preferences.title')}</h1>
             <p className="text-sm text-slate-500">
-              {t('preferences.description') || 'Configure your default settings for video creation and automation.'}
+              {t('preferences.description')}
             </p>
           </div>
           <Button onClick={handleSave} loading={saving}>
@@ -165,7 +160,7 @@ export function Preferences() {
         <Card className="p-6">
           <div className="mb-6 flex items-center gap-3">
             <Globe className="h-5 w-5 text-slate-400" />
-            <h2 className="text-lg font-semibold text-primary">{t('preferences.language') || 'Platform Language'}</h2>
+            <h2 className="text-lg font-semibold text-primary">{t('preferences.language')}</h2>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {[
@@ -199,7 +194,7 @@ export function Preferences() {
           <Card className="p-6">
             <div className="mb-6 flex items-center gap-3">
               <Share2 className="h-5 w-5 text-slate-400" />
-              <h2 className="text-lg font-semibold text-primary">Connected Social Media</h2>
+              <h2 className="text-lg font-semibold text-primary">{t('preferences.connected_social')}</h2>
             </div>
             <div className="flex flex-wrap gap-3">
               {connectedPlatforms.map((platform: string) => {
@@ -219,9 +214,9 @@ export function Preferences() {
               })}
             </div>
             <p className="mt-4 text-xs text-slate-500">
-              Manage your social media connections in{' '}
+              {t('preferences.manage_social_desc')}{' '}
               <a href="/social" className="text-brand-600 hover:underline">
-                Social Accounts
+                {t('common.social_accounts')}
               </a>
             </p>
           </Card>
@@ -231,18 +226,19 @@ export function Preferences() {
         <Card className="p-6">
           <div className="mb-6 flex items-center gap-3">
             <Globe className="h-5 w-5 text-slate-400" />
-            <h2 className="text-lg font-semibold text-primary">Timezone</h2>
+            <h2 className="text-lg font-semibold text-primary">{t('preferences.timezone')}</h2>
           </div>
           <div className="space-y-4">
             <Select
-              label="Default Timezone"
+              label={t('video_planning.timezone')}
               value={preferences.timezone}
               onChange={(e) => setPreferences({ ...preferences, timezone: e.target.value })}
               options={timezones}
             />
             <p className="text-xs text-slate-500">
-              This timezone will be used for scheduling videos and other time-based features.
-              Detected timezone: <strong>{Intl.DateTimeFormat().resolvedOptions().timeZone}</strong>
+              {t('preferences.timezone_desc')}
+              <br />
+              {t('preferences.detected_timezone')} <strong>{Intl.DateTimeFormat().resolvedOptions().timeZone}</strong>
             </p>
           </div>
         </Card>
@@ -251,11 +247,11 @@ export function Preferences() {
         <Card className="p-6">
           <div className="mb-6 flex items-center gap-3">
             <Settings className="h-5 w-5 text-slate-400" />
-            <h2 className="text-lg font-semibold text-primary">Default Platforms</h2>
+            <h2 className="text-lg font-semibold text-primary">{t('preferences.default_platforms')}</h2>
           </div>
           <div className="space-y-4">
             <p className="text-sm text-slate-600">
-              Select the default platforms for posting videos. These will be pre-selected when creating new video plans.
+              {t('preferences.default_platforms_desc')}
             </p>
             <div className="flex flex-wrap gap-2">
               {availablePlatforms.map((platform) => {
@@ -278,7 +274,7 @@ export function Preferences() {
                     {preferences.default_platforms.includes(platform) && (
                       <span className="ml-2">✓</span>
                     )}
-                    {!isConnected && <span className="ml-2 text-xs">(Not connected)</span>}
+                    {!isConnected && <span className="ml-2 text-xs">({t('video_planning.pending')})</span>}
                   </button>
                 )
               })}
@@ -291,7 +287,7 @@ export function Preferences() {
         <Card className="p-6">
           <div className="mb-6 flex items-center gap-3">
             <Bell className="h-5 w-5 text-slate-400" />
-            <h2 className="text-lg font-semibold text-primary">Notifications</h2>
+            <h2 className="text-lg font-semibold text-primary">{t('header.notifications')}</h2>
           </div>
           <div className="flex items-start gap-3">
             <input
@@ -305,10 +301,10 @@ export function Preferences() {
             />
             <div className="flex-1">
               <label htmlFor="notifications" className="text-sm font-medium text-slate-700">
-                Enable notifications
+                {t('preferences.enable_notifications')}
               </label>
               <p className="mt-0.5 text-xs text-slate-500">
-                Receive notifications about video generation status and other important updates.
+                {t('preferences.notifications_desc')}
               </p>
             </div>
           </div>
