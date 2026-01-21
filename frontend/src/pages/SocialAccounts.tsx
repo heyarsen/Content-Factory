@@ -42,15 +42,15 @@ export function SocialAccounts() {
   const [loading, setLoading] = useState(true)
   const [connectingPlatform, setConnectingPlatform] = useState<SocialAccount['platform'] | null>(null)
 
-  const platformNames = {
-    instagram: t('platforms.instagram'),
-    tiktok: t('platforms.tiktok'),
-    youtube: t('platforms.youtube'),
-    facebook: t('platforms.facebook'),
-    x: t('platforms.x'),
-    linkedin: t('platforms.linkedin'),
-    pinterest: t('platforms.pinterest'),
-    threads: t('platforms.threads'),
+  const platformNames: Record<string, string> = {
+    instagram: t('platforms.instagram') !== 'platforms.instagram' ? t('platforms.instagram') : 'Instagram',
+    tiktok: t('platforms.tiktok') !== 'platforms.tiktok' ? t('platforms.tiktok') : 'TikTok',
+    youtube: t('platforms.youtube') !== 'platforms.youtube' ? t('platforms.youtube') : 'YouTube',
+    facebook: t('platforms.facebook') !== 'platforms.facebook' ? t('platforms.facebook') : 'Facebook',
+    x: t('platforms.x') !== 'platforms.x' ? t('platforms.x') : 'X (Twitter)',
+    linkedin: t('platforms.linkedin') !== 'platforms.linkedin' ? t('platforms.linkedin') : 'LinkedIn',
+    pinterest: t('platforms.pinterest') !== 'platforms.pinterest' ? t('platforms.pinterest') : 'Pinterest',
+    threads: t('platforms.threads') !== 'platforms.threads' ? t('platforms.threads') : 'Threads',
   }
   const [disconnectModal, setDisconnectModal] = useState<string | null>(null)
   const [disconnecting, setDisconnecting] = useState(false)

@@ -43,28 +43,20 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
   }
 
   try {
-    // Use RPC for faster role lookup (bypasses RLS)
-    const { data: rpcResult, error: rpcError } = await supabase
-      .rpc('get_user_role', { user_id: userId })
-    
-    if (!rpcError && rpcResult) {
-      const profileData = { role: rpcResult, has_active_subscription: false }
-      profileCache.set(userId, { data: profileData, timestamp: Date.now() })
-      return profileData
-    }
-
-    // Fallback to direct query
+    // Query user_profiles directly to get both role AND subscription status
     const { data: profile, error } = await supabase
       .from('user_profiles')
       .select('role, has_active_subscription')
       .eq('id', userId)
       .maybeSingle()
-    
+
     if (!error && profile) {
+      console.log('[Auth] Fetched profile from database:', profile)
       profileCache.set(userId, { data: profile, timestamp: Date.now() })
       return profile
     }
-    
+
+    console.warn('[Auth] Profile query failed or not found, using defaults:', error?.message)
     return { role: 'user', has_active_subscription: false }
   } catch (err) {
     console.error('[Auth] Role/Subscription fetch error:', err)
@@ -83,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // FIRST: Check our own storage - this is the source of truth
     const token = localStorage.getItem('access_token')
     const storedUser = localStorage.getItem('auth_user')
-    
+
     console.log('[Auth] Init: Checking storage...', { hasToken: !!token, hasStoredUser: !!storedUser })
 
     if (storedUser) {
@@ -93,12 +85,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log('[Auth] Restored user from localStorage:', { email: parsedUser.email, role: parsedUser.role })
         setUser(parsedUser)
         setLoading(false) // Set loading false immediately
-        
+
         // Fetch actual role and subscription status from database in background (non-blocking)
         fetchUserRoleAndSubscription(parsedUser.id).then(profile => {
           if (mounted) {
-            const updatedUser = { 
-              ...parsedUser, 
+            const updatedUser = {
+              ...parsedUser,
               role: profile.role as 'user' | 'admin',
               hasActiveSubscription: profile.has_active_subscription || false
             }
@@ -116,7 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else {
       // No stored session, check Supabase as fallback with timeout
       console.log('[Auth] No stored session, checking Supabase...')
-      
+
       // Set a 1 second timeout - faster fallback for better UX
       timeoutId = setTimeout(() => {
         if (mounted) {
@@ -124,22 +116,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false)
         }
       }, 1000)
-      
+
       supabase.auth.getSession()
         .then(async ({ data: { session } }) => {
           if (timeoutId) clearTimeout(timeoutId)
-          
+
           if (mounted && session?.user) {
             console.log('[Auth] Found Supabase session, fetching user role...')
-            
+
             // Fetch role and subscription in parallel with session
             const [profileResult] = await Promise.allSettled([
               fetchUserRoleAndSubscription(session.user.id)
             ])
-            
+
             let role: 'user' | 'admin' = 'user'
             let hasActiveSubscription = false
-            
+
             if (profileResult.status === 'fulfilled') {
               role = profileResult.value.role as 'user' | 'admin'
               hasActiveSubscription = profileResult.value.has_active_subscription || false
@@ -147,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } else {
               console.warn('[Auth] Profile fetch failed, using defaults')
             }
-            
+
             const user = {
               ...session.user,
               role,
@@ -171,25 +163,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth changes from Supabase
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('[Auth] Auth state change event:', event, session?.user?.id)
-      
+
       if (mounted) {
         if (session?.user) {
-        // Fetch role and subscription in parallel for faster auth state changes
-        const [profileResult] = await Promise.allSettled([
-          fetchUserRoleAndSubscription(session.user.id)
-        ])
-        
-        let role: 'user' | 'admin' = 'user'
-        let hasActiveSubscription = false
-        
-        if (profileResult.status === 'fulfilled') {
-          role = profileResult.value.role as 'user' | 'admin'
-          hasActiveSubscription = profileResult.value.has_active_subscription || false
-          console.log('[Auth] User profile fetched on state change:', { role, hasActiveSubscription })
-        } else {
-          console.warn('[Auth] Profile fetch failed on state change, using defaults')
-        }
-          
+          // Fetch role and subscription in parallel for faster auth state changes
+          const [profileResult] = await Promise.allSettled([
+            fetchUserRoleAndSubscription(session.user.id)
+          ])
+
+          let role: 'user' | 'admin' = 'user'
+          let hasActiveSubscription = false
+
+          if (profileResult.status === 'fulfilled') {
+            role = profileResult.value.role as 'user' | 'admin'
+            hasActiveSubscription = profileResult.value.has_active_subscription || false
+            console.log('[Auth] User profile fetched on state change:', { role, hasActiveSubscription })
+          } else {
+            console.warn('[Auth] Profile fetch failed on state change, using defaults')
+          }
+
           const user = {
             ...session.user,
             role,
@@ -233,16 +225,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (data.access_token) {
         localStorage.setItem('access_token', data.access_token)
-        
+
         // Set user immediately with basic data, fetch role in background
         let userWithRole = { ...data.user, role: 'user' as const, hasActiveSubscription: false }
         setUser(userWithRole)
         localStorage.setItem('auth_user', JSON.stringify(userWithRole))
-        
+
         // Fetch role in background (non-blocking)
         fetchUserRoleAndSubscription(data.user.id).then(profile => {
-          const updatedUser = { 
-            ...data.user, 
+          const updatedUser = {
+            ...data.user,
             role: profile.role as 'user' | 'admin',
             hasActiveSubscription: profile.has_active_subscription || false
           }
@@ -308,42 +300,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     console.log('[Auth] Starting sign out...')
-    
+
     // Clear cache on sign out
     if (user?.id) {
       profileCache.delete(user.id)
     }
-    
+
     // Step 1: Clear our state immediately
     setUser(null)
-    
+
     // Step 2: Clear our auth storage
     localStorage.removeItem('access_token')
     localStorage.removeItem('auth_user')
-    
+
     // Step 3: Clear Supabase storage by collecting keys first (to avoid length issues)
     const sessionKeys = Array.from({ length: sessionStorage.length }, (_, i) => sessionStorage.key(i) || '')
       .filter(key => key && (key.startsWith('sb-') || key === 'supabase.auth.token'))
     sessionKeys.forEach(key => sessionStorage.removeItem(key))
-    
+
     const localStorageKeys = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i) || '')
       .filter(key => key && (key.startsWith('sb-') || key === 'supabase.auth.token'))
     localStorageKeys.forEach(key => localStorage.removeItem(key))
-    
+
     // Step 4: Sign out from Supabase (non-blocking)
     try {
       await supabase.auth.signOut()
     } catch (error) {
       console.warn('[Auth] Supabase sign out warning:', error)
     }
-    
+
     // Step 5: Call logout API (non-blocking)
     try {
       await api.post('/api/auth/logout')
     } catch (error) {
       console.warn('[Auth] Logout API warning:', error)
     }
-    
+
     console.log('[Auth] Sign out complete')
   }
 
@@ -368,20 +360,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     console.log('[Auth] Refreshing subscription status for user:', user.id)
-    
+
     try {
       // Force refresh subscription status
       const profile = await fetchUserRoleAndSubscription(user.id, true)
-      
-      const updatedUser = { 
-        ...user, 
+
+      const updatedUser = {
+        ...user,
         role: profile.role as 'user' | 'admin',
         hasActiveSubscription: profile.has_active_subscription || false
       }
-      
+
       localStorage.setItem('auth_user', JSON.stringify(updatedUser))
       setUser(updatedUser)
-      
+
       console.log('[Auth] ✅ Subscription status refreshed:', {
         role: profile.role,
         hasActiveSubscription: profile.has_active_subscription
