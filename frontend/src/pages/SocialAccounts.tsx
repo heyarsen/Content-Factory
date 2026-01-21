@@ -11,6 +11,7 @@ import { Users, Link2, X, Instagram, Youtube, Facebook, Share2, Crown, Lock } fr
 import api from '../lib/api'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../hooks/useToast'
 
 interface SocialAccount {
   id: string
@@ -38,6 +39,7 @@ const platformIcons = {
 export function SocialAccounts() {
   const { t } = useLanguage()
   const { user, refreshSubscriptionStatus } = useAuth()
+  const { toast } = useToast()
   const [accounts, setAccounts] = useState<SocialAccount[]>([])
   const [loading, setLoading] = useState(true)
   const [connectingPlatform, setConnectingPlatform] = useState<SocialAccount['platform'] | null>(null)
@@ -100,14 +102,23 @@ export function SocialAccounts() {
 
 
   const handleConnect = async (platform: SocialAccount['platform']) => {
-    // Refresh subscription status first to get latest data from database
-    const { hasActiveSubscription, role } = await refreshSubscriptionStatus()
+    // Refresh subscription status first to get the latest data
+    const refreshResult = await refreshSubscriptionStatus()
+    const { hasActiveSubscription, role: userRole } = refreshResult
 
-    console.log('[SocialAccounts] Connecting platform check:', { hasActiveSubscription, role })
+    console.log('[Social] Connection attempt:', {
+      platform,
+      userId: user?.id,
+      userRoleFromState: user?.role,
+      hasSubFromState: user?.hasActiveSubscription,
+      userRoleFromRefresh: userRole,
+      hasSubFromRefresh: hasActiveSubscription
+    })
 
-    // Check if user has active subscription (or is admin)
-    if (!hasActiveSubscription && role !== 'admin') {
-      alert(t('social_accounts.subscription_needed_alert'))
+    // Check if user has an active subscription or is admin
+    if (!hasActiveSubscription && userRole !== 'admin') {
+      console.log('[Social] Connection blocked: No active subscription for non-admin user')
+      toast.error(t('social_accounts.subscription_needed_alert'))
       return
     }
 

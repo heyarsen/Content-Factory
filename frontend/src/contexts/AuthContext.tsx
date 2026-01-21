@@ -51,7 +51,7 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
     const isAdminEmail = userEmail === 'heyarsen@icloud.com'
 
     // 2. Query user_profiles and user_subscriptions in parallel for robustness
-    const [profileResult, subscriptionResult] = await Promise.all([
+    const results = await Promise.allSettled([
       supabase
         .from('user_profiles')
         .select('role, has_active_subscription')
@@ -64,41 +64,56 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
         .eq('status', 'active')
         .eq('payment_status', 'completed')
         .limit(1)
+        .maybeSingle(),
+      // Fallback for active status with failed payment status (matches backend service logic)
+      supabase
+        .from('user_subscriptions')
+        .select('status, payment_status')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .eq('payment_status', 'failed')
+        .limit(1)
         .maybeSingle()
     ])
 
-    const profile = profileResult.data
-    const subscription = subscriptionResult.data
+    const profileData = results[0].status === 'fulfilled' ? (results[0].value as any).data : null
+    const subCompletedData = results[1].status === 'fulfilled' ? (results[1].value as any).data : null
+    const subFailedData = results[2].status === 'fulfilled' ? (results[2].value as any).data : null
 
     // A user has an active subscription if:
     // - user_profiles says so OR
-    // - they have an 'active' record in user_subscriptions with 'completed' payment
-    const hasActiveSubscription = !!(profile?.has_active_subscription || subscription)
+    // - they have an 'active' record in user_subscriptions (completed OR failed payment fallback)
+    const hasActiveSubscription = !!(
+      profileData?.has_active_subscription ||
+      subCompletedData ||
+      subFailedData
+    )
 
     // A user is an admin if:
     // - their email is the admin email OR
     // - user_profiles says they are an admin
-    let role = profile?.role || 'user'
+    let role = profileData?.role || 'user'
     if (isAdminEmail) role = 'admin'
 
     console.log(`[Auth] Determined for ${userId}:`, {
       role,
       hasActiveSubscription,
-      profileHasSub: profile?.has_active_subscription,
-      dbSubscription: !!subscription,
+      profileHasSub: profileData?.has_active_subscription,
+      dbSubCompleted: !!subCompletedData,
+      dbSubFailed: !!subFailedData,
       isAdminEmail
     })
 
-    const result = { role, has_active_subscription: hasActiveSubscription }
+    const result = { role, hasActiveSubscription }
 
     console.log('[Auth] Robust profile check completed:', {
       userId,
-      role,
-      hasActiveSubscription,
+      ...result,
       source: {
-        profileHasSub: !!profile?.has_active_subscription,
-        subscriptionTableHasSub: !!subscription,
-        profileRole: profile?.role,
+        profileHasSub: !!profileData?.has_active_subscription,
+        subCompletedTable: !!subCompletedData,
+        subFailedTable: !!subFailedData,
+        profileRole: profileData?.role,
         isAdminEmail
       }
     })
@@ -107,7 +122,7 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
     return result
   } catch (err) {
     console.error('[Auth] Robust Role/Subscription fetch error:', err)
-    return { role: 'user', has_active_subscription: false }
+    return { role: 'user', hasActiveSubscription: false }
   }
 }
 
