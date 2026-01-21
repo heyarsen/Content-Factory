@@ -178,6 +178,7 @@ export class RecurringPaymentService {
         merchantAccount,
         merchantPassword: merchantSecretKey,
         orderReference,
+        apiVersion: '1', // Add API version to prevent script errors
       }
 
       console.log('[RecurringPayment] Deleting:', { orderReference })
