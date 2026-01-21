@@ -184,7 +184,7 @@ export class RecurringPaymentService {
       console.log('[RecurringPayment] Deleting:', { orderReference })
 
       const response = await axios.post(
-        `${apiUrl}/remove`,
+        apiUrl, // Use base API URL, not /remove endpoint
         requestBody,
         {
           headers: {
