@@ -37,16 +37,6 @@ const platformIcons: Record<string, any> = {
   pinterest: Share2,
   threads: Share2,
 }
-const platformNames: Record<string, string> = {
-  instagram: t('platforms.instagram'),
-  youtube: t('platforms.youtube'),
-  tiktok: t('platforms.tiktok'),
-  facebook: t('platforms.facebook'),
-  x: t('platforms.x'),
-  linkedin: t('platforms.linkedin'),
-  pinterest: t('platforms.pinterest'),
-  threads: t('platforms.threads'),
-}
 
 export function Preferences() {
   const { language, setLanguage, t } = useLanguage()
@@ -62,6 +52,17 @@ export function Preferences() {
     auto_research_default: true,
     auto_approve_default: false,
   })
+
+  const platformNames: Record<string, string> = {
+    instagram: t('platforms.instagram'),
+    youtube: t('platforms.youtube'),
+    tiktok: t('platforms.tiktok'),
+    facebook: t('platforms.facebook'),
+    x: t('platforms.x'),
+    linkedin: t('platforms.linkedin'),
+    pinterest: t('platforms.pinterest'),
+    threads: t('platforms.threads'),
+  }
 
   useEffect(() => {
     loadPreferences()

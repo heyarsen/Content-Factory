@@ -35,23 +35,23 @@ const platformIcons = {
   threads: Share2,
 }
 
-const platformNames = {
-  instagram: t('platforms.instagram'),
-  tiktok: t('platforms.tiktok'),
-  youtube: t('platforms.youtube'),
-  facebook: t('platforms.facebook'),
-  x: t('platforms.x'),
-  linkedin: t('platforms.linkedin'),
-  pinterest: t('platforms.pinterest'),
-  threads: t('platforms.threads'),
-}
-
 export function SocialAccounts() {
   const { t } = useLanguage()
   const { user, refreshSubscriptionStatus } = useAuth()
   const [accounts, setAccounts] = useState<SocialAccount[]>([])
   const [loading, setLoading] = useState(true)
   const [connectingPlatform, setConnectingPlatform] = useState<SocialAccount['platform'] | null>(null)
+
+  const platformNames = {
+    instagram: t('platforms.instagram'),
+    tiktok: t('platforms.tiktok'),
+    youtube: t('platforms.youtube'),
+    facebook: t('platforms.facebook'),
+    x: t('platforms.x'),
+    linkedin: t('platforms.linkedin'),
+    pinterest: t('platforms.pinterest'),
+    threads: t('platforms.threads'),
+  }
   const [disconnectModal, setDisconnectModal] = useState<string | null>(null)
   const [disconnecting, setDisconnecting] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
@@ -102,10 +102,10 @@ export function SocialAccounts() {
   const handleConnect = async (platform: SocialAccount['platform']) => {
     // Refresh subscription status first to get latest data
     await refreshSubscriptionStatus()
-    
+
     // Add a small delay to ensure state is updated
     await new Promise(resolve => setTimeout(resolve, 500))
-    
+
     // Check if user has active subscription after refresh
     if (!user?.hasActiveSubscription) {
       alert(t('social_accounts.subscription_needed_alert'))
