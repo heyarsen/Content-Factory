@@ -499,26 +499,32 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
           let creditsAdded = null
 
           if (isRenewal) {
-            // Handle successful renewal - burn all credits and add new ones based on subscription plan
-            console.log('[WayForPay] Renewal approved, burning all credits and adding new subscription credits')
+            // Handle successful renewal - preserve top-up credits, only burn subscription credits
+            console.log('[WayForPay] Renewal approved, preserving top-up credits and renewing subscription credits')
             
             creditsBefore = await CreditsService.getUserCredits(userId)
+            const topupCredits = await CreditsService.getTopupCredits(userId)
+            const subscriptionCreditsToBurn = Math.max(0, creditsBefore - topupCredits)
             
-            // Burn all existing credits (from previous subscription + top-ups)
-            await CreditsService.setCredits(userId, 0, `subscription_renewal_burn_${plan.id}_${Date.now()}`)
+            // Burn only subscription credits, preserve top-up credits
+            if (subscriptionCreditsToBurn > 0) {
+              await CreditsService.setCredits(userId, topupCredits, `subscription_renewal_burn_${plan.id}_${Date.now()}`)
+            }
             
-            // Add credits equal to the plan's credit allocation (NOT the payment amount)
+            // Add new subscription credits to preserved top-up credits
             // Ensure planCredits is an integer to prevent database errors
             const planCredits = Math.round(Number(plan.credits) || 0)
-            creditsAfter = await CreditsService.setCredits(userId, planCredits, `subscription_renewal_${plan.id}_${Date.now()}`)
+            creditsAfter = await CreditsService.setCredits(userId, topupCredits + planCredits, `subscription_renewal_${plan.id}_${Date.now()}`)
             creditsAdded = planCredits
             
-            console.log('[WayForPay] Renewal credits processed (burn all + add plan):', {
+            console.log('[WayForPay] Renewal credits processed (preserve top-up + add plan):', {
               userId,
               planCredits,
+              topupCredits,
               balanceBefore: creditsBefore,
               balanceAfter: creditsAfter,
-              creditsBurned: creditsBefore, // All previous credits burned
+              subscriptionCreditsBurned: subscriptionCreditsToBurn,
+              topupCreditsPreserved: topupCredits,
             })
 
             // Update subscription with renewal info
@@ -528,7 +534,7 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
                 payment_status: 'completed',
                 credits_included: creditsAdded, // Use plan credit allocation
                 credits_remaining: creditsAfter,
-                credits_burned: creditsBefore, // Track all credits burned
+                credits_burned: subscriptionCreditsToBurn, // Only track subscription credits burned
                 updated_at: new Date().toISOString(),
               })
               .eq('id', subscription.id)
