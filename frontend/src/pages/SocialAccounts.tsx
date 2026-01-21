@@ -36,14 +36,14 @@ const platformIcons = {
 }
 
 const platformNames = {
-  instagram: 'Instagram',
-  tiktok: 'TikTok',
-  youtube: 'YouTube',
-  facebook: 'Facebook',
-  x: 'X (Twitter)',
-  linkedin: 'LinkedIn',
-  pinterest: 'Pinterest',
-  threads: 'Threads',
+  instagram: t('platforms.instagram'),
+  tiktok: t('platforms.tiktok'),
+  youtube: t('platforms.youtube'),
+  facebook: t('platforms.facebook'),
+  x: t('platforms.x'),
+  linkedin: t('platforms.linkedin'),
+  pinterest: t('platforms.pinterest'),
+  threads: t('platforms.threads'),
 }
 
 export function SocialAccounts() {

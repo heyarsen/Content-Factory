@@ -38,14 +38,14 @@ const platformIcons: Record<string, any> = {
   threads: Share2,
 }
 const platformNames: Record<string, string> = {
-  instagram: 'Instagram',
-  youtube: 'YouTube',
-  tiktok: 'TikTok',
-  facebook: 'Facebook',
-  x: 'X (Twitter)',
-  linkedin: 'LinkedIn',
-  pinterest: 'Pinterest',
-  threads: 'Threads',
+  instagram: t('platforms.instagram'),
+  youtube: t('platforms.youtube'),
+  tiktok: t('platforms.tiktok'),
+  facebook: t('platforms.facebook'),
+  x: t('platforms.x'),
+  linkedin: t('platforms.linkedin'),
+  pinterest: t('platforms.pinterest'),
+  threads: t('platforms.threads'),
 }
 
 export function Preferences() {
