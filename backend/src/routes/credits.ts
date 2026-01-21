@@ -538,22 +538,29 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
           } else {
             // Handle initial subscription activation
             creditsBefore = await CreditsService.getUserCredits(userId)
+            const topupCredits = await CreditsService.getTopupCredits(userId)
+            const subscriptionCreditsToBurn = Math.max(0, creditsBefore - topupCredits)
             
-            // Burn all previous credits first (including top-ups)
-            await CreditsService.setCredits(userId, 0, `subscription_burn_previous_${plan.id}`)
+            // Burn only subscription credits, preserve top-up credits
+            if (subscriptionCreditsToBurn > 0) {
+              await CreditsService.setCredits(userId, topupCredits, `subscription_burn_previous_${plan.id}`)
+            }
             
             // Add credits equal to the plan's credit allocation (NOT the payment amount)
             // Ensure planCredits is an integer to prevent database errors
             const planCredits = Math.round(Number(plan.credits) || 0)
             await SubscriptionService.activateSubscription(userId, orderReference)
-            creditsAfter = await CreditsService.setCredits(userId, planCredits, `subscription_initial_${plan.id}`)
+            creditsAfter = await CreditsService.setCredits(userId, topupCredits + planCredits, `subscription_initial_${plan.id}`)
             creditsAdded = planCredits
             
-            console.log('[WayForPay] Initial subscription activated with plan credits:', {
+            console.log('[WayForPay] Initial subscription activated with preserved top-up credits:', {
               userId,
               planCredits,
-              creditsBefore,
-              creditsAfter,
+              topupCredits,
+              balanceBefore: creditsBefore,
+              balanceAfter: creditsAfter,
+              subscriptionCreditsBurned: subscriptionCreditsToBurn,
+              topupCreditsPreserved: topupCredits,
             })
           }
 
