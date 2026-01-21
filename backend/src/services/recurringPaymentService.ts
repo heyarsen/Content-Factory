@@ -173,12 +173,24 @@ export class RecurringPaymentService {
       const merchantSecretKey = process.env.WAYFORPAY_MERCHANT_SECRET_KEY || 'flk3409refn54t54t*FNJRET'
       const apiUrl = process.env.WAYFORPAY_API_URL || 'https://api.wayforpay.com/api'
       
+      // Generate signature for DELETE request
+      const signatureString = [
+        merchantAccount,
+        merchantSecretKey,
+        orderReference
+      ].join(';')
+      
+      const merchantSignature = require('crypto')
+        .createHash('md5')
+        .update(signatureString)
+        .digest('hex')
+      
       const requestBody = {
         requestType: 'REMOVE',
         merchantAccount,
         merchantPassword: merchantSecretKey,
         orderReference,
-        apiVersion: '1', // Add API version to prevent script errors
+        merchantSignature, // Add required signature
       }
 
       console.log('[RecurringPayment] Deleting:', { orderReference })
