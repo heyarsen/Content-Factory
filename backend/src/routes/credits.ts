@@ -123,7 +123,8 @@ router.get('/plans', authenticate, async (req: AuthRequest, res: Response) => {
 router.post('/cancel', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
-    await SubscriptionService.cancelSubscription(userId)
+    const { RecurringPaymentService } = await import('../services/recurringPaymentService.js')
+    await RecurringPaymentService.cancelSubscription(userId)
     res.json({ message: 'Subscription cancelled successfully' })
   } catch (error: any) {
     console.error('Cancel subscription error:', error)
