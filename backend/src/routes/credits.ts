@@ -539,7 +539,8 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
             // Handle initial subscription activation
             creditsBefore = await CreditsService.getUserCredits(userId)
             const topupCredits = await CreditsService.getTopupCredits(userId)
-            const subscriptionCreditsToBurn = Math.max(0, creditsBefore - topupCredits)
+            const currentCredits = creditsBefore ?? 0
+            const subscriptionCreditsToBurn = Math.max(0, currentCredits - topupCredits)
             
             // Burn only subscription credits, preserve top-up credits
             if (subscriptionCreditsToBurn > 0) {
@@ -557,7 +558,7 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
               userId,
               planCredits,
               topupCredits,
-              balanceBefore: creditsBefore,
+              balanceBefore: currentCredits,
               balanceAfter: creditsAfter,
               subscriptionCreditsBurned: subscriptionCreditsToBurn,
               topupCreditsPreserved: topupCredits,
