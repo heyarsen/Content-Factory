@@ -171,13 +171,13 @@ export class RecurringPaymentService {
     try {
       // Use environment variables directly since getConfig is private
       const merchantAccount = process.env.WAYFORPAY_MERCHANT_ACCOUNT || 'test_merch_n1'
-      const merchantSecretKey = process.env.WAYFORPAY_MERCHANT_SECRET_KEY || 'flk3409refn54t54t*FNJRET'
+      // WAYFORPAY_MERCHANT_PASSWORD is a separate password from your Wayforpay merchant dashboard
+      // It should be a 32-character MD5 hash value (check Settings → API in your dashboard)
+      const merchantPassword = process.env.WAYFORPAY_MERCHANT_PASSWORD
 
-      // According to Wayforpay docs, merchantPassword must be MD5 hash (32 chars)
-      const merchantPassword = crypto
-        .createHash('md5')
-        .update(merchantSecretKey)
-        .digest('hex')
+      if (!merchantPassword) {
+        throw new Error('WAYFORPAY_MERCHANT_PASSWORD environment variable is required for deleting recurring payments')
+      }
 
       const requestBody = {
         requestType: 'REMOVE',
