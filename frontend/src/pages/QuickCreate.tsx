@@ -366,56 +366,56 @@ export function QuickCreate() {
     <Layout>
       <div className="mx-auto w-full max-w-4xl space-y-6 sm:space-y-8">
         {/* Header */}
-        <div className="rounded-[28px] border border-white/40 bg-white/80 p-4 sm:p-6 lg:p-8 shadow-[0_35px_80px_-50px_rgba(79,70,229,0.6)] backdrop-blur-xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">{t('common.create')}</p>
-          <h1 className="mt-2 sm:mt-3 text-2xl sm:text-3xl font-semibold text-primary">{t('quick_create.title')}</h1>
-          <p className="mt-2 text-sm text-slate-500">
+        <div className="rounded-[28px] border border-white/40 bg-white/80 p-5 sm:p-6 lg:p-8 shadow-[0_35px_80px_-50px_rgba(79,70,229,0.6)] backdrop-blur-xl">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 leading-none">{t('common.create')}</p>
+          <h1 className="mt-3 text-2xl sm:text-3xl font-bold text-slate-900 leading-tight">{t('quick_create.title')}</h1>
+          <p className="mt-2 text-sm text-slate-500 leading-relaxed">
             {t('quick_create.desc')}
           </p>
         </div>
 
         {/* Progress Steps */}
         <Card className="p-4 sm:p-6">
-          <div className="flex items-center justify-between overflow-x-auto">
-            <div className="flex items-center gap-2 sm:gap-4 min-w-max">
-              <div className={`flex items-center gap-3 ${step === 'idea' ? 'text-brand-600' : ['script', 'generate', 'complete'].includes(step) ? 'text-emerald-600' : 'text-slate-400'}`}>
-                <div className={`flex h-10 w-10 items-center justify-center rounded-full border-2 ${step === 'idea' ? 'border-brand-500 bg-brand-50' :
+          <div className="flex items-center justify-between overflow-x-auto scrollbar-hide">
+            <div className="flex items-center gap-3 sm:gap-6 min-w-max">
+              <div className={`flex items-center gap-2 sm:gap-3 ${step === 'idea' ? 'text-brand-600' : ['script', 'generate', 'complete'].includes(step) ? 'text-emerald-600' : 'text-slate-400'}`}>
+                <div className={`flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full border-2 transition-all ${step === 'idea' ? 'border-brand-500 bg-brand-50 shadow-sm' :
                   ['script', 'generate', 'complete'].includes(step) ? 'border-emerald-500 bg-emerald-50' :
                     'border-slate-300 bg-white'
                   }`}>
-                  {['script', 'generate', 'complete'].includes(step) ? <CheckCircle2 className="h-5 w-5" /> : <span className="text-sm font-semibold">1</span>}
+                  {['script', 'generate', 'complete'].includes(step) ? <CheckCircle2 className="h-5 w-5" /> : <span className="text-sm font-bold">1</span>}
                 </div>
-                <div>
-                  <p className="text-sm font-semibold">{t('quick_create.step_idea')}</p>
-                  <p className="text-xs text-slate-500">{t('quick_create.step_idea_desc')}</p>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm font-bold leading-tight">{t('quick_create.step_idea')}</p>
+                  <p className="hidden xs:block text-[10px] text-slate-500">{t('quick_create.step_idea_desc')}</p>
                 </div>
               </div>
 
-              <ArrowRight className="h-5 w-5 text-slate-300" />
+              <ArrowRight className="h-4 w-4 text-slate-300 shrink-0" />
 
-              <div className={`flex items-center gap-3 ${step === 'script' ? 'text-brand-600' : ['generate', 'complete'].includes(step) ? 'text-emerald-600' : 'text-slate-400'}`}>
-                <div className={`flex h-10 w-10 items-center justify-center rounded-full border-2 ${step === 'script' ? 'border-brand-500 bg-brand-50' :
+              <div className={`flex items-center gap-2 sm:gap-3 ${step === 'script' ? 'text-brand-600' : ['generate', 'complete'].includes(step) ? 'text-emerald-600' : 'text-slate-400'}`}>
+                <div className={`flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full border-2 transition-all ${step === 'script' ? 'border-brand-500 bg-brand-50 shadow-sm' :
                   ['generate', 'complete'].includes(step) ? 'border-emerald-500 bg-emerald-50' :
                     'border-slate-300 bg-white'
                   }`}>
-                  {['generate', 'complete'].includes(step) ? <CheckCircle2 className="h-5 w-5" /> : step === 'script' ? <Loader className="h-5 w-5 animate-spin" /> : <span className="text-sm font-semibold">2</span>}
+                  {['generate', 'complete'].includes(step) ? <CheckCircle2 className="h-5 w-5" /> : step === 'script' ? <Loader className="h-5 w-5 animate-spin" /> : <span className="text-sm font-bold">2</span>}
                 </div>
-                <div>
-                  <p className="text-sm font-semibold">{t('quick_create.step_script')}</p>
-                  <p className="text-xs text-slate-500">{t('quick_create.step_script_desc')}</p>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm font-bold leading-tight">{t('quick_create.step_script')}</p>
+                  <p className="hidden xs:block text-[10px] text-slate-500">{t('quick_create.step_script_desc')}</p>
                 </div>
               </div>
 
-              <ArrowRight className="h-5 w-5 text-slate-300" />
+              <ArrowRight className="h-4 w-4 text-slate-300 shrink-0" />
 
-              <div className={`flex items-center gap-3 ${step === 'generate' ? 'text-brand-600' : step === 'complete' ? 'text-emerald-600' : 'text-slate-400'}`}>
-                <div className={`flex h-10 w-10 items-center justify-center rounded-full border-2 ${step === 'generate' ? 'border-brand-500 bg-brand-50' : step === 'complete' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-300 bg-white'
+              <div className={`flex items-center gap-2 sm:gap-3 ${step === 'generate' ? 'text-brand-600' : step === 'complete' ? 'text-emerald-600' : 'text-slate-400'}`}>
+                <div className={`flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full border-2 transition-all ${step === 'generate' ? 'border-brand-500 bg-brand-50 shadow-sm' : step === 'complete' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-300 bg-white'
                   }`}>
-                  {step === 'complete' ? <CheckCircle2 className="h-5 w-5" /> : step === 'generate' ? <Loader className="h-5 w-5 animate-spin" /> : <span className="text-sm font-semibold">3</span>}
+                  {step === 'complete' ? <CheckCircle2 className="h-5 w-5" /> : step === 'generate' ? <Loader className="h-5 w-5 animate-spin" /> : <span className="text-sm font-bold">3</span>}
                 </div>
-                <div>
-                  <p className="text-sm font-semibold">{t('quick_create.step_generate')}</p>
-                  <p className="text-xs text-slate-500">{t('quick_create.step_generate_desc')}</p>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm font-bold leading-tight">{t('quick_create.step_generate')}</p>
+                  <p className="hidden xs:block text-[10px] text-slate-500">{t('quick_create.step_generate_desc')}</p>
                 </div>
               </div>
             </div>
@@ -479,11 +479,11 @@ export function QuickCreate() {
               />
 
 
-              <div className="flex justify-end gap-3 pt-4">
+              <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6">
                 <Button
                   variant="ghost"
                   onClick={() => navigate('/videos')}
-                  className="border border-white/60 text-slate-500"
+                  className="w-full sm:w-auto border border-slate-200"
                 >
                   {t('common.cancel')}
                 </Button>
@@ -492,6 +492,7 @@ export function QuickCreate() {
                   disabled={!canProceedToScript || generatingScript}
                   loading={generatingScript}
                   leftIcon={!generatingScript ? <Sparkles className="h-4 w-4" /> : undefined}
+                  className="w-full sm:w-auto shadow-lg shadow-brand-500/20"
                 >
                   {t('quick_create.generate_script')}
                 </Button>
@@ -539,20 +540,22 @@ export function QuickCreate() {
                 <p className="mt-1">{t('quick_create.tip_desc')}</p>
               </div>
 
-              <div className="flex justify-between gap-3 pt-4">
+              <div className="flex flex-col sm:flex-row justify-between gap-3 pt-6">
                 <Button
                   variant="ghost"
                   onClick={() => setStep('idea')}
                   leftIcon={<ArrowLeft className="h-4 w-4" />}
+                  className="w-full sm:w-auto border border-slate-200"
                 >
                   {t('common.back')}
                 </Button>
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <Button
                     variant="ghost"
                     onClick={handleGenerateScript}
                     disabled={generatingScript}
                     loading={generatingScript}
+                    className="w-full sm:w-auto border border-slate-200"
                   >
                     {t('quick_create.regenerate')}
                   </Button>
@@ -560,6 +563,7 @@ export function QuickCreate() {
                     onClick={() => setStep('generate')}
                     disabled={!canProceedToVideo}
                     rightIcon={<ArrowRight className="h-4 w-4" />}
+                    className="w-full sm:w-auto shadow-lg shadow-brand-500/20"
                   >
                     {t('quick_create.continue_to_video')}
                   </Button>
@@ -653,20 +657,21 @@ export function QuickCreate() {
                   </div>
                 </div>
 
-                <div className="flex justify-between gap-3 pt-4">
+                <div className="flex flex-col sm:flex-row justify-between gap-3 pt-6">
                   <Button
                     variant="ghost"
                     onClick={() => setStep('script')}
                     leftIcon={<ArrowLeft className="h-4 w-4" />}
+                    className="w-full sm:w-auto border border-slate-200"
                   >
-                    Back
+                    {t('common.back')}
                   </Button>
                   <Button
                     onClick={handleGenerateVideo}
                     disabled={generatingVideo}
                     loading={generatingVideo}
                     leftIcon={!generatingVideo ? <Video className="h-4 w-4" /> : undefined}
-                    className="min-w-[160px]"
+                    className="w-full sm:w-auto min-w-[160px] shadow-lg shadow-brand-500/20"
                   >
                     {generatingVideo ? t('quick_create.generating_btn') : t('quick_create.step_generate')}
                   </Button>
@@ -683,7 +688,7 @@ export function QuickCreate() {
 
         {/* Step 4: Post-Generation */}
         {step === 'complete' && videoUrl && (
-          <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
+          <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
             {/* Left: Video Preview */}
             <Card className="p-4 sm:p-6">
               <div className="mb-4 flex items-center gap-3">
@@ -736,7 +741,7 @@ export function QuickCreate() {
               <Card className="p-4 sm:p-6">
                 <h3 className="mb-4 text-base sm:text-lg font-semibold text-primary">{t('quick_create.post_social_title')}</h3>
                 <div className="space-y-4">
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2.5 sm:gap-3">
                     {connectedPlatforms.map((platform) => {
                       const Icon = platformIcons[platform] || Share2
                       const isSelected = selectedPlatforms.includes(platform)
@@ -745,8 +750,8 @@ export function QuickCreate() {
                           key={platform}
                           type="button"
                           onClick={() => togglePlatform(platform)}
-                          className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition touch-manipulation min-h-[44px] ${isSelected
-                            ? 'border-brand-500 bg-brand-50 text-brand-700'
+                          className={`flex items-center gap-2.5 rounded-2xl border px-4 py-2.5 text-sm font-bold transition-all touch-manipulation min-h-[44px] active:scale-95 ${isSelected
+                            ? 'border-brand-500 bg-brand-50 text-brand-700 shadow-sm shadow-brand-500/10'
                             : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                             }`}
                         >

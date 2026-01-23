@@ -10,7 +10,7 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Modal } from '../components/ui/Modal'
 import { Textarea } from '../components/ui/Textarea'
-import { Video as VideoIcon, Search, Trash2, RefreshCw, Download, Share2, Sparkles, Check, Music, Heart, MessageCircle, Bookmark } from 'lucide-react'
+import { Video as VideoIcon, Search, Trash2, RefreshCw, Download, Share2, Sparkles, Check, Music, Heart, MessageCircle, Bookmark, ArrowRight } from 'lucide-react'
 import { useNotifications } from '../contexts/NotificationContext'
 import { useLanguage } from '../contexts/LanguageContext'
 import api from '../lib/api'
@@ -428,7 +428,7 @@ export function Videos() {
       pending: 'warning',
       failed: 'error',
     }
-    return <Badge variant={variants[status] || 'default'}>{status}</Badge>
+    return <Badge variant={variants[status] || 'default'} className="shrink-0 transition-all hover:scale-105">{status}</Badge>
   }
 
   if (loading) {
@@ -464,29 +464,39 @@ export function Videos() {
           </Link>
         </div>
 
-        <Card className="border-dashed border-white/40">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center">
+        <Card className="border-dashed border-white/40 p-4 sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
               <Input
                 placeholder={t('videos.search_placeholder')}
                 value={search}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
-                className="pl-11"
+                className="pl-11 h-12 sm:h-11 rounded-2xl sm:rounded-xl border-slate-200 focus:border-brand-400 focus:ring-brand-400 active:bg-white"
               />
             </div>
-            <Select
-              options={[
-                { value: 'all', label: t('videos.all_status') },
-                { value: 'pending', label: t('videos.status_pending') },
-                { value: 'generating', label: t('videos.status_generating') },
-                { value: 'completed', label: t('videos.status_completed') },
-                { value: 'failed', label: t('videos.status_failed') },
-              ]}
-              value={statusFilter ?? 'all'}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setStatusFilter(e.target.value as ListVideosParams['status'])}
-              className="w-full md:w-56"
-            />
+            <div className="flex items-center gap-3">
+              <Select
+                options={[
+                  { value: 'all', label: t('videos.all_status') },
+                  { value: 'pending', label: t('videos.status_pending') },
+                  { value: 'generating', label: t('videos.status_generating') },
+                  { value: 'completed', label: t('videos.status_completed') },
+                  { value: 'failed', label: t('videos.status_failed') },
+                ]}
+                value={statusFilter ?? 'all'}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setStatusFilter(e.target.value as ListVideosParams['status'])}
+                className="h-12 sm:h-11 rounded-2xl sm:rounded-xl flex-1 sm:w-56 border-slate-200"
+              />
+              <Button
+                variant="secondary"
+                onClick={loadVideos}
+                loading={loading}
+                className="h-12 w-12 sm:h-11 sm:w-11 p-0 rounded-2xl sm:rounded-xl active:scale-95"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
           </div>
         </Card>
 
@@ -502,12 +512,12 @@ export function Videos() {
             }
           />
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
             {videos.map((video: VideoRecord) => (
               <Card
                 key={video.id}
                 hover
-                className="flex h-full flex-col gap-5 cursor-pointer"
+                className="flex h-full flex-col gap-5 cursor-pointer p-5 sm:p-6"
                 onClick={(e: React.MouseEvent<HTMLDivElement>) => handleCardClick(video.id, e)}
               >
                 <div className="flex items-start justify-between gap-4">
@@ -582,7 +592,8 @@ export function Videos() {
                         onClick={() => handleOpenPostModal(video)}
                       >
                         <Share2 className="mr-2 h-4 w-4" />
-                        Post
+                        {t('videos.post')}
+                        <ArrowRight className="ml-2 h-3 w-3 opacity-60" />
                       </Button>
                       <Button
                         variant="ghost"
@@ -644,11 +655,11 @@ export function Videos() {
               <p className="text-sm text-slate-500">{t('videos.details_loading')}</p>
             </div>
           ) : selectedVideo ? (
-            <div className="grid gap-8 lg:grid-cols-2">
+            <div className="grid gap-6 lg:gap-8 lg:grid-cols-2 p-4 sm:p-6 overflow-y-auto max-h-[calc(100vh-12rem)]">
               {/* Left: Video Preview */}
               <div className="space-y-4">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">
-                  {t('videos.preview_title')}
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  {t('videos.preview')}
                 </h3>
                 {selectedVideo.status === 'completed' ? (
                   <div className="space-y-3">
@@ -748,6 +759,7 @@ export function Videos() {
                         className="w-full shadow-lg shadow-brand-500/10"
                         onClick={() => handleOpenPostModal(selectedVideo)}
                         leftIcon={<Share2 className="h-4 w-4" />}
+                        rightIcon={<ArrowRight className="h-4 w-4" />}
                       >
                         {t('videos.post')}
                       </Button>
@@ -790,9 +802,9 @@ export function Videos() {
           isOpen={isPostModalOpen}
           onClose={() => setIsPostModalOpen(false)}
           title={t('videos.post_social_title')}
-          size="lg"
+          size="xl"
         >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 lg:gap-10 items-start p-5 sm:p-8 overflow-y-auto max-h-[calc(100vh-12rem)]">
             {/* Left: TikTok Mockup */}
             <div className="flex flex-col items-center justify-center bg-slate-50 rounded-2xl p-6 border border-slate-100">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
@@ -944,13 +956,19 @@ export function Videos() {
 
               <div className="mt-4 pt-6 border-t border-slate-100">
                 <Button
-                  className="w-full h-12 text-base font-bold shadow-lg shadow-brand-500/20"
+                  className="w-full h-12 text-base font-bold shadow-lg shadow-brand-500/20 px-6"
                   onClick={handlePostToSocial}
                   loading={isPosting}
                   disabled={selectedPlatforms.length === 0}
-                  leftIcon={!isPosting && <Share2 className="h-5 w-5" />}
                 >
-                  {isPosting ? t('videos.posting') : t('videos.post_now')}
+                  <div className="flex-1" />
+                  <div className="flex items-center gap-2">
+                    {!isPosting && <Share2 className="h-5 w-5" />}
+                    {isPosting ? t('videos.posting') : t('videos.post_now')}
+                  </div>
+                  <div className="flex-1 flex justify-end">
+                    {!isPosting && <ArrowRight className="h-5 w-5 opacity-70 group-hover:translate-x-1 transition-transform" />}
+                  </div>
                 </Button>
                 <p className="mt-3 text-center text-[11px] text-slate-400">
                   {t('videos.queued_desc')}

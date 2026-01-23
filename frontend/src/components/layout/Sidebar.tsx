@@ -73,14 +73,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </Link>
             <button
               onClick={onClose}
-              className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 lg:hidden"
+              className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 lg:hidden touch-manipulation active:scale-95 shadow-sm"
               aria-label="Close menu"
             >
               <span className="sr-only">Close</span>
-              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
+              <X className="h-5 w-5" />
             </button>
           </div>
 
@@ -92,22 +89,22 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   key={to}
                   to={to}
                   onClick={onClose}
-                  className={`group relative flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all duration-200 ${isActive
+                  className={`group relative flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold transition-all duration-200 touch-manipulation active:scale-[0.98] ${isActive
                     ? 'bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-transparent text-brand-600'
                     : 'text-slate-500 hover:bg-white hover:text-primary'
                     }`}
                 >
                   <div
-                    className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-all duration-200 ${isActive
+                    className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-200 ${isActive
                       ? 'border-brand-200 bg-white text-brand-600 shadow-sm'
                       : 'border-transparent bg-slate-100 text-slate-500 group-hover:border-slate-200'
                       }`}
                   >
-                    <Icon className="h-4 w-4" />
+                    <Icon className="h-5 w-5" />
                   </div>
                   <span>{label}</span>
                   {isActive && (
-                    <span className="absolute inset-y-0 right-0 w-1 rounded-full bg-brand-500" />
+                    <span className="absolute inset-y-2 right-0 w-1.5 rounded-full bg-brand-500" />
                   )}
                 </NavLink>
               )
@@ -123,22 +120,22 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                       key={to}
                       to={to}
                       onClick={onClose}
-                      className={`group relative flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all duration-200 ${isActive
+                      className={`group relative flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold transition-all duration-200 touch-manipulation active:scale-[0.98] ${isActive
                         ? 'bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-transparent text-brand-600'
                         : 'text-slate-500 hover:bg-white hover:text-primary'
                         }`}
                     >
                       <div
-                        className={`flex h-9 w-9 items-center justify-center rounded-xl border transition-all duration-200 ${isActive
+                        className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-200 ${isActive
                           ? 'border-brand-200 bg-white text-brand-600 shadow-sm'
                           : 'border-transparent bg-slate-100 text-slate-500 group-hover:border-slate-200'
                           }`}
                       >
-                        <Icon className="h-4 w-4" />
+                        <Icon className="h-5 w-5" />
                       </div>
                       <span>{label}</span>
                       {isActive && (
-                        <span className="absolute inset-y-0 right-0 w-1 rounded-full bg-brand-500" />
+                        <span className="absolute inset-y-2 right-0 w-1.5 rounded-full bg-brand-500" />
                       )}
                     </NavLink>
                   )

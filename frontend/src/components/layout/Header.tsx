@@ -40,29 +40,29 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/80 backdrop-blur-xl overflow-visible">
       <div className="flex h-16 w-full items-center justify-between px-4 sm:px-6 lg:px-8 gap-4">
-        <div className="flex items-center gap-4 min-w-0 flex-1">
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
           <button
             type="button"
             onClick={onToggleSidebar}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 lg:hidden"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 lg:hidden touch-manipulation active:scale-95"
             aria-label={t('header.open_navigation') || 'Open navigation'}
           >
             <Menu className="h-5 w-5" />
           </button>
 
-          <div className="hidden md:block min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{t('header.workspace')}</p>
-            <p className="mt-0.5 text-lg font-semibold text-slate-900 truncate">{t('header.welcome_back')}, {greetingName}</p>
+          <div className="hidden sm:block min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 leading-none">{t('header.workspace')}</p>
+            <p className="mt-1 text-base md:text-lg font-bold text-slate-900 truncate leading-tight">{t('header.welcome_back')}, {greetingName}</p>
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 sm:gap-3 shrink-0">
+        <div className="flex items-center justify-end gap-1.5 sm:gap-3 shrink-0">
           {/* Notifications */}
           <div className="relative" ref={notificationRef}>
             <button
               type="button"
               onClick={() => setNotificationsOpen(!notificationsOpen)}
-              className="relative flex h-10 w-10 min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 touch-manipulation"
+              className="relative flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 touch-manipulation active:scale-95"
               aria-label={t('header.notifications') || 'Notifications'}
             >
               <Bell className="h-5 w-5" />
@@ -164,7 +164,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           <button
             type="button"
             onClick={() => navigate('/support')}
-            className="relative flex h-10 min-h-[44px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 touch-manipulation"
+            className="relative flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 touch-manipulation active:scale-95"
             aria-label={t('header.support') || 'Support'}
           >
             <HelpCircle className="h-4 w-4" />
@@ -180,7 +180,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           <button
             type="button"
             onClick={() => navigate('/profile')}
-            className="flex h-10 w-10 min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 touch-manipulation md:hidden"
+            className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 touch-manipulation active:scale-95 sm:hidden"
             aria-label={t('header.account') || 'Account'}
           >
             <User className="h-5 w-5" />
@@ -190,7 +190,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           <button
             type="button"
             onClick={() => navigate('/profile')}
-            className="hidden items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 md:flex min-h-[44px] touch-manipulation max-w-[200px]"
+            className="hidden items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 sm:flex min-h-[44px] touch-manipulation active:scale-95 max-w-[200px]"
           >
             <div className="flex flex-col leading-tight min-w-0">
               <span className="text-xs font-medium uppercase tracking-wide text-slate-400">{t('header.account')}</span>

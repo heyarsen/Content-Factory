@@ -5,7 +5,7 @@ import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Badge } from '../components/ui/Badge'
-import { Video, Calendar, Users, Zap } from 'lucide-react'
+import { Video, Calendar, Users, Zap, ArrowRight, PlayCircle, Sparkles } from 'lucide-react'
 import api from '../lib/api'
 
 import { useLanguage } from '../contexts/LanguageContext'
@@ -105,16 +105,16 @@ export function Dashboard() {
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 text-sm font-medium">
-              <Link to="/create" className="w-full sm:w-auto">
-                <Button className="w-full sm:w-auto border border-white/20 bg-white/20 text-white backdrop-blur hover:bg-white/30 hover:text-white shadow-lg">
-                  <Zap className="mr-2 h-4 w-4" />
+              <Link to="/quick-create" className="w-full sm:w-auto">
+                <Button className="w-full sm:w-auto border border-white/20 bg-white/20 text-white backdrop-blur hover:bg-white/30 hover:text-white shadow-lg active:scale-[0.98]">
+                  <Sparkles className="mr-2 h-4 w-4" />
                   {t('dashboard.create_video')}
                 </Button>
               </Link>
               <Link to="/videos" className="w-full sm:w-auto">
                 <Button
                   variant="ghost"
-                  className="w-full sm:w-auto border border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/20 hover:text-white"
+                  className="w-full sm:w-auto border border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/20 hover:text-white active:scale-[0.98]"
                 >
                   <Video className="mr-2 h-4 w-4" />
                   {t('dashboard.library')}
@@ -125,59 +125,59 @@ export function Dashboard() {
         </section>
 
         <section className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-          <Card className="relative overflow-hidden">
-            <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-brand-100/60 blur-3xl" />
-            <div className="relative z-10 flex items-start justify-between">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{t('dashboard.total_videos')}</p>
-                <p className="mt-3 text-4xl font-semibold text-primary">{videoStats?.total || 0}</p>
-                <p className="mt-2 text-xs text-slate-400">{t('dashboard.total_videos_desc')}</p>
+          <Card className="relative overflow-hidden p-5 sm:p-6">
+            <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-brand-100/60 blur-3xl pointer-events-none" />
+            <div className="relative z-10 flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 leading-none">{t('dashboard.total_videos')}</p>
+                <p className="mt-3 text-3xl sm:text-4xl font-bold text-slate-900 leading-tight truncate">{videoStats?.total || 0}</p>
+                <p className="mt-2 text-[10px] sm:text-xs text-slate-400 leading-tight">{t('dashboard.total_videos_desc')}</p>
               </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
+              <div className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-[18px] bg-brand-50 text-brand-600 shadow-sm border border-brand-100/50">
                 <Video className="h-5 w-5" />
               </div>
             </div>
           </Card>
 
-          <Card className="relative overflow-hidden">
-            <div className="absolute -right-12 -top-12 h-36 w-36 rounded-full bg-emerald-100/60 blur-3xl" />
+          <Card className="relative overflow-hidden p-5 sm:p-6">
+            <div className="absolute -right-12 -top-12 h-36 w-36 rounded-full bg-emerald-100/60 blur-3xl pointer-events-none" />
             <div className="relative z-10 flex h-full flex-col justify-between">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{t('dashboard.completed')}</p>
-                  <p className="mt-3 text-4xl font-semibold text-primary">{videoStats?.completed || 0}</p>
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 leading-none">{t('dashboard.completed')}</p>
+                  <p className="mt-3 text-3xl sm:text-4xl font-bold text-slate-900 leading-tight truncate">{videoStats?.completed || 0}</p>
                 </div>
-                <Badge variant="success">Live</Badge>
+                <Badge variant="success" className="shrink-0">{t('common.live') || 'Live'}</Badge>
               </div>
-              <p className="mt-4 text-xs text-slate-400">{t('dashboard.completed_desc')}</p>
+              <p className="mt-4 text-[10px] sm:text-xs text-slate-400 leading-tight">{t('dashboard.completed_desc')}</p>
             </div>
           </Card>
 
-          <Card className="relative overflow-hidden">
-            <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-sky-100/60 blur-3xl" />
+          <Card className="relative overflow-hidden p-5 sm:p-6">
+            <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-sky-100/60 blur-3xl pointer-events-none" />
             <div className="relative z-10 flex h-full flex-col justify-between">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{t('dashboard.generating')}</p>
-                  <p className="mt-3 text-4xl font-semibold text-primary">{videoStats?.generating || 0}</p>
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 leading-none">{t('dashboard.generating')}</p>
+                  <p className="mt-3 text-3xl sm:text-4xl font-bold text-slate-900 leading-tight truncate">{videoStats?.generating || 0}</p>
                 </div>
-                <Badge variant="info">In flight</Badge>
+                <Badge variant="info" className="shrink-0">{t('common.in_flight') || 'In flight'}</Badge>
               </div>
-              <p className="mt-4 text-xs text-slate-400">{t('dashboard.generating_desc')}</p>
+              <p className="mt-4 text-[10px] sm:text-xs text-slate-400 leading-tight">{t('dashboard.generating_desc')}</p>
             </div>
           </Card>
 
-          <Card className="relative overflow-hidden">
-            <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-amber-100/60 blur-3xl" />
+          <Card className="relative overflow-hidden p-5 sm:p-6">
+            <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-amber-100/60 blur-3xl pointer-events-none" />
             <div className="relative z-10 flex h-full flex-col justify-between">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{t('dashboard.scheduled_posts')}</p>
-                  <p className="mt-3 text-4xl font-semibold text-primary">{postStats?.pending || 0}</p>
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 leading-none">{t('dashboard.scheduled_posts')}</p>
+                  <p className="mt-3 text-3xl sm:text-4xl font-bold text-slate-900 leading-tight truncate">{postStats?.pending || 0}</p>
                 </div>
-                <Calendar className="h-5 w-5 text-amber-500" />
+                <Calendar className="h-5 w-5 text-amber-500 shrink-0" />
               </div>
-              <p className="mt-4 text-xs text-slate-400">
+              <p className="mt-4 text-[10px] sm:text-xs text-slate-400 leading-tight">
                 {postStats?.posted || 0} {t('dashboard.posted_desc')}
               </p>
             </div>
@@ -196,34 +196,34 @@ export function Dashboard() {
               <div className="mt-6 grid gap-4">
                 <Link
                   to="/create"
-                  className="group flex items-center justify-between rounded-2xl border-2 border-brand-200 bg-gradient-to-r from-brand-50/80 to-indigo-50/60 px-5 py-4 transition hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-[0_18px_45px_-30px_rgba(99,102,241,0.45)]"
+                  className="group flex items-center justify-between rounded-2xl border-2 border-brand-200 bg-gradient-to-r from-brand-50/80 to-indigo-50/60 px-4 py-3 sm:px-5 sm:py-4 transition-all hover:border-brand-300 hover:shadow-[0_18px_45px_-30px_rgba(99,102,241,0.45)] touch-manipulation active:scale-[0.98]"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-indigo-500 text-white shadow-md">
+                  <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                    <div className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-[18px] bg-gradient-to-br from-brand-500 to-indigo-500 text-white shadow-md">
                       <Zap className="h-5 w-5" />
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-primary">{t('dashboard.create_video')}</p>
-                      <p className="text-xs text-slate-400">{t('dashboard.create_video_desc')}</p>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-slate-900 leading-tight truncate">{t('dashboard.create_video')}</p>
+                      <p className="mt-0.5 text-[10px] sm:text-xs text-slate-500 leading-none truncate">{t('dashboard.create_video_desc')}</p>
                     </div>
                   </div>
-                  <span className="text-sm font-semibold text-brand-600 opacity-0 transition group-hover:opacity-100">{t('common.start')} {'->'}</span>
+                  <ArrowRight className="h-4 w-4 text-brand-600 transition group-hover:translate-x-0.5 shrink-0" />
                 </Link>
 
                 <Link
                   to="/social"
-                  className="group flex items-center justify-between rounded-2xl border border-white/60 bg-white/70 px-5 py-4 transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-[0_18px_45px_-30px_rgba(99,102,241,0.45)]"
+                  className="group flex items-center justify-between rounded-2xl border border-white/60 bg-white/70 px-4 py-3 sm:px-5 sm:py-4 transition-all hover:border-brand-200 hover:shadow-[0_18px_45px_-30px_rgba(99,102,241,0.45)] touch-manipulation active:scale-[0.98]"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-50 text-sky-500">
+                  <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                    <div className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-[18px] bg-sky-50 text-sky-500">
                       <Users className="h-5 w-5" />
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-primary">{t('dashboard.connect_social')}</p>
-                      <p className="text-xs text-slate-400">{t('dashboard.connect_social_desc')}</p>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-slate-900 leading-tight truncate">{t('dashboard.connect_social')}</p>
+                      <p className="mt-0.5 text-[10px] sm:text-xs text-slate-500 leading-none truncate">{t('dashboard.connect_social_desc')}</p>
                     </div>
                   </div>
-                  <span className="text-sm font-semibold text-brand-600 opacity-0 transition group-hover:opacity-100">{t('common.manage')} {'->'}</span>
+                  <ArrowRight className="h-4 w-4 text-brand-600 transition group-hover:translate-x-0.5 shrink-0" />
                 </Link>
               </div>
             </div>
