@@ -183,22 +183,12 @@ export class SubscriptionService {
 
     const hasActiveSub = !!(completedSub || failedSub)
 
-    console.log('[Subscription] Subscription check result:', {
-      userId,
+    console.log('[Subscription] FINAL check result for', userId, ':', {
       hasActiveSub,
       profileHasActive: profile?.has_active_subscription,
       completedSub: completedSub?.id,
       failedSub: failedSub?.id
     })
-
-    // If we found an active subscription but profile doesn't reflect it, update the profile
-    if (hasActiveSub && profile && !profile.has_active_subscription) {
-      console.log('[Subscription] Updating user profile to reflect active subscription:', userId)
-      await supabase
-        .from('user_profiles')
-        .update({ has_active_subscription: true })
-        .eq('id', userId)
-    }
 
     return hasActiveSub
   }

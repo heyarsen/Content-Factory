@@ -32,7 +32,7 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
   // Check cache first (unless force refresh is requested)
   const cached = profileCache.get(userId)
   if (!forceRefresh && cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    console.log('[Auth] Using cached profile data')
+    console.log('[Auth) Using cached profile data')
     return cached.data
   }
 
@@ -91,15 +91,22 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
     const subCompletedData = results[1].status === 'fulfilled' ? (results[1].value as any).data : null
     const subFailedData = results[2].status === 'fulfilled' ? (results[2].value as any).data : null
 
-    // A user has an active subscription if:
-    // - user_profiles says so OR
-    // - they have an 'active' record in user_subscriptions (completed OR failed payment fallback) OR
-    // - they have a 'pending' record (lenient for slow gateways)
+    // A user has an active subscription if they have an 'active' record in user_subscriptions (completed OR failed payment fallback)
+    // We NO LONGER rely on profileData.has_active_subscription as it can be stale
     const hasActiveSubscription = !!(
-      profileData?.has_active_subscription ||
       subCompletedData ||
       subFailedData
     )
+
+    console.log('[Auth] Final subscription check result:', {
+      userId,
+      hasActiveSubscription,
+      reason: {
+        profileData: !!profileData?.has_active_subscription,
+        subCompletedData: !!subCompletedData,
+        subFailedData: !!subFailedData
+      }
+    })
 
     // A user is an admin if:
     // - their email is the admin email OR
@@ -481,4 +488,3 @@ export function useAuth() {
   }
   return context
 }
-
