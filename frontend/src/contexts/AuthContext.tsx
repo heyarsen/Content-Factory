@@ -90,7 +90,6 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
     const profileData = results[0].status === 'fulfilled' ? (results[0].value as any).data : null
     const subCompletedData = results[1].status === 'fulfilled' ? (results[1].value as any).data : null
     const subFailedData = results[2].status === 'fulfilled' ? (results[2].value as any).data : null
-    const subPendingData = results[3].status === 'fulfilled' ? (results[3].value as any).data : null
 
     // A user has an active subscription if:
     // - user_profiles says so OR
@@ -99,8 +98,7 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
     const hasActiveSubscription = !!(
       profileData?.has_active_subscription ||
       subCompletedData ||
-      subFailedData ||
-      subPendingData
+      subFailedData
     )
 
     // A user is an admin if:
@@ -115,12 +113,10 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
       profileHasSub: profileData?.has_active_subscription,
       dbSubCompleted: !!subCompletedData,
       dbSubFailed: !!subFailedData,
-      dbSubPending: !!subPendingData,
       isAdminEmail,
       subDetails: {
         completed: subCompletedData ? { status: subCompletedData.status, payment: subCompletedData.payment_status } : null,
-        failed: subFailedData ? { status: subFailedData.status, payment: subFailedData.payment_status } : null,
-        pending: subPendingData ? { status: subPendingData.status, payment: subPendingData.payment_status } : null
+        failed: subFailedData ? { status: subFailedData.status, payment: subFailedData.payment_status } : null
       }
     })
 

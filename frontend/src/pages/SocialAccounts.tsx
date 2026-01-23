@@ -113,8 +113,8 @@ export function SocialAccounts() {
       userRole
     })
 
-    // Check if user has an active subscription or is admin
-    if (!hasActiveSubscription && userRole !== 'admin') {
+    // Check if user has an active subscription
+    if (!hasActiveSubscription) {
       toast.error(t('social_accounts.subscription_needed_alert'))
       return
     }

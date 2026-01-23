@@ -138,10 +138,13 @@ export class SubscriptionService {
       .eq('id', userId)
       .maybeSingle()
 
+    /* 
+    // Optimization disabled for strict enforcement: always check the source of truth
     if (!profileError && profile?.has_active_subscription) {
       console.log('[Subscription] Found active subscription in user_profiles:', userId)
       return true
     }
+    */
 
     // Fallback: Check user_subscriptions table directly with multiple queries (matches frontend logic)
     const results = await Promise.allSettled([
@@ -163,7 +166,8 @@ export class SubscriptionService {
         .eq('payment_status', 'failed')
         .limit(1)
         .maybeSingle(),
-      // Pending subscription (lenient for slow gateways)
+      /*
+      // Pending subscription disabled for strict enforcement
       supabase
         .from('user_subscriptions')
         .select('id, status, payment_status')
@@ -171,21 +175,20 @@ export class SubscriptionService {
         .eq('status', 'pending')
         .limit(1)
         .maybeSingle()
+      */
     ])
 
     const completedSub = results[0].status === 'fulfilled' ? (results[0].value as any).data : null
     const failedSub = results[1].status === 'fulfilled' ? (results[1].value as any).data : null
-    const pendingSub = results[2].status === 'fulfilled' ? (results[2].value as any).data : null
 
-    const hasActiveSub = !!(completedSub || failedSub || pendingSub)
-    
+    const hasActiveSub = !!(completedSub || failedSub)
+
     console.log('[Subscription] Subscription check result:', {
       userId,
       hasActiveSub,
       profileHasActive: profile?.has_active_subscription,
       completedSub: completedSub?.id,
-      failedSub: failedSub?.id,
-      pendingSub: pendingSub?.id
+      failedSub: failedSub?.id
     })
 
     // If we found an active subscription but profile doesn't reflect it, update the profile
@@ -400,7 +403,7 @@ export class SubscriptionService {
     const { CreditsService } = await import('./creditsService.js')
     const creditsBefore = await CreditsService.getUserCredits(userId)
     await CreditsService.setCredits(userId, 0, `subscription_cancelled_${subscription.id}`)
-    
+
     console.log('[Subscription] Credits burned due to cancellation:', {
       userId,
       subscriptionId: subscription.id,
