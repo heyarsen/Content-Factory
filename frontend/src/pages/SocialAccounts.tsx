@@ -102,10 +102,22 @@ export function SocialAccounts() {
 
 
   const handleConnect = async (platform: SocialAccount['platform']) => {
+    // Refresh subscription status first to get the latest data
+    const refreshResult = await refreshSubscriptionStatus()
+    const { hasActiveSubscription, role: userRole } = refreshResult
+
     console.log('[Social] Connection attempt:', {
       platform,
       userId: user?.id,
+      hasActiveSubscription,
+      userRole
     })
+
+    // Check if user has an active subscription or is admin
+    if (!hasActiveSubscription && userRole !== 'admin') {
+      toast.error(t('social_accounts.subscription_needed_alert'))
+      return
+    }
 
     setConnectingPlatform(platform)
     try {

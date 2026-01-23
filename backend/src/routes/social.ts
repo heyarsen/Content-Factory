@@ -1,7 +1,7 @@
 import { Router, Response } from 'express'
 import { supabase } from '../lib/supabase.js'
 import { getSupabaseClientForUser } from '../lib/supabase.js'
-import { authenticate, AuthRequest } from '../middleware/auth.js'
+import { authenticate, AuthRequest, requireSubscription } from '../middleware/auth.js'
 import { createUserProfile, generateUserAccessLink, getUserProfile } from '../lib/uploadpost.js'
 
 const router = Router()
@@ -156,7 +156,7 @@ router.get('/accounts', authenticate, async (req: AuthRequest, res: Response) =>
 })
 
 // Get or create Upload-Post user profile and generate access link for linking accounts
-router.post('/connect', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/connect', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const { platform } = req.body
     const userId = req.userId!
@@ -362,7 +362,7 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
 })
 
 // Handle account connection confirmation (after user links account via Upload-Post UI)
-router.post('/callback', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/callback', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const { platform, uploadPostUsername } = req.body
     const userId = req.userId!
