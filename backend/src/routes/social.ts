@@ -203,11 +203,24 @@ router.post('/connect', authenticate, requireSubscription, async (req: AuthReque
       throw new Error('Unable to generate username for Upload-Post profile')
     }
 
-    // Use the derived username for link generation (account will be created in callback when actually connected)
+    // Use the derived username for link generation
     const usernameForLink = finalUsername
 
     if (!usernameForLink || usernameForLink.trim() === '') {
       throw new Error('Upload-Post username could not be determined')
+    }
+
+    // Ensure user profile exists on Upload-Post before generating link
+    try {
+      console.log('Ensuring Upload-Post user profile exists for:', usernameForLink)
+      await createUserProfile({
+        username: usernameForLink,
+        email: userEmail || undefined,
+        name: userName || undefined
+      })
+    } catch (profileError: any) {
+      // Ignore "already exists" errors, but log others
+      console.warn('Upload-Post profile creation notice (may already exist):', profileError.message)
     }
 
     try {
