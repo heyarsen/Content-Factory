@@ -108,6 +108,11 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
         profileData: !!profileData?.has_active_subscription,
         subCompletedData: !!subCompletedData,
         subFailedData: !!subFailedData
+      },
+      details: {
+        profileData,
+        subCompletedData,
+        subFailedData
       }
     })
 

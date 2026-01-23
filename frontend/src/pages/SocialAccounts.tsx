@@ -102,25 +102,34 @@ export function SocialAccounts() {
 
 
   const handleConnect = async (platform: SocialAccount['platform']) => {
+    console.log('[Social] === CONNECTION ATTEMPT START ===')
+    console.log('[Social] Platform:', platform)
+    console.log('[Social] User ID:', user?.id)
+    console.log('[Social] User Email:', user?.email)
+    
     // Refresh subscription status first to get the latest data
     const refreshResult = await refreshSubscriptionStatus()
     const { hasActiveSubscription, role: userRole } = refreshResult
 
-    console.log('[Social] Connection attempt:', {
+    console.log('[Social] Subscription check result:', {
       platform,
       userId: user?.id,
       hasActiveSubscription,
-      userRole
+      userRole,
+      refreshResult
     })
 
     // Check if user has an active subscription
     if (!hasActiveSubscription) {
-      console.log('[Social] BLOCKING connection - no active subscription found')
+      console.log('[Social] ❌ BLOCKING CONNECTION - NO ACTIVE SUBSCRIPTION')
+      console.log('[Social] Showing error toast...')
       toast.error(t('social_accounts.subscription_needed_alert'))
+      console.log('[Social] === CONNECTION BLOCKED ===')
       return
     }
 
-    console.log('[Social] ALLOWING connection - active subscription confirmed')
+    console.log('[Social] ✅ ALLOWING CONNECTION - ACTIVE SUBSCRIPTION CONFIRMED')
+    console.log('[Social] === CONNECTION PROCEEDING ===')
     setConnectingPlatform(platform)
     try {
       const response = await api.post('/api/social/connect', { platform })
