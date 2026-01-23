@@ -11,6 +11,7 @@ import {
   Settings,
   BarChart3,
   MessagesSquare,
+  X,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCredits } from '../../hooks/useCredits'

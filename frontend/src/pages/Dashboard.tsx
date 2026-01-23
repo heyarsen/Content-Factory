@@ -5,7 +5,7 @@ import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Badge } from '../components/ui/Badge'
-import { Video, Calendar, Users, Zap, ArrowRight, PlayCircle, Sparkles } from 'lucide-react'
+import { Video, Calendar, Users, Zap, ArrowRight, Sparkles } from 'lucide-react'
 import api from '../lib/api'
 
 import { useLanguage } from '../contexts/LanguageContext'
