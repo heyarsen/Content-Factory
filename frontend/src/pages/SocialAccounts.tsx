@@ -132,12 +132,17 @@ export function SocialAccounts() {
     console.log('[Social] === CONNECTION PROCEEDING ===')
     setConnectingPlatform(platform)
     try {
+      console.log('[Social] Making API call to /api/social/connect')
       const response = await api.post('/api/social/connect', { platform })
+      console.log('[Social] API response:', response.data)
+      
       const { accessUrl, uploadPostUsername, redirectUrl } = response.data as {
         accessUrl?: string
         uploadPostUsername?: string
         redirectUrl?: string
       }
+
+      console.log('[Social] Parsed response:', { accessUrl, uploadPostUsername, redirectUrl })
 
       localStorage.removeItem(`uploadpost_jwt_${platform}`)
       localStorage.removeItem(`uploadpost_userid_${platform}`)
@@ -166,11 +171,14 @@ export function SocialAccounts() {
       // Redirect directly to Upload-Post connection page instead of popup
       if (accessUrl) {
         const resolvedAccessUrl = buildPlatformUrl(accessUrl)
+        console.log('[Social] Redirecting to:', resolvedAccessUrl)
         localStorage.setItem(`uploadpost_access_url_${platform}`, resolvedAccessUrl)
         // Redirect current window to Upload-Post
         window.location.href = resolvedAccessUrl
       } else {
+        console.log('[Social] No accessUrl, using fallback')
         const fallbackBaseUrl = buildPlatformUrl('https://connect.upload-post.com')
+        console.log('[Social] Redirecting to fallback:', fallbackBaseUrl)
         localStorage.setItem(`uploadpost_access_url_${platform}`, fallbackBaseUrl)
         // Redirect current window to Upload-Post
         window.location.href = fallbackBaseUrl
