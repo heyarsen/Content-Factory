@@ -156,7 +156,7 @@ router.get('/accounts', authenticate, async (req: AuthRequest, res: Response) =>
 })
 
 // Get or create Upload-Post user profile and generate access link for linking accounts
-router.post('/connect', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
+router.post('/connect', authenticate, /* requireSubscription, */ async (req: AuthRequest, res: Response) => {
   try {
     const { platform } = req.body
     const userId = req.userId!
@@ -375,7 +375,7 @@ router.post('/connect', authenticate, requireSubscription, async (req: AuthReque
 })
 
 // Handle account connection confirmation (after user links account via Upload-Post UI)
-router.post('/callback', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
+router.post('/callback', authenticate, /* requireSubscription, */ async (req: AuthRequest, res: Response) => {
   try {
     const { platform, uploadPostUsername } = req.body
     const userId = req.userId!

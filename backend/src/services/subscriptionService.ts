@@ -187,7 +187,10 @@ export class SubscriptionService {
       hasActiveSub,
       profileHasActive: profile?.has_active_subscription,
       completedSub: completedSub?.id,
-      failedSub: failedSub?.id
+      failedSub: failedSub?.id,
+      completedSubDetails: completedSub,
+      failedSubDetails: failedSub,
+      profileError: profileError?.message
     })
 
     return hasActiveSub
