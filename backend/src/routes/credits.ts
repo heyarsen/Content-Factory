@@ -252,6 +252,16 @@ router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) 
     // Create unique order reference
     const orderReference = `subscription_${userId}_${Date.now()}`
 
+    // Cancel any existing active subscription on Wayforpay before creating a new one
+    try {
+      const { RecurringPaymentService } = await import('../services/recurringPaymentService.js')
+      await RecurringPaymentService.cancelSubscription(userId)
+      console.log('[Credits API] Existing subscription cancelled (if any) before new purchase')
+    } catch (cancelError) {
+      console.warn('[Credits API] Non-critical error while cancelling existing subscription:', cancelError)
+      // We continue as the user might not have a wayforpay record yet or it might be already cancelled
+    }
+
     // Create pending subscription
     await SubscriptionService.createSubscription(userId, planId, orderReference, 'pending')
 

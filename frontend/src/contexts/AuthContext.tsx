@@ -174,7 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const updatedUser = {
               ...parsedUser,
               role: profile.role as 'user' | 'admin',
-              hasActiveSubscription: profile.has_active_subscription || false
+              hasActiveSubscription: profile.hasActiveSubscription || false
             }
             localStorage.setItem('auth_user', JSON.stringify(updatedUser))
             setUser(updatedUser)
@@ -216,7 +216,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             if (profileResult.status === 'fulfilled') {
               role = profileResult.value.role as 'user' | 'admin'
-              hasActiveSubscription = profileResult.value.has_active_subscription || false
+              hasActiveSubscription = profileResult.value.hasActiveSubscription || false
               console.log('[Auth] User profile fetched in parallel:', { role, hasActiveSubscription })
             } else {
               console.warn('[Auth] Profile fetch failed, using defaults')
@@ -258,7 +258,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           if (profileResult.status === 'fulfilled') {
             role = profileResult.value.role as 'user' | 'admin'
-            hasActiveSubscription = profileResult.value.has_active_subscription || false
+            hasActiveSubscription = profileResult.value.hasActiveSubscription || false
             console.log('[Auth] User profile fetched on state change:', { role, hasActiveSubscription })
           } else {
             console.warn('[Auth] Profile fetch failed on state change, using defaults')
@@ -318,7 +318,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const updatedUser = {
             ...data.user,
             role: profile.role as 'user' | 'admin',
-            hasActiveSubscription: profile.has_active_subscription || false
+            hasActiveSubscription: profile.hasActiveSubscription || false
           }
           localStorage.setItem('auth_user', JSON.stringify(updatedUser))
           setUser(updatedUser)
@@ -447,7 +447,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Force refresh subscription status
       const profile = await fetchUserRoleAndSubscription(user.id, true)
 
-      const hasActive = profile.has_active_subscription || false
+      const hasActive = profile.hasActiveSubscription || false
       const role = profile.role as 'user' | 'admin'
 
       const updatedUser = {

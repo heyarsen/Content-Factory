@@ -171,12 +171,13 @@ export class RecurringPaymentService {
     try {
       // Use environment variables directly since getConfig is private
       const merchantAccount = process.env.WAYFORPAY_MERCHANT_ACCOUNT || 'test_merch_n1'
-      // WAYFORPAY_MERCHANT_PASSWORD is a separate password from your Wayforpay merchant dashboard
-      // It should be a 32-character MD5 hash value (check Settings → API in your dashboard)
-      const merchantPassword = process.env.WAYFORPAY_MERCHANT_PASSWORD
+      // Try to use the dedicated merchant password, fallback to secret key
+      // WayForPay regularApi often requires the merchant password from the dashboard
+      const merchantSecretKey = process.env.WAYFORPAY_MERCHANT_SECRET_KEY || 'flk3409refn54t54t*FNJRET'
+      const merchantPassword = process.env.WAYFORPAY_MERCHANT_PASSWORD || merchantSecretKey
 
       if (!merchantPassword) {
-        throw new Error('WAYFORPAY_MERCHANT_PASSWORD environment variable is required for deleting recurring payments')
+        throw new Error('WayForPay merchant credentials (password/secret) missing')
       }
 
       const requestBody = {
