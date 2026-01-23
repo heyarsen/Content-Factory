@@ -1,7 +1,7 @@
 import { Router, Response } from 'express'
 import { supabase } from '../lib/supabase.js'
 import { getSupabaseClientForUser } from '../lib/supabase.js'
-import { authenticate, AuthRequest, requireSubscription } from '../middleware/auth.js'
+import { authenticate, AuthRequest } from '../middleware/auth.js'
 import { createUserProfile, generateUserAccessLink, getUserProfile } from '../lib/uploadpost.js'
 
 const router = Router()
@@ -24,29 +24,29 @@ function isUploadPostPlatformConnected(profile: any, platform: string): boolean 
   }
 
   const platformLower = platform.toLowerCase()
-  
+
   // Log the profile structure for debugging
   console.log('[Connection Check] Checking platform:', platform, 'Profile keys:', Object.keys(profile || {}))
-  
+
   // Handle response structure: profile might be nested in a "profile" key
   const actualProfile = profile.profile || profile
-  
+
   // Check social_accounts object - this is the official way according to Upload-Post API
   if (actualProfile.social_accounts && typeof actualProfile.social_accounts === 'object') {
     const socialAccounts = actualProfile.social_accounts
-    
+
     // Map our platform name to Upload-Post API format (e.g., twitter -> x)
     const uploadPostPlatformName = mapPlatformToUploadPost(platform)
     const uploadPostPlatformLower = uploadPostPlatformName.toLowerCase()
-    
+
     // Check if the platform exists in social_accounts
-    const platformAccount = socialAccounts[platformLower] || 
-                           socialAccounts[platform] || 
-                           socialAccounts[uploadPostPlatformLower] ||
-                           socialAccounts[uploadPostPlatformName]
-    
+    const platformAccount = socialAccounts[platformLower] ||
+      socialAccounts[platform] ||
+      socialAccounts[uploadPostPlatformLower] ||
+      socialAccounts[uploadPostPlatformName]
+
     console.log('[Connection Check] social_accounts for platform:', platform, '(Upload-Post name:', uploadPostPlatformName, ') =', platformAccount)
-    
+
     // If platformAccount is an object (not null, not empty string), it's connected
     if (platformAccount && typeof platformAccount === 'object') {
       // Verify it has connection data (display_name, username, etc.)
@@ -55,26 +55,26 @@ function isUploadPostPlatformConnected(profile: any, platform: string): boolean 
         return true
       }
     }
-    
+
     // If platformAccount is null, empty string, or undefined, it's NOT connected
     if (platformAccount === null || platformAccount === '' || platformAccount === undefined) {
       console.log('[Connection Check] ✗ Platform is NOT connected (null/empty)')
       return false
     }
   }
-  
+
   // Fallback: if social_accounts doesn't exist, check if it's in the root profile
   if (profile.social_accounts && typeof profile.social_accounts === 'object') {
     const socialAccounts = profile.social_accounts
     const platformAccount = socialAccounts[platformLower] || socialAccounts[platform]
-    
+
     if (platformAccount && typeof platformAccount === 'object') {
       if (platformAccount.display_name || platformAccount.username || Object.keys(platformAccount).length > 0) {
         console.log('[Connection Check] ✓ Platform is CONNECTED (root level). Account data:', platformAccount)
         return true
       }
     }
-    
+
     if (platformAccount === null || platformAccount === '' || platformAccount === undefined) {
       console.log('[Connection Check] ✗ Platform is NOT connected (root level, null/empty)')
       return false
@@ -82,9 +82,9 @@ function isUploadPostPlatformConnected(profile: any, platform: string): boolean 
   }
 
   // If we get here, social_accounts doesn't exist or platform isn't in it
-  console.log('[Connection Check] ✗ NO connection evidence found. social_accounts:', 
+  console.log('[Connection Check] ✗ NO connection evidence found. social_accounts:',
     actualProfile.social_accounts || profile.social_accounts || 'not found')
-  console.log('[Connection Check] Full profile structure (first 1500 chars):', 
+  console.log('[Connection Check] Full profile structure (first 1500 chars):',
     JSON.stringify(actualProfile || profile, null, 2).substring(0, 1500))
   return false
 }
@@ -113,25 +113,25 @@ router.get('/accounts', authenticate, async (req: AuthRequest, res: Response) =>
           try {
             const profile = await getUserProfile(account.platform_account_id)
             const actualProfile = profile.profile || profile
-            
+
             // Extract account info from Upload-Post profile
             const socialAccounts = actualProfile?.social_accounts || profile?.social_accounts || {}
             const platformName = mapPlatformToUploadPost(account.platform)
-            const platformAccount = socialAccounts[platformName] || 
-                                   socialAccounts[account.platform] ||
-                                   socialAccounts[platformName.toLowerCase()] ||
-                                   socialAccounts[account.platform.toLowerCase()]
-            
+            const platformAccount = socialAccounts[platformName] ||
+              socialAccounts[account.platform] ||
+              socialAccounts[platformName.toLowerCase()] ||
+              socialAccounts[account.platform.toLowerCase()]
+
             if (platformAccount && typeof platformAccount === 'object') {
               return {
                 ...account,
                 account_info: {
                   username: platformAccount.username || platformAccount.display_name || null,
                   display_name: platformAccount.display_name || platformAccount.username || null,
-                  avatar_url: platformAccount.social_images?.profile_picture || 
-                             platformAccount.profile_picture ||
-                             platformAccount.avatar_url ||
-                             null,
+                  avatar_url: platformAccount.social_images?.profile_picture ||
+                    platformAccount.profile_picture ||
+                    platformAccount.avatar_url ||
+                    null,
                 },
               }
             }
@@ -140,7 +140,7 @@ router.get('/accounts', authenticate, async (req: AuthRequest, res: Response) =>
             // Continue without account info if profile fetch fails
           }
         }
-        
+
         return {
           ...account,
           account_info: null,
@@ -156,7 +156,7 @@ router.get('/accounts', authenticate, async (req: AuthRequest, res: Response) =>
 })
 
 // Get or create Upload-Post user profile and generate access link for linking accounts
-router.post('/connect', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
+router.post('/connect', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { platform } = req.body
     const userId = req.userId!
@@ -198,14 +198,14 @@ router.post('/connect', authenticate, requireSubscription, async (req: AuthReque
 
     // Determine the final username to use (don't create account yet - only when actually connecting)
     const finalUsername = uploadPostUsername || derivedUsername || userId.replace(/-/g, '_')
-    
+
     if (!finalUsername || finalUsername.trim() === '') {
       throw new Error('Unable to generate username for Upload-Post profile')
     }
 
     // Use the derived username for link generation (account will be created in callback when actually connected)
     const usernameForLink = finalUsername
-    
+
     if (!usernameForLink || usernameForLink.trim() === '') {
       throw new Error('Upload-Post username could not be determined')
     }
@@ -228,21 +228,21 @@ router.post('/connect', authenticate, requireSubscription, async (req: AuthReque
       let accessLink
       let retries = 3
       let lastError: any = null
-      
+
       while (retries > 0) {
         try {
           // Map platform name to Upload-Post API format (e.g., twitter -> x)
           const uploadPostPlatform = mapPlatformToUploadPost(platform)
           accessLink = await generateUserAccessLink(usernameForLink, {
             platforms: [uploadPostPlatform as any],
-        redirectUrl,
+            redirectUrl,
             redirectButtonText: 'Back to Content Factory',
           })
           break
         } catch (linkError: any) {
           lastError = linkError
           const status = linkError.response?.status
-          
+
           // If 429 rate limit, wait and retry
           if (status === 429 && retries > 1) {
             const retryAfter = linkError.response?.headers?.['retry-after'] || '5'
@@ -252,12 +252,12 @@ router.post('/connect', authenticate, requireSubscription, async (req: AuthReque
             retries--
             continue
           }
-          
+
           // For other errors or last retry, throw
           throw linkError
         }
       }
-      
+
       if (!accessLink) {
         throw lastError || new Error('Failed to generate access link after retries')
       }
@@ -326,10 +326,10 @@ router.post('/connect', authenticate, requireSubscription, async (req: AuthReque
         usernameForLink,
         errorResponse: linkError.response?.data,
       })
-      
+
       const errorMessage = linkError.message || 'Failed to complete account setup'
       const apiError = linkError.response?.data?.message || linkError.response?.data?.error
-      
+
       return res.status(500).json({
         error: errorMessage || 'Failed to complete account setup',
         details: apiError || linkError.message || 'Unknown error occurred',
@@ -346,10 +346,10 @@ router.post('/connect', authenticate, requireSubscription, async (req: AuthReque
       errorResponse: error.response?.data,
       userId: req.userId,
     })
-    
+
     const errorMessage = error.message || 'Failed to initiate connection'
     const apiError = error.response?.data?.message || error.response?.data?.error || error.response?.data?.details
-    
+
     res.status(500).json({
       error: errorMessage,
       details: apiError || errorMessage,
@@ -362,7 +362,7 @@ router.post('/connect', authenticate, requireSubscription, async (req: AuthReque
 })
 
 // Handle account connection confirmation (after user links account via Upload-Post UI)
-router.post('/callback', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
+router.post('/callback', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { platform, uploadPostUsername } = req.body
     const userId = req.userId!
@@ -468,13 +468,13 @@ router.post('/callback', authenticate, requireSubscription, async (req: AuthRequ
 
       // Check if platform is actually connected - be VERY strict about this
       const platformConnected = isUploadPostPlatformConnected(userProfile, platform)
-      
+
       console.log('[Callback] Platform connection check result:', platformConnected, 'for platform:', platform)
 
       // If platform is NOT connected, update status to pending and return error
       if (!platformConnected) {
         console.log('[Callback] Platform NOT connected. Setting status to pending.')
-        
+
         if (existing) {
           const { error: updateError } = await userSupabase
             .from('social_accounts')
@@ -484,7 +484,7 @@ router.post('/callback', authenticate, requireSubscription, async (req: AuthRequ
               connected_at: null,
             })
             .eq('id', existing.id)
-            
+
           if (updateError) {
             console.error('[Callback] Error updating to pending:', updateError)
           }
@@ -497,7 +497,7 @@ router.post('/callback', authenticate, requireSubscription, async (req: AuthRequ
               platform_account_id: finalUploadPostUsername,
               status: 'pending',
             })
-            
+
           if (insertError) {
             console.error('[Callback] Error inserting pending account:', insertError)
           }
@@ -508,7 +508,7 @@ router.post('/callback', authenticate, requireSubscription, async (req: AuthRequ
           platformConnected: false,
         })
       }
-      
+
       console.log('[Callback] Platform IS connected. Proceeding with connection.')
 
       if (existing) {

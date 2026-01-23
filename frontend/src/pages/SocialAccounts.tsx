@@ -7,7 +7,7 @@ import { Badge } from '../components/ui/Badge'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Modal } from '../components/ui/Modal'
-import { Users, Link2, X, Instagram, Youtube, Facebook, Share2, Crown, Lock } from 'lucide-react'
+import { Users, Link2, X, Instagram, Youtube, Facebook, Share2 } from 'lucide-react'
 import api from '../lib/api'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -89,7 +89,7 @@ export function SocialAccounts() {
 
     if (connectedPlatform) {
       const platformLabel = platformNames[connectedPlatform] || connectedPlatform
-      alert(t('social_accounts.connect_success').replace('{platform}', platformLabel))
+      toast.success(t('social_accounts.connect_success').replace('{platform}', platformLabel))
 
       const nextParams = new URLSearchParams(searchParams)
       nextParams.delete('connected')
@@ -102,25 +102,10 @@ export function SocialAccounts() {
 
 
   const handleConnect = async (platform: SocialAccount['platform']) => {
-    // Refresh subscription status first to get the latest data
-    const refreshResult = await refreshSubscriptionStatus()
-    const { hasActiveSubscription, role: userRole } = refreshResult
-
     console.log('[Social] Connection attempt:', {
       platform,
       userId: user?.id,
-      userRoleFromState: user?.role,
-      hasSubFromState: user?.hasActiveSubscription,
-      userRoleFromRefresh: userRole,
-      hasSubFromRefresh: hasActiveSubscription
     })
-
-    // Check if user has an active subscription or is admin
-    if (!hasActiveSubscription && userRole !== 'admin') {
-      console.log('[Social] Connection blocked: No active subscription for non-admin user')
-      toast.error(t('social_accounts.subscription_needed_alert'))
-      return
-    }
 
     setConnectingPlatform(platform)
     try {
@@ -194,7 +179,7 @@ export function SocialAccounts() {
         fullResponse: error.response?.data,
         status: error.response?.status,
       })
-      alert(errorMessage)
+      toast.error(errorMessage)
     } finally {
       setConnectingPlatform(null)
     }
@@ -205,11 +190,12 @@ export function SocialAccounts() {
     try {
       await api.delete(`/api/social/accounts/${id}`)
       setAccounts(accounts.filter((a) => a.id !== id))
-      setDisconnectModal(null)
     } catch (error) {
       console.error('Failed to disconnect:', error)
+      toast.error(t('errors.delete_failed'))
     } finally {
       setDisconnecting(false)
+      setDisconnectModal(null)
     }
   }
 
@@ -253,20 +239,6 @@ export function SocialAccounts() {
           <p className="text-sm text-slate-500">
             {t('social_accounts.subtitle')}
           </p>
-          {(user?.hasActiveSubscription || user?.role === 'admin') && (
-            <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-2">
-              <Crown className="h-4 w-4 text-emerald-600" />
-              <span className="text-sm font-medium text-emerald-600">
-                {user?.role === 'admin' ? t('social_accounts.premium_plan_active') : t('social_accounts.premium_plan_active')}
-              </span>
-            </div>
-          )}
-          {(!user?.hasActiveSubscription && user?.role !== 'admin') && (
-            <div className="flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-2">
-              <Lock className="h-4 w-4 text-amber-600" />
-              <span className="text-sm font-medium text-amber-600">{t('social_accounts.subscription_required')}</span>
-            </div>
-          )}
         </div>
 
         {accounts.length === 0 && availablePlatforms.length === 0 ? (
@@ -353,15 +325,14 @@ export function SocialAccounts() {
                       </Button>
                     ) : (
                       <Button
-                        variant={(user?.hasActiveSubscription || user?.role === 'admin') ? "primary" : "ghost"}
+                        variant="primary"
                         size="sm"
                         onClick={() => handleConnect(platform)}
                         loading={connectingPlatform === platform}
-                        disabled={!user?.hasActiveSubscription && user?.role !== 'admin'}
-                        className={`w-full ${(!user?.hasActiveSubscription && user?.role !== 'admin') ? 'border border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed' : ''}`}
+                        className="w-full"
                       >
                         <Link2 className="mr-2 h-4 w-4" />
-                        {(user?.hasActiveSubscription || user?.role === 'admin') ? t('social_accounts.connect') : t('social_accounts.subscribe_to_connect')}
+                        {t('social_accounts.connect')}
                       </Button>
                     )}
                   </div>
