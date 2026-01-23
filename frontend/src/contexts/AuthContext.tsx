@@ -93,6 +93,13 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
     const subCompletedData = results[1].status === 'fulfilled' ? (results[1].value as any).data : null
     const subFailedData = results[2].status === 'fulfilled' ? (results[2].value as any).data : null
 
+    console.log('[Auth] Raw query results:', {
+      profileData,
+      subCompletedData,
+      subFailedData,
+      resultsLength: results.length
+    })
+
     // A user has an active subscription if they have an 'active' record in user_subscriptions (completed OR failed payment fallback)
     // We NO LONGER rely on profileData.has_active_subscription as it can be stale
     // PENDING subscriptions are NOT counted to match backend strict enforcement
