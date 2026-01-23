@@ -76,7 +76,8 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle(),
-      // Fallback 2: pending status (gateway might be slow)
+      // Fallback 2: pending status (gateway might be slow) - DISABLED to match backend strict enforcement
+      /*
       supabase
         .from('user_subscriptions')
         .select('status, payment_status, created_at, expires_at')
@@ -85,6 +86,7 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
+      */
     ])
 
     const profileData = results[0].status === 'fulfilled' ? (results[0].value as any).data : null
@@ -93,6 +95,7 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
 
     // A user has an active subscription if they have an 'active' record in user_subscriptions (completed OR failed payment fallback)
     // We NO LONGER rely on profileData.has_active_subscription as it can be stale
+    // PENDING subscriptions are NOT counted to match backend strict enforcement
     const hasActiveSubscription = !!(
       subCompletedData ||
       subFailedData

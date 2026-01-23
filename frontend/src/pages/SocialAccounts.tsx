@@ -115,10 +115,12 @@ export function SocialAccounts() {
 
     // Check if user has an active subscription
     if (!hasActiveSubscription) {
+      console.log('[Social] BLOCKING connection - no active subscription found')
       toast.error(t('social_accounts.subscription_needed_alert'))
       return
     }
 
+    console.log('[Social] ALLOWING connection - active subscription confirmed')
     setConnectingPlatform(platform)
     try {
       const response = await api.post('/api/social/connect', { platform })
