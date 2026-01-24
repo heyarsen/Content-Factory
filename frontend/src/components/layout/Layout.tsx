@@ -1,4 +1,3 @@
-```javascript
 import { ReactNode, useState } from 'react'
 import { Header } from './Header'
 import { Sidebar } from './Sidebar'
@@ -36,11 +35,11 @@ export function Layout({ children }: LayoutProps) {
       {/* DEBUG OVERLAY - TEMPORARY */}
       <div className="fixed bottom-4 right-4 z-50 bg-black/80 text-white p-4 rounded-lg text-xs font-mono max-w-sm overflow-auto shadow-2xl border border-white/20">
         <div className="flex items-center justify-between mb-2">
-          <strong className="flex items-center gap-2"><Info size={14}/> DEBUG INFO</strong>
+          <strong className="flex items-center gap-2"><Info size={14} /> DEBUG INFO</strong>
           <button
             onClick={async () => {
               const res = await refreshSubscriptionStatus()
-              alert(`Refreshed!\nActive: ${ res.hasActiveSubscription } \nRole: ${ res.role } `)
+              alert(`Refreshed!\nActive: ${res.hasActiveSubscription} \nRole: ${res.role} `)
             }}
             className="bg-brand-500 hover:bg-brand-600 px-2 py-1 rounded text-[10px] uppercase font-bold"
           >
