@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react'
+import { ReactNode, useState, useEffect } from 'react'
 import { Header } from './Header'
 import { Sidebar } from './Sidebar'
 import { useAuth } from '../../contexts/AuthContext'
@@ -6,10 +6,20 @@ import { useAuth } from '../../contexts/AuthContext'
 export function Layout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { user, refreshSubscriptionStatus } = useAuth()
+  const [backendProjectId, setBackendProjectId] = useState<string>('WAITING...')
 
-  // Get Project ID from URL
+  // Get Local Project ID
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
-  const projectId = supabaseUrl.split('//')[1]?.split('.')[0] || 'UNKNOWN'
+  const localProjectId = supabaseUrl.split('//')[1]?.split('.')[0] || 'UNKNOWN'
+
+  // Listen for custom 401 detail events from api.ts
+  useEffect(() => {
+    const handle401Detail = (e: any) => {
+      if (e.detail?.projectId) setBackendProjectId(e.detail.projectId)
+    }
+    window.addEventListener('api-401-detail', handle401Detail)
+    return () => window.removeEventListener('api-401-detail', handle401Detail)
+  }, [])
 
   return (
     <div className="relative flex min-h-screen bg-background">
@@ -23,17 +33,24 @@ export function Layout({ children }: { children: ReactNode }) {
         </main>
       </div>
 
-      {/* STABILITY DEBUG BOX V6 */}
-      <div className="fixed bottom-4 right-4 z-50 bg-black/90 text-white p-4 rounded-lg text-[10px] font-mono max-w-xs shadow-2xl border border-brand-500/50 backdrop-blur-md">
-        <div className="flex items-center justify-between mb-2 border-b border-white/10 pb-2">
-          <strong className="text-brand-400">PROJECT ID: {projectId}</strong>
-          <button
-            onClick={() => refreshSubscriptionStatus()}
-            className="bg-brand-500 px-2 py-0.5 rounded text-[8px]"
-          >
-            REFRESH
-          </button>
+      {/* PROJECT SYNC DEBUG BOX V7 */}
+      <div className="fixed bottom-4 right-4 z-50 bg-black/95 text-white p-4 rounded-xl text-[10px] font-mono max-w-xs shadow-2xl border-2 border-brand-500/50 backdrop-blur-xl">
+        <div className="mb-3 border-b border-white/10 pb-2">
+          <div className="flex justify-between items-center text-brand-400 font-bold mb-1">
+            <span>LOCAL ID:</span>
+            <span>{localProjectId}</span>
+          </div>
+          <div className="flex justify-between items-center font-bold">
+            <span className={backendProjectId !== localProjectId && backendProjectId !== 'WAITING...' ? 'text-red-500' : 'text-green-400'}>
+              BACKEND ID:
+            </span>
+            <span>{backendProjectId}</span>
+          </div>
+          {backendProjectId !== localProjectId && backendProjectId !== 'WAITING...' && (
+            <div className="text-[8px] text-red-500 animate-pulse mt-1">⚠️ PROJECT MISMATCH DETECTED!</div>
+          )}
         </div>
+
         <div className="space-y-1">
           <div className="flex justify-between">
             <span>Email:</span>
@@ -49,12 +66,12 @@ export function Layout({ children }: { children: ReactNode }) {
             <span>Reason:</span>
             <span className="text-cyan-400">{user?.debugReason || 'NONE'}</span>
           </div>
-          <div className="mt-2 text-[7px] text-slate-500 pt-1 border-t border-white/5">
-            <div>Latest Sub Record:</div>
-            <pre className="mt-1 bg-white/5 p-1 rounded max-h-20 overflow-auto text-slate-400">
-              {user?.rawLatestSub ? JSON.stringify(user.rawLatestSub, null, 1) : 'ABSENT'}
-            </pre>
-          </div>
+          <button
+            onClick={() => refreshSubscriptionStatus()}
+            className="w-full mt-2 bg-brand-600 hover:bg-brand-500 py-1 rounded text-[8px] font-bold transition-colors"
+          >
+            FORCE SYNC REFRESH
+          </button>
         </div>
       </div>
     </div>
