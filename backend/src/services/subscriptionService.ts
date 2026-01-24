@@ -134,7 +134,7 @@ export class SubscriptionService {
     // First check user_profiles table for cached subscription status
     const { data: profile, error: profileError } = await supabase
       .from('user_profiles')
-      .select('has_active_subscription')
+      .select('role, has_active_subscription')
       .eq('id', userId)
       .maybeSingle()
 
