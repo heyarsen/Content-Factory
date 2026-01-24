@@ -108,29 +108,8 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
       })
     }
 
-    // Perform quick health check
-    const isHealthy = await checkSupabaseHealth()
-    if (!isHealthy) {
-      console.log(`[Auth] Supabase health check failed, rejecting login attempt`)
-      return res.status(503).json({
-        error: 'Authentication service is currently unavailable. Please try again in a few moments.',
-        retryAfter: 30,
-      })
-    }
-
-    // For signInWithPassword, we can use either service role or anon key
-    // Anon key is actually preferred for user authentication operations
-    const supabaseUrl = process.env.SUPABASE_URL
-    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
-
-    if (!supabaseUrl || !supabaseAnonKey) {
-      console.error(`[Auth] Missing Supabase configuration`)
-      return res.status(500).json({
-        error: 'Server configuration error. Please contact support.',
-      })
-    }
-
     // Get Supabase client with health check and circuit breaker
+    // This ALREADY performs a health check internally, so no need to call it twice.
     const { client: healthCheckedClient, error: clientError } = await getSupabaseClientWithHealthCheck(
       supabaseUrl,
       supabaseAnonKey,

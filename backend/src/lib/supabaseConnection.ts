@@ -51,7 +51,7 @@ export async function checkSupabaseHealth(): Promise<boolean> {
   try {
     // Quick health check - try to reach the REST API
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 3000) // 3 second timeout
 
     try {
       const response = await fetch(`${supabaseUrl}/rest/v1/`, {
@@ -65,7 +65,7 @@ export async function checkSupabaseHealth(): Promise<boolean> {
 
       const isHealthy = response.status < 500
       const wasUnhealthy = !connectionHealthCache.isHealthy || connectionHealthCache.consecutiveFailures > 0
-      
+
       connectionHealthCache.isHealthy = isHealthy
       connectionHealthCache.lastCheck = now
 
@@ -148,21 +148,21 @@ export async function getSupabaseClientWithHealthCheck(
           signal: controller.signal,
         })
         clearTimeout(timeoutId)
-        
+
         // Record success if we got a response
         if (response.status < 500) {
           circuitBreaker.recordSuccess('supabase')
         }
-        
+
         return response
       } catch (error: any) {
         clearTimeout(timeoutId)
-        
+
         // Record failure for timeout/connection errors
         if (error.name === 'AbortError' || error.message?.includes('timeout') || error.message?.includes('fetch failed')) {
           circuitBreaker.recordFailure('supabase')
         }
-        
+
         if (error.name === 'AbortError') {
           throw new Error(`Request timeout after ${timeoutMs}ms`)
         }

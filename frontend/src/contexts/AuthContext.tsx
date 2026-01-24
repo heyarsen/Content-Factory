@@ -90,27 +90,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
 
-      if (session?.user) {
-        if (session.access_token) {
-          localStorage.setItem('access_token', session.access_token)
-        }
-
-        if (event !== 'SIGNED_OUT') {
-          const p = await fetchUserRoleAndSubscription(session.user.id, session.user.email!)
-          if (mounted) {
-            const uObj = { ...session.user, ...p } as User
-            localStorage.setItem('auth_user', JSON.stringify(uObj))
-            setUser(uObj)
-            setLoading(false)
+      try {
+        if (session?.user) {
+          if (session.access_token) {
+            localStorage.setItem('access_token', session.access_token)
           }
+
+          if (event !== 'SIGNED_OUT') {
+            // IMMEDIATE: Set user with basic info so app can proceed
+            const basicUser = { ...session.user } as User
+            setUser(prev => prev ? { ...prev, ...basicUser } : basicUser)
+            setLoading(false)
+
+            // BACKGROUND: Fetch extra profile/sub info
+            const p = await fetchUserRoleAndSubscription(session.user.id, session.user.email!)
+            if (mounted) {
+              const uObj = { ...session.user, ...p } as User
+              localStorage.setItem('auth_user', JSON.stringify(uObj))
+              setUser(uObj)
+            }
+          }
+        } else if (event === 'SIGNED_OUT' || (event === 'INITIAL_SESSION' && !session)) {
+          localStorage.removeItem('auth_user')
+          localStorage.removeItem('access_token')
+          setUser(null)
+          setLoading(false)
+        } else {
+          setLoading(false)
         }
-      } else if (event === 'SIGNED_OUT' || (event === 'INITIAL_SESSION' && !session)) {
-        localStorage.removeItem('auth_user')
-        localStorage.removeItem('access_token')
-        setUser(null)
+      } catch (err) {
+        console.error('[Auth Context] Error in listener:', err)
         setLoading(false)
-      } else {
-        if (mounted) setLoading(false)
       }
     })
 
@@ -143,6 +153,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const p = await fetchUserRoleAndSubscription(user.id, user.email, true)
         if (user) setUser({ ...user, ...p })
         return { hasActiveSubscription: p.hasActiveSubscription, role: p.role, debugReason: p.debugReason }
+        // - [x] Fix build error and propagate debugReason in refresh <!-- id: 20 -->
+        // - [/] Fix authentication hangs and performance <!-- id: 56 -->
+        //     - [ ] Decouple profile fetch from initial loading in AuthContext <!-- id: 57 -->
+        //     - [ ] Streamline backend login probes in auth.ts <!-- id: 58 -->
+        //     - [ ] Shorten connection timeouts in supabaseConnection.ts <!-- id: 59 -->
+        //     - [ ] Verify fix by monitoring dashboard transition speed <!-- id: 60 -->
       }
     }}>
       {children}
