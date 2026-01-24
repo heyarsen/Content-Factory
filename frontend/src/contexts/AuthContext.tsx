@@ -52,7 +52,7 @@ const fetchUserRoleAndSubscription = async (userId: string, userEmail: string, f
       const active = ['active', 'pending'].includes(latestSub.status)
       const expired = latestSub.expires_at && new Date(latestSub.expires_at).getTime() < Date.now()
       hasActive = active && !expired
-      reason = `Sub: ${latestSub.status}${expired ? ' (EXP)' : ''}`
+      reason = `Sub Table: ${latestSub.status}${expired ? ' (EXP)' : ''}`
     } else if (profileData?.has_active_subscription) {
       hasActive = true; reason = 'Profile Flag'
     }
@@ -73,12 +73,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true
 
-    // 1. Initial State
+    // 1. Initial State from storage
     const stored = localStorage.getItem('auth_user')
     if (stored) {
       try {
         const u = JSON.parse(stored)
-        console.log('[Auth] Init from storage:', u.email)
         setUser(u)
         setLoading(false)
         fetchUserRoleAndSubscription(u.id, u.email).then(p => {
@@ -87,21 +86,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (e) { localStorage.removeItem('auth_user') }
     }
 
-    // 2. Listener
+    // 2. Powerful Listener that keeps BOTH localStorage and State in sync
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log(`[Auth] TRACE: Event=${event} Session=${!!session}`)
+      console.log(`[Auth] Listener Event: ${event} Session: ${!!session}`)
+
       if (!mounted) return
 
-      if (session?.user && (event !== 'SIGNED_OUT')) {
-        const p = await fetchUserRoleAndSubscription(session.user.id, session.user.email!)
-        if (mounted) {
-          const uObj = { ...session.user, ...p } as User
-          localStorage.setItem('auth_user', JSON.stringify(uObj))
-          setUser(uObj)
-          setLoading(false)
+      if (session?.user) {
+        // ALWAYS update the access_token in localStorage so api.ts can find it
+        if (session.access_token) {
+          console.log('[Auth] Token Refreshed in storage')
+          localStorage.setItem('access_token', session.access_token)
         }
-      } else if (event === 'SIGNED_OUT') {
-        console.trace('[Auth] SIGNED_OUT TRACE - clearing user')
+
+        if (event !== 'SIGNED_OUT') {
+          const p = await fetchUserRoleAndSubscription(session.user.id, session.user.email!)
+          if (mounted) {
+            const uObj = { ...session.user, ...p } as User
+            localStorage.setItem('auth_user', JSON.stringify(uObj))
+            setUser(uObj)
+            setLoading(false)
+          }
+        }
+      } else if (event === 'SIGNED_OUT' || (event === 'INITIAL_SESSION' && !session)) {
+        console.log('[Auth] Clearing session state')
         localStorage.removeItem('auth_user')
         localStorage.removeItem('access_token')
         setUser(null)
@@ -123,7 +131,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async () => {
-    console.trace('[Auth] Manual SignOut Trace')
     localStorage.removeItem('auth_user')
     localStorage.removeItem('access_token')
     setUser(null)

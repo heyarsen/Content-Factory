@@ -16,16 +16,20 @@ export async function authenticate(
 ) {
   try {
     const authHeader = req.headers.authorization
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+
+    // Log the existence of the authorization header (but not the sensitive value)
+    if (!authHeader) {
+      console.warn(`[Auth Debug] MISSING Authorization header for req: ${req.path}`)
+      console.log(`[Auth Debug] All received headers:`, JSON.stringify(req.headers))
+      return res.status(401).json({ error: 'Missing token' })
+    }
+
+    if (!authHeader.startsWith('Bearer ')) {
+      console.warn(`[Auth Debug] MALFORMED Authorization header for req: ${req.path}`)
       return res.status(401).json({ error: 'Missing token' })
     }
 
     const token = authHeader.substring(7)
-
-    // DEBUG: Log first bit of project URL to check for mismatch
-    const subUrl = (process.env.SUPABASE_URL || '').substring(0, 30)
-    console.log(`[Auth Debug] Verifying token against URL: ${subUrl}...`)
-
     const { data: { user }, error } = await retrySupabaseOperation(
       () => supabase.auth.getUser(token),
       2,
@@ -33,11 +37,12 @@ export async function authenticate(
     )
 
     if (error || !user) {
-      console.warn('[Auth Debug] Token rejection:', error?.message || 'No user returned')
+      const projId = process.env.SUPABASE_URL?.split('//')[1]?.split('.')[0]
+      console.warn(`[Auth Debug] Token rejected for ${req.path}: ${error?.message || 'No user'}`)
       return res.status(401).json({
         error: 'Invalid token',
         details: error?.message,
-        projectId: process.env.SUPABASE_URL?.split('//')[1]?.split('.')[0]
+        projectId: projId
       })
     }
 
@@ -49,7 +54,7 @@ export async function authenticate(
     const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', user.id).maybeSingle()
     req.role = profile?.role || 'user'
 
-    console.log(`[Auth Debug] Success: ${user.email} Role: ${req.role}`)
+    console.log(`[Auth Debug] OK: ${user.email} -> ${req.path}`)
     next()
   } catch (error: any) {
     console.error('[Auth Debug] Critical Error:', error.message)

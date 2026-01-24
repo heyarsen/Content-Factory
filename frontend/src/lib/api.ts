@@ -11,7 +11,13 @@ const api = axios.create({
 
 api.interceptors.request.use(async (config) => {
   const token = localStorage.getItem('access_token')
-  if (token) config.headers.Authorization = `Bearer ${token}`
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  } else {
+    console.warn(`[API DEBUG] No token found in localStorage for ${config.url}`)
+  }
+
   return config
 })
 
@@ -21,12 +27,13 @@ api.interceptors.response.use(
     if (err.response?.status === 401) {
       const url = err.config?.url || 'unknown'
       const projectId = err.response.data?.projectId
+      const errorMsg = err.response.data?.error
 
-      console.warn(`[API TRACE] 401 on ${url}. Backend Project: ${projectId}`)
+      console.error(`[API 401 ERROR] ${url} | Server message: ${errorMsg} | Backend Project: ${projectId}`)
 
       // Dispatch custom event for Layout.tsx to pick up
       window.dispatchEvent(new CustomEvent('api-401-detail', {
-        detail: { projectId, url }
+        detail: { projectId, url, errorMsg }
       }))
     }
     return Promise.reject(err)
