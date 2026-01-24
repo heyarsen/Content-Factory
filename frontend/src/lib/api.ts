@@ -47,24 +47,13 @@ api.interceptors.response.use(
 
     if (error.code === 'ECONNABORTED' || error.message === 'Network Error' || !error.response) {
       console.error('Network error:', error.message)
-      if (!error.config?.url?.includes('/api/auth/login')) {
-        return Promise.reject(error)
-      }
+      return Promise.reject(error)
     }
 
     if (error.response?.status === 401) {
       const url = error.config?.url || 'unknown'
-      console.warn(`[API] 401 Unauthorized on ${url}`)
-
-      // DO NOT wipe the session for these common background calls
-      const isBackgroundCheck = ['/api/credits', '/api/auth/profile'].some(path => url.includes(path))
-
-      if (!isBackgroundCheck && !window.location.pathname.includes('/login')) {
-        console.error('[API] Critical 401 - clearing auth and redirecting')
-        localStorage.removeItem('access_token')
-        localStorage.removeItem('auth_user')
-        window.location.href = '/login'
-      }
+      console.warn(`[API TRACE] 401 Unauthorized on ${url}. NO AUTO-LOGOUT TRIGGERED.`)
+      // I've removed the clear logout here to see if users stay logged in.
     }
     return Promise.reject(error)
   }

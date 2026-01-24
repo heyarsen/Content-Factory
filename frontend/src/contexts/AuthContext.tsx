@@ -3,7 +3,6 @@ import { supabase } from '../lib/supabase'
 import api from '../lib/api'
 
 const profileCache = new Map<string, { data: any; timestamp: number }>()
-const CACHE_DURATION = 5 * 60 * 1000
 
 interface User {
   id: string
@@ -29,16 +28,12 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 const fetchUserRoleAndSubscription = async (userId: string, userEmail: string, forceRefresh: boolean = false) => {
-  const cached = profileCache.get(userId)
-  if (!forceRefresh && cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    return cached.data
-  }
   if (forceRefresh) profileCache.delete(userId)
+  const cached = profileCache.get(userId)
+  if (!forceRefresh && cached && Date.now() - cached.timestamp < 300000) return cached.data
 
   try {
-    console.log('[Auth] FETCH START:', { userId, email: userEmail })
-    const isAdminEmail = userEmail === 'heyarsen@icloud.com'
-
+    console.log('[Auth] Fetching Profile:', userEmail)
     const [profileRes, subRes] = await Promise.all([
       supabase.from('user_profiles').select('role, has_active_subscription').eq('id', userId).maybeSingle(),
       supabase.from('user_subscriptions').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle()
@@ -46,36 +41,28 @@ const fetchUserRoleAndSubscription = async (userId: string, userEmail: string, f
 
     const profileData = profileRes.data
     const latestSub = subRes.data
-    const role = isAdminEmail ? 'admin' : (profileData?.role || 'user')
-    let hasActiveSubscription = false
-    let debugReason = 'UNKNOWN'
+    const isAdmin = userEmail === 'heyarsen@icloud.com' || profileData?.role === 'admin'
 
-    if (role === 'admin') {
-      hasActiveSubscription = true
-      debugReason = 'Admin Bypass'
+    let hasActive = false
+    let reason = 'NONE'
+
+    if (isAdmin) {
+      hasActive = true; reason = 'Admin'
     } else if (latestSub) {
-      const isStatusValid = ['active', 'pending'].includes(latestSub.status)
-      let isExpired = false
-      if (latestSub.expires_at) {
-        isExpired = new Date(latestSub.expires_at).getTime() < Date.now()
-      }
-      hasActiveSubscription = isStatusValid && !isExpired
-      debugReason = `Sub Table: ${latestSub.status}${isExpired ? ' (EXPIRED)' : ''}`
+      const active = ['active', 'pending'].includes(latestSub.status)
+      const expired = latestSub.expires_at && new Date(latestSub.expires_at).getTime() < Date.now()
+      hasActive = active && !expired
+      reason = `Sub: ${latestSub.status}${expired ? ' (EXP)' : ''}`
     } else if (profileData?.has_active_subscription) {
-      hasActiveSubscription = true
-      debugReason = 'Profile Flag (Legacy)'
-    } else {
-      hasActiveSubscription = false
-      debugReason = 'No active records'
+      hasActive = true; reason = 'Profile Flag'
     }
 
-    const result = { role, hasActiveSubscription, debugReason, rawLatestSub: latestSub }
-    console.log('[Auth] FETCH COMPLETE:', result)
-    profileCache.set(userId, { data: result, timestamp: Date.now() })
-    return result
+    const res = { role: isAdmin ? 'admin' : 'user', hasActiveSubscription: hasActive, debugReason: reason, rawLatestSub: latestSub }
+    profileCache.set(userId, { data: res, timestamp: Date.now() })
+    return res
   } catch (err) {
-    console.error('[Auth] FETCH ERROR:', err)
-    return { role: 'user', hasActiveSubscription: false, debugReason: 'Error occurred' }
+    console.error('[Auth] Fetch Error:', err)
+    return { role: 'user', hasActiveSubscription: false, debugReason: 'Error' }
   }
 }
 
@@ -84,94 +71,78 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    let mounted = true;
+    let mounted = true
 
-    // 1. Immediate restore from storage
-    const storedUser = localStorage.getItem('auth_user')
-    if (storedUser) {
+    // 1. Initial State
+    const stored = localStorage.getItem('auth_user')
+    if (stored) {
       try {
-        const parsed = JSON.parse(storedUser)
-        setUser(parsed)
+        const u = JSON.parse(stored)
+        console.log('[Auth] Init from storage:', u.email)
+        setUser(u)
         setLoading(false)
-        fetchUserRoleAndSubscription(parsed.id, parsed.email).then(profile => {
-          if (mounted) {
-            const updated = { ...parsed, ...profile }
-            localStorage.setItem('auth_user', JSON.stringify(updated))
-            setUser(updated)
-          }
+        fetchUserRoleAndSubscription(u.id, u.email).then(p => {
+          if (mounted) setUser(prev => prev ? { ...prev, ...p } : null)
         })
       } catch (e) { localStorage.removeItem('auth_user') }
     }
 
-    // 2. Auth state listener
+    // 2. Listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log(`[Auth] Listener: ${event}`, !!session)
+      console.log(`[Auth] TRACE: Event=${event} Session=${!!session}`)
       if (!mounted) return
 
-      if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION')) {
-        const profile = await fetchUserRoleAndSubscription(session.user.id, session.user.email!)
+      if (session?.user && (event !== 'SIGNED_OUT')) {
+        const p = await fetchUserRoleAndSubscription(session.user.id, session.user.email!)
         if (mounted) {
-          const userObj = { ...session.user, ...profile } as User
-          localStorage.setItem('auth_user', JSON.stringify(userObj))
-          setUser(userObj)
+          const uObj = { ...session.user, ...p } as User
+          localStorage.setItem('auth_user', JSON.stringify(uObj))
+          setUser(uObj)
           setLoading(false)
         }
       } else if (event === 'SIGNED_OUT') {
+        console.trace('[Auth] SIGNED_OUT TRACE - clearing user')
         localStorage.removeItem('auth_user')
         localStorage.removeItem('access_token')
         setUser(null)
         setLoading(false)
       } else {
-        // Fallback for loading state
         if (mounted) setLoading(false)
       }
     })
 
-    return () => {
-      mounted = false
-      subscription.unsubscribe()
-    }
+    return () => { mounted = false; subscription.unsubscribe() }
   }, [])
 
-  const signUp = async (e: string, p: string, l?: string) => { await api.post('/api/auth/signup', { email: e, password: p, preferredLanguage: l }) }
-
-  const signIn = async (email: string, password: string) => {
-    const { data } = await api.post('/api/auth/login', { email, password }, { timeout: 5000 })
+  const signIn = async (e: string, p: string) => {
+    const { data } = await api.post('/api/auth/login', { email: e, password: p })
     if (data.access_token) {
       localStorage.setItem('access_token', data.access_token)
-      // JUST set session. The listener will handle state.
       await supabase.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token || data.access_token })
     }
   }
 
   const signOut = async () => {
-    if (user?.id) profileCache.delete(user.id)
+    console.trace('[Auth] Manual SignOut Trace')
     localStorage.removeItem('auth_user')
     localStorage.removeItem('access_token')
     setUser(null)
     await supabase.auth.signOut()
   }
 
-  const refreshSubscriptionStatus = async () => {
-    if (!user?.id) return { hasActiveSubscription: false, role: 'user' }
-    const profile = await fetchUserRoleAndSubscription(user.id, user.email, true)
-    if (user) {
-      const updated = { ...user, ...profile }
-      localStorage.setItem('auth_user', JSON.stringify(updated))
-      setUser(updated as User)
-    }
-    return { hasActiveSubscription: profile.hasActiveSubscription, role: profile.role, debugReason: profile.debugReason }
-  }
-
-  const signInWithGoogle = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/dashboard` } })
-    if (error) throw error
-  }
-
-  const resetPassword = async (email: string) => { await api.post('/api/auth/reset-password', { email }) }
-
   return (
-    <AuthContext.Provider value={{ user, loading, signUp, signIn, signInWithGoogle, signOut, resetPassword, refreshSubscriptionStatus }}>
+    <AuthContext.Provider value={{
+      user, loading, signOut, signIn,
+      signUp: async (e, p, l) => { await api.post('/api/auth/signup', { email: e, password: p, preferredLanguage: l }) },
+      signInWithGoogle: async () => { await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/dashboard` } }) },
+      resetPassword: async (e) => { await api.post('/api/auth/reset-password', { email: e }) },
+      refreshSubscriptionStatus: async () => {
+        if (!user) return { hasActiveSubscription: false, role: 'user' }
+        const p = await fetchUserRoleAndSubscription(user.id, user.email, true)
+        if (user) setUser({ ...user, ...p })
+        return { hasActiveSubscription: p.hasActiveSubscription, role: p.role, debugReason: p.debugReason }
+      }
+    }}>
       {children}
     </AuthContext.Provider>
   )
