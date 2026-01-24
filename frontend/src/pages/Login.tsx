@@ -38,6 +38,7 @@ export function Login() {
     try {
       console.log('[Login] Attempting sign in...')
       await signIn(email, password)
+      console.log('[Login] Sign in successful, navigating to dashboard...')
       clearTimeout(safetyTimeout)
       setOptimisticLoading(false)
       navigate('/dashboard')

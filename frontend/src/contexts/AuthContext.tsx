@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import api from '../lib/api'
 
 const profileCache = new Map<string, { data: any; timestamp: number }>()
+const pendingFetches = new Set<string>()
 
 interface User {
   id: string
@@ -31,6 +32,13 @@ const fetchUserRoleAndSubscription = async (userId: string, userEmail: string, f
   if (forceRefresh) profileCache.delete(userId)
   const cached = profileCache.get(userId)
   if (!forceRefresh && cached && Date.now() - cached.timestamp < 300000) return cached.data
+
+  if (pendingFetches.has(userId)) {
+    console.log(`[Auth] Fetch already in progress for ${userEmail}, skipping...`)
+    return cached?.data || null
+  }
+
+  pendingFetches.add(userId)
 
   console.log(`[Auth] Fetching role/sub for ${userEmail}...`)
 
@@ -70,8 +78,10 @@ const fetchUserRoleAndSubscription = async (userId: string, userEmail: string, f
     const res = { role: isAdmin ? 'admin' : 'user', hasActiveSubscription: hasActive, debugReason: reason, rawLatestSub: latestSub }
     console.log(`[Auth] Role/sub fetched for ${userEmail}:`, { role: res.role, hasActive: res.hasActiveSubscription, reason })
     profileCache.set(userId, { data: res, timestamp: Date.now() })
+    pendingFetches.delete(userId)
     return res
   } catch (err: any) {
+    pendingFetches.delete(userId)
     console.error('[Auth] Profile Fetch Error or Timeout:', err)
     return { role: 'user', hasActiveSubscription: false, debugReason: err.message === 'Profile fetch timeout' ? 'Timeout' : 'Error' }
   }
@@ -141,6 +151,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data } = await api.post('/api/auth/login', { email: e, password: p })
     if (data.access_token) {
       localStorage.setItem('access_token', data.access_token)
+
+      // If profile data is provided in the response, cache it
+      if (data.user && data.profile) {
+        console.log('[Auth] Profile data received in login response:', data.profile)
+        profileCache.set(data.user.id, { data: data.profile, timestamp: Date.now() })
+        const uObj = { ...data.user, ...data.profile } as User
+        localStorage.setItem('auth_user', JSON.stringify(uObj))
+        setUser(uObj)
+      }
+
       await supabase.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token || data.access_token })
     }
   }

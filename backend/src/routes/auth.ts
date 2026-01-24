@@ -291,16 +291,19 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'Failed to create session' })
     }
 
-    console.log(`[Auth] Login successful for ${email}`, {
-      userId: data.user?.id,
-      hasAccessToken: !!data.session.access_token,
-      hasRefreshToken: !!data.session.refresh_token,
-    })
+    // Fetch profile and subscription info for the response
+    const { data: profile } = await supabase.from('user_profiles').select('role, has_active_subscription').eq('id', data.user.id).maybeSingle()
+    const { data: latestSub } = await supabase.from('user_subscriptions').select('*').eq('user_id', data.user.id).order('created_at', { ascending: false }).limit(1).maybeSingle()
 
     res.json({
       access_token: data.session.access_token,
       refresh_token: data.session.refresh_token,
       user: data.user,
+      profile: {
+        role: (data.user.email === 'heyarsen@icloud.com' || profile?.role === 'admin') ? 'admin' : 'user',
+        hasActiveSubscription: !!profile?.has_active_subscription || (data.user.email === 'heyarsen@icloud.com'),
+        debugReason: profile?.has_active_subscription ? 'Profile Flag' : (latestSub ? `Sub: ${latestSub.status}` : 'No Sub'),
+      }
     })
   } catch (error: any) {
     console.error('[Auth] Login exception:', {
