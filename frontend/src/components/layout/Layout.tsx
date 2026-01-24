@@ -1,15 +1,7 @@
 import { ReactNode, useState } from 'react'
 import { Header } from './Header'
 import { Sidebar } from './Sidebar'
-import {
-  Settings,
-  LogOut,
-  Menu,
-  X,
-  CreditCard,
-  User,
-  Info // Use Info instead of Bug to be safe
-} from 'lucide-react'
+import { Info } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 
 interface LayoutProps {
