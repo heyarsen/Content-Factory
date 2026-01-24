@@ -121,13 +121,10 @@ export async function requireSubscription(
       method: req.method
     })
 
-    // Allow admins to bypass subscription check - COMMENTED OUT FOR STRICT ENFORCEMENT
-    /*
     if (userRole === 'admin') {
       console.log('[Subscription Middleware] Admin bypass for user:', userId)
       return next()
     }
-    */
 
     // Import SubscriptionService to check subscription status
     const { SubscriptionService } = await import('../services/subscriptionService.js')

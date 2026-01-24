@@ -100,13 +100,19 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
       resultsLength: results.length
     })
 
+    // A user has an active subscription if:
+    // 1. User is an admin (BYPASS)
+    // 2. Profile has the flag set (most reliable fallback if DB sync is slow)
+    // 3. There's a confirmed completed sub in use_subscriptions table
+    // 4. Fallback: sub table has 'active' but failed payment status (matches backend service logic)
+
+    const role = isAdminEmail ? 'admin' : (profileData?.role || 'user')
+
     // A user has an active subscription if they have an 'active' record in user_subscriptions (completed OR failed payment fallback)
-    // We NO LONGER rely on profileData.has_active_subscription as it can be stale
-    // PENDING subscriptions are NOT counted to match backend strict enforcement
-    const hasActiveSubscription = !!(
-      subCompletedData ||
-      subFailedData
-    )
+    // or if the profile record has the flag (fallback) or if they are an admin
+    const hasActiveSubscription = (role === 'admin') ||
+      !!profileData?.has_active_subscription ||
+      !!(subCompletedData || subFailedData)
 
     console.log('[Auth] Final subscription check result:', {
       userId,
@@ -123,11 +129,7 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
       }
     })
 
-    // A user is an admin if:
-    // - their email is the admin email OR
-    // - user_profiles says they are an admin
-    let role = profileData?.role || 'user'
-    if (isAdminEmail) role = 'admin'
+    // role is already determined above
 
     console.log(`[Auth] Determined for ${userId}:`, {
       role,

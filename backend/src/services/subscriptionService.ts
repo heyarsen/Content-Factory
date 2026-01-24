@@ -138,13 +138,18 @@ export class SubscriptionService {
       .eq('id', userId)
       .maybeSingle()
 
-    /* 
-    // Optimization disabled for strict enforcement: always check the source of truth
-    if (!profileError && profile?.has_active_subscription) {
-      console.log('[Subscription] Found active subscription in user_profiles:', userId)
-      return true
+    // Optimization: Trust user_profiles table for cached subscription status if it's true
+    // OR if user is an admin
+    if (!profileError) {
+      if (profile?.has_active_subscription) {
+        console.log('[Subscription] Found active subscription in user_profiles flag:', userId)
+        return true
+      }
+      if (profile?.role === 'admin') {
+        console.log('[Subscription] Admin bypass in hasActiveSubscription:', userId)
+        return true
+      }
     }
-    */
 
     // Fallback: Check user_subscriptions table directly with multiple queries (matches frontend logic)
     const results = await Promise.allSettled([

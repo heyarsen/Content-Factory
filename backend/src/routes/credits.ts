@@ -72,28 +72,31 @@ router.get('/subscription-status', authenticate, async (req: AuthRequest, res: R
     const userId = req.userId!
     console.log('[Credits API] Getting subscription status for user:', userId)
 
-    const subscription = await SubscriptionService.getUserSubscription(userId)
-    const hasSubscription = subscription !== null
-
-    // Also check user profile to ensure consistency
     const { data: profile } = await supabase
       .from('user_profiles')
-      .select('has_active_subscription, current_subscription_id, credits')
+      .select('role, has_active_subscription, current_subscription_id, credits')
       .eq('id', userId)
       .single()
+
+    const subscription = await SubscriptionService.getUserSubscription(userId)
+
+    const hasSubscription = (profile?.role === 'admin') ||
+      (profile?.has_active_subscription === true) ||
+      (subscription !== null)
 
     console.log('[Credits API] Subscription status:', {
       userId,
       hasSubscription,
+      role: profile?.role,
       profileHasSubscription: profile?.has_active_subscription,
       subscriptionId: subscription?.id,
       planId: subscription?.plan_id,
-      creditsRemaining: subscription?.credits_remaining,
+      creditsRemaining: (subscription as any)?.credits_remaining,
       userCredits: profile?.credits,
     })
 
     res.json({
-      hasSubscription: hasSubscription && profile?.has_active_subscription === true,
+      hasSubscription,
       subscription
     })
   } catch (error: any) {
