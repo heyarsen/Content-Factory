@@ -56,11 +56,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       />
 
       <aside
-        className={`fixed z-40 inset-y-0 left-0 w-72 transform transition-all duration-300 lg:fixed lg:translate-x-0`}
+        className={`fixed inset-y-0 left-0 z-40 w-72 transform transition-all duration-300 lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
+          } ${!isOpen ? 'pointer-events-none lg:pointer-events-auto' : ''}`}
       >
         <div
-          className={`flex h-screen flex-col border-r border-white/60 bg-white/80 px-6 py-8 backdrop-blur-xl shadow-[0_25px_70px_-35px_rgba(15,23,42,0.35)] transition-transform duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-            }`}
+          className="flex h-screen flex-col border-r border-white/60 bg-white/80 px-6 py-8 backdrop-blur-xl shadow-[0_25px_70px_-35px_rgba(15,23,42,0.35)]"
         >
           <div className="flex items-center justify-between">
             <Link to="/dashboard" className="flex items-center gap-3">

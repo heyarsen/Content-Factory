@@ -107,28 +107,9 @@ export function SocialAccounts() {
     console.log('[Social] User ID:', user?.id)
     console.log('[Social] User Email:', user?.email)
     
-    // Refresh subscription status first to get the latest data
-    const refreshResult = await refreshSubscriptionStatus()
-    const { hasActiveSubscription, role: userRole } = refreshResult
-
-    console.log('[Social] Subscription check result:', {
-      platform,
-      userId: user?.id,
-      hasActiveSubscription,
-      userRole,
-      refreshResult
-    })
-
-    // Check if user has an active subscription
-    if (!hasActiveSubscription) {
-      console.log('[Social] ❌ BLOCKING CONNECTION - NO ACTIVE SUBSCRIPTION')
-      console.log('[Social] Showing error toast...')
-      toast.error(t('social_accounts.subscription_needed_alert'))
-      console.log('[Social] === CONNECTION BLOCKED ===')
-      return
-    }
-
-    console.log('[Social] ✅ ALLOWING CONNECTION - ACTIVE SUBSCRIPTION CONFIRMED')
+    // Note: Subscription check is handled by backend middleware
+    // Frontend should not block connections - let backend handle subscription validation
+    console.log('[Social] ✅ PROCEEDING WITH CONNECTION (backend will validate subscription)')
     console.log('[Social] === CONNECTION PROCEEDING ===')
     setConnectingPlatform(platform)
     try {
