@@ -702,9 +702,13 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
           let creditsBefore = null
           let creditsAfter = null
 
-          if (isRenewal) {
-            // For renewals: cancel subscription and burn credits on payment decline
-            console.log('[WayForPay] Renewal payment failed, cancelling subscription and burning credits')
+          // Terminal failure statuses from WayForPay
+          const terminalFailures = ['Declined', 'Expired', 'Refunded', 'Voided']
+          const isTerminalFailure = terminalFailures.includes(transactionStatus)
+
+          if (isRenewal && isTerminalFailure) {
+            // For renewals: cancel subscription and burn credits on terminal failure
+            console.log(`[WayForPay] Renewal payment ${transactionStatus}, cancelling subscription and burning credits`)
 
             creditsBefore = await CreditsService.getUserCredits(userId)
 
@@ -729,13 +733,16 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
               .eq('id', userId)
 
             // Burn all credits
-            await CreditsService.setCredits(userId, 0, `subscription_renewal_failed_${plan.id}_${Date.now()}`)
+            await CreditsService.setCredits(userId, 0, `subscription_renewal_failed_${transactionStatus}_${plan.id}_${Date.now()}`)
             creditsAfter = 0
 
-            console.log('[WayForPay] Subscription cancelled and credits burned due to failed renewal')
+            console.log(`[WayForPay] Subscription cancelled and credits burned due to ${transactionStatus}`)
+          } else if (isRenewal) {
+            // Renewal is not a terminal failure yet (e.g. InProcessing, WaitingAuthComplete)
+            console.log(`[WayForPay] Renewal payment status: ${transactionStatus}, no cancellation yet`)
           } else {
-            // For initial payments: only update status if still pending
-            if (subscription.status === 'pending' || subscription.payment_status !== 'completed') {
+            // For initial payments: only update status if still pending and it's a failure
+            if (isFailed && (subscription.status === 'pending' || subscription.payment_status !== 'completed')) {
               await supabase
                 .from('user_subscriptions')
                 .update({
@@ -743,9 +750,9 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
                   updated_at: new Date().toISOString(),
                 })
                 .eq('id', subscription.id)
-              console.log('[WayForPay] Pending initial payment not approved, marked as failed')
+              console.log('[WayForPay] Pending initial payment failed activation')
             } else {
-              console.log('[WayForPay] Ignoring failed payment for already-active subscription (likely a refund/expiration after activation)')
+              console.log(`[WayForPay] Ignoring ${transactionStatus} for initial activation (already active or non-failure)`)
             }
           }
 
@@ -977,11 +984,18 @@ router.post('/webhook', webhookBodyParser, async (req: any, res: Response) => {
       console.warn('[WayForPay] Unknown payment type:', orderReference)
     }
 
-    res.json({ status: 'ok' })
+    // Build and send acknowledgement response to WayForPay
+    const responseData = WayForPayService.buildWebhookResponse(orderReference)
+    console.log('[WayForPay] Sending webhook acknowledgement:', responseData)
+    res.json(responseData)
   } catch (error: any) {
     console.error('[WayForPay] Webhook error:', error.message)
-    // Always return success to WayForPay to avoid retries
-    res.json({ status: 'ok' })
+    // Even on error, try to acknowledge if we have an order reference
+    const orderReference = req.body?.orderReference || req.query?.orderReference
+    if (orderReference) {
+      return res.json(WayForPayService.buildWebhookResponse(orderReference))
+    }
+    res.json({ status: 'error', message: error.message })
   }
 })
 

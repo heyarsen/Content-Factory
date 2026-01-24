@@ -183,7 +183,7 @@ export class WayForPayService {
         merchantSignature,
         apiVersion: 1,
       }
-      
+
       // Add optional fields if they exist
       if (purchaseRequest.clientAccountId) requestBody.clientAccountId = purchaseRequest.clientAccountId
       if (purchaseRequest.clientEmail) requestBody.clientEmail = purchaseRequest.clientEmail
@@ -203,7 +203,7 @@ export class WayForPayService {
 
       // WayForPay API endpoint format: /api/purchase (or /api/v1/purchase for versioned API)
       const apiEndpoint = `${config.apiUrl}/purchase`
-      
+
       const response = await axios.post<WayForPayPurchaseResponse>(
         apiEndpoint,
         requestBody,
@@ -366,14 +366,14 @@ export class WayForPayService {
     }
 
     const config = this.getConfig()
-    
+
     // Filter out undefined/null values and build signature fields
     const signatureFields: string[] = []
-    
+
     // Standard WayForPay callback signature fields in order
     const fieldNames = [
       'merchantAccount',
-      'orderReference', 
+      'orderReference',
       'amount',
       'currency',
       'authCode',
@@ -388,6 +388,36 @@ export class WayForPayService {
     }
 
     return this.verifySignature(signatureFields, data.merchantSignature)
+  }
+
+  /**
+   * Generate signature for webhook acknowledgment response
+   * Format: orderReference;status;time
+   */
+  static generateResponseSignature(orderReference: string, status: string, time: number): string {
+    const config = this.getConfig()
+    const fields = [orderReference, status, time.toString()]
+    const message = fields.join(';')
+    return crypto
+      .createHmac('md5', config.merchantSecretKey)
+      .update(message)
+      .digest('hex')
+  }
+
+  /**
+   * Build standard webhook acknowledgment response
+   */
+  static buildWebhookResponse(orderReference: string): any {
+    const status = 'accept'
+    const time = Math.floor(Date.now() / 1000)
+    const signature = this.generateResponseSignature(orderReference, status, time)
+
+    return {
+      orderReference,
+      status,
+      time,
+      signature,
+    }
   }
 }
 
