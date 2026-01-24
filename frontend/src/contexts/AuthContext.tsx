@@ -12,6 +12,7 @@ interface User {
   email_confirmed_at?: string
   role?: 'user' | 'admin'
   hasActiveSubscription?: boolean
+  subStatusReason?: string // New field for debugging
 }
 
 interface AuthContextType {
@@ -50,7 +51,7 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
     const userEmail = authUser?.email
     const isAdminEmail = userEmail === 'heyarsen@icloud.com'
 
-    // 2. Query user_profiles and user_subscriptions in parallel for robustness
+    // 2. Query user_profiles and the LATEST subscription record
     const results = await Promise.allSettled([
       supabase
         .from('user_profiles')
@@ -59,101 +60,54 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
         .maybeSingle(),
       supabase
         .from('user_subscriptions')
-        .select('status, payment_status, created_at, expires_at')
+        .select('id, status, payment_status, created_at, expires_at')
         .eq('user_id', userId)
-        .eq('status', 'active')
-        .eq('payment_status', 'completed')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      // Fallback 1: active status with failed payment status (matches backend service logic)
-      supabase
-        .from('user_subscriptions')
-        .select('status, payment_status, created_at, expires_at')
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .eq('payment_status', 'failed')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      // Fallback 2: pending status (gateway might be slow) - ENABLED for testing/ux
-      supabase
-        .from('user_subscriptions')
-        .select('status, payment_status, created_at, expires_at')
-        .eq('user_id', userId)
-        .eq('status', 'pending')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
     ])
 
     const profileData = results[0].status === 'fulfilled' ? (results[0].value as any).data : null
-    const subCompletedData = results[1].status === 'fulfilled' ? (results[1].value as any).data : null
-    const subFailedData = results[2].status === 'fulfilled' ? (results[2].value as any).data : null
-    const subPendingData = results[3].status === 'fulfilled' ? (results[3].value as any).data : null
+    const latestSub = results[1].status === 'fulfilled' ? (results[1].value as any).data : null
 
     console.log('[Auth] Raw query results:', {
       profileData,
-      subCompletedData,
-      subFailedData,
-      subPendingData,
+      latestSub,
       resultsLength: results.length
     })
 
-    // A user has an active subscription if:
-    // 1. User is an admin (BYPASS)
-    // 2. Profile has the flag set (most reliable fallback if DB sync is slow)
-    // 3. There's a confirmed completed sub in use_subscriptions table
-    // 4. Fallback: sub table has 'active' but failed payment status (matches backend service logic)
-
     const role = isAdminEmail ? 'admin' : (profileData?.role || 'user')
+    let hasActiveSubscription = false
+    let subStatusReason = 'No subscription found'
 
-    // A user has an active subscription if they have an 'active' record in user_subscriptions (completed OR failed payment fallback)
-    // OR if they have a 'pending' record (for testing/slow gateways)
-    // or if the profile record has the flag (fallback) or if they are an admin
-    const hasActiveSubscription = (role === 'admin') ||
-      !!profileData?.has_active_subscription ||
-      !!(subCompletedData || subFailedData || subPendingData)
+    if (role === 'admin') {
+      hasActiveSubscription = true
+      subStatusReason = 'Admin Bypass'
+    } else if (profileData?.has_active_subscription) {
+      hasActiveSubscription = true
+      subStatusReason = 'Profile Flag (Synced)'
+    } else if (latestSub) {
+      // ONLY check the latest record. If it's cancelled, the user is cancelled.
+      const isAllowedStatus = ['active', 'pending'].includes(latestSub.status)
+      hasActiveSubscription = isAllowedStatus
+      subStatusReason = `Latest record: ${latestSub.status}`
+    }
 
     console.log('[Auth] Final subscription check result:', {
       userId,
       hasActiveSubscription,
-      reason: {
-        profileData: !!profileData?.has_active_subscription,
-        subCompletedData: !!subCompletedData,
-        subFailedData: !!subFailedData
-      },
-      details: {
-        profileData,
-        subCompletedData,
-        subFailedData
-      }
+      subStatusReason,
+      latestSub
     })
 
-    // role is already determined above
-
-    console.log(`[Auth] Determined for ${userId}:`, {
-      role,
-      hasActiveSubscription,
-      profileHasSub: profileData?.has_active_subscription,
-      dbSubCompleted: !!subCompletedData,
-      dbSubFailed: !!subFailedData,
-      isAdminEmail,
-      subDetails: {
-        completed: subCompletedData ? { status: subCompletedData.status, payment: subCompletedData.payment_status } : null,
-        failed: subFailedData ? { status: subFailedData.status, payment: subFailedData.payment_status } : null
-      }
-    })
-
-    const result = { role, hasActiveSubscription }
+    const result = { role, hasActiveSubscription, subStatusReason }
 
     console.log('[Auth] Robust profile check completed:', {
       userId,
       ...result,
       source: {
         profileHasSub: !!profileData?.has_active_subscription,
-        subCompletedTable: !!subCompletedData,
-        subFailedTable: !!subFailedData,
+        latestSubStatus: latestSub?.status,
         profileRole: profileData?.role,
         isAdminEmail
       }
@@ -195,7 +149,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const updatedUser = {
               ...parsedUser,
               role: profile.role as 'user' | 'admin',
-              hasActiveSubscription: profile.hasActiveSubscription || false
+              hasActiveSubscription: profile.hasActiveSubscription || false,
+              subStatusReason: profile.subStatusReason
             }
             localStorage.setItem('auth_user', JSON.stringify(updatedUser))
             setUser(updatedUser)
@@ -238,7 +193,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (profileResult.status === 'fulfilled') {
               role = profileResult.value.role as 'user' | 'admin'
               hasActiveSubscription = profileResult.value.hasActiveSubscription || false
-              console.log('[Auth] User profile fetched in parallel:', { role, hasActiveSubscription })
+              const subStatusReason = profileResult.value.subStatusReason
+              console.log('[Auth] User profile fetched in parallel:', { role, hasActiveSubscription, subStatusReason })
             } else {
               console.warn('[Auth] Profile fetch failed, using defaults')
             }
@@ -280,7 +236,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (profileResult.status === 'fulfilled') {
             role = profileResult.value.role as 'user' | 'admin'
             hasActiveSubscription = profileResult.value.hasActiveSubscription || false
-            console.log('[Auth] User profile fetched on state change:', { role, hasActiveSubscription })
+            const subStatusReason = profileResult.value.subStatusReason
+            console.log('[Auth] User profile fetched on state change:', { role, hasActiveSubscription, subStatusReason })
           } else {
             console.warn('[Auth] Profile fetch failed on state change, using defaults')
           }
@@ -330,7 +287,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('access_token', data.access_token)
 
         // Set user immediately with basic data, fetch role in background
-        let userWithRole = { ...data.user, role: 'user' as const, hasActiveSubscription: false }
+        let userWithRole = {
+          ...data.user,
+          role: 'user' as const,
+          hasActiveSubscription: false,
+          subStatusReason: 'Checking status...'
+        }
         setUser(userWithRole)
         localStorage.setItem('auth_user', JSON.stringify(userWithRole))
 
@@ -339,7 +301,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const updatedUser = {
             ...data.user,
             role: profile.role as 'user' | 'admin',
-            hasActiveSubscription: profile.hasActiveSubscription || false
+            hasActiveSubscription: profile.hasActiveSubscription || false,
+            subStatusReason: profile.subStatusReason
           }
           localStorage.setItem('auth_user', JSON.stringify(updatedUser))
           setUser(updatedUser)

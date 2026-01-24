@@ -44,6 +44,7 @@ export function Layout({ children }: LayoutProps) {
           <div className={user?.hasActiveSubscription ? 'text-green-400' : 'text-red-400'}>
             Subscription: {String(user?.hasActiveSubscription)}
           </div>
+          <div className="text-[10px] text-slate-400 italic">Reason: {user?.subStatusReason}</div>
           <div>Role: {user?.role}</div>
         </div>
       </div>

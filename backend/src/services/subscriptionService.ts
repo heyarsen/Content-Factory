@@ -151,50 +151,25 @@ export class SubscriptionService {
       }
     }
 
-    // Fallback: Check user_subscriptions table directly with multiple queries (matches frontend logic)
-    const results = await Promise.allSettled([
-      // Active subscription with completed payment
-      supabase
-        .from('user_subscriptions')
-        .select('id, status, payment_status')
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .eq('payment_status', 'completed')
-        .limit(1)
-        .maybeSingle(),
-      // Active subscription with failed payment (late refund webhook fallback)
-      supabase
-        .from('user_subscriptions')
-        .select('id, status, payment_status')
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .eq('payment_status', 'failed')
-        .limit(1)
-        .maybeSingle(),
-      // Pending subscription ENABLED for user testing/slow gateways
-      supabase
-        .from('user_subscriptions')
-        .select('id, status, payment_status')
-        .eq('user_id', userId)
-        .eq('status', 'pending')
-        .limit(1)
-        .maybeSingle()
-    ])
+    // Fallback: Check user_subscriptions table directly for the LATEST record
+    const { data: latestSub, error: subError } = await supabase
+      .from('user_subscriptions')
+      .select('id, status, payment_status')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
-    const completedSub = results[0].status === 'fulfilled' ? (results[0].value as any).data : null
-    const failedSub = results[1].status === 'fulfilled' ? (results[1].value as any).data : null
-    const pendingSub = results[2].status === 'fulfilled' ? (results[2].value as any).data : null
-
-    const hasActiveSub = !!(completedSub || failedSub || pendingSub)
+    // If latest is active or pending, it's considered active
+    const hasActiveSub = !!latestSub && ['active', 'pending'].includes(latestSub.status)
 
     console.log('[Subscription] FINAL check result for', userId, ':', {
       hasActiveSub,
       profileHasActive: profile?.has_active_subscription,
-      completedSub: completedSub?.id,
-      failedSub: failedSub?.id,
-      completedSubDetails: completedSub,
-      failedSubDetails: failedSub,
-      profileError: profileError?.message
+      latestSubId: latestSub?.id,
+      latestSubStatus: latestSub?.status,
+      profileError: profileError?.message,
+      subError: subError?.message
     })
 
     return hasActiveSub
