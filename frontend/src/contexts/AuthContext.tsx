@@ -33,7 +33,6 @@ const fetchUserRoleAndSubscription = async (userId: string, userEmail: string, f
   if (!forceRefresh && cached && Date.now() - cached.timestamp < 300000) return cached.data
 
   try {
-    console.log('[Auth] Fetching Profile:', userEmail)
     const [profileRes, subRes] = await Promise.all([
       supabase.from('user_profiles').select('role, has_active_subscription').eq('id', userId).maybeSingle(),
       supabase.from('user_subscriptions').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle()
@@ -52,7 +51,7 @@ const fetchUserRoleAndSubscription = async (userId: string, userEmail: string, f
       const active = ['active', 'pending'].includes(latestSub.status)
       const expired = latestSub.expires_at && new Date(latestSub.expires_at).getTime() < Date.now()
       hasActive = active && !expired
-      reason = `Sub Table: ${latestSub.status}${expired ? ' (EXP)' : ''}`
+      reason = `Sub: ${latestSub.status}${expired ? ' (EXP)' : ''}`
     } else if (profileData?.has_active_subscription) {
       hasActive = true; reason = 'Profile Flag'
     }
@@ -73,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true
 
-    // 1. Initial State from storage
+    // Restore from storage
     const stored = localStorage.getItem('auth_user')
     if (stored) {
       try {
@@ -86,16 +85,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (e) { localStorage.removeItem('auth_user') }
     }
 
-    // 2. Powerful Listener that keeps BOTH localStorage and State in sync
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log(`[Auth] Listener Event: ${event} Session: ${!!session}`)
-
       if (!mounted) return
 
       if (session?.user) {
-        // ALWAYS update the access_token in localStorage so api.ts can find it
         if (session.access_token) {
-          console.log('[Auth] Token Refreshed in storage')
           localStorage.setItem('access_token', session.access_token)
         }
 
@@ -109,7 +103,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
       } else if (event === 'SIGNED_OUT' || (event === 'INITIAL_SESSION' && !session)) {
-        console.log('[Auth] Clearing session state')
         localStorage.removeItem('auth_user')
         localStorage.removeItem('access_token')
         setUser(null)

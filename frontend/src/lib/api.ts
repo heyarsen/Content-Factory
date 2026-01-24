@@ -9,32 +9,23 @@ const api = axios.create({
   timeout: 300000,
 })
 
+// Ensures Authorization header is always added if token exists
 api.interceptors.request.use(async (config) => {
   const token = localStorage.getItem('access_token')
-
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
-  } else {
-    console.warn(`[API DEBUG] No token found in localStorage for ${config.url}`)
   }
-
   return config
 })
 
+// Common response handling
 api.interceptors.response.use(
   (res) => res,
   async (err) => {
     if (err.response?.status === 401) {
-      const url = err.config?.url || 'unknown'
-      const projectId = err.response.data?.projectId
-      const errorMsg = err.response.data?.error
-
-      console.error(`[API 401 ERROR] ${url} | Server message: ${errorMsg} | Backend Project: ${projectId}`)
-
-      // Dispatch custom event for Layout.tsx to pick up
-      window.dispatchEvent(new CustomEvent('api-401-detail', {
-        detail: { projectId, url, errorMsg }
-      }))
+      // If we get a 401, we don't automatically log out anymore to prevent loops,
+      // but we should probably inform the user or handle it gracefully in components.
+      console.warn(`[API] 401 Unauthorized on ${err.config?.url}`)
     }
     return Promise.reject(err)
   }

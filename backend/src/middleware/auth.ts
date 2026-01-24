@@ -16,16 +16,7 @@ export async function authenticate(
 ) {
   try {
     const authHeader = req.headers.authorization
-
-    // Log the existence of the authorization header (but not the sensitive value)
-    if (!authHeader) {
-      console.warn(`[Auth Debug] MISSING Authorization header for req: ${req.path}`)
-      console.log(`[Auth Debug] All received headers:`, JSON.stringify(req.headers))
-      return res.status(401).json({ error: 'Missing token' })
-    }
-
-    if (!authHeader.startsWith('Bearer ')) {
-      console.warn(`[Auth Debug] MALFORMED Authorization header for req: ${req.path}`)
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'Missing token' })
     }
 
@@ -37,27 +28,19 @@ export async function authenticate(
     )
 
     if (error || !user) {
-      const projId = process.env.SUPABASE_URL?.split('//')[1]?.split('.')[0]
-      console.warn(`[Auth Debug] Token rejected for ${req.path}: ${error?.message || 'No user'}`)
-      return res.status(401).json({
-        error: 'Invalid token',
-        details: error?.message,
-        projectId: projId
-      })
+      return res.status(401).json({ error: 'Invalid token' })
     }
 
     req.userId = user.id
     req.user = user
     req.userToken = token
 
-    // Get role
     const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', user.id).maybeSingle()
     req.role = profile?.role || 'user'
 
-    console.log(`[Auth Debug] OK: ${user.email} -> ${req.path}`)
     next()
   } catch (error: any) {
-    console.error('[Auth Debug] Critical Error:', error.message)
+    console.error('[Auth] Error:', error.message)
     return res.status(401).json({ error: 'Unauthorized' })
   }
 }
