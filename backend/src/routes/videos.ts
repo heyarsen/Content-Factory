@@ -1,5 +1,5 @@
 import { Router, Response } from 'express'
-import { authenticate, AuthRequest } from '../middleware/auth.js'
+import { authenticate, AuthRequest, requireSubscription } from '../middleware/auth.js'
 import { VideoService } from '../services/videoService.js'
 import OpenAI from 'openai'
 import dotenv from 'dotenv'
@@ -18,20 +18,20 @@ function handleServiceError(res: Response, error: any, fallbackMessage: string) 
   }
 
   console.error(fallbackMessage, error)
-  
+
   // Extract meaningful error message
-  const errorMessage = 
-    error?.message || 
-    error?.response?.data?.message || 
+  const errorMessage =
+    error?.message ||
+    error?.response?.data?.message ||
     error?.response?.data?.error?.message ||
     error?.response?.data?.error ||
     (typeof error === 'string' ? error : 'Internal server error')
-  
+
   return res.status(500).json({ error: errorMessage })
 }
 
 // Generate video
-router.post('/generate', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/generate', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   console.log('✅ Video generation endpoint hit!', {
     method: req.method,
     path: req.path,
@@ -39,11 +39,11 @@ router.post('/generate', authenticate, async (req: AuthRequest, res: Response) =
     userId: req.userId,
     bodyKeys: Object.keys(req.body || {}),
   })
-  
+
   try {
     const { topic, script, style, duration, avatar_id, talking_photo_id, look_id, generate_caption, aspect_ratio, dimension } = req.body
     const userId = req.userId!
-    
+
     console.log('Video generation request:', {
       userId,
       hasTopic: !!topic,
@@ -216,7 +216,7 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 })
 
 // Retry failed generation
-router.post('/:id/retry', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/:id/retry', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { id } = req.params

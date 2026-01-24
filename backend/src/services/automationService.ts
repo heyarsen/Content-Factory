@@ -386,6 +386,13 @@ export class AutomationService {
     // Only auto-create if auto_create is enabled
     if (!autoCreate) return
 
+    // Check if user has an active subscription
+    const hasActiveSub = await SubscriptionService.hasActiveSubscription(userId)
+    if (!hasActiveSub) {
+      console.log(`[Automation] Skipping video generation for plan ${planId} - user ${userId} has no active subscription`)
+      return
+    }
+
     const query = supabase
       .from('video_plan_items')
       .select('*')
@@ -2330,6 +2337,20 @@ export class AutomationService {
       isFirstBatch = false
       try {
         const firstPost = videoPosts[0]
+
+        // Check if user has an active subscription before sending posts
+        const hasActiveSub = await SubscriptionService.hasActiveSubscription(firstPost.user_id)
+        if (!hasActiveSub) {
+          console.log(`[Scheduled Posts] Skipping posts for user ${firstPost.user_id} - no active subscription`)
+          await supabase
+            .from('scheduled_posts')
+            .update({
+              status: 'failed',
+              error_message: 'Subscription expired or cancelled'
+            })
+            .in('id', videoPosts.map(p => p.id))
+          continue
+        }
 
         // Get video URL
         const { data: video } = await supabase

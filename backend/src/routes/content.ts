@@ -1,6 +1,6 @@
 import { Router, Response } from 'express'
 import { supabase } from '../lib/supabase.js'
-import { authenticate, AuthRequest } from '../middleware/auth.js'
+import { authenticate, AuthRequest, requireSubscription } from '../middleware/auth.js'
 
 const router = Router()
 
@@ -479,7 +479,7 @@ router.put('/prompts/:id', async (req: AuthRequest, res: Response) => {
 })
 
 // Scout-Research Hunter: Generate topics
-router.post('/generate-topics', async (req: AuthRequest, res: Response) => {
+router.post('/generate-topics', requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { ResearchService } = await import('../services/researchService.js')
@@ -507,7 +507,7 @@ router.post('/generate-topics', async (req: AuthRequest, res: Response) => {
 })
 
 // Research a topic
-router.post('/research', async (req: AuthRequest, res: Response) => {
+router.post('/research', requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { topic, category, content_item_id } = req.body
@@ -552,7 +552,7 @@ router.get('/items', async (req: AuthRequest, res: Response) => {
 })
 
 // A_Script Creation: Generate script from content item
-router.post('/generate-script', async (req: AuthRequest, res: Response) => {
+router.post('/generate-script', requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { content_item_id } = req.body
@@ -609,7 +609,7 @@ router.post('/generate-script', async (req: AuthRequest, res: Response) => {
 })
 
 // Quick Create: Generate script directly from user input
-router.post('/quick-create/generate-script', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/quick-create/generate-script', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { category, topic, description, whyImportant, usefulTips } = req.body
@@ -620,7 +620,7 @@ router.post('/quick-create/generate-script', authenticate, async (req: AuthReque
 
     // Look up category from database
     const normalizedCategoryKey = category.toLowerCase().trim().replace(/\s+/g, '_')
-    
+
     // Try to find category by key (exact match first, then normalized)
     let { data: categoryData } = await supabase
       .from('content_categories')
@@ -629,7 +629,7 @@ router.post('/quick-create/generate-script', authenticate, async (req: AuthReque
       .eq('status', 'active')
       .eq('category_key', category)
       .maybeSingle()
-    
+
     // If not found, try normalized key
     if (!categoryData) {
       const { data } = await supabase

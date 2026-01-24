@@ -1,12 +1,12 @@
 import { Router, Response } from 'express'
 import { supabase } from '../lib/supabase.js'
-import { authenticate, AuthRequest } from '../middleware/auth.js'
+import { authenticate, AuthRequest, requireSubscription } from '../middleware/auth.js'
 import { postVideo, getUploadStatus } from '../lib/uploadpost.js'
 
 const router = Router()
 
 // Schedule/Queue video for posting
-router.post('/schedule', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/schedule', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const { video_id, platforms, scheduled_time, caption } = req.body
     const userId = req.userId!
@@ -56,7 +56,7 @@ router.post('/schedule', authenticate, async (req: AuthRequest, res: Response) =
     try {
       // Use sharable URL if available, otherwise use direct video URL
       let videoUrlToUse = video.video_url
-      
+
       // Try to get sharable URL from HeyGen if we have a heygen_video_id
       if (video.heygen_video_id && !video.video_url?.includes('share')) {
         try {
@@ -93,16 +93,16 @@ router.post('/schedule', authenticate, async (req: AuthRequest, res: Response) =
 
       // If async upload, start polling for status updates
       const isAsync = postResponse.status === 'pending' && postResponse.upload_id
-      
+
       // Create scheduled_post record for each platform
       for (const platform of platforms) {
         const platformResult = postResponse.results?.find((r: any) => r.platform === platform)
-        
+
         // For async uploads, always start as pending
         const status = isAsync ? 'pending' :
-                      platformResult?.status === 'success' || postResponse.status === 'success' ? 'posted' : 
-                      platformResult?.status === 'failed' ? 'failed' : 'pending'
-        
+          platformResult?.status === 'success' || postResponse.status === 'success' ? 'posted' :
+            platformResult?.status === 'failed' ? 'failed' : 'pending'
+
         const { data: postData, error: postError } = await supabase
           .from('scheduled_posts')
           .insert({
@@ -138,9 +138,9 @@ router.post('/schedule', authenticate, async (req: AuthRequest, res: Response) =
       if (hasFailures) {
         const failedPosts = scheduledPosts.filter((p: any) => p.status === 'failed')
         const errorMessages = failedPosts.map((p: any) => `${p.platform}: ${p.error_message || 'Unknown error'}`).join('; ')
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: `Some posts failed: ${errorMessages}`,
-          posts: scheduledPosts 
+          posts: scheduledPosts
         })
       }
     } catch (error: any) {
@@ -150,12 +150,12 @@ router.post('/schedule', authenticate, async (req: AuthRequest, res: Response) =
         status: error.response?.status,
         stack: error.stack,
       })
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.response?.data?.error ||
-                          error.message || 
-                          'Failed to post video'
-      
+
+      const errorMessage = error.response?.data?.message ||
+        error.response?.data?.error ||
+        error.message ||
+        'Failed to post video'
+
       // Create failed records for all platforms
       for (const platform of platforms) {
         const { data: postData } = await supabase
@@ -175,11 +175,11 @@ router.post('/schedule', authenticate, async (req: AuthRequest, res: Response) =
           scheduledPosts.push(postData)
         }
       }
-      
+
       // Return error response so frontend knows it failed
-      return res.status(500).json({ 
+      return res.status(500).json({
         error: errorMessage,
-        posts: scheduledPosts 
+        posts: scheduledPosts
       })
     }
 
@@ -245,15 +245,15 @@ router.get('/:id/status', authenticate, async (req: AuthRequest, res: Response) 
     if (post.upload_post_id && (post.status === 'pending' || post.status === 'failed')) {
       try {
         const uploadPostStatus = await getUploadStatus(post.upload_post_id)
-        
+
         // Find the platform-specific result
-        const platformResult = uploadPostStatus.results?.find((r: any) => 
+        const platformResult = uploadPostStatus.results?.find((r: any) =>
           r.platform === post.platform
         )
 
         const status = platformResult?.status === 'success' || uploadPostStatus.status === 'success' ? 'posted' :
-                     platformResult?.status === 'failed' || uploadPostStatus.status === 'failed' ? 'failed' :
-                     'pending'
+          platformResult?.status === 'failed' || uploadPostStatus.status === 'failed' ? 'failed' :
+            'pending'
 
         await supabase
           .from('scheduled_posts')
@@ -343,13 +343,13 @@ async function pollUploadStatus(
       for (let i = 0; i < platforms.length && i < postIds.length; i++) {
         const platform = platforms[i]
         const postId = postIds[i]
-        
+
         const platformResult = uploadStatus.results?.find((r: any) => r.platform === platform)
-        
+
         if (platformResult) {
           const status = platformResult.status === 'success' ? 'posted' :
-                        platformResult.status === 'failed' ? 'failed' :
-                        'pending'
+            platformResult.status === 'failed' ? 'failed' :
+              'pending'
 
           await supabase
             .from('scheduled_posts')
@@ -366,7 +366,7 @@ async function pollUploadStatus(
       }
 
       // If all platforms are done (success or failed), stop polling
-      const allDone = uploadStatus.results?.every((r: any) => 
+      const allDone = uploadStatus.results?.every((r: any) =>
         r.status === 'success' || r.status === 'failed'
       ) || uploadStatus.status === 'success' || uploadStatus.status === 'failed'
 

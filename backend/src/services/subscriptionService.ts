@@ -403,6 +403,30 @@ export class SubscriptionService {
       creditsBurned: creditsBefore,
     })
 
+    // Cancel all pending scheduled posts
+    console.log('[Subscription] Cancelling all pending scheduled posts for user:', userId)
+    const { data: cancelledPosts, error: cancelPostsError } = await supabase
+      .from('scheduled_posts')
+      .update({
+        status: 'cancelled',
+        error_message: 'Subscription cancelled',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', userId)
+      .in('status', ['pending', 'scheduled'])
+      .select('id, platform, video_id')
+
+    if (cancelPostsError) {
+      console.error('[Subscription] Error cancelling scheduled posts:', cancelPostsError)
+      // Don't throw - we still want to complete the cancellation
+    } else {
+      console.log('[Subscription] Cancelled scheduled posts:', {
+        userId,
+        postsCount: cancelledPosts?.length || 0,
+        posts: cancelledPosts,
+      })
+    }
+
     console.log('[Subscription] Subscription cancelled successfully:', { userId, subscriptionId: subscription.id })
   }
 }

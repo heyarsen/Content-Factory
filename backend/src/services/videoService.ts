@@ -1011,6 +1011,11 @@ export class VideoService {
    * Create a manual video request and trigger HeyGen generation asynchronously
    */
   static async requestManualVideo(userId: string, input: ManualVideoInput): Promise<Video> {
+    // Check if user has an active subscription
+    const hasActiveSub = await SubscriptionService.hasActiveSubscription(userId)
+    if (!hasActiveSub) {
+      throw new Error('An active subscription is required to generate videos.')
+    }
     // If talking_photo_id is provided, use it directly (it's a specific look ID)
     // Otherwise, resolve the avatar context normally
     let avatarId: string | undefined
