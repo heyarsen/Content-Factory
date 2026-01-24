@@ -31,7 +31,7 @@ export function Layout({ children }: LayoutProps) {
           <button
             onClick={async () => {
               const res = await refreshSubscriptionStatus()
-              alert(`REFRESHED!\nActive: ${res.hasActiveSubscription}\nReason: ${user?.debugReason}`)
+              alert(`REFRESHED!\nActive: ${res.hasActiveSubscription}\nReason: ${res.debugReason}`)
             }}
             className="bg-brand-500 hover:bg-brand-600 px-2 py-0.5 rounded uppercase font-bold text-[9px]"
           >

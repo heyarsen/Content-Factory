@@ -24,7 +24,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
-  refreshSubscriptionStatus: () => Promise<{ hasActiveSubscription: boolean; role: string }>
+  refreshSubscriptionStatus: () => Promise<{ hasActiveSubscription: boolean; role: string; debugReason?: string }>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -248,7 +248,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (email: string, password: string) => {
     try {
       console.log('[Auth] Attempting to sign in...')
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
       const { data } = await api.post('/api/auth/login', { email, password }, { timeout: 5000 })
 
       if (data.access_token) {
@@ -331,7 +330,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       localStorage.setItem('auth_user', JSON.stringify(updatedUser))
       setUser(updatedUser as User)
-      return { hasActiveSubscription: profile.hasActiveSubscription, role: profile.role }
+      return {
+        hasActiveSubscription: profile.hasActiveSubscription,
+        role: profile.role,
+        debugReason: profile.debugReason
+      }
     } catch (error) {
       console.error('[Auth] refreshSubscriptionStatus error:', error)
       return { hasActiveSubscription: false, role: user?.role || 'user' }
