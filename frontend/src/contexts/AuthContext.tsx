@@ -83,14 +83,15 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
     if (role === 'admin') {
       hasActiveSubscription = true
       subStatusReason = 'Admin Bypass'
-    } else if (profileData?.has_active_subscription) {
-      hasActiveSubscription = true
-      subStatusReason = 'Profile Flag (Synced)'
     } else if (latestSub) {
-      // ONLY check the latest record. If it's cancelled, the user is cancelled.
+      // THE MOST RECENT RECORD IS THE SOURCE OF TRUTH
       const isAllowedStatus = ['active', 'pending'].includes(latestSub.status)
       hasActiveSubscription = isAllowedStatus
       subStatusReason = `Latest record: ${latestSub.status}`
+    } else if (profileData?.has_active_subscription) {
+      // Fallback to profile flag only if no subscription record found
+      hasActiveSubscription = true
+      subStatusReason = 'Profile Flag (Legacy/Sync)'
     }
 
     console.log('[Auth] Final subscription check result:', {
@@ -202,7 +203,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const user = {
               ...session.user,
               role,
-              hasActiveSubscription
+              hasActiveSubscription,
+              subStatusReason: profileResult.status === 'fulfilled' ? profileResult.value.subStatusReason : 'Profile fetch failed'
             } as User
             localStorage.setItem('access_token', session.access_token)
             localStorage.setItem('auth_user', JSON.stringify(user))
@@ -245,7 +247,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const user = {
             ...session.user,
             role,
-            hasActiveSubscription
+            hasActiveSubscription,
+            subStatusReason: profileResult.status === 'fulfilled' ? profileResult.value.subStatusReason : 'Profile fetch failed'
           } as User
           localStorage.setItem('access_token', session.access_token)
           localStorage.setItem('auth_user', JSON.stringify(user))
@@ -437,15 +440,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const updatedUser = {
         ...user,
         role: role,
-        hasActiveSubscription: hasActive
+        hasActiveSubscription: hasActive,
+        subStatusReason: profile.subStatusReason
       }
 
       localStorage.setItem('auth_user', JSON.stringify(updatedUser))
-      setUser(updatedUser)
+      setUser(updatedUser as User)
 
       console.log('[Auth] ✅ Subscription status refreshed:', {
         role: role,
-        hasActiveSubscription: hasActive
+        hasActiveSubscription: hasActive,
+        subStatusReason: profile.subStatusReason
       })
 
       return { hasActiveSubscription: hasActive, role: role }
