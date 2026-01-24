@@ -133,7 +133,7 @@ export function ProfileSettings() {
               {t('preferences.email_change_note')}
             </p>
             <div className="flex justify-end">
-              <Button onClick={handleEmailUpdate} loading={saving} disabled={emailForm.email === user?.email}>
+              <Button onClick={handleEmailUpdate} loading={saving} disabled={emailForm.email === user?.email} className="w-full sm:w-auto">
                 {t('preferences.update_email')}
               </Button>
             </div>
@@ -172,7 +172,7 @@ export function ProfileSettings() {
               {t('preferences.password_requirement')}
             </p>
             <div className="flex justify-end">
-              <Button onClick={handlePasswordUpdate} loading={saving}>
+              <Button onClick={handlePasswordUpdate} loading={saving} className="w-full sm:w-auto">
                 {t('preferences.update_password')}
               </Button>
             </div>

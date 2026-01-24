@@ -306,10 +306,10 @@ export function Distribution() {
       loadAccounts()
     } catch (error: any) {
       console.error('Failed to connect:', error)
-      const errorMessage = error.response?.data?.error || 
-                          error.response?.data?.details || 
-                          error.message || 
-                          'Failed to initiate connection'
+      const errorMessage = error.response?.data?.error ||
+        error.response?.data?.details ||
+        error.message ||
+        'Failed to initiate connection'
       console.error('Error details:', {
         message: errorMessage,
         fullResponse: error.response?.data,
@@ -349,11 +349,11 @@ export function Distribution() {
         scheduled_time: scheduledTime || null,
         caption: caption || undefined,
       })
-      
+
       // Check if any posts failed
       const posts = response.data.posts || []
       const failedPosts = posts.filter((p: any) => p.status === 'failed')
-      
+
       if (failedPosts.length > 0) {
         const errorMessages = failedPosts.map((p: any) => {
           const platform = p.platform as keyof typeof platformNames
@@ -367,7 +367,7 @@ export function Distribution() {
           return platformNames[platform] || p.platform
         }).join(', ')}`)
       }
-      
+
       setScheduleModal(false)
       setSelectedVideo('')
       setSelectedPlatforms([])
@@ -644,7 +644,7 @@ export function Distribution() {
                   Link valid for {connectPortal.duration}.
                 </div>
               )}
-              <div className="h-[540px] overflow-hidden rounded-3xl border border-white/60 bg-slate-50/70">
+              <div className="h-[400px] sm:h-[540px] max-h-[60vh] overflow-hidden rounded-3xl border border-white/60 bg-slate-50/70">
                 {!portalLoadFailed && !connectPortal.embedDisabled ? (
                   <iframe
                     key={connectPortal.url}
@@ -783,11 +783,10 @@ export function Distribution() {
                       key={key}
                       type="button"
                       onClick={() => togglePlatform(key)}
-                      className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-medium transition ${
-                        isSelected
+                      className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-medium transition ${isSelected
                           ? 'border-brand-300 bg-brand-50 text-brand-600 shadow-[0_18px_45px_-30px_rgba(99,102,241,0.45)]'
                           : 'border-white/60 bg-white/70 text-slate-500 hover:border-brand-200 hover:text-brand-600'
-                      }`}
+                        }`}
                     >
                       <Icon className="h-5 w-5" />
                       <span>{name}</span>

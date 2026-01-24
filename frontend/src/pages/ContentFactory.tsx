@@ -82,11 +82,10 @@ function SectionTab({ label, active, onClick }: { label: string; active: boolean
   return (
     <button
       onClick={onClick}
-      className={`rounded-2xl px-4 py-2 text-sm font-medium transition focus:outline-none ${
-        active
-          ? 'bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-transparent text-brand-600 shadow-[0_12px_40px_-25px_rgba(99,102,241,0.9)]'
-          : 'text-slate-500 hover:bg-white hover:text-primary'
-      }`}
+      className={`rounded-2xl px-4 py-2 text-sm font-medium transition focus:outline-none whitespace-nowrap ${active
+        ? 'bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-transparent text-brand-600 shadow-[0_12px_40px_-25px_rgba(99,102,241,0.9)]'
+        : 'text-slate-500 hover:bg-white hover:text-primary'
+        }`}
     >
       {label}
     </button>
@@ -391,11 +390,11 @@ function IdeasPromptForm({
   const [form, setForm] = useState(() =>
     prompt
       ? {
-          persona: prompt.persona,
-          business_model: prompt.business_model,
-          focus: prompt.focus,
-          categories: prompt.categories,
-        }
+        persona: prompt.persona,
+        business_model: prompt.business_model,
+        focus: prompt.focus,
+        categories: prompt.categories,
+      }
       : null
   )
   const [saving, setSaving] = useState(false)
@@ -500,11 +499,11 @@ function ResearchPromptForm({
   const [form, setForm] = useState(() =>
     prompt
       ? {
-          persona: prompt.persona,
-          core_message: prompt.core_message,
-          rules: prompt.rules,
-          notes: prompt.notes,
-        }
+        persona: prompt.persona,
+        core_message: prompt.core_message,
+        rules: prompt.rules,
+        notes: prompt.notes,
+      }
       : null
   )
   const [saving, setSaving] = useState(false)
@@ -610,12 +609,12 @@ function ScriptPromptForm({
   const [form, setForm] = useState(() =>
     prompt
       ? {
-          duration: prompt.duration,
-          word_range: prompt.word_range,
-          tone: prompt.tone,
-          structure: prompt.structure,
-          rules: prompt.rules,
-        }
+        duration: prompt.duration,
+        word_range: prompt.word_range,
+        tone: prompt.tone,
+        structure: prompt.structure,
+        rules: prompt.rules,
+      }
       : null
   )
   const [saving, setSaving] = useState(false)
@@ -916,7 +915,7 @@ export function ContentFactory() {
           </div>
         )}
 
-        <div className="flex flex-wrap gap-3 rounded-3xl border border-white/60 bg-white/70 p-2 shadow-inner">
+        <div className="flex gap-2 overflow-x-auto rounded-3xl border border-white/60 bg-white/70 p-2 shadow-inner scrollbar-hide">
           <SectionTab label="Categories" active={activeTab === 'categories'} onClick={() => setActiveTab('categories')} />
           <SectionTab label="Idea prompt" active={activeTab === 'ideas'} onClick={() => setActiveTab('ideas')} />
           <SectionTab label="Research prompt" active={activeTab === 'research'} onClick={() => setActiveTab('research')} />

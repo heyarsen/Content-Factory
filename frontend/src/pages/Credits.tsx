@@ -425,7 +425,7 @@ export function Credits() {
     <Layout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">{t('credits.title')}</h1>
             <p className="mt-2 text-slate-600">{t('credits.subtitle')}</p>
@@ -441,7 +441,7 @@ export function Credits() {
               </div>
             )}
           </div>
-          <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-6 py-4 shadow-sm">
+          <div className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-6 py-4 shadow-sm sm:w-auto">
             <Coins className="h-6 w-6 text-amber-500" />
             <div>
               <p className="text-xs text-slate-500">{t('credits.current_balance')}</p>
@@ -502,13 +502,13 @@ export function Credits() {
             {hasSubscription ? t('credits.change_sub_plan') : t('credits.choose_sub_plan')}
           </h2>
           {loadingPlans ? (
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {[1, 2, 3, 4].map((i) => (
                 <Skeleton key={i} className="h-64" />
               ))}
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {plans.map((plan: SubscriptionPlan) => {
                 const isCurrentPlan = (subscription?.plan_id === plan.id && subscription?.status === 'active') || (!hasSubscription && plan.id === 'plan_free')
                 return (
@@ -569,13 +569,13 @@ export function Credits() {
           </p>
 
           {loadingPackages ? (
-            <div className="grid gap-4 md:grid-cols-5">
+            <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
               {[1, 2, 3, 4, 5].map((i) => (
                 <Skeleton key={i} className="h-36" />
               ))}
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-5">
+            <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
               {packages.map((pkg) => (
                 <Card key={pkg.id} className={`p-4 ${!hasSubscription ? 'opacity-60' : ''}`}>
                   <div className="flex flex-col gap-2">
