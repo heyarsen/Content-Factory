@@ -40,6 +40,7 @@ export function Support() {
     const [showCreate, setShowCreate] = useState(false)
     const [subject, setSubject] = useState('')
     const [message, setMessage] = useState('')
+    const [reply, setReply] = useState('')
     const [sending, setSending] = useState(false)
     const [view, setView] = useState<'list' | 'chat'>('list')
     const { addNotification, refreshSupportCount, markAllSupportAsRead } = useNotifications()
