@@ -5,6 +5,8 @@ import api from '../lib/api'
 // Cache for user profile data to avoid repeated fetches
 const profileCache = new Map<string, { data: any; timestamp: number }>()
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+const AUTH_BUILD_ID = 'NUCLEAR_V3_FINAL'
+console.log(`[Auth] Loaded Build: ${AUTH_BUILD_ID}`)
 
 interface User {
   id: string
@@ -316,8 +318,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await api.post('/api/auth/reset-password', { email })
   }
 
+  let lastRefreshTime = 0
   const refreshSubscriptionStatus = async () => {
     if (!user?.id) return { hasActiveSubscription: false, role: 'user' }
+
+    // Rate limit manual refreshes to once every 2 seconds
+    const now = Date.now()
+    if (now - lastRefreshTime < 2000) {
+      console.log('[Auth] Refresh throttled')
+      return { hasActiveSubscription: user.hasActiveSubscription || false, role: user.role || 'user' }
+    }
+    lastRefreshTime = now
+
     console.log('[Auth] refreshSubscriptionStatus: FORCING REFRESH')
     try {
       const profile = await fetchUserRoleAndSubscription(user.id, true)
