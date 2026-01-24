@@ -1,11 +1,8 @@
 import { ReactNode, useState } from 'react'
 import { Header } from './Header'
 import { Sidebar } from './Sidebar'
-import { useAuth } from '../../contexts/AuthContext'
-
 export function Layout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { user, refreshSubscriptionStatus } = useAuth()
 
   return (
     <div className="relative flex min-h-screen bg-background">
