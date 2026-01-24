@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase.js'
+import { SubscriptionService } from './subscriptionService.js'
 import {
   generateVideo as requestHeygenVideo,
   generateVideoFromTemplate,

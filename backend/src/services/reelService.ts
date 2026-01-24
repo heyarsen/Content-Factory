@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase.js'
 import { Reel } from '../types/database.js'
+import { SubscriptionService } from './subscriptionService.js'
 
 export class ReelService {
   /**
@@ -18,6 +19,12 @@ export class ReelService {
       scheduled_time?: string
     }
   ): Promise<Reel> {
+    // Check if user has an active subscription
+    const hasActiveSub = await SubscriptionService.hasActiveSubscription(userId)
+    if (!hasActiveSub) {
+      throw new Error('An active subscription is required to create reels.')
+    }
+
     const scheduledTime = data.scheduled_time || new Date(Date.now() + 20 * 60 * 1000).toISOString() // 20 minutes from now
 
     const { data: reel, error } = await supabase

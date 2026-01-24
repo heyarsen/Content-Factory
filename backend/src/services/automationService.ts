@@ -3,6 +3,7 @@ import { PlanService } from './planService.js'
 import { ResearchService } from './researchService.js'
 import { ScriptService } from './scriptService.js'
 import { VideoService } from './videoService.js'
+import { SubscriptionService } from './subscriptionService.js'
 import { postVideo } from '../lib/uploadpost.js'
 import { DateTime } from 'luxon'
 
@@ -160,6 +161,13 @@ export class AutomationService {
     }
 
     const userId = plan.user_id
+
+    // Check if user has an active subscription
+    const hasActiveSub = await SubscriptionService.hasActiveSubscription(userId)
+    if (!hasActiveSub) {
+      console.log(`[Automation] Skipping script generation for plan ${planId} - user ${userId} has no active subscription`)
+      return
+    }
 
     // Get items with research data for today
     const { data: itemsWithResearch } = await supabase
