@@ -25,11 +25,24 @@ export function Login() {
     setLoading(true)
     setOptimisticLoading(true) // Immediate loading feedback
 
+    // Safety timeout to prevent infinite loading
+    const safetyTimeout = setTimeout(() => {
+      if (setLoading) {
+        setLoading(false)
+        setOptimisticLoading(false)
+        setError(t('auth.server_error'))
+        console.warn('[Login] Safety timeout triggered')
+      }
+    }, 35000)
+
     try {
+      console.log('[Login] Attempting sign in...')
       await signIn(email, password)
+      clearTimeout(safetyTimeout)
       setOptimisticLoading(false)
       navigate('/dashboard')
     } catch (err: any) {
+      clearTimeout(safetyTimeout)
       setOptimisticLoading(false)
       console.error('Login error:', err)
 

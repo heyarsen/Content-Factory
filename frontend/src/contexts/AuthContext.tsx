@@ -32,11 +32,20 @@ const fetchUserRoleAndSubscription = async (userId: string, userEmail: string, f
   const cached = profileCache.get(userId)
   if (!forceRefresh && cached && Date.now() - cached.timestamp < 300000) return cached.data
 
+  console.log(`[Auth] Fetching role/sub for ${userEmail}...`)
+
+  // Add a 15-second timeout to the combined profile/sub fetch
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('Profile fetch timeout')), 15000)
+  )
+
   try {
-    const [profileRes, subRes] = await Promise.all([
+    const fetchPromise = Promise.all([
       supabase.from('user_profiles').select('role, has_active_subscription').eq('id', userId).maybeSingle(),
       supabase.from('user_subscriptions').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle()
     ])
+
+    const [profileRes, subRes] = await Promise.race([fetchPromise, timeoutPromise]) as [any, any]
 
     const profileData = profileRes.data
     const latestSub = subRes.data
@@ -59,11 +68,12 @@ const fetchUserRoleAndSubscription = async (userId: string, userEmail: string, f
     }
 
     const res = { role: isAdmin ? 'admin' : 'user', hasActiveSubscription: hasActive, debugReason: reason, rawLatestSub: latestSub }
+    console.log(`[Auth] Role/sub fetched for ${userEmail}:`, { role: res.role, hasActive: res.hasActiveSubscription, reason })
     profileCache.set(userId, { data: res, timestamp: Date.now() })
     return res
-  } catch (err) {
-    console.error('[Auth] Fetch Error:', err)
-    return { role: 'user', hasActiveSubscription: false, debugReason: 'Error' }
+  } catch (err: any) {
+    console.error('[Auth] Profile Fetch Error or Timeout:', err)
+    return { role: 'user', hasActiveSubscription: false, debugReason: err.message === 'Profile fetch timeout' ? 'Timeout' : 'Error' }
   }
 }
 
@@ -136,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async () => {
+    console.log('[Auth] Signing out...')
     localStorage.removeItem('auth_user')
     localStorage.removeItem('access_token')
     setUser(null)

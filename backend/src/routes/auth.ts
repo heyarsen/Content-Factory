@@ -146,11 +146,15 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
 
     // Single attempt with the health-checked client
     // If health check passed, the connection should work
+    const authStart = Date.now()
     try {
       const result = await authClient.auth.signInWithPassword({
         email,
         password,
       })
+      const authDuration = Date.now() - authStart
+      console.log(`[Auth] signInWithPassword for ${email} took ${authDuration}ms`)
+
       data = result.data
       error = result.error
 
