@@ -76,8 +76,7 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle(),
-      // Fallback 2: pending status (gateway might be slow) - DISABLED to match backend strict enforcement
-      /*
+      // Fallback 2: pending status (gateway might be slow) - ENABLED for testing/ux
       supabase
         .from('user_subscriptions')
         .select('status, payment_status, created_at, expires_at')
@@ -86,17 +85,18 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
-      */
     ])
 
     const profileData = results[0].status === 'fulfilled' ? (results[0].value as any).data : null
     const subCompletedData = results[1].status === 'fulfilled' ? (results[1].value as any).data : null
     const subFailedData = results[2].status === 'fulfilled' ? (results[2].value as any).data : null
+    const subPendingData = results[3].status === 'fulfilled' ? (results[3].value as any).data : null
 
     console.log('[Auth] Raw query results:', {
       profileData,
       subCompletedData,
       subFailedData,
+      subPendingData,
       resultsLength: results.length
     })
 
@@ -109,10 +109,11 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
     const role = isAdminEmail ? 'admin' : (profileData?.role || 'user')
 
     // A user has an active subscription if they have an 'active' record in user_subscriptions (completed OR failed payment fallback)
+    // OR if they have a 'pending' record (for testing/slow gateways)
     // or if the profile record has the flag (fallback) or if they are an admin
     const hasActiveSubscription = (role === 'admin') ||
       !!profileData?.has_active_subscription ||
-      !!(subCompletedData || subFailedData)
+      !!(subCompletedData || subFailedData || subPendingData)
 
     console.log('[Auth] Final subscription check result:', {
       userId,

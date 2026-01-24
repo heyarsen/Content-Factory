@@ -171,8 +171,7 @@ export class SubscriptionService {
         .eq('payment_status', 'failed')
         .limit(1)
         .maybeSingle(),
-      /*
-      // Pending subscription disabled for strict enforcement
+      // Pending subscription ENABLED for user testing/slow gateways
       supabase
         .from('user_subscriptions')
         .select('id, status, payment_status')
@@ -180,13 +179,13 @@ export class SubscriptionService {
         .eq('status', 'pending')
         .limit(1)
         .maybeSingle()
-      */
     ])
 
     const completedSub = results[0].status === 'fulfilled' ? (results[0].value as any).data : null
     const failedSub = results[1].status === 'fulfilled' ? (results[1].value as any).data : null
+    const pendingSub = results[2].status === 'fulfilled' ? (results[2].value as any).data : null
 
-    const hasActiveSub = !!(completedSub || failedSub)
+    const hasActiveSub = !!(completedSub || failedSub || pendingSub)
 
     console.log('[Subscription] FINAL check result for', userId, ':', {
       hasActiveSub,
