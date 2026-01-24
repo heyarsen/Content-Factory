@@ -137,7 +137,7 @@ export async function getSupabaseClientWithHealthCheck(
   }
 
   // Create client with timeout
-  const createFetchWithTimeout = (timeoutMs: number = 90000) => {
+  const createFetchWithTimeout = (timeoutMs: number = 20000) => {
     return async (fetchUrl: string, fetchOptions: any = {}) => {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
@@ -172,7 +172,7 @@ export async function getSupabaseClientWithHealthCheck(
   }
 
   try {
-    const customFetch = createFetchWithTimeout(90000)
+    const customFetch = createFetchWithTimeout(20000)
     const client = createClient(url, key, {
       ...options,
       global: {

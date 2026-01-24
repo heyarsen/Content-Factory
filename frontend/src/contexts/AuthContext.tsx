@@ -153,12 +153,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const p = await fetchUserRoleAndSubscription(user.id, user.email, true)
         if (user) setUser({ ...user, ...p })
         return { hasActiveSubscription: p.hasActiveSubscription, role: p.role, debugReason: p.debugReason }
-        // - [x] Fix build error and propagate debugReason in refresh <!-- id: 20 -->
-        // - [/] Fix authentication hangs and performance <!-- id: 56 -->
-        //     - [ ] Decouple profile fetch from initial loading in AuthContext <!-- id: 57 -->
-        //     - [ ] Streamline backend login probes in auth.ts <!-- id: 58 -->
-        //     - [ ] Shorten connection timeouts in supabaseConnection.ts <!-- id: 59 -->
-        //     - [ ] Verify fix by monitoring dashboard transition speed <!-- id: 60 -->
       }
     }}>
       {children}

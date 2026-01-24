@@ -3,7 +3,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
 let supabaseClient: SupabaseClient | null = null
 
 // Helper function to create a fetch with timeout
-function createFetchWithTimeout(timeoutMs: number = 30000) {
+function createFetchWithTimeout(timeoutMs: number = 20000) {
   return async (url: string, options: any = {}) => {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
@@ -39,8 +39,8 @@ function getSupabaseClient(): SupabaseClient {
     )
   }
 
-  // Create fetch with increased timeout (60 seconds)
-  const customFetch = createFetchWithTimeout(60000)
+  // Create fetch with shorter timeout (20 seconds)
+  const customFetch = createFetchWithTimeout(20000)
 
   supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
     auth: {
@@ -69,8 +69,8 @@ export function getSupabaseClientForUser(userJWT: string): SupabaseClient {
     )
   }
 
-  // Create fetch with increased timeout (60 seconds)
-  const customFetch = createFetchWithTimeout(60000)
+  // Create fetch with shorter timeout (20 seconds)
+  const customFetch = createFetchWithTimeout(20000)
 
   // Create client with user's JWT token in headers for RLS
   const client = createClient(supabaseUrl, supabaseAnonKey, {
