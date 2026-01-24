@@ -10,7 +10,7 @@ import { Input } from '../components/ui/Input'
 import { Textarea } from '../components/ui/Textarea'
 import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, Calendar, ChevronLeft, ChevronRight, Instagram, Users, Youtube, Facebook } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 interface Post {
@@ -299,7 +299,7 @@ export function ScheduledPosts() {
                 <p className="text-sm opacity-90">Your subscription is inactive. Please upgrade to schedule posts to social media.</p>
               </div>
               <Link to="/credits" className="ml-auto">
-                <Button size="sm" variant="default" className="bg-amber-600 hover:bg-amber-700 border-none">
+                <Button size="sm" variant="primary" className="bg-amber-600 hover:bg-amber-700 border-none">
                   Upgrade Now
                 </Button>
               </Link>

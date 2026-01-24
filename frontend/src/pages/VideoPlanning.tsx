@@ -1199,7 +1199,7 @@ export function VideoPlanning() {
                 <p className="text-sm opacity-90">{t('videos.subscription_expire_desc') || 'Your subscription is inactive. Please upgrade to continue generating videos and scheduling posts.'}</p>
               </div>
               <Link to="/credits" className="ml-auto">
-                <Button size="sm" variant="default" className="bg-amber-600 hover:bg-amber-700 border-none">
+                <Button size="sm" variant="primary" className="bg-amber-600 hover:bg-amber-700 border-none">
                   {t('common.upgrade_now') || 'Upgrade Now'}
                 </Button>
               </Link>

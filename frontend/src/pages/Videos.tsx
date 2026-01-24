@@ -462,7 +462,7 @@ export function Videos() {
           <Link to={hasSubscription ? "/create" : "/credits"} className="w-full md:w-auto">
             <Button
               className="w-full md:w-auto shadow-[0_20px_45px_-25px_rgba(99,102,241,0.6)]"
-              variant={hasSubscription ? "default" : "secondary"}
+              variant={hasSubscription ? "primary" : "secondary"}
             >
               <VideoIcon className="mr-2 h-4 w-4" />
               {hasSubscription ? t('videos.create_video') : t('common.upgrade_required') || 'Upgrade Required'}
@@ -479,7 +479,7 @@ export function Videos() {
                 <p className="text-sm opacity-90">{t('videos.subscription_expire_desc') || 'Your subscription is inactive. Please upgrade to continue generating videos and scheduling posts.'}</p>
               </div>
               <Link to="/credits" className="ml-auto">
-                <Button size="sm" variant="default" className="bg-amber-600 hover:bg-amber-700 border-none">
+                <Button size="sm" variant="primary" className="bg-amber-600 hover:bg-amber-700 border-none">
                   {t('common.upgrade_now') || 'Upgrade Now'}
                 </Button>
               </Link>
