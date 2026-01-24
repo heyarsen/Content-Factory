@@ -11,15 +11,13 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
   withCredentials: true,
-  timeout: 300000, // 5 minutes timeout for avatar creation and status checks (can take time)
+  timeout: 300000, // 5 minutes
 })
 
 // Request deduplication interceptor
 api.interceptors.request.use(async (config) => {
-  // Create a unique key for this request
   const requestKey = `${config.method?.toUpperCase()}-${config.url}-${JSON.stringify(config.data)}`
-  
-  // For POST requests to login endpoint, check if there's already a pending request
+
   if (config.method === 'post' && config.url?.includes('/api/auth/login')) {
     const existingRequest = pendingRequests.get(requestKey)
     if (existingRequest) {
@@ -27,7 +25,7 @@ api.interceptors.request.use(async (config) => {
       throw new axios.Cancel('Duplicate request cancelled')
     }
   }
-  
+
   const token = localStorage.getItem('access_token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
@@ -35,45 +33,41 @@ api.interceptors.request.use(async (config) => {
   return config
 })
 
-// Handle token refresh on 401 and manage pending requests
 api.interceptors.response.use(
   (response) => {
-    // Clear pending request on success
     const requestKey = `${response.config.method?.toUpperCase()}-${response.config.url}-${JSON.stringify(response.config.data)}`
     pendingRequests.delete(requestKey)
     return response
   },
   async (error) => {
-    // Clear pending request on error
     if (error.config) {
       const requestKey = `${error.config.method?.toUpperCase()}-${error.config.url}-${JSON.stringify(error.config.data)}`
       pendingRequests.delete(requestKey)
     }
-    
-    // Handle network errors
+
     if (error.code === 'ECONNABORTED' || error.message === 'Network Error' || !error.response) {
       console.error('Network error:', error.message)
-      // Don't redirect on network errors during login - let the component handle it
       if (!error.config?.url?.includes('/api/auth/login')) {
         return Promise.reject(error)
       }
     }
-    
+
     if (error.response?.status === 401) {
-      // Token is invalid - clear storage and redirect to login
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('auth_user')
-      console.warn('[API] 401 Unauthorized - clearing auth and redirecting to login')
-      
-      // Don't redirect if we're already on the login page
-      if (!window.location.pathname.includes('/login')) {
+      const url = error.config?.url || 'unknown'
+      console.warn(`[API] 401 Unauthorized on ${url}`)
+
+      // DO NOT wipe the session for these common background calls
+      const isBackgroundCheck = ['/api/credits', '/api/auth/profile'].some(path => url.includes(path))
+
+      if (!isBackgroundCheck && !window.location.pathname.includes('/login')) {
+        console.error('[API] Critical 401 - clearing auth and redirecting')
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('auth_user')
         window.location.href = '/login'
       }
-      return Promise.reject(error)
     }
     return Promise.reject(error)
   }
 )
 
 export default api
-

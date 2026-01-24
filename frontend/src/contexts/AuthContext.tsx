@@ -2,9 +2,8 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { supabase } from '../lib/supabase'
 import api from '../lib/api'
 
-// Cache for user profile data to avoid repeated fetches
 const profileCache = new Map<string, { data: any; timestamp: number }>()
-const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+const CACHE_DURATION = 5 * 60 * 1000
 
 interface User {
   id: string
@@ -29,46 +28,24 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Optimized function to fetch user role and subscription with caching
 const fetchUserRoleAndSubscription = async (userId: string, userEmail: string, forceRefresh: boolean = false) => {
-  // Check cache first (unless force refresh is requested)
   const cached = profileCache.get(userId)
   if (!forceRefresh && cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    console.log('[Auth] Using cached profile data')
     return cached.data
   }
-
-  if (forceRefresh) {
-    profileCache.delete(userId)
-    console.log('[Auth] Cache cleared for force refresh')
-  }
+  if (forceRefresh) profileCache.delete(userId)
 
   try {
     console.log('[Auth] FETCH START:', { userId, email: userEmail })
-
     const isAdminEmail = userEmail === 'heyarsen@icloud.com'
 
-    // Query user_profiles and the LATEST subscription record in parallel
     const [profileRes, subRes] = await Promise.all([
-      supabase
-        .from('user_profiles')
-        .select('role, has_active_subscription')
-        .eq('id', userId)
-        .maybeSingle(),
-      supabase
-        .from('user_subscriptions')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
+      supabase.from('user_profiles').select('role, has_active_subscription').eq('id', userId).maybeSingle(),
+      supabase.from('user_subscriptions').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle()
     ])
 
     const profileData = profileRes.data
     const latestSub = subRes.data
-
-    console.log('[Auth] DB DATA RECEIVED:', { profileData, latestSub })
-
     const role = isAdminEmail ? 'admin' : (profileData?.role || 'user')
     let hasActiveSubscription = false
     let debugReason = 'UNKNOWN'
@@ -77,34 +54,23 @@ const fetchUserRoleAndSubscription = async (userId: string, userEmail: string, f
       hasActiveSubscription = true
       debugReason = 'Admin Bypass'
     } else if (latestSub) {
-      // THE MOST RECENT RECORD IS THE ABSOLUTE SOURCE OF TRUTH
       const isStatusValid = ['active', 'pending'].includes(latestSub.status)
-
-      // Check for expiration
       let isExpired = false
       if (latestSub.expires_at) {
         isExpired = new Date(latestSub.expires_at).getTime() < Date.now()
       }
-
       hasActiveSubscription = isStatusValid && !isExpired
       debugReason = `Sub Table: ${latestSub.status}${isExpired ? ' (EXPIRED)' : ''}`
     } else if (profileData?.has_active_subscription) {
-      // Fallback only if NO sub records exist
       hasActiveSubscription = true
-      debugReason = 'Profile Flag (No sub record found)'
+      debugReason = 'Profile Flag (Legacy)'
     } else {
       hasActiveSubscription = false
       debugReason = 'No active records'
     }
 
-    const result = {
-      role,
-      hasActiveSubscription,
-      debugReason,
-      rawLatestSub: latestSub
-    }
+    const result = { role, hasActiveSubscription, debugReason, rawLatestSub: latestSub }
     console.log('[Auth] FETCH COMPLETE:', result)
-
     profileCache.set(userId, { data: result, timestamp: Date.now() })
     return result
   } catch (err) {
@@ -119,150 +85,93 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
-    let timeoutId: NodeJS.Timeout | null = null
 
-    // 1. Restore from localStorage IMMEDIATELY if available
+    // 1. Immediate restore from storage
     const storedUser = localStorage.getItem('auth_user')
     if (storedUser) {
       try {
-        const parsedUser = JSON.parse(storedUser)
-        console.log('[Auth] Restoring from storage:', parsedUser.email)
-        setUser(parsedUser)
+        const parsed = JSON.parse(storedUser)
+        setUser(parsed)
         setLoading(false)
-
-        // Background check to verify status
-        fetchUserRoleAndSubscription(parsedUser.id, parsedUser.email).then(profile => {
+        fetchUserRoleAndSubscription(parsed.id, parsed.email).then(profile => {
           if (mounted) {
-            const updatedUser = { ...parsedUser, ...profile }
-            localStorage.setItem('auth_user', JSON.stringify(updatedUser))
-            setUser(updatedUser)
+            const updated = { ...parsed, ...profile }
+            localStorage.setItem('auth_user', JSON.stringify(updated))
+            setUser(updated)
           }
         })
-      } catch (e) {
-        localStorage.removeItem('auth_user')
-      }
+      } catch (e) { localStorage.removeItem('auth_user') }
     }
 
-    // 2. Check Supabase if no state exists
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (mounted && session?.user && !user) {
-        console.log('[Auth] Found Supabase session, fetching profile...')
+    // 2. Auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log(`[Auth] Listener: ${event}`, !!session)
+      if (!mounted) return
+
+      if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION')) {
         const profile = await fetchUserRoleAndSubscription(session.user.id, session.user.email!)
         if (mounted) {
           const userObj = { ...session.user, ...profile } as User
           localStorage.setItem('auth_user', JSON.stringify(userObj))
           setUser(userObj)
-        }
-      }
-      if (mounted) setLoading(false)
-    }
-
-    if (!user) checkSession()
-
-    // 3. Robust Auth State Listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('[Auth] Listener event:', event, !!session)
-
-      if (!mounted) return
-
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-        if (session?.user) {
-          // If we already have the user and it's the same one, maybe skip fetch or just update
-          const profile = await fetchUserRoleAndSubscription(session.user.id, session.user.email!)
-          if (mounted) {
-            const userObj = { ...session.user, ...profile } as User
-            localStorage.setItem('auth_user', JSON.stringify(userObj))
-            setUser(userObj)
-            setLoading(false)
-          }
+          setLoading(false)
         }
       } else if (event === 'SIGNED_OUT') {
-        console.log('[Auth] SIGNED_OUT: Clearing state')
         localStorage.removeItem('auth_user')
         localStorage.removeItem('access_token')
         setUser(null)
         setLoading(false)
+      } else {
+        // Fallback for loading state
+        if (mounted) setLoading(false)
       }
     })
 
     return () => {
       mounted = false
-      if (timeoutId) clearTimeout(timeoutId)
       subscription.unsubscribe()
     }
-  }, []) // Empty deps for single listener setup
+  }, [])
 
-  const signUp = async (email: string, password: string, preferredLanguage?: string) => {
-    await api.post('/api/auth/signup', { email, password, preferredLanguage })
-  }
+  const signUp = async (e: string, p: string, l?: string) => { await api.post('/api/auth/signup', { email: e, password: p, preferredLanguage: l }) }
 
   const signIn = async (email: string, password: string) => {
-    console.log('[Auth] signIn start')
     const { data } = await api.post('/api/auth/login', { email, password }, { timeout: 5000 })
     if (data.access_token) {
       localStorage.setItem('access_token', data.access_token)
-
-      // We set the session FIRST. This will trigger onAuthStateChange
-      // which will then handle the full profile fetch and state update.
-      console.log('[Auth] setting supabase session...')
-      await supabase.auth.setSession({
-        access_token: data.access_token,
-        refresh_token: data.refresh_token || data.access_token
-      })
-      console.log('[Auth] session set complete')
+      // JUST set session. The listener will handle state.
+      await supabase.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token || data.access_token })
     }
   }
 
   const signOut = async () => {
-    console.log('[Auth] signOut start')
     if (user?.id) profileCache.delete(user.id)
     localStorage.removeItem('auth_user')
     localStorage.removeItem('access_token')
     setUser(null)
     await supabase.auth.signOut()
-    console.log('[Auth] signOut complete')
   }
 
   const refreshSubscriptionStatus = async () => {
     if (!user?.id) return { hasActiveSubscription: false, role: 'user' }
-    console.log('[Auth] manual refresh start')
     const profile = await fetchUserRoleAndSubscription(user.id, user.email, true)
     if (user) {
-      const updatedUser = { ...user, ...profile }
-      localStorage.setItem('auth_user', JSON.stringify(updatedUser))
-      setUser(updatedUser as User)
+      const updated = { ...user, ...profile }
+      localStorage.setItem('auth_user', JSON.stringify(updated))
+      setUser(updated as User)
     }
-    return {
-      hasActiveSubscription: profile.hasActiveSubscription,
-      role: profile.role,
-      debugReason: profile.debugReason
-    }
+    return { hasActiveSubscription: profile.hasActiveSubscription, role: profile.role, debugReason: profile.debugReason }
   }
 
   const signInWithGoogle = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: `${window.location.origin}/dashboard` },
-    })
+    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/dashboard` } })
     if (error) throw error
   }
 
-  const resetPassword = async (email: string) => {
-    await api.post('/api/auth/reset-password', { email })
-  }
+  const resetPassword = async (email: string) => { await api.post('/api/auth/reset-password', { email }) }
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      loading,
-      signUp,
-      signIn,
-      signInWithGoogle,
-      signOut,
-      resetPassword,
-      refreshSubscriptionStatus
-    }}>
+    <AuthContext.Provider value={{ user, loading, signUp, signIn, signInWithGoogle, signOut, resetPassword, refreshSubscriptionStatus }}>
       {children}
     </AuthContext.Provider>
   )
