@@ -1983,6 +1983,7 @@ export function VideoPlanning() {
                     onChange={(e) =>
                       setEditForm((prev) => ({ ...prev, topic: e.target.value }))
                     }
+                    className="w-full"
                   />
                   <div className="grid grid-cols-2 gap-4">
                     <Input

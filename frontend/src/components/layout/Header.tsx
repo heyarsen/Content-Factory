@@ -72,7 +72,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             </button>
 
             {notificationsOpen && (
-              <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-96 sm:max-w-96 rounded-xl border border-slate-200 bg-white shadow-lg z-50 max-h-[80vh] overflow-hidden flex flex-col">
+              <div className="fixed inset-x-4 top-16 mt-2 flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg z-50 max-h-[80vh] sm:absolute sm:right-0 sm:inset-x-auto sm:w-96">
                 <div className="p-4 border-b border-slate-200 flex items-center justify-between">
                   <div className="text-sm font-semibold text-slate-900">{t('header.notifications')}</div>
                   {unreadCount > 0 && (

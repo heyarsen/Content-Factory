@@ -40,8 +40,8 @@ export function Support() {
     const [showCreate, setShowCreate] = useState(false)
     const [subject, setSubject] = useState('')
     const [message, setMessage] = useState('')
-    const [reply, setReply] = useState('')
     const [sending, setSending] = useState(false)
+    const [view, setView] = useState<'list' | 'chat'>('list')
     const { addNotification, refreshSupportCount, markAllSupportAsRead } = useNotifications()
     const { user } = useAuth() // Need user ID for subscription filtering if desired, or just use ticket ID
 
@@ -130,6 +130,7 @@ export function Support() {
             const response = await api.get(`/api/support/tickets/${id}`)
             setSelectedTicket(response.data)
             setShowCreate(false)
+            setView('chat')
 
             // Mark as read
             await api.post(`/api/support/tickets/${id}/read`)
@@ -201,9 +202,9 @@ export function Support() {
 
     return (
         <Layout>
-            <div className="flex h-[calc(100vh-160px)] gap-6 overflow-hidden">
+            <div className="flex h-[calc(100vh-140px)] sm:h-[calc(100vh-160px)] gap-6 overflow-hidden relative">
                 {/* Sidebar - Ticket List */}
-                <div className="flex w-1/3 flex-col gap-4 overflow-hidden">
+                <div className={`${view === 'chat' || showCreate ? 'hidden' : 'flex'} w-full lg:flex lg:w-1/3 flex-col gap-4 overflow-hidden`}>
                     <div className="flex items-center justify-between">
                         <h2 className="text-xl font-semibold text-primary">{t('support.title')}</h2>
                         <div className="flex gap-2">
