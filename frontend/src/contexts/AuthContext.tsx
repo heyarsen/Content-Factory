@@ -222,8 +222,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { hasActiveSubscription: profile.hasActiveSubscription, role: profile.role, debugReason: profile.debugReason }
   }
 
+  const signInWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/dashboard` },
+    })
+    if (error) throw error
+  }
+
+  const resetPassword = async (email: string) => {
+    await api.post('/api/auth/reset-password', { email })
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, signUp, signIn, signInWithGoogle: async () => { }, signOut, resetPassword: async () => { }, refreshSubscriptionStatus }}>
+    <AuthContext.Provider value={{
+      user,
+      loading,
+      signUp,
+      signIn,
+      signInWithGoogle,
+      signOut,
+      resetPassword,
+      refreshSubscriptionStatus
+    }}>
       {children}
     </AuthContext.Provider>
   )
