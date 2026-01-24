@@ -4,9 +4,10 @@ import { useAuth } from '../../contexts/AuthContext'
 
 interface ProtectedRouteProps {
   children: ReactNode
+  requireSubscription?: boolean
 }
 
-export function ProtectedRoute({ children }: ProtectedRouteProps) {
+export function ProtectedRoute({ children, requireSubscription = false }: ProtectedRouteProps) {
   const { user, loading } = useAuth()
 
   if (loading) {
@@ -19,6 +20,11 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (!user) {
     return <Navigate to="/login" replace />
+  }
+
+  if (requireSubscription && user.role !== 'admin' && !user.hasActiveSubscription) {
+    console.log('[ProtectedRoute] Access denied: Subscription required')
+    return <Navigate to="/credits" replace />
   }
 
   return <>{children}</>

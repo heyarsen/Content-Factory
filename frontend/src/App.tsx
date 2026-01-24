@@ -73,7 +73,7 @@ function AppContent() {
         <Route
           path="/create"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requireSubscription={true}>
               <QuickCreate />
             </ProtectedRoute>
           }
@@ -97,7 +97,7 @@ function AppContent() {
         <Route
           path="/social"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requireSubscription={true}>
               <SocialAccounts />
             </ProtectedRoute>
           }
@@ -105,7 +105,7 @@ function AppContent() {
         <Route
           path="/posts"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requireSubscription={true}>
               <ScheduledPosts />
             </ProtectedRoute>
           }
@@ -113,7 +113,7 @@ function AppContent() {
         <Route
           path="/planning"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requireSubscription={true}>
               <VideoPlanning />
             </ProtectedRoute>
           }
@@ -121,7 +121,7 @@ function AppContent() {
         <Route
           path="/content"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requireSubscription={true}>
               <ContentFactory />
             </ProtectedRoute>
           }
@@ -129,7 +129,7 @@ function AppContent() {
         <Route
           path="/workflows"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requireSubscription={true}>
               <Workflows />
             </ProtectedRoute>
           }
@@ -193,7 +193,7 @@ function AppContent() {
         <Route
           path="/avatars"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requireSubscription={true}>
               <Avatars />
             </ProtectedRoute>
           }

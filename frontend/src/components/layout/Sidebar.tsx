@@ -192,8 +192,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               {/* Compact Action Button */}
               {!unlimited && (
                 <div className="mt-2">
-                  {!subscription ? (
-                    <button className="w-full rounded-md bg-brand-600 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700">
+                  {!subscription || subscription.status !== 'active' ? (
+                    <button className="w-full rounded-md bg-amber-600 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700 shadow-md">
                       {t('sidebar.buy_subscription')}
                     </button>
                   ) : credits !== null && credits < 5 ? (
