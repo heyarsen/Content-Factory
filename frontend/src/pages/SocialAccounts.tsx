@@ -7,11 +7,12 @@ import { Badge } from '../components/ui/Badge'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Modal } from '../components/ui/Modal'
-import { Users, Link2, X, Instagram, Youtube, Facebook, Share2 } from 'lucide-react'
+import { Users, Link2, X, Instagram, Youtube, Facebook, Share2, Sparkles } from 'lucide-react'
 import api from '../lib/api'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../hooks/useToast'
+import { Link } from 'react-router-dom'
 
 interface SocialAccount {
   id: string
@@ -106,17 +107,19 @@ export function SocialAccounts() {
     console.log('[Social] Platform:', platform)
     console.log('[Social] User ID:', user?.id)
     console.log('[Social] User Email:', user?.email)
-    
-    // Note: Subscription check is handled by backend middleware
-    // Frontend should not block connections - let backend handle subscription validation
-    console.log('[Social] ✅ PROCEEDING WITH CONNECTION (backend will validate subscription)')
-    console.log('[Social] === CONNECTION PROCEEDING ===')
+
+    if (!user?.hasActiveSubscription) {
+      toast.error(t('social_accounts.subscription_needed_alert'))
+      return
+    }
+
+    // Note: Subscription check is also handled by backend middleware
     setConnectingPlatform(platform)
     try {
       console.log('[Social] Making API call to /api/social/connect')
       const response = await api.post('/api/social/connect', { platform })
       console.log('[Social] API response:', response.data)
-      
+
       const { accessUrl, uploadPostUsername, redirectUrl } = response.data as {
         accessUrl?: string
         uploadPostUsername?: string
@@ -253,6 +256,23 @@ export function SocialAccounts() {
           </p>
         </div>
 
+        {!user?.hasActiveSubscription && (
+          <Card className="border-amber-200 bg-amber-50 p-4 sm:p-5">
+            <div className="flex flex-col sm:flex-row items-center gap-4 text-amber-800">
+              <Sparkles className="h-6 w-6 text-amber-500 shrink-0" />
+              <div className="text-center sm:text-left">
+                <h3 className="font-semibold text-amber-900">{t('videos.subscription_required') || 'Subscription Required'}</h3>
+                <p className="text-sm opacity-90">{t('videos.subscription_expire_desc') || 'Your subscription is inactive. Please upgrade to continue connecting social media and scheduling posts.'}</p>
+              </div>
+              <Link to="/credits" className="w-full sm:w-auto mt-2 sm:mt-0 sm:ml-auto">
+                <Button size="sm" variant="primary" className="w-full bg-amber-600 hover:bg-amber-700 border-none text-white">
+                  {t('common.upgrade_now') || 'Upgrade Now'}
+                </Button>
+              </Link>
+            </div>
+          </Card>
+        )}
+
         {accounts.length === 0 && availablePlatforms.length === 0 ? (
           <EmptyState
             icon={<Users className="w-16 h-16" />}
@@ -341,6 +361,7 @@ export function SocialAccounts() {
                         size="sm"
                         onClick={() => handleConnect(platform)}
                         loading={connectingPlatform === platform}
+                        disabled={!user?.hasActiveSubscription}
                         className="w-full"
                       >
                         <Link2 className="mr-2 h-4 w-4" />

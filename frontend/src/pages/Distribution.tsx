@@ -10,8 +10,10 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { Modal } from '../components/ui/Modal'
 import { Input } from '../components/ui/Input'
 import { Textarea } from '../components/ui/Textarea'
-import { Calendar, X, Instagram, Youtube, Facebook, Users, Link2 } from 'lucide-react'
+import { Calendar, X, Instagram, Youtube, Facebook, Users, Link2, Sparkles } from 'lucide-react'
 import api from '../lib/api'
+import { useAuth } from '../contexts/AuthContext'
+import { Link } from 'react-router-dom'
 
 interface SocialAccount {
   id: string
@@ -50,6 +52,9 @@ const platformNames = {
 }
 
 export function Distribution() {
+  const { user } = useAuth()
+  const hasSubscription = user?.hasActiveSubscription || false
+
   // Social Accounts state
   const [accounts, setAccounts] = useState<SocialAccount[]>([])
   const [accountsLoading, setAccountsLoading] = useState(true)
@@ -213,6 +218,10 @@ export function Distribution() {
   }, [])
 
   const handleConnect = async (platform: SocialAccount['platform']) => {
+    if (!hasSubscription) {
+      alert('Subscription required to connect social accounts.')
+      return
+    }
     setConnectingPlatform(platform)
     setConnectPortal(null)
     setPortalLoadFailed(false)
@@ -336,6 +345,10 @@ export function Distribution() {
 
   // Scheduled Posts handlers
   const handleSchedule = async () => {
+    if (!hasSubscription) {
+      alert('Subscription required to schedule posts.')
+      return
+    }
     if (!selectedVideo || selectedPlatforms.length === 0) {
       alert('Please select a video and at least one platform')
       return
@@ -434,6 +447,23 @@ export function Distribution() {
           </p>
         </div>
 
+        {!hasSubscription && (
+          <Card className="border-amber-200 bg-amber-50 p-4 sm:p-5">
+            <div className="flex flex-col sm:flex-row items-center gap-4 text-amber-800">
+              <Sparkles className="h-6 w-6 text-amber-500 shrink-0" />
+              <div className="text-center sm:text-left">
+                <h3 className="font-semibold text-amber-900">Subscription Required</h3>
+                <p className="text-sm opacity-90">Your subscription is inactive. Please upgrade to continue connecting social media and scheduling posts.</p>
+              </div>
+              <Link to="/credits" className="w-full sm:w-auto mt-2 sm:mt-0 sm:ml-auto">
+                <Button size="sm" variant="primary" className="w-full bg-amber-600 hover:bg-amber-700 border-none text-white">
+                  Upgrade Now
+                </Button>
+              </Link>
+            </div>
+          </Card>
+        )}
+
         {/* Social Accounts Section */}
         <section className="space-y-6">
           <div className="flex items-center justify-between">
@@ -508,6 +538,7 @@ export function Distribution() {
                           size="sm"
                           onClick={() => handleConnect(platform)}
                           loading={connectingPlatform === platform}
+                          disabled={!hasSubscription}
                           className="w-full"
                         >
                           <Link2 className="mr-2 h-4 w-4" />
@@ -529,9 +560,13 @@ export function Distribution() {
               <h2 className="text-xl font-semibold text-primary">Scheduled Posts</h2>
               <p className="text-sm text-slate-500">Activate multi-channel distribution and keep audiences warm.</p>
             </div>
-            <Button onClick={() => setScheduleModal(true)} className="shadow-[0_20px_45px_-25px_rgba(99,102,241,0.5)]">
+            <Button
+              onClick={() => setScheduleModal(true)}
+              className="shadow-[0_20px_45px_-25px_rgba(99,102,241,0.5)]"
+              disabled={!hasSubscription}
+            >
               <Calendar className="mr-2 h-4 w-4" />
-              Schedule post
+              {hasSubscription ? 'Schedule post' : 'Upgrade to schedule'}
             </Button>
           </div>
 
@@ -784,8 +819,8 @@ export function Distribution() {
                       type="button"
                       onClick={() => togglePlatform(key)}
                       className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-medium transition ${isSelected
-                          ? 'border-brand-300 bg-brand-50 text-brand-600 shadow-[0_18px_45px_-30px_rgba(99,102,241,0.45)]'
-                          : 'border-white/60 bg-white/70 text-slate-500 hover:border-brand-200 hover:text-brand-600'
+                        ? 'border-brand-300 bg-brand-50 text-brand-600 shadow-[0_18px_45px_-30px_rgba(99,102,241,0.45)]'
+                        : 'border-white/60 bg-white/70 text-slate-500 hover:border-brand-200 hover:text-brand-600'
                         }`}
                     >
                       <Icon className="h-5 w-5" />
