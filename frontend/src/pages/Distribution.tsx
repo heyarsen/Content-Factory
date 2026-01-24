@@ -53,7 +53,7 @@ const platformNames = {
 
 export function Distribution() {
   const { user } = useAuth()
-  const hasSubscription = user?.hasActiveSubscription || false
+  const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
 
   // Social Accounts state
   const [accounts, setAccounts] = useState<SocialAccount[]>([])

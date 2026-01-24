@@ -26,7 +26,7 @@ interface PostStats {
 export function Dashboard() {
   const { t } = useLanguage()
   const { user } = useAuth()
-  const hasSubscription = user?.hasActiveSubscription ?? true
+  const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') ?? true
   const [videoStats, setVideoStats] = useState<VideoStats | null>(null)
   const [postStats, setPostStats] = useState<PostStats | null>(null)
   const [loading, setLoading] = useState(true)

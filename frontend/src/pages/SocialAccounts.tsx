@@ -108,7 +108,8 @@ export function SocialAccounts() {
     console.log('[Social] User ID:', user?.id)
     console.log('[Social] User Email:', user?.email)
 
-    if (!user?.hasActiveSubscription) {
+    const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin')
+    if (!hasSubscription) {
       toast.error(t('social_accounts.subscription_needed_alert'))
       return
     }
@@ -256,7 +257,7 @@ export function SocialAccounts() {
           </p>
         </div>
 
-        {!user?.hasActiveSubscription && (
+        {!(user?.hasActiveSubscription || user?.role === 'admin') && (
           <Card className="border-amber-200 bg-amber-50 p-4 sm:p-5">
             <div className="flex flex-col sm:flex-row items-center gap-4 text-amber-800">
               <Sparkles className="h-6 w-6 text-amber-500 shrink-0" />
@@ -361,7 +362,7 @@ export function SocialAccounts() {
                         size="sm"
                         onClick={() => handleConnect(platform)}
                         loading={connectingPlatform === platform}
-                        disabled={!user?.hasActiveSubscription}
+                        disabled={!(user?.hasActiveSubscription || user?.role === 'admin')}
                         className="w-full"
                       >
                         <Link2 className="mr-2 h-4 w-4" />

@@ -37,7 +37,7 @@ export function Videos() {
   const { addNotification } = useNotifications()
   const { t } = useLanguage()
   const { user } = useAuth()
-  const hasSubscription = user?.hasActiveSubscription || false
+  const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
   const [searchParams, setSearchParams] = useSearchParams()
   const [videos, setVideos] = useState<VideoRecord[]>([])
   const [loading, setLoading] = useState(true)

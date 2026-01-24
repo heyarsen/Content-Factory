@@ -209,11 +209,11 @@ export function ProfileSettings() {
                   <CreditCard className="h-4 w-4 text-slate-400" />
                   <span className="text-sm font-medium text-slate-600">Subscription Status</span>
                 </div>
-                <Badge variant={user?.hasActiveSubscription ? 'success' : 'warning'}>
-                  {user?.hasActiveSubscription ? 'Active' : 'Inactive'}
+                <Badge variant={(user?.hasActiveSubscription || user?.role === 'admin') ? 'success' : 'warning'}>
+                  {(user?.hasActiveSubscription || user?.role === 'admin') ? 'Active' : 'Inactive'}
                 </Badge>
               </div>
-              {!user?.hasActiveSubscription && (
+              {!(user?.hasActiveSubscription || user?.role === 'admin') && (
                 <div className="rounded-xl bg-amber-50 p-4 border border-amber-100">
                   <div className="mb-3 flex items-start gap-3">
                     <Sparkles className="mt-0.5 h-4 w-4 text-amber-500" />

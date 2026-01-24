@@ -108,7 +108,7 @@ interface ScheduledPost {
 export function VideoPlanning() {
   const { t, language } = useLanguage()
   const { user } = useAuth()
-  const hasSubscription = user?.hasActiveSubscription || false
+  const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
   const navigate = useNavigate()
   const [plans, setPlans] = useState<VideoPlan[]>([])
   const [selectedPlan, setSelectedPlan] = useState<VideoPlan | null>(null)

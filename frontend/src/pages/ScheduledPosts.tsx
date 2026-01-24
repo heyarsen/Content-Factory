@@ -43,7 +43,7 @@ const platformNames = {
 
 export function ScheduledPosts() {
   const { user } = useAuth()
-  const hasSubscription = user?.hasActiveSubscription || false
+  const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
   const [posts, setPosts] = useState<Post[]>([])
   const [videos, setVideos] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
