@@ -33,7 +33,7 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
   // Check cache first (unless force refresh is requested)
   const cached = profileCache.get(userId)
   if (!forceRefresh && cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    console.log('[Auth) Using cached profile data')
+    console.log('[Auth] Using cached profile data')
     return cached.data
   }
 
@@ -78,7 +78,15 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
 
     const role = isAdminEmail ? 'admin' : (profileData?.role || 'user')
     let hasActiveSubscription = false
-    let subStatusReason = 'No subscription found'
+    let subStatusReason = 'PENDING_CHECK'
+
+    console.log('[Auth] Debugging status determination:', {
+      role,
+      isAdminEmail,
+      hasProfileFlag: profileData?.has_active_subscription,
+      hasLatestSub: !!latestSub,
+      latestSubStatus: latestSub?.status
+    })
 
     if (role === 'admin') {
       hasActiveSubscription = true
@@ -87,21 +95,21 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
       // THE MOST RECENT RECORD IS THE SOURCE OF TRUTH
       const isAllowedStatus = ['active', 'pending'].includes(latestSub.status)
       hasActiveSubscription = isAllowedStatus
-      subStatusReason = `Latest record: ${latestSub.status}`
+      subStatusReason = `Sub Table: ${latestSub.status}`
+      console.log(`[Auth] Using Sub Table. Status: ${latestSub.status} -> Active: ${hasActiveSubscription}`)
     } else if (profileData?.has_active_subscription) {
-      // Fallback to profile flag only if no subscription record found
+      // ONLY use profile flag if NO subscription record exists at all
       hasActiveSubscription = true
-      subStatusReason = 'Profile Flag (Legacy/Sync)'
+      subStatusReason = 'Profile Flag (No sub record found)'
+      console.log('[Auth] Using Profile Flag (Fallback)')
+    } else {
+      hasActiveSubscription = false
+      subStatusReason = 'No active records'
+      console.log('[Auth] No active sub found anywhere')
     }
 
-    console.log('[Auth] Final subscription check result:', {
-      userId,
-      hasActiveSubscription,
-      subStatusReason,
-      latestSub
-    })
-
     const result = { role, hasActiveSubscription, subStatusReason }
+    console.log('[Auth] FINAL RESULT for state update:', result)
 
     console.log('[Auth] Robust profile check completed:', {
       userId,
@@ -118,7 +126,7 @@ const fetchUserRoleAndSubscription = async (userId: string, forceRefresh: boolea
     return result
   } catch (err) {
     console.error('[Auth] Robust Role/Subscription fetch error:', err)
-    return { role: 'user', hasActiveSubscription: false }
+    return { role: 'user', hasActiveSubscription: false, subStatusReason: 'Fetch Error' }
   }
 }
 
@@ -190,21 +198,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             let role: 'user' | 'admin' = 'user'
             let hasActiveSubscription = false
+            let subStatusReason = 'PENDING'
 
             if (profileResult.status === 'fulfilled') {
               role = profileResult.value.role as 'user' | 'admin'
               hasActiveSubscription = profileResult.value.hasActiveSubscription || false
-              const subStatusReason = profileResult.value.subStatusReason
+              subStatusReason = profileResult.value.subStatusReason
               console.log('[Auth] User profile fetched in parallel:', { role, hasActiveSubscription, subStatusReason })
             } else {
               console.warn('[Auth] Profile fetch failed, using defaults')
+              subStatusReason = 'Profile fetch failed'
             }
 
             const user = {
               ...session.user,
               role,
               hasActiveSubscription,
-              subStatusReason: profileResult.status === 'fulfilled' ? profileResult.value.subStatusReason : 'Profile fetch failed'
+              subStatusReason
             } as User
             localStorage.setItem('access_token', session.access_token)
             localStorage.setItem('auth_user', JSON.stringify(user))
@@ -234,21 +244,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           let role: 'user' | 'admin' = 'user'
           let hasActiveSubscription = false
+          let subStatusReason = 'PENDING'
 
           if (profileResult.status === 'fulfilled') {
             role = profileResult.value.role as 'user' | 'admin'
             hasActiveSubscription = profileResult.value.hasActiveSubscription || false
-            const subStatusReason = profileResult.value.subStatusReason
+            subStatusReason = profileResult.value.subStatusReason
             console.log('[Auth] User profile fetched on state change:', { role, hasActiveSubscription, subStatusReason })
           } else {
             console.warn('[Auth] Profile fetch failed on state change, using defaults')
+            subStatusReason = 'Profile fetch failed'
           }
 
           const user = {
             ...session.user,
             role,
             hasActiveSubscription,
-            subStatusReason: profileResult.status === 'fulfilled' ? profileResult.value.subStatusReason : 'Profile fetch failed'
+            subStatusReason
           } as User
           localStorage.setItem('access_token', session.access_token)
           localStorage.setItem('auth_user', JSON.stringify(user))
@@ -447,7 +459,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('auth_user', JSON.stringify(updatedUser))
       setUser(updatedUser as User)
 
-      console.log('[Auth] ✅ Subscription status refreshed:', {
+      console.log('[Auth] ✅ Subscription status refreshed (force):', {
         role: role,
         hasActiveSubscription: hasActive,
         subStatusReason: profile.subStatusReason
