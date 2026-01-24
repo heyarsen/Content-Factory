@@ -52,8 +52,10 @@ const fetchUserRoleAndSubscription = async (userId: string, userEmail: string, f
       const expired = latestSub.expires_at && new Date(latestSub.expires_at).getTime() < Date.now()
       hasActive = active && !expired
       reason = `Sub: ${latestSub.status}${expired ? ' (EXP)' : ''}`
-    } else if (profileData?.has_active_subscription) {
-      hasActive = true; reason = 'Profile Flag'
+    } else {
+      // No sub record found and not admin
+      hasActive = false
+      reason = 'No Sub Record'
     }
 
     const res = { role: isAdmin ? 'admin' : 'user', hasActiveSubscription: hasActive, debugReason: reason, rawLatestSub: latestSub }
