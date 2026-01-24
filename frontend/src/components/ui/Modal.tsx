@@ -36,7 +36,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', closeOnOv
 
   return (
     <div
-      className="fixed z-[9999] inset-0 sm:inset-4 flex items-center justify-center p-4 sm:p-6"
+      className="fixed z-[9999] inset-0 sm:inset-4 flex items-center justify-center p-2 sm:p-6"
       onClick={closeOnOverlayClick ? handleClose : undefined}
     >
       {/* Backdrop */}
@@ -47,15 +47,15 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', closeOnOv
 
       {/* Modal Content - Centered */}
       <div
-        className={`modal-content relative w-full ${sizes[size]} transform overflow-hidden rounded-[24px] sm:rounded-[32px] border border-white/40 bg-white/95 text-left shadow-2xl transition-all flex flex-col backdrop-blur-xl`}
+        className={`modal-content relative w-full ${sizes[size]} transform overflow-hidden rounded-[20px] sm:rounded-[32px] border border-white/40 bg-white/95 text-left shadow-2xl transition-all flex flex-col backdrop-blur-xl`}
         onClick={(e) => e.stopPropagation()}
         style={{
-          maxHeight: 'calc(100vh - 2rem)',
-          height: size === 'full' ? 'calc(100vh - 2rem)' : 'auto'
+          maxHeight: 'calc(100vh - 1rem)',
+          height: size === 'full' ? 'calc(100vh - 1rem)' : 'auto'
         }}
       >
         {/* Header - Fixed height */}
-        <div className={`flex items-center border-b border-slate-200 px-6 sm:px-8 py-4 bg-white flex-shrink-0 ${showCloseButton ? 'justify-between' : 'justify-center'}`}>
+        <div className={`flex items-center border-b border-slate-200 px-4 sm:px-8 py-3 sm:py-4 bg-white flex-shrink-0 ${showCloseButton ? 'justify-between' : 'justify-center'}`}>
           <h3 className="text-lg font-semibold text-slate-900 truncate pr-2">{title}</h3>
           {showCloseButton && (
             <button
@@ -68,8 +68,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', closeOnOv
             </button>
           )}
         </div>
-        {/* Content - Scrollable */}
-        <div className="px-6 sm:px-8 py-4 sm:py-6 overflow-y-auto flex-1 min-h-0">
+        <div className="px-4 sm:px-8 py-4 sm:py-6 overflow-y-auto flex-1 min-h-0">
           {children}
         </div>
       </div>

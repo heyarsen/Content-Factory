@@ -16,7 +16,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     return (
       <div className="w-full">
         {label && finalId && (
-          <label 
+          <label
             htmlFor={finalId}
             className="mb-2 block text-sm font-semibold text-slate-500"
           >
@@ -27,11 +27,10 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           ref={ref}
           id={finalId}
           name={finalName}
-          className={`w-full resize-none rounded-2xl border px-4 py-3 text-sm transition focus:outline-none ${
-            error
+          className={`w-full resize-none rounded-2xl border px-3 sm:px-4 py-2.5 sm:py-3 text-base sm:text-sm transition focus:outline-none ${error
               ? 'border-red-300 bg-white focus:border-red-400 focus:ring-2 focus:ring-red-200'
               : 'border-slate-300 bg-white shadow-sm focus:border-brand-400 focus:ring-2 focus:ring-brand-200'
-          } ${className}`}
+            } ${className}`}
           {...props}
         />
         {error && (
