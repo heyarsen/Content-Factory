@@ -10,7 +10,7 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { user, refreshSubscriptionStatus } = useAuth() // Added refreshSubscriptionStatus
+  const { user, refreshSubscriptionStatus } = useAuth()
 
   return (
     <div className="relative flex min-h-screen bg-background">
@@ -24,28 +24,41 @@ export function Layout({ children }: LayoutProps) {
         </main>
       </div>
 
-      {/* DEBUG OVERLAY - TEMPORARY */}
-      <div className="fixed bottom-4 right-4 z-50 bg-black/80 text-white p-4 rounded-lg text-xs font-mono max-w-sm overflow-auto shadow-2xl border border-white/20">
-        <div className="flex items-center justify-between mb-2">
-          <strong className="flex items-center gap-2"><Info size={14} /> DEBUG INFO</strong>
+      {/* NUCLEAR DEBUG OVERLAY - VERSION 3 */}
+      <div className="fixed bottom-4 right-4 z-50 bg-black/90 text-white p-4 rounded-lg text-[10px] font-mono max-w-xs overflow-auto shadow-2xl border border-brand-500/50 backdrop-blur-md">
+        <div className="flex items-center justify-between mb-2 border-b border-white/10 pb-2">
+          <strong className="flex items-center gap-2 text-brand-400"><Info size={12} /> DB DEBUG V3</strong>
           <button
             onClick={async () => {
               const res = await refreshSubscriptionStatus()
-              alert(`Refreshed!\nActive: ${res.hasActiveSubscription} \nRole: ${res.role} `)
+              alert(`REFRESHED!\nActive: ${res.hasActiveSubscription}\nReason: ${user?.debugReason}`)
             }}
-            className="bg-brand-500 hover:bg-brand-600 px-2 py-1 rounded text-[10px] uppercase font-bold"
+            className="bg-brand-500 hover:bg-brand-600 px-2 py-0.5 rounded uppercase font-bold text-[9px]"
           >
-            Force Refresh
+            REFRESH
           </button>
         </div>
-        <div className="space-y-1">
-          <div>ID: {user?.id?.slice(0, 8)}...</div>
-          <div>Email: {user?.email}</div>
-          <div className={user?.hasActiveSubscription ? 'text-green-400' : 'text-red-400'}>
-            Subscription: {String(user?.hasActiveSubscription)}
+        <div className="space-y-1.5 pt-1">
+          <div className="flex justify-between">
+            <span>Email:</span>
+            <span className="text-slate-300 truncate ml-1">{user?.email}</span>
           </div>
-          <div className="text-[10px] text-slate-400 italic">Reason: {user?.subStatusReason}</div>
-          <div>Role: {user?.role}</div>
+          <div className="flex justify-between font-bold">
+            <span>ACTIVE:</span>
+            <span className={user?.hasActiveSubscription ? 'text-green-400' : 'text-red-400'}>
+              {String(user?.hasActiveSubscription).toUpperCase()}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span>Reason:</span>
+            <span className="text-cyan-400">{user?.debugReason || 'EMPTY'}</span>
+          </div>
+          <div className="mt-2 text-[8px] text-slate-500 border-t border-white/5 pt-2">
+            <div>Latest Sub:</div>
+            <pre className="mt-1 bg-white/5 p-1 rounded max-h-20 overflow-y-auto text-[7px] text-slate-400">
+              {user?.rawLatestSub ? JSON.stringify(user.rawLatestSub, null, 2) : 'NONE'}
+            </pre>
+          </div>
         </div>
       </div>
     </div>
