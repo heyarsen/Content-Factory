@@ -13,6 +13,7 @@ import { Textarea } from '../components/ui/Textarea'
 import { Video as VideoIcon, Search, Trash2, RefreshCw, Download, Share2, Sparkles, Check, Music, Heart, MessageCircle, Bookmark, ArrowRight } from 'lucide-react'
 import { useNotifications } from '../contexts/NotificationContext'
 import { useLanguage } from '../contexts/LanguageContext'
+import { useAuth } from '../contexts/AuthContext'
 import api from '../lib/api'
 import { supabase } from '../lib/supabase'
 import {
@@ -35,6 +36,8 @@ interface SocialAccount {
 export function Videos() {
   const { addNotification } = useNotifications()
   const { t } = useLanguage()
+  const { user } = useAuth()
+  const hasSubscription = user?.hasActiveSubscription || false
   const [searchParams, setSearchParams] = useSearchParams()
   const [videos, setVideos] = useState<VideoRecord[]>([])
   const [loading, setLoading] = useState(true)
@@ -456,13 +459,33 @@ export function Videos() {
             <h1 className="text-3xl font-semibold text-primary">{t('videos.library_title')}</h1>
             <p className="text-sm text-slate-500">{t('videos.library_desc')}</p>
           </div>
-          <Link to="/create" className="w-full md:w-auto">
-            <Button className="w-full md:w-auto shadow-[0_20px_45px_-25px_rgba(99,102,241,0.6)]">
+          <Link to={hasSubscription ? "/create" : "/credits"} className="w-full md:w-auto">
+            <Button
+              className="w-full md:w-auto shadow-[0_20px_45px_-25px_rgba(99,102,241,0.6)]"
+              variant={hasSubscription ? "default" : "secondary"}
+            >
               <VideoIcon className="mr-2 h-4 w-4" />
-              {t('videos.create_video')}
+              {hasSubscription ? t('videos.create_video') : t('common.upgrade_required') || 'Upgrade Required'}
             </Button>
           </Link>
         </div>
+
+        {!hasSubscription && (
+          <Card className="border-amber-200 bg-amber-50 p-4 sm:p-6 mb-6">
+            <div className="flex items-center gap-4 text-amber-800">
+              <Sparkles className="h-6 w-6 text-amber-500" />
+              <div>
+                <h3 className="font-semibold">{t('videos.subscription_required') || 'Subscription Required'}</h3>
+                <p className="text-sm opacity-90">{t('videos.subscription_expire_desc') || 'Your subscription is inactive. Please upgrade to continue generating videos and scheduling posts.'}</p>
+              </div>
+              <Link to="/credits" className="ml-auto">
+                <Button size="sm" variant="default" className="bg-amber-600 hover:bg-amber-700 border-none">
+                  {t('common.upgrade_now') || 'Upgrade Now'}
+                </Button>
+              </Link>
+            </div>
+          </Card>
+        )}
 
         <Card className="border-dashed border-white/40 p-4 sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -590,9 +613,10 @@ export function Videos() {
                         size="sm"
                         className="border border-white/60 bg-white/70 text-brand-600 hover:border-brand-200 hover:bg-white"
                         onClick={() => handleOpenPostModal(video)}
+                        disabled={!hasSubscription}
                       >
                         <Share2 className="mr-2 h-4 w-4" />
-                        {t('videos.post')}
+                        {!hasSubscription ? (t('common.upgrade_needed') || 'Upgrade') : t('videos.post')}
                         <ArrowRight className="ml-2 h-3 w-3 opacity-60" />
                       </Button>
                       <Button
@@ -623,9 +647,10 @@ export function Videos() {
                       size="sm"
                       className="border border-white/60 bg-white/70 text-amber-500 hover:border-amber-200 hover:bg-white"
                       onClick={() => handleRetry(video.id)}
+                      disabled={!hasSubscription}
                     >
                       <RefreshCw className="mr-2 h-4 w-4" />
-                      {t('videos.retry')}
+                      {!hasSubscription ? (t('common.upgrade_needed') || 'Upgrade') : t('videos.retry')}
                     </Button>
                   )}
                   <Button
@@ -680,8 +705,9 @@ export function Videos() {
                         onClick={() => handleOpenPostModal(selectedVideo)}
                         leftIcon={<Share2 className="h-4 w-4" />}
                         className="w-full justify-center"
+                        disabled={!hasSubscription}
                       >
-                        {t('videos.post')}
+                        {!hasSubscription ? (t('common.upgrade_needed') || 'Upgrade') : t('videos.post')}
                       </Button>
                       <Button
                         variant="secondary"
@@ -760,8 +786,9 @@ export function Videos() {
                         onClick={() => handleOpenPostModal(selectedVideo)}
                         leftIcon={<Share2 className="h-4 w-4" />}
                         rightIcon={<ArrowRight className="h-4 w-4" />}
+                        disabled={!hasSubscription}
                       >
-                        {t('videos.post')}
+                        {!hasSubscription ? (t('common.upgrade_needed') || 'Upgrade') : t('videos.post')}
                       </Button>
                     )}
                     <Button

@@ -534,6 +534,13 @@ export class AutomationService {
         const nowInPlanTz = DateTime.now().setZone(planTimezone)
         const today = nowInPlanTz.toFormat('yyyy-MM-dd')
 
+        // Check if user has an active subscription
+        const hasActiveSub = await SubscriptionService.hasActiveSubscription(plan.user_id)
+        if (!hasActiveSub) {
+          console.log(`[Automation] Skipping research generation for plan ${plan.id} - user ${plan.user_id} has no active subscription`)
+          continue
+        }
+
         // Check if trigger time has passed
         if (plan.trigger_time) {
           const [triggerHourStr, triggerMinuteStr] = plan.trigger_time.split(':')
@@ -604,6 +611,13 @@ export class AutomationService {
         const planTimezone = plan.timezone || 'UTC'
         const nowInPlanTz = DateTime.now().setZone(planTimezone)
         const today = nowInPlanTz.toFormat('yyyy-MM-dd')
+
+        // Check if user has an active subscription
+        const hasActiveSub = await SubscriptionService.hasActiveSubscription(plan.user_id)
+        if (!hasActiveSub) {
+          console.log(`[Automation] Skipping script generation for plan ${plan.id} - user ${plan.user_id} has no active subscription`)
+          continue
+        }
 
         // Check if trigger time has passed
         if (plan.trigger_time) {
@@ -734,6 +748,13 @@ export class AutomationService {
         const planTimezone = plan.timezone || 'UTC'
         const nowInPlanTz = DateTime.now().setZone(planTimezone)
         const today = nowInPlanTz.toFormat('yyyy-MM-dd')
+
+        // Check if user has an active subscription
+        const hasActiveSub = await SubscriptionService.hasActiveSubscription(plan.user_id)
+        if (!hasActiveSub) {
+          console.log(`[Automation] Skipping video generation for plan ${plan.id} - user ${plan.user_id} has no active subscription`)
+          continue
+        }
 
         // Check if trigger time has passed
         if (plan.trigger_time) {
@@ -1395,49 +1416,59 @@ export class AutomationService {
     const allItemsCount = items?.length || 0
     console.log(`[Distribution] Found ${itemsToProcess.length} items to process for posting (out of ${allItemsCount} total)`)
 
-    // Check if items have existing posts that should prevent duplicate posting
     // This check is important even for items without scheduled_post_id, as posts might exist
     // We'll build a new array instead of mutating the existing one to avoid index issues
     const filteredItems: typeof itemsToProcess = []
 
     for (const item of itemsToProcess) {
-      // Always check for existing scheduled posts, regardless of scheduled_post_id
-      const { data: existingPosts } = await supabase
-        .from('scheduled_posts')
-        .select('status, created_at, platform')
-        .eq('video_id', item.video_id)
-
-      if (existingPosts && existingPosts.length > 0) {
-        const allFailed = existingPosts.every(p => p.status === 'failed')
-        const anyPending = existingPosts.some(p => p.status === 'pending' || p.status === 'scheduled')
-        const anyPosted = existingPosts.some(p => p.status === 'posted')
-
-        // If any posts are pending or posted, skip to prevent duplicates
-        if (anyPending || anyPosted) {
-          console.log(`[Distribution] Skipping item ${item.id} - has ${existingPosts.length} existing post(s) with status: ${existingPosts.map(p => `${p.platform}:${p.status}`).join(', ')}`)
+      try {
+        // Check if user has an active subscription
+        const hasActiveSub = await SubscriptionService.hasActiveSubscription(item.plan.user_id)
+        if (!hasActiveSub) {
+          console.log(`[Distribution] Skipping distribution for item ${item.id} - user ${item.plan.user_id} has no active subscription`)
           continue
         }
 
-        // If all posts failed, check if we should retry
-        if (allFailed) {
-          // Check when posts were created - if recent (< 1 hour), don't retry yet
-          const mostRecentPost = existingPosts.sort((a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          )[0]
+        // Always check for existing scheduled posts, regardless of scheduled_post_id
+        const { data: existingPosts } = await supabase
+          .from('scheduled_posts')
+          .select('status, created_at, platform')
+          .eq('video_id', item.video_id)
 
-          if (mostRecentPost) {
-            const postAge = Date.now() - new Date(mostRecentPost.created_at).getTime()
-            const oneHour = 60 * 60 * 1000
-            if (postAge < oneHour) {
-              console.log(`[Distribution] Skipping item ${item.id} - all posts failed recently (${Math.round(postAge / 60000)} minutes ago), waiting before retry`)
-              continue
+        if (existingPosts && existingPosts.length > 0) {
+          const allFailed = existingPosts.every(p => p.status === 'failed')
+          const anyPending = existingPosts.some(p => p.status === 'pending' || p.status === 'scheduled')
+          const anyPosted = existingPosts.some(p => p.status === 'posted')
+
+          // If any posts are pending or posted, skip to prevent duplicates
+          if (anyPending || anyPosted) {
+            console.log(`[Distribution] Skipping item ${item.id} - has ${existingPosts.length} existing post(s) with status: ${existingPosts.map(p => `${p.platform}:${p.status}`).join(', ')}`)
+            continue
+          }
+
+          // If all posts failed, check if we should retry
+          if (allFailed) {
+            // Check when posts were created - if recent (< 1 hour), don't retry yet
+            const mostRecentPost = existingPosts.sort((a, b) =>
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            )[0]
+
+            if (mostRecentPost) {
+              const postAge = Date.now() - new Date(mostRecentPost.created_at).getTime()
+              const oneHour = 60 * 60 * 1000
+              if (postAge < oneHour) {
+                console.log(`[Distribution] Skipping item ${item.id} - all posts failed recently (${Math.round(postAge / 60000)} minutes ago), waiting before retry`)
+                continue
+              }
             }
           }
         }
-      }
 
-      // Item passed all checks, add it to filtered list
-      filteredItems.push(item)
+        // Item passed all checks, add it to filtered list
+        filteredItems.push(item)
+      } catch (error: any) {
+        console.error(`[Distribution] Error filtering item ${item.id}:`, error.message)
+      }
     }
 
     // Replace itemsToProcess with filtered list

@@ -356,10 +356,22 @@ router.delete('/account', authenticate, async (req: AuthRequest, res: Response) 
 // Get current user
 router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
   try {
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('subscription_plan_id, subscription_status, credits')
+      .eq('id', req.userId)
+      .single()
+
+    const hasActiveSubscription = profile?.subscription_status === 'active' || profile?.subscription_status === 'trialing'
+
     res.json({
       user: {
         ...req.user,
-        role: (req as any).role
+        role: (req as any).role,
+        credits: profile?.credits || 0,
+        subscription_plan_id: profile?.subscription_plan_id,
+        subscription_status: profile?.subscription_status,
+        hasActiveSubscription
       }
     })
   } catch (error: any) {

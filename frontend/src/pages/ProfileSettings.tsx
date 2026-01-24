@@ -9,6 +9,8 @@ import { useToast } from '../hooks/useToast'
 import { User, Lock, Mail, LogOut } from 'lucide-react'
 import api from '../lib/api'
 import { useLanguage } from '../contexts/LanguageContext'
+import { Sparkles, CreditCard } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 export function ProfileSettings() {
   const { user, signOut } = useAuth()
@@ -194,11 +196,38 @@ export function ProfileSettings() {
               <span className="text-sm font-medium text-slate-600">{t('common.email')}</span>
               <span className="text-sm text-slate-500">{user?.email}</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between border-b border-slate-200 pb-3">
               <span className="text-sm font-medium text-slate-600">{t('preferences.email_verified')}</span>
               <span className="text-sm text-slate-500">
                 {user?.email_confirmed_at ? t('preferences.yes') : t('preferences.no')}
               </span>
+            </div>
+            <div className="flex flex-col gap-4 pt-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-slate-400" />
+                  <span className="text-sm font-medium text-slate-600">Subscription Status</span>
+                </div>
+                <Badge variant={user?.hasActiveSubscription ? 'success' : 'warning'}>
+                  {user?.hasActiveSubscription ? 'Active' : 'Inactive'}
+                </Badge>
+              </div>
+              {!user?.hasActiveSubscription && (
+                <div className="rounded-xl bg-amber-50 p-4 border border-amber-100">
+                  <div className="mb-3 flex items-start gap-3">
+                    <Sparkles className="mt-0.5 h-4 w-4 text-amber-500" />
+                    <div>
+                      <p className="text-sm font-medium text-amber-900">Upgrade Required</p>
+                      <p className="text-xs text-amber-700">Your subscription is inactive. Generating videos and AI-powered planning features are disabled.</p>
+                    </div>
+                  </div>
+                  <Link to="/credits">
+                    <Button size="sm" className="w-full bg-amber-600 hover:bg-amber-700 border-none">
+                      Go to Subscription
+                    </Button>
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </Card>

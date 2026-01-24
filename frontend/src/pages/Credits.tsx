@@ -529,7 +529,7 @@ export function Credits() {
                       <div className="mb-4 mt-auto">
                         <div className="flex items-baseline gap-2">
                           <span className="text-3xl font-bold text-slate-900">
-                            {plan.id === 'plan_free' ? '3' : plan.credits}
+                            {plan.credits}
                           </span>
                           <span className="text-sm text-slate-500">{t('credits.credits_unit')}</span>
                         </div>

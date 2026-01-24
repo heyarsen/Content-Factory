@@ -19,6 +19,12 @@ export const ru = {
         selection_required: "Требуется выбор",
         preferences: "Настройки",
         email: "Электронная почта",
+        upgrade_now: 'Обновить сейчас',
+        upgrade_needed: 'Нужна подписка',
+        upgrade_required: 'Требуется подписка',
+        upgrade_to_create: 'Обновите тариф для создания',
+        upgrade_to_generate: 'Обновите тариф для генерации',
+        go_to_credits: 'Посмотреть тарифы',
     },
     dashboard: {
         title: "Создатель видео",
@@ -256,6 +262,8 @@ export const ru = {
         post_success_message: "Ваше видео публикуется в",
         post_fail_title: "Ошибка публикации",
         post_fail_message: "Не удалось запланировать пост. Пожалуйста, проверьте подключение соцсетей.",
+        subscription_required: 'Требуется подписка',
+        subscription_expire_desc: 'Ваша подписка неактивна. Пожалуйста, обновите тариф, чтобы продолжить создание видео и планирование постов.',
     },
     quick_create: {
         title: "Создать новое видео",

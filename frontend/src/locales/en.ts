@@ -19,6 +19,12 @@ export const en = {
         selection_required: "Selection Required",
         preferences: "Preferences",
         email: "Email",
+        upgrade_now: 'Upgrade Now',
+        upgrade_needed: 'Upgrade Needed',
+        upgrade_required: 'Upgrade Required',
+        upgrade_to_create: 'Upgrade to Create',
+        upgrade_to_generate: 'Upgrade to Generate',
+        go_to_credits: 'View Plans',
     },
     dashboard: {
         title: "Video Creator",
@@ -256,6 +262,8 @@ export const en = {
         post_success_message: "Your video is being posted to",
         post_fail_title: "Posting Failed",
         post_fail_message: "Failed to schedule your posts. Please check your social connections.",
+        subscription_required: 'Subscription Required',
+        subscription_expire_desc: 'Your subscription is inactive. Please upgrade to continue generating videos and scheduling posts.',
     },
     quick_create: {
         title: "Create a new video",

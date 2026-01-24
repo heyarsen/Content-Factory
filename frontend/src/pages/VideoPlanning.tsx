@@ -31,6 +31,8 @@ import {
 import api from '../lib/api'
 import { timezones } from '../lib/timezones'
 import { useLanguage } from '../contexts/LanguageContext'
+import { useAuth } from '../contexts/AuthContext'
+import { Link } from 'react-router-dom'
 
 const STATUS_FILTER_KEY = 'video_planning_status_filter'
 
@@ -105,6 +107,8 @@ interface ScheduledPost {
 
 export function VideoPlanning() {
   const { t, language } = useLanguage()
+  const { user } = useAuth()
+  const hasSubscription = user?.hasActiveSubscription || false
   const navigate = useNavigate()
   const [plans, setPlans] = useState<VideoPlan[]>([])
   const [selectedPlan, setSelectedPlan] = useState<VideoPlan | null>(null)
@@ -1145,8 +1149,9 @@ export function VideoPlanning() {
             onClick={() => setCreateModal(true)}
             leftIcon={<Plus className="h-4 w-4" />}
             className="w-full md:w-auto"
+            disabled={!hasSubscription}
           >
-            {t('video_planning.new_plan')}
+            {hasSubscription ? t('video_planning.new_plan') : t('common.upgrade_required') || 'Upgrade Required'}
           </Button>
         </div>
 
@@ -1181,6 +1186,23 @@ export function VideoPlanning() {
                   </button>
                 </div>
               ))}
+            </div>
+          </Card>
+        )}
+
+        {!hasSubscription && (
+          <Card className="border-amber-200 bg-amber-50 p-4 sm:p-5">
+            <div className="flex items-center gap-4 text-amber-800">
+              <Sparkles className="h-6 w-6 text-amber-500" />
+              <div>
+                <h3 className="font-semibold">{t('videos.subscription_required') || 'Subscription Required'}</h3>
+                <p className="text-sm opacity-90">{t('videos.subscription_expire_desc') || 'Your subscription is inactive. Please upgrade to continue generating videos and scheduling posts.'}</p>
+              </div>
+              <Link to="/credits" className="ml-auto">
+                <Button size="sm" variant="default" className="bg-amber-600 hover:bg-amber-700 border-none">
+                  {t('common.upgrade_now') || 'Upgrade Now'}
+                </Button>
+              </Link>
             </div>
           </Card>
         )}
@@ -1802,8 +1824,9 @@ export function VideoPlanning() {
                                     variant="ghost"
                                     onClick={() => handleGenerateTopic(item.id)}
                                     leftIcon={<Sparkles className="h-4 w-4" />}
+                                    disabled={!hasSubscription}
                                   >
-                                    {item.topic ? t('video_planning.regenerate') : t('video_planning.auto_generate')}
+                                    {!hasSubscription ? (t('common.upgrade_needed') || 'Upgrade') : (item.topic ? t('video_planning.regenerate') : t('video_planning.auto_generate'))}
                                   </Button>
                                 )}
                                 {item.script_status === 'draft' &&
@@ -1820,6 +1843,7 @@ export function VideoPlanning() {
                                 {item.status === 'ready' && !item.script && (
                                   <Button
                                     size="sm"
+                                    disabled={!hasSubscription}
                                     onClick={async () => {
                                       try {
                                         await api.post(

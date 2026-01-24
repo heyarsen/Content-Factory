@@ -8,8 +8,10 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { Modal } from '../components/ui/Modal'
 import { Input } from '../components/ui/Input'
 import { Textarea } from '../components/ui/Textarea'
-import { Calendar, Instagram, Youtube, Facebook, Users, ChevronLeft, ChevronRight } from 'lucide-react'
 import api from '../lib/api'
+import { useAuth } from '../contexts/AuthContext'
+import { Sparkles } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 interface Post {
   id: string
@@ -40,6 +42,8 @@ const platformNames = {
 }
 
 export function ScheduledPosts() {
+  const { user } = useAuth()
+  const hasSubscription = user?.hasActiveSubscription || false
   const [posts, setPosts] = useState<Post[]>([])
   const [videos, setVideos] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -278,12 +282,30 @@ export function ScheduledPosts() {
                 setScheduleModal(true)
               }}
               className="shadow-[0_20px_45px_-25px_rgba(99,102,241,0.5)]"
+              disabled={!hasSubscription}
             >
               <Calendar className="mr-2 h-4 w-4" />
-              Schedule post
+              {hasSubscription ? 'Schedule post' : 'Upgrade to schedule'}
             </Button>
           </div>
         </div>
+
+        {!hasSubscription && (
+          <Card className="border-amber-200 bg-amber-50 p-4 sm:p-5">
+            <div className="flex items-center gap-4 text-amber-800">
+              <Sparkles className="h-6 w-6 text-amber-500" />
+              <div>
+                <h3 className="font-semibold">Subscription Required</h3>
+                <p className="text-sm opacity-90">Your subscription is inactive. Please upgrade to schedule posts to social media.</p>
+              </div>
+              <Link to="/credits" className="ml-auto">
+                <Button size="sm" variant="default" className="bg-amber-600 hover:bg-amber-700 border-none">
+                  Upgrade Now
+                </Button>
+              </Link>
+            </div>
+          </Card>
+        )}
 
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
           {/* Calendar - Always visible */}
