@@ -4,13 +4,13 @@ import { Sidebar } from './Sidebar'
 import { Info } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 
-interface LayoutProps {
-  children: ReactNode
-}
-
-export function Layout({ children }: LayoutProps) {
+export function Layout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { user, refreshSubscriptionStatus } = useAuth()
+
+  // Get Project ID from URL
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+  const projectId = supabaseUrl.split('//')[1]?.split('.')[0] || 'UNKNOWN'
 
   return (
     <div className="relative flex min-h-screen bg-background">
@@ -24,24 +24,21 @@ export function Layout({ children }: LayoutProps) {
         </main>
       </div>
 
-      {/* NUCLEAR DEBUG OVERLAY - VERSION 3 */}
-      <div className="fixed bottom-4 right-4 z-50 bg-black/90 text-white p-4 rounded-lg text-[10px] font-mono max-w-xs overflow-auto shadow-2xl border border-brand-500/50 backdrop-blur-md">
+      {/* STABILITY DEBUG BOX V6 */}
+      <div className="fixed bottom-4 right-4 z-50 bg-black/90 text-white p-4 rounded-lg text-[10px] font-mono max-w-xs shadow-2xl border border-brand-500/50 backdrop-blur-md">
         <div className="flex items-center justify-between mb-2 border-b border-white/10 pb-2">
-          <strong className="flex items-center gap-2 text-brand-400"><Info size={12} /> DB DEBUG V3</strong>
+          <strong className="text-brand-400">PROJECT ID: {projectId}</strong>
           <button
-            onClick={async () => {
-              const res = await refreshSubscriptionStatus()
-              alert(`REFRESHED!\nActive: ${res.hasActiveSubscription}\nReason: ${res.debugReason}`)
-            }}
-            className="bg-brand-500 hover:bg-brand-600 px-2 py-0.5 rounded uppercase font-bold text-[9px]"
+            onClick={() => refreshSubscriptionStatus()}
+            className="bg-brand-500 px-2 py-0.5 rounded text-[8px]"
           >
             REFRESH
           </button>
         </div>
-        <div className="space-y-1.5 pt-1">
+        <div className="space-y-1">
           <div className="flex justify-between">
             <span>Email:</span>
-            <span className="text-slate-300 truncate ml-1">{user?.email}</span>
+            <span className="truncate ml-2 text-slate-400">{user?.email || 'OFFLINE'}</span>
           </div>
           <div className="flex justify-between font-bold">
             <span>ACTIVE:</span>
@@ -51,12 +48,12 @@ export function Layout({ children }: LayoutProps) {
           </div>
           <div className="flex justify-between">
             <span>Reason:</span>
-            <span className="text-cyan-400">{user?.debugReason || 'EMPTY'}</span>
+            <span className="text-cyan-400">{user?.debugReason || 'NONE'}</span>
           </div>
-          <div className="mt-2 text-[8px] text-slate-500 border-t border-white/5 pt-2">
-            <div>Latest Sub:</div>
-            <pre className="mt-1 bg-white/5 p-1 rounded max-h-20 overflow-y-auto text-[7px] text-slate-400">
-              {user?.rawLatestSub ? JSON.stringify(user.rawLatestSub, null, 2) : 'NONE'}
+          <div className="mt-2 text-[7px] text-slate-500 pt-1 border-t border-white/5">
+            <div>Latest Sub Record:</div>
+            <pre className="mt-1 bg-white/5 p-1 rounded max-h-20 overflow-auto text-slate-400">
+              {user?.rawLatestSub ? JSON.stringify(user.rawLatestSub, null, 1) : 'ABSENT'}
             </pre>
           </div>
         </div>
