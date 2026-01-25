@@ -38,9 +38,12 @@ export function Videos() {
   const { addNotification } = useNotifications()
   const { t } = useLanguage()
   const { user } = useAuth()
-  const { credits, unlimited } = useCreditsContext()
+  const { credits, unlimited, loading: creditsLoading } = useCreditsContext()
   const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
   const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
+  
+  // Debug logging
+  console.log('[Videos] Debug:', { hasSubscription, credits, unlimited, safeCanCreate, creditsLoading })
   const [searchParams, setSearchParams] = useSearchParams()
   const [videos, setVideos] = useState<VideoRecord[]>([])
   const [loading, setLoading] = useState(true)
