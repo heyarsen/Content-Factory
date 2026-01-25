@@ -1,6 +1,6 @@
 import { Router, Response, Request } from 'express'
 import express from 'express'
-import { authenticate, AuthRequest } from '../middleware/auth.js'
+import { authenticate, AuthRequest, requireSubscription } from '../middleware/auth.js'
 import { CreditsService } from '../services/creditsService.js'
 import { SubscriptionService } from '../services/subscriptionService.js'
 import { WayForPayService } from '../services/wayforpayService.js'
