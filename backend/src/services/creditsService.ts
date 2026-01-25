@@ -21,7 +21,7 @@ export class CreditsService {
 
     if (error) {
       console.error('[Credits] Error fetching user credits:', error)
-      // If profile doesn't exist, create it with 0 credits (users must purchase subscription)
+      // If profile doesn't exist, create it with 3 free credits for new users
       try {
         const { data: newProfile } = await supabase
           .from('user_profiles')

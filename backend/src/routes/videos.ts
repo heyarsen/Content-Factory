@@ -31,7 +31,7 @@ function handleServiceError(res: Response, error: any, fallbackMessage: string) 
 }
 
 // Generate video
-router.post('/generate', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
+router.post('/generate', authenticate, async (req: AuthRequest, res: Response) => {
   console.log('✅ Video generation endpoint hit!', {
     method: req.method,
     path: req.path,
@@ -216,7 +216,7 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 })
 
 // Retry failed generation
-router.post('/:id/retry', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
+router.post('/:id/retry', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { id } = req.params
