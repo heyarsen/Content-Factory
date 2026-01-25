@@ -76,7 +76,7 @@ router.post('/generate', authenticate, async (req: AuthRequest, res: Response) =
       aspect_ratio: aspect_ratio || null,
       dimension: dimension || null,
       provider: 'sora', // Always use Sora
-      output_resolution: null,
+      output_resolution: undefined,
     })
 
     console.log('✅ Video generation initiated successfully:', {
