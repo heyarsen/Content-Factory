@@ -90,7 +90,7 @@ function isUploadPostPlatformConnected(profile: any, platform: string): boolean 
 }
 
 // List connected accounts
-router.get('/accounts', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/accounts', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const userSupabase = req.userToken ? getSupabaseClientForUser(req.userToken) : supabase
@@ -156,7 +156,7 @@ router.get('/accounts', authenticate, async (req: AuthRequest, res: Response) =>
 })
 
 // Get or create Upload-Post user profile and generate access link for linking accounts
-router.post('/connect', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/connect', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const { platform } = req.body
     const userId = req.userId!
@@ -375,7 +375,7 @@ router.post('/connect', authenticate, async (req: AuthRequest, res: Response) =>
 })
 
 // Handle account connection confirmation (after user links account via Upload-Post UI)
-router.post('/callback', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/callback', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const { platform, uploadPostUsername } = req.body
     const userId = req.userId!
@@ -574,7 +574,7 @@ router.post('/callback', authenticate, async (req: AuthRequest, res: Response) =
 })
 
 // Disconnect account
-router.delete('/accounts/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.delete('/accounts/:id', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { id } = req.params
@@ -603,7 +603,7 @@ router.delete('/accounts/:id', authenticate, async (req: AuthRequest, res: Respo
 })
 
 // Get account status
-router.get('/accounts/:id/status', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/accounts/:id/status', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { id } = req.params
