@@ -25,7 +25,7 @@ export class CreditsService {
       try {
         const { data: newProfile } = await supabase
           .from('user_profiles')
-          .insert({ id: userId, credits: 3 })
+          .insert({ id: userId, credits: 3, preferred_language: 'en' })
           .select('credits')
           .single()
         return newProfile?.credits ?? 0
@@ -236,7 +236,7 @@ export class CreditsService {
       // Try to create profile if it doesn't exist
       const { data: newProfile } = await supabase
         .from('user_profiles')
-        .insert({ id: userId, credits: 3 })
+        .insert({ id: userId, credits: 3, preferred_language: 'en' })
         .select('credits')
         .single()
 
@@ -345,7 +345,7 @@ export class CreditsService {
       // Try to create profile if it doesn't exist
       const { data: newProfile } = await supabase
         .from('user_profiles')
-        .insert({ id: userId, credits: 3 })
+        .insert({ id: userId, credits: 3, preferred_language: 'en' })
         .select('credits')
         .single()
 

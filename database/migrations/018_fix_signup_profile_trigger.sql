@@ -13,8 +13,8 @@ CREATE OR REPLACE FUNCTION create_user_profile()
 RETURNS TRIGGER AS $$
 BEGIN
   BEGIN
-    INSERT INTO user_profiles (id, credits)
-    VALUES (NEW.id, 3)
+    INSERT INTO user_profiles (id, credits, preferred_language)
+    VALUES (NEW.id, 3, 'en')
     ON CONFLICT (id) DO NOTHING;
   EXCEPTION WHEN OTHERS THEN
     -- Never block user signup if profile creation fails.

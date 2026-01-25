@@ -32,8 +32,8 @@ CREATE POLICY "Users can update own profile" ON user_profiles
 CREATE OR REPLACE FUNCTION create_user_profile()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO user_profiles (id, credits)
-  VALUES (NEW.id, 3) -- Users start with 3 credits for testing
+  INSERT INTO user_profiles (id, credits, preferred_language)
+  VALUES (NEW.id, 3, 'en') -- Users start with 3 credits for testing
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;
