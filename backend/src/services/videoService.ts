@@ -1178,7 +1178,7 @@ export class VideoService {
       // Refund credits if video record was created but generation failed
       if (videoRecordCreated) {
         try {
-          await CreditsService.addCredits(userId, cost, 'VIDEO_GENERATION_REFUND', 'Refund for failed video generation')
+          await CreditsService.addCredits(userId, cost, 'Refund for failed video generation')
           console.log(`[VideoService] Refunded ${cost} credits to user ${userId} due to video generation failure`)
         } catch (refundError) {
           console.error('[VideoService] Failed to refund credits:', refundError)
@@ -1434,7 +1434,7 @@ export class VideoService {
       
       // Refund credits since video creation failed
       try {
-        await CreditsService.addCredits(userId, cost, 'VIDEO_GENERATION_REFUND', 'Refund for failed video generation')
+        await CreditsService.addCredits(userId, cost, 'Refund for failed video generation')
         console.log(`[VideoService] Refunded ${cost} credits to user ${userId} due to video creation failure`)
       } catch (refundError) {
         console.error('[VideoService] Failed to refund credits:', refundError)
