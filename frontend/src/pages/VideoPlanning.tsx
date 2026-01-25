@@ -488,7 +488,7 @@ export function VideoPlanning() {
 
   const handleCreatePlan = async () => {
     if (!hasSubscription) {
-      alert(t('common.upgrade_required') || 'Upgrade Required')
+      alert(t('common.upgrade_required') || 'Subscription Required')
       return
     }
 
@@ -1156,7 +1156,7 @@ export function VideoPlanning() {
             className="w-full md:w-auto"
             disabled={!hasSubscription}
           >
-            {hasSubscription ? t('video_planning.new_plan') : t('common.upgrade_required') || 'Upgrade Required'}
+            {hasSubscription ? t('video_planning.new_plan') : t('common.upgrade_required') || 'Subscription Required'}
           </Button>
         </div>
 

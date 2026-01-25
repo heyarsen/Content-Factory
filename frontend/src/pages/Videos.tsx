@@ -465,7 +465,7 @@ export function Videos() {
               variant={hasSubscription ? "primary" : "secondary"}
             >
               <VideoIcon className="mr-2 h-4 w-4" />
-              {hasSubscription ? t('videos.create_video') : t('common.upgrade_required') || 'Upgrade Required'}
+              {hasSubscription ? t('videos.create_video') : t('common.upgrade_required') || 'Subscription Required'}
             </Button>
           </Link>
         </div>

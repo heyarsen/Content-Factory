@@ -21,7 +21,7 @@ export const en = {
         email: "Email",
         upgrade_now: 'Upgrade Now',
         upgrade_needed: 'Upgrade Needed',
-        upgrade_required: 'Upgrade Required',
+        upgrade_required: 'Subscription Required',
         upgrade_to_create: 'Upgrade to Create',
         upgrade_to_generate: 'Upgrade to Generate',
         go_to_credits: 'View Plans',

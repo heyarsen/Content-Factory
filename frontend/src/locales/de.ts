@@ -19,6 +19,12 @@ export const de = {
         close: "Schließen",
         selection_required: "Auswahl erforderlich",
         email: "E-Mail",
+        upgrade_now: 'Jetzt upgraden',
+        upgrade_needed: 'Abonnement benötigt',
+        upgrade_required: 'Abonnement erforderlich',
+        upgrade_to_create: 'Upgrade zum Erstellen',
+        upgrade_to_generate: 'Upgrade zum Generieren',
+        go_to_credits: 'Pläne ansehen',
     },
     dashboard: {
         title: "Video-Ersteller",

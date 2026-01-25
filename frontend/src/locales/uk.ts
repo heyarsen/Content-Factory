@@ -19,6 +19,12 @@ export const uk = {
         selection_required: "Потрібно вибрати",
         preferences: "Налаштування",
         email: "Електронна пошта",
+        upgrade_now: 'Оновити зараз',
+        upgrade_needed: 'Потрібна підписка',
+        upgrade_required: 'Потрібна підписка',
+        upgrade_to_create: 'Оновіть тариф для створення',
+        upgrade_to_generate: 'Оновіть тариф для генерації',
+        go_to_credits: 'Подивитися тарифи',
     },
     dashboard: {
         title: "Творець відео",

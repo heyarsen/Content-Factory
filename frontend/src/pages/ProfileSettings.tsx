@@ -218,7 +218,7 @@ export function ProfileSettings() {
                   <div className="mb-3 flex items-start gap-3">
                     <Sparkles className="mt-0.5 h-4 w-4 text-amber-500" />
                     <div>
-                      <p className="text-sm font-medium text-amber-900">Upgrade Required</p>
+                      <p className="text-sm font-medium text-amber-900">Subscription Required</p>
                       <p className="text-xs text-amber-700">Your subscription is inactive. Generating videos and AI-powered planning features are disabled.</p>
                     </div>
                   </div>
