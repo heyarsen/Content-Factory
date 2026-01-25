@@ -112,7 +112,7 @@ export function SocialAccounts() {
     console.log('[Social] User Email:', user?.email)
 
     const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin')
-    const safeCanCreate = hasSubscription || unlimited
+    const safeCanCreate = hasSubscription
 
     if (!safeCanCreate) {
       toast.error(t('social_accounts.subscription_needed_alert'))
@@ -262,7 +262,7 @@ export function SocialAccounts() {
           </p>
         </div>
 
-        {!(hasSubscription || (credits !== null && credits > 0) || unlimited) && (
+        {!hasSubscription && (
           <Card className="border-amber-200 bg-amber-50 p-4 sm:p-5">
             <div className="flex flex-col sm:flex-row items-center gap-4 text-amber-800">
               <Sparkles className="h-6 w-6 text-amber-500 shrink-0" />
@@ -367,7 +367,7 @@ export function SocialAccounts() {
                         size="sm"
                         onClick={() => handleConnect(platform)}
                         loading={connectingPlatform === platform}
-                        disabled={!(hasSubscription || (credits !== null && credits > 0) || unlimited)}
+                        disabled={!hasSubscription}
                         className="w-full"
                       >
                         <Link2 className="mr-2 h-4 w-4" />
