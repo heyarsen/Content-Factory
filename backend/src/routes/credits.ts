@@ -231,7 +231,7 @@ router.post('/topup', authenticate, requireSubscription, async (req: AuthRequest
  * POST /api/credits/subscribe
  * Purchase a subscription plan
  */
-router.post('/subscribe', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
+router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { planId } = req.body
