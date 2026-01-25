@@ -1019,95 +1019,85 @@ export class VideoService {
     if (credits !== null && credits < cost) {
       throw new Error(`Insufficient credits. You have ${credits} credits but need ${cost} credits to generate a video.`)
     }
-    // If talking_photo_id is provided, use it directly (it's a specific look ID)
-    // Otherwise, resolve the avatar context normally
-    let avatarId: string | undefined
-    let avatarRecordId: string | undefined
-    let isPhotoAvatar = false
+    
+    let videoRecordCreated = false
+    
+    try {
+      // If talking_photo_id is provided, use it directly (it's a specific look ID)
+      // Otherwise, resolve the avatar context normally
+      let avatarId: string | undefined
+      let avatarRecordId: string | undefined
+      let isPhotoAvatar = false
 
-    if (input.talking_photo_id) {
-      // Direct look ID provided - use it as talking_photo_id
-      avatarId = input.talking_photo_id
-      isPhotoAvatar = true
-      // Find the avatar record using the group_id (avatar_id) to get avatarRecordId
-      if (input.avatar_id) {
-        const { data: avatarRecord } = await supabase
-          .from('avatars')
-          .select('id, heygen_avatar_id')
-          .eq('heygen_avatar_id', input.avatar_id)
-          .eq('user_id', userId)
+      if (input.talking_photo_id) {
+        // Direct look ID provided - use it as talking_photo_id
+        avatarId = input.talking_photo_id
+        isPhotoAvatar = true
+      } else {
+        const resolved = await resolveAvatarContext(
+          userId,
+          input.avatar_id || null
+        )
+        avatarId = resolved.avatarId
+        avatarRecordId = resolved.avatarRecordId
+        isPhotoAvatar = resolved.isPhotoAvatar
+      }
+      
+      // Always use the hardcoded template for everyone
+      const templatePreference = await fetchUserTemplatePreference(userId)
+
+      // Idempotency 1: If tied to a plan item, and it already has a video_id, reuse that video
+      if (input.plan_item_id) {
+        const { data: existingItem } = await supabase
+          .from('video_plan_items')
+          .select('video_id')
+          .eq('id', input.plan_item_id)
           .single()
-        if (avatarRecord) {
-          avatarRecordId = avatarRecord.id
+        if (existingItem?.video_id) {
+          const { data: existingVideo } = await supabase
+            .from('videos')
+            .select('*')
+            .eq('id', existingItem.video_id)
+            .single()
+          if (existingVideo) {
+            console.log('[Video Generation] Reusing existing video for plan item:', {
+              planItemId: input.plan_item_id,
+              videoId: existingVideo.id,
+              status: existingVideo.status,
+            })
+            return existingVideo
+          }
         }
       }
-    } else {
-      const resolved = await resolveAvatarContext(
-        userId,
-        input.avatar_id || null
-      )
-      avatarId = resolved.avatarId
-      avatarRecordId = resolved.avatarRecordId
-      isPhotoAvatar = resolved.isPhotoAvatar
-    }
-    // Always use the hardcoded template for everyone
-    const templatePreference = await fetchUserTemplatePreference(userId)
 
-    // Idempotency 1: If tied to a plan item, and it already has a video_id, reuse that video
-    if (input.plan_item_id) {
-      const { data: existingItem } = await supabase
-        .from('video_plan_items')
-        .select('video_id')
-        .eq('id', input.plan_item_id)
-        .single()
-      if (existingItem?.video_id) {
-        const { data: existingVideo } = await supabase
-          .from('videos')
-          .select('*')
-          .eq('id', existingItem.video_id)
-          .single()
-        if (existingVideo) {
-          console.log('[Idempotency] Reusing existing video for plan item:', {
-            planItemId: input.plan_item_id,
-            videoId: existingItem.video_id,
-          })
-          return existingVideo as Video
-        }
-      }
-    }
+      // Idempotency 2: If user created the exact same video recently, reuse it
+      const recentWindowMs = 6 * 60 * 60 * 1000 // 6 hours
+      const sinceIso = new Date(Date.now() - recentWindowMs).toISOString()
+      const equivalentQuery = supabase
+        .from('videos')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('topic', input.topic)
+        .eq('script', input.script || null)
+        .eq('style', input.style || DEFAULT_REEL_STYLE)
+        .eq('duration', input.duration || DEFAULT_REEL_DURATION)
+        .eq('avatar_id', avatarRecordId || null)
+        .gte('created_at', sinceIso)
+        .in('status', ['pending', 'generating', 'completed'])
 
-    // Idempotency 2: Reuse a very recent, equivalent request by same user to avoid duplicates
-    const recentWindowMs = 6 * 60 * 60 * 1000 // 6 hours
-    const sinceIso = new Date(Date.now() - recentWindowMs).toISOString()
-    const equivalentQuery = supabase
-      .from('videos')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('topic', input.topic)
-      .eq('style', input.style || DEFAULT_REEL_STYLE)
-      .eq('duration', input.duration || DEFAULT_REEL_DURATION)
-      .gte('created_at', sinceIso)
-      .in('status', ['pending', 'generating', 'completed'] as any)
-      .order('created_at', { ascending: false })
-      .limit(1)
-
-    const { data: maybeDuplicate } = await equivalentQuery
-    if (maybeDuplicate && maybeDuplicate.length > 0) {
-      const candidate = maybeDuplicate[0] as Video
-      const scriptMatches =
-        (candidate.script || '') === (input.script || '')
-      const avatarMatches =
-        !avatarRecordId || candidate.avatar_id === avatarRecordId
-      if (scriptMatches && avatarMatches) {
-        console.log('[Idempotency] Reusing recent equivalent video request:', {
-          existingVideoId: candidate.id,
+      const { data: equivalentVideos } = await equivalentQuery
+      if (equivalentVideos && equivalentVideos.length > 0) {
+        const candidate = equivalentVideos[0]
+        console.log('[Video Generation] Reusing equivalent video:', {
+          videoId: candidate.id,
           status: candidate.status,
+          created_at: candidate.created_at,
         })
         return candidate
       }
-    }
 
-    const video = await this.createVideoRecord(userId, input, avatarRecordId)
+      const video = await this.createVideoRecord(userId, input, avatarRecordId)
+      videoRecordCreated = true
     const outputResolution = input.output_resolution || DEFAULT_HEYGEN_RESOLUTION
     const aspectRatio = input.aspect_ratio || DEFAULT_VERTICAL_ASPECT_RATIO
     const dimension =
@@ -1181,6 +1171,22 @@ export class VideoService {
       void scheduleManualGeneration()
     }
     return video
+    
+  } catch (error: any) {
+      console.error('[VideoService] Video generation failed:', error)
+      
+      // Refund credits if video record was created but generation failed
+      if (videoRecordCreated) {
+        try {
+          await CreditsService.addCredits(userId, cost, 'VIDEO_GENERATION_REFUND', 'Refund for failed video generation')
+          console.log(`[VideoService] Refunded ${cost} credits to user ${userId} due to video generation failure`)
+        } catch (refundError) {
+          console.error('[VideoService] Failed to refund credits:', refundError)
+        }
+      }
+      
+      throw error
+    }
   }
 
   /**
@@ -1425,6 +1431,15 @@ export class VideoService {
         provider: input.provider,
         avatarRecordId,
       })
+      
+      // Refund credits since video creation failed
+      try {
+        await CreditsService.addCredits(userId, cost, 'VIDEO_GENERATION_REFUND', 'Refund for failed video generation')
+        console.log(`[VideoService] Refunded ${cost} credits to user ${userId} due to video creation failure`)
+      } catch (refundError) {
+        console.error('[VideoService] Failed to refund credits:', refundError)
+      }
+      
       const errorMessage = error?.message || 'Failed to create video record'
       const detailedMessage = error?.details ? `${errorMessage}: ${error.details}` : errorMessage
       throw new Error(detailedMessage)
