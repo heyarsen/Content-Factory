@@ -40,7 +40,7 @@ initializeWayForPay()
  * GET /api/credits
  * Get user's current credits
  */
-router.get('/', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
+router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const credits = await CreditsService.getUserCredits(userId)
@@ -109,7 +109,7 @@ router.get('/subscription-status', authenticate, requireSubscription, async (req
  * GET /api/credits/plans
  * Get available subscription plans
  */
-router.get('/plans', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
+router.get('/plans', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const plans = await SubscriptionService.getPlans()
     res.json({ plans })
