@@ -12,11 +12,16 @@ import api from '../lib/api'
 import { useLanguage } from '../contexts/LanguageContext'
 import { Sparkles, CreditCard } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { useCreditsContext } from '../contexts/CreditContext'
 
 export function ProfileSettings() {
   const { user, signOut } = useAuth()
+  const { credits, unlimited } = useCreditsContext()
   const { toast } = useToast()
   const { t } = useLanguage()
+
+  const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')
+  const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
   const navigate = useNavigate()
   const [emailForm, setEmailForm] = useState({
     email: '',
@@ -209,17 +214,17 @@ export function ProfileSettings() {
                   <CreditCard className="h-4 w-4 text-slate-400" />
                   <span className="text-sm font-medium text-slate-600">Subscription Status</span>
                 </div>
-                <Badge variant={(user?.hasActiveSubscription || user?.role === 'admin') ? 'success' : 'warning'}>
-                  {(user?.hasActiveSubscription || user?.role === 'admin') ? 'Active' : 'Inactive'}
+                <Badge variant={safeCanCreate ? 'success' : 'warning'}>
+                  {safeCanCreate ? 'Active' : 'Inactive'}
                 </Badge>
               </div>
-              {!(user?.hasActiveSubscription || user?.role === 'admin') && (
+              {!safeCanCreate && (
                 <div className="rounded-xl bg-amber-50 p-4 border border-amber-100">
                   <div className="mb-3 flex items-start gap-3">
                     <Sparkles className="mt-0.5 h-4 w-4 text-amber-500" />
                     <div>
                       <p className="text-sm font-medium text-amber-900">Subscription Required</p>
-                      <p className="text-xs text-amber-700">Your subscription is inactive. Generating videos and AI-powered planning features are disabled.</p>
+                      <p className="text-xs text-amber-700">Your subscription is inactive. Please upgrade or use credits to enable video generation and planning features.</p>
                     </div>
                   </div>
                   <Link to="/credits">

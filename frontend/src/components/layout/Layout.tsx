@@ -2,6 +2,7 @@ import { ReactNode, useState } from 'react'
 import { Header } from './Header'
 import { Sidebar } from './Sidebar'
 import { useAuth } from '../../contexts/AuthContext'
+import { useCreditsContext } from '../../contexts/CreditContext'
 import { AlertCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useLanguage } from '../../contexts/LanguageContext'
@@ -9,9 +10,12 @@ import { useLanguage } from '../../contexts/LanguageContext'
 export function Layout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { user } = useAuth()
+  const { credits, unlimited } = useCreditsContext()
   const { t } = useLanguage()
 
-  const showBanner = user && user.role !== 'admin' && !user.hasActiveSubscription
+  const hasSubscription = user && (user.role === 'admin' || user.hasActiveSubscription)
+  const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
+  const showBanner = user && !safeCanCreate
   return (
     <div className="relative flex min-h-screen bg-background">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />

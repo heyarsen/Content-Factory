@@ -32,6 +32,7 @@ import api from '../lib/api'
 import { timezones } from '../lib/timezones'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
+import { useCreditsContext } from '../contexts/CreditContext'
 import { Link } from 'react-router-dom'
 
 const STATUS_FILTER_KEY = 'video_planning_status_filter'
@@ -108,7 +109,9 @@ interface ScheduledPost {
 export function VideoPlanning() {
   const { t, language } = useLanguage()
   const { user } = useAuth()
+  const { credits, unlimited } = useCreditsContext()
   const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
+  const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
   const navigate = useNavigate()
   const [plans, setPlans] = useState<VideoPlan[]>([])
   const [selectedPlan, setSelectedPlan] = useState<VideoPlan | null>(null)
@@ -487,7 +490,7 @@ export function VideoPlanning() {
   }
 
   const handleCreatePlan = async () => {
-    if (!hasSubscription) {
+    if (!safeCanCreate) {
       alert(t('common.upgrade_required') || 'Subscription Required')
       return
     }
@@ -1154,9 +1157,9 @@ export function VideoPlanning() {
             onClick={() => setCreateModal(true)}
             leftIcon={<Plus className="h-4 w-4" />}
             className="w-full md:w-auto"
-            disabled={!hasSubscription}
+            disabled={!safeCanCreate}
           >
-            {hasSubscription ? t('video_planning.new_plan') : t('common.upgrade_required') || 'Subscription Required'}
+            {safeCanCreate ? t('video_planning.new_plan') : t('common.upgrade_required') || 'Subscription Required'}
           </Button>
         </div>
 
@@ -1195,7 +1198,7 @@ export function VideoPlanning() {
           </Card>
         )}
 
-        {!hasSubscription && (
+        {!safeCanCreate && (
           <Card className="border-amber-200 bg-amber-50 p-4 sm:p-5">
             <div className="flex items-center gap-4 text-amber-800">
               <Sparkles className="h-6 w-6 text-amber-500" />
@@ -1829,9 +1832,9 @@ export function VideoPlanning() {
                                     variant="ghost"
                                     onClick={() => handleGenerateTopic(item.id)}
                                     leftIcon={<Sparkles className="h-4 w-4" />}
-                                    disabled={!hasSubscription}
+                                    disabled={!safeCanCreate}
                                   >
-                                    {!hasSubscription ? (t('common.upgrade_needed') || 'Upgrade') : (item.topic ? t('video_planning.regenerate') : t('video_planning.auto_generate'))}
+                                    {!safeCanCreate ? (t('common.upgrade_needed') || 'Upgrade') : (item.topic ? t('video_planning.regenerate') : t('video_planning.auto_generate'))}
                                   </Button>
                                 )}
                                 {item.script_status === 'draft' &&
@@ -1848,7 +1851,7 @@ export function VideoPlanning() {
                                 {item.status === 'ready' && !item.script && (
                                   <Button
                                     size="sm"
-                                    disabled={!hasSubscription}
+                                    disabled={!safeCanCreate}
                                     onClick={async () => {
                                       try {
                                         await api.post(

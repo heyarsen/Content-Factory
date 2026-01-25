@@ -13,6 +13,7 @@ import { Textarea } from '../components/ui/Textarea'
 import { Calendar, X, Instagram, Youtube, Facebook, Users, Link2, Sparkles } from 'lucide-react'
 import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
+import { useCreditsContext } from '../contexts/CreditContext'
 import { Link } from 'react-router-dom'
 
 interface SocialAccount {
@@ -53,7 +54,9 @@ const platformNames = {
 
 export function Distribution() {
   const { user } = useAuth()
+  const { credits, unlimited } = useCreditsContext()
   const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
+  const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
 
   // Social Accounts state
   const [accounts, setAccounts] = useState<SocialAccount[]>([])
@@ -218,8 +221,8 @@ export function Distribution() {
   }, [])
 
   const handleConnect = async (platform: SocialAccount['platform']) => {
-    if (!hasSubscription) {
-      alert('Subscription required to connect social accounts.')
+    if (!safeCanCreate) {
+      alert('Subscription or credits required to connect social accounts.')
       return
     }
     setConnectingPlatform(platform)
@@ -345,8 +348,8 @@ export function Distribution() {
 
   // Scheduled Posts handlers
   const handleSchedule = async () => {
-    if (!hasSubscription) {
-      alert('Subscription required to schedule posts.')
+    if (!safeCanCreate) {
+      alert('Subscription or credits required to schedule posts.')
       return
     }
     if (!selectedVideo || selectedPlatforms.length === 0) {
@@ -447,13 +450,13 @@ export function Distribution() {
           </p>
         </div>
 
-        {!hasSubscription && (
+        {!safeCanCreate && (
           <Card className="border-amber-200 bg-amber-50 p-4 sm:p-5">
             <div className="flex flex-col sm:flex-row items-center gap-4 text-amber-800">
               <Sparkles className="h-6 w-6 text-amber-500 shrink-0" />
               <div className="text-center sm:text-left">
                 <h3 className="font-semibold text-amber-900">Subscription Required</h3>
-                <p className="text-sm opacity-90">Your subscription is inactive. Please upgrade to continue connecting social media and scheduling posts.</p>
+                <p className="text-sm opacity-90">Your subscription is inactive. Please upgrade or use credits to continue connecting social media and scheduling posts.</p>
               </div>
               <Link to="/credits" className="w-full sm:w-auto mt-2 sm:mt-0 sm:ml-auto">
                 <Button size="sm" variant="primary" className="w-full bg-amber-600 hover:bg-amber-700 border-none text-white">
@@ -538,7 +541,7 @@ export function Distribution() {
                           size="sm"
                           onClick={() => handleConnect(platform)}
                           loading={connectingPlatform === platform}
-                          disabled={!hasSubscription}
+                          disabled={!safeCanCreate}
                           className="w-full"
                         >
                           <Link2 className="mr-2 h-4 w-4" />
@@ -563,10 +566,10 @@ export function Distribution() {
             <Button
               onClick={() => setScheduleModal(true)}
               className="shadow-[0_20px_45px_-25px_rgba(99,102,241,0.5)]"
-              disabled={!hasSubscription}
+              disabled={!safeCanCreate}
             >
               <Calendar className="mr-2 h-4 w-4" />
-              {hasSubscription ? 'Schedule post' : 'Upgrade to schedule'}
+              {safeCanCreate ? 'Schedule post' : 'Upgrade to schedule'}
             </Button>
           </div>
 
