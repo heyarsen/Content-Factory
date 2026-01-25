@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase.js'
 import { SubscriptionService } from './subscriptionService.js'
+import { CreditsService } from './creditsService.js'
 import {
   generateVideo as requestHeygenVideo,
   generateVideoFromTemplate,
@@ -1011,10 +1012,12 @@ export class VideoService {
    * Create a manual video request and trigger HeyGen generation asynchronously
    */
   static async requestManualVideo(userId: string, input: ManualVideoInput): Promise<Video> {
-    // Check if user has an active subscription
-    const hasActiveSub = await SubscriptionService.hasActiveSubscription(userId)
-    if (!hasActiveSub) {
-      throw new Error('An active subscription is required to generate videos.')
+    // Check if user has sufficient credits (instead of subscription)
+    const credits = await CreditsService.getUserCredits(userId)
+    const cost = CreditsService.COSTS.VIDEO_GENERATION
+    
+    if (credits !== null && credits < cost) {
+      throw new Error(`Insufficient credits. You have ${credits} credits but need ${cost} credits to generate a video.`)
     }
     // If talking_photo_id is provided, use it directly (it's a specific look ID)
     // Otherwise, resolve the avatar context normally
@@ -1388,6 +1391,10 @@ export class VideoService {
    * Get template for category
    */
   private static async createVideoRecord(userId: string, input: ManualVideoInput, avatarRecordId?: string): Promise<Video> {
+    // Deduct credits for video generation
+    const cost = CreditsService.COSTS.VIDEO_GENERATION
+    await CreditsService.deductCredits(userId, cost, 'VIDEO_GENERATION')
+    
     const { data, error } = await supabase
       .from('videos')
       .insert({
