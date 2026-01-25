@@ -487,6 +487,11 @@ export function VideoPlanning() {
   }
 
   const handleCreatePlan = async () => {
+    if (!hasSubscription) {
+      alert(t('common.upgrade_required') || 'Upgrade Required')
+      return
+    }
+
     if (!planName || !startDate || !videoTopics.some((t: string) => t.trim() !== '')) {
       alert(t('video_planning.create_plan_alert'))
       return

@@ -1,5 +1,5 @@
 import { Router, Response } from 'express'
-import { authenticate, AuthRequest } from '../middleware/auth.js'
+import { authenticate, AuthRequest, requireSubscription } from '../middleware/auth.js'
 import { PlanService } from '../services/planService.js'
 import { AutomationService } from '../services/automationService.js'
 import { supabase } from '../lib/supabase.js'
@@ -9,16 +9,16 @@ import { ScriptService } from '../services/scriptService.js'
 const router = Router()
 
 // Create a new plan
-router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
-    const { 
-      name, 
-      videos_per_day, 
-      start_date, 
-      end_date, 
-      enabled, 
-      auto_research, 
+    const {
+      name,
+      videos_per_day,
+      start_date,
+      end_date,
+      enabled,
+      auto_research,
       auto_create,
       auto_schedule_trigger,
       trigger_time,
@@ -73,9 +73,9 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
     let itemsGenerationError: string | null = null
     try {
       items = await PlanService.generatePlanItems(
-        plan.id, 
-        userId, 
-        start_date, 
+        plan.id,
+        userId,
+        start_date,
         end_date || undefined,
         video_times, // Pass custom times
         video_topics, // Pass custom topics
@@ -113,7 +113,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       console.error(`[Plans API] Error stack:`, itemError?.stack)
       console.error(`[Plans API] Error details:`, JSON.stringify(itemError, null, 2))
       itemsGenerationError = itemError.message || 'Failed to generate plan items'
-      
+
       // Try to fetch items from database in case some were created before the error
       try {
         const existingItems = await PlanService.getPlanItems(plan.id, userId)
@@ -127,9 +127,9 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       }
     }
 
-    return res.json({ 
-      plan, 
-      items: items || [], 
+    return res.json({
+      plan,
+      items: items || [],
       itemsCount: items.length,
       hasItems: items.length > 0,
       ...(itemsGenerationError && { warning: itemsGenerationError })
@@ -284,7 +284,7 @@ router.post('/:id/generate-scripts', authenticate, async (req: AuthRequest, res:
     }
 
     await AutomationService.generateTopicsForDate(id, date, userId)
-    
+
     // Then generate scripts for ready items
     const { data: items } = await supabase
       .from('video_plan_items')
@@ -447,7 +447,7 @@ router.post('/items/:id/create-video', authenticate, async (req: AuthRequest, re
     return res.json({ video, item: { ...item, video_id: video.id, status: 'completed' } })
   } catch (error: any) {
     console.error('Create video from plan error:', error)
-    
+
     // Update status to failed
     try {
       await supabase
@@ -500,7 +500,7 @@ router.post('/items/:id/refresh-status', authenticate, async (req: AuthRequest, 
         // Check if it's time to post
         const now = new Date()
         const planTimezone = (item.plan as any).timezone || 'UTC'
-        
+
         const dateFormatter = new Intl.DateTimeFormat('en-CA', {
           timeZone: planTimezone,
           year: 'numeric',
@@ -517,21 +517,21 @@ router.post('/items/:id/refresh-status', authenticate, async (req: AuthRequest, 
           minute: '2-digit',
           hour12: false,
         })
-        
+
         const today = dateFormatter.format(now)
         const currentHour = parseInt(hourFormatter.format(now), 10)
         const currentMinute = parseInt(minuteFormatter.format(now), 10)
-        
+
         const [postHours, postMinutes] = item.scheduled_time.split(':')
         const postHour = parseInt(postHours, 10)
         const postMinute = parseInt(postMinutes || '0', 10)
-        
+
         const postMinutesTotal = postHour * 60 + postMinute
         const currentMinutesTotal = currentHour * 60 + currentMinute
-        const timeDiffMinutes = (item.scheduled_date === today) 
+        const timeDiffMinutes = (item.scheduled_date === today)
           ? (postMinutesTotal - currentMinutesTotal)
           : (item.scheduled_date < today ? -999999 : 999999)
-        
+
         // If scheduled time has passed, trigger posting
         if (timeDiffMinutes <= 1 && item.scheduled_date <= today) {
           console.log(`[Status Refresh] Item ${id} scheduled time passed, triggering posting...`)
@@ -559,8 +559,8 @@ router.post('/items/:id/refresh-status', authenticate, async (req: AuthRequest, 
 
               if (platformResult) {
                 const newPostStatus = platformResult.status === 'success' ? 'posted' :
-                                     platformResult.status === 'failed' ? 'failed' :
-                                     'pending'
+                  platformResult.status === 'failed' ? 'failed' :
+                    'pending'
 
                 if (newPostStatus !== post.status) {
                   await supabase

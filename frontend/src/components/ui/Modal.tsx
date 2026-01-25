@@ -36,7 +36,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', closeOnOv
 
   return (
     <div
-      className="fixed z-[9999] inset-0 lg:left-72 lg:top-16 flex items-center justify-center p-2 sm:p-6"
+      className="fixed z-[9999] inset-0 lg:left-72 lg:top-16 flex items-center justify-center p-4 sm:p-10 lg:p-14"
       onClick={closeOnOverlayClick ? handleClose : undefined}
     >
       {/* Backdrop */}
@@ -50,8 +50,8 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', closeOnOv
         className={`modal-content relative w-full ${sizes[size]} transform overflow-hidden rounded-[20px] sm:rounded-[32px] border border-white/40 bg-white/95 text-left shadow-2xl transition-all flex flex-col backdrop-blur-xl`}
         onClick={(e) => e.stopPropagation()}
         style={{
-          maxHeight: 'calc(100vh - 1rem)',
-          height: size === 'full' ? 'calc(100vh - 1rem)' : 'auto'
+          maxHeight: 'calc(100vh - 8rem)',
+          height: size === 'full' ? 'calc(100vh - 8rem)' : 'auto'
         }}
       >
         {/* Header - Fixed height */}
