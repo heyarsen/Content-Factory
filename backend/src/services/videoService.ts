@@ -1251,6 +1251,19 @@ export class VideoService {
       return null
     }
 
+    // Handle Sora videos
+    if (video.sora_task_id && (video.status === 'pending' || video.status === 'generating')) {
+      try {
+        const { checkSoraTaskStatus } = await import('./soraService.js')
+        await checkSoraTaskStatus(video.id, video.sora_task_id)
+        return { ...video, progress: undefined }
+      } catch (error: any) {
+        console.error('Error checking Sora task status:', error)
+        throw new Error('Failed to check Sora task status')
+      }
+    }
+
+    // Handle HeyGen videos
     if (video.heygen_video_id && (video.status === 'pending' || video.status === 'generating')) {
       try {
         const status = await getVideoStatus(video.heygen_video_id)
