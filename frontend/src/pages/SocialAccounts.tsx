@@ -11,7 +11,6 @@ import { Users, Link2, X, Instagram, Youtube, Facebook, Share2, Sparkles } from 
 import api from '../lib/api'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
-import { useCreditsContext } from '../contexts/CreditContext'
 import { useToast } from '../hooks/useToast'
 import { Link } from 'react-router-dom'
 
@@ -41,7 +40,6 @@ const platformIcons = {
 export function SocialAccounts() {
   const { t } = useLanguage()
   const { user, refreshSubscriptionStatus } = useAuth()
-  const { credits, unlimited } = useCreditsContext()
   const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
   const { toast } = useToast()
   const [accounts, setAccounts] = useState<SocialAccount[]>([])
