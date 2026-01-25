@@ -153,7 +153,7 @@ router.get('/packages', authenticate, requireSubscription, async (_req: AuthRequ
  * POST /api/credits/topup
  * Purchase a credit package (requires active subscription)
  */
-router.post('/topup', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
+router.post('/topup', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { packageId } = req.body
