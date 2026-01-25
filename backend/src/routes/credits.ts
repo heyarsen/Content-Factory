@@ -40,7 +40,7 @@ initializeWayForPay()
  * GET /api/credits
  * Get user's current credits
  */
-router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const credits = await CreditsService.getUserCredits(userId)
@@ -67,7 +67,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
  * GET /api/credits/subscription-status
  * Get user's subscription status
  */
-router.get('/subscription-status', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/subscription-status', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     console.log('[Credits API] Getting subscription status for user:', userId)
@@ -109,7 +109,7 @@ router.get('/subscription-status', authenticate, async (req: AuthRequest, res: R
  * GET /api/credits/plans
  * Get available subscription plans
  */
-router.get('/plans', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/plans', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const plans = await SubscriptionService.getPlans()
     res.json({ plans })
@@ -123,7 +123,7 @@ router.get('/plans', authenticate, async (req: AuthRequest, res: Response) => {
  * POST /api/credits/cancel
  * Cancel the active subscription
  */
-router.post('/cancel', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/cancel', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { RecurringPaymentService } = await import('../services/recurringPaymentService.js')
@@ -139,7 +139,7 @@ router.post('/cancel', authenticate, async (req: AuthRequest, res: Response) => 
  * GET /api/credits/packages
  * Get available credit top-up packages
  */
-router.get('/packages', authenticate, async (_req: AuthRequest, res: Response) => {
+router.get('/packages', authenticate, requireSubscription, async (_req: AuthRequest, res: Response) => {
   try {
     const packages = await CreditsService.getCreditPackages()
     res.json({ packages })
@@ -153,7 +153,7 @@ router.get('/packages', authenticate, async (_req: AuthRequest, res: Response) =
  * POST /api/credits/topup
  * Purchase a credit package (requires active subscription)
  */
-router.post('/topup', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/topup', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { packageId } = req.body
@@ -231,7 +231,7 @@ router.post('/topup', authenticate, async (req: AuthRequest, res: Response) => {
  * POST /api/credits/subscribe
  * Purchase a subscription plan
  */
-router.post('/subscribe', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/subscribe', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { planId } = req.body

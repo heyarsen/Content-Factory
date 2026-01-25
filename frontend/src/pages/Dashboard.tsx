@@ -29,7 +29,7 @@ export function Dashboard() {
   const { user } = useAuth()
   const { credits, unlimited } = useCreditsContext()
   const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')
-  const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
+  const safeCanCreate = hasSubscription || unlimited
   const [videoStats, setVideoStats] = useState<VideoStats | null>(null)
   const [postStats, setPostStats] = useState<PostStats | null>(null)
   const [loading, setLoading] = useState(true)

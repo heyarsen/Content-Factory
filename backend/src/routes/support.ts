@@ -1,5 +1,5 @@
 import { Router, Response } from 'express'
-import { authenticate, AuthRequest } from '../middleware/auth.js'
+import { authenticate, AuthRequest, requireSubscription } from '../middleware/auth.js'
 import { SupportService } from '../services/supportService.js'
 
 const router = Router()
@@ -8,7 +8,7 @@ const router = Router()
  * GET /api/support/tickets
  * Get user's tickets
  */
-router.get('/tickets', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/tickets', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.userId!
         const tickets = await SupportService.getUserTickets(userId, req.userToken)
@@ -23,7 +23,7 @@ router.get('/tickets', authenticate, async (req: AuthRequest, res: Response) => 
  * POST /api/support/tickets
  * Create a new ticket
  */
-router.post('/tickets', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/tickets', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.userId!
         const { subject, message, priority } = req.body as { subject: string, message: string, priority?: 'low' | 'medium' | 'high' | 'urgent' }
@@ -44,7 +44,7 @@ router.post('/tickets', authenticate, async (req: AuthRequest, res: Response) =>
  * GET /api/support/tickets/:id
  * Get ticket details and messages
  */
-router.get('/tickets/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/tickets/:id', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.userId!
         const ticketId = req.params.id
@@ -70,7 +70,7 @@ router.get('/tickets/:id', authenticate, async (req: AuthRequest, res: Response)
  * POST /api/support/tickets/:id/message
  * Add message to own ticket
  */
-router.post('/tickets/:id/message', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/tickets/:id/message', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.userId!
         const ticketId = req.params.id
@@ -108,7 +108,7 @@ router.post('/tickets/:id/message', authenticate, async (req: AuthRequest, res: 
  * POST /api/support/tickets/:id/read
  * Mark ticket messages as read
  */
-router.post('/tickets/:id/read', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/tickets/:id/read', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.userId!
         const ticketId = req.params.id
@@ -125,7 +125,7 @@ router.post('/tickets/:id/read', authenticate, async (req: AuthRequest, res: Res
  * POST /api/support/tickets/mark-all-read
  * Mark all support messages as read
  */
-router.post('/tickets/mark-all-read', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/tickets/mark-all-read', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
     try {
         await SupportService.markAllAsRead(req.userId!, req.role!)
         res.json({ success: true })

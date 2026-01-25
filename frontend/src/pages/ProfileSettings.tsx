@@ -21,7 +21,7 @@ export function ProfileSettings() {
   const { t } = useLanguage()
 
   const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')
-  const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
+  const safeCanCreate = hasSubscription || unlimited
   const navigate = useNavigate()
   const [emailForm, setEmailForm] = useState({
     email: '',

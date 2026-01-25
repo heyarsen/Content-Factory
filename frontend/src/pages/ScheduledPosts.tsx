@@ -46,7 +46,7 @@ export function ScheduledPosts() {
   const { user } = useAuth()
   const { credits, unlimited } = useCreditsContext()
   const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
-  const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
+  const safeCanCreate = hasSubscription || unlimited
   const [posts, setPosts] = useState<Post[]>([])
   const [videos, setVideos] = useState<any[]>([])
   const [loading, setLoading] = useState(true)

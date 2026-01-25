@@ -112,7 +112,7 @@ export function SocialAccounts() {
     console.log('[Social] User Email:', user?.email)
 
     const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin')
-    const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
+    const safeCanCreate = hasSubscription || unlimited
 
     if (!safeCanCreate) {
       toast.error(t('social_accounts.subscription_needed_alert'))

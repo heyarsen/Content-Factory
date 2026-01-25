@@ -56,7 +56,7 @@ export function Distribution() {
   const { user } = useAuth()
   const { credits, unlimited } = useCreditsContext()
   const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
-  const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
+  const safeCanCreate = hasSubscription || unlimited
 
   // Social Accounts state
   const [accounts, setAccounts] = useState<SocialAccount[]>([])

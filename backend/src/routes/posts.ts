@@ -191,7 +191,7 @@ router.post('/schedule', authenticate, requireSubscription, async (req: AuthRequ
 })
 
 // List scheduled/published posts
-router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { status, video_id } = req.query
@@ -225,7 +225,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 })
 
 // Get post status
-router.get('/:id/status', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/:id/status', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { id } = req.params
@@ -281,7 +281,7 @@ router.get('/:id/status', authenticate, async (req: AuthRequest, res: Response) 
 })
 
 // Cancel scheduled post
-router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.delete('/:id', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { id } = req.params

@@ -1,11 +1,11 @@
 import { Router, Response } from 'express'
-import { authenticate, AuthRequest } from '../middleware/auth.js'
+import { authenticate, AuthRequest, requireSubscription } from '../middleware/auth.js'
 import { supabase } from '../lib/supabase.js'
 
 const router = Router()
 
 // Get user preferences
-router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
 
@@ -38,7 +38,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 })
 
 // Update user preferences
-router.put('/', authenticate, async (req: AuthRequest, res: Response) => {
+router.put('/', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const {

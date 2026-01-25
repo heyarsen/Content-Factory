@@ -18,7 +18,7 @@ interface VideoPrompt {
 }
 
 // Get all prompts for the authenticated user
-router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
 
@@ -41,7 +41,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 })
 
 // Get a single prompt by ID
-router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/:id', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { id } = req.params
@@ -69,7 +69,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 })
 
 // Create a new prompt
-router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { name, topic, category, description, why_important, useful_tips } = req.body
@@ -105,7 +105,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
 })
 
 // Update a prompt
-router.put('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.put('/:id', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { id } = req.params
@@ -155,7 +155,7 @@ router.put('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 })
 
 // Delete a prompt
-router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.delete('/:id', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { id } = req.params

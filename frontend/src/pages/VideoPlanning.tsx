@@ -111,7 +111,7 @@ export function VideoPlanning() {
   const { user } = useAuth()
   const { credits, unlimited } = useCreditsContext()
   const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
-  const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
+  const safeCanCreate = hasSubscription || unlimited
   const navigate = useNavigate()
   const [plans, setPlans] = useState<VideoPlan[]>([])
   const [selectedPlan, setSelectedPlan] = useState<VideoPlan | null>(null)

@@ -141,7 +141,7 @@ router.post('/', authenticate, requireSubscription, async (req: AuthRequest, res
 })
 
 // Get all plans for user
-router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const plans = await PlanService.getUserPlans(userId)
@@ -153,7 +153,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 })
 
 // Get a specific plan with items
-router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.get('/:id', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { id } = req.params
@@ -194,7 +194,7 @@ router.patch('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 })
 
 // Generate script for a plan item
-router.post('/items/:id/generate-script', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/items/:id/generate-script', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { id } = req.params
@@ -219,7 +219,7 @@ router.post('/items/:id/generate-script', authenticate, async (req: AuthRequest,
 })
 
 // Generate topic for a plan item
-router.post('/items/:id/generate-topic', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/items/:id/generate-topic', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { id } = req.params
@@ -259,7 +259,7 @@ router.patch('/items/:id', authenticate, async (req: AuthRequest, res: Response)
 })
 
 // Delete a plan
-router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+router.delete('/:id', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { id } = req.params
@@ -273,7 +273,7 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
 })
 
 // Generate scripts for a plan date
-router.post('/:id/generate-scripts', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/:id/generate-scripts', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { id } = req.params
@@ -306,7 +306,7 @@ router.post('/:id/generate-scripts', authenticate, async (req: AuthRequest, res:
 })
 
 // Approve a script
-router.post('/items/:id/approve-script', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/items/:id/approve-script', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { id } = req.params
@@ -327,7 +327,7 @@ router.post('/items/:id/approve-script', authenticate, async (req: AuthRequest, 
 })
 
 // Reject a script
-router.post('/items/:id/reject-script', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/items/:id/reject-script', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { id } = req.params
@@ -348,7 +348,7 @@ router.post('/items/:id/reject-script', authenticate, async (req: AuthRequest, r
 })
 
 // Manually trigger full pipeline for a plan
-router.post('/:id/process', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/:id/process', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { id } = req.params
@@ -376,7 +376,7 @@ router.post('/:id/process', authenticate, async (req: AuthRequest, res: Response
 })
 
 // Create video from plan item
-router.post('/items/:id/create-video', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/items/:id/create-video', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { id } = req.params
@@ -466,7 +466,7 @@ router.post('/items/:id/create-video', authenticate, async (req: AuthRequest, re
 })
 
 // Refresh posting status for a plan item (check scheduled posts and update status)
-router.post('/items/:id/refresh-status', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/items/:id/refresh-status', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
     const { id } = req.params
