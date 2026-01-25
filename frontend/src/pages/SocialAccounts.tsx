@@ -42,6 +42,7 @@ export function SocialAccounts() {
   const { t } = useLanguage()
   const { user, refreshSubscriptionStatus } = useAuth()
   const { credits, unlimited } = useCreditsContext()
+  const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
   const { toast } = useToast()
   const [accounts, setAccounts] = useState<SocialAccount[]>([])
   const [loading, setLoading] = useState(true)
