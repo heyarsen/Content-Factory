@@ -48,46 +48,58 @@ router.post('/generate', authenticate, async (req: AuthRequest, res: Response) =
       userId,
       hasTopic: !!topic,
       hasScript: !!script,
-      scriptLength: script?.length,
       style,
       duration,
       avatar_id,
       talking_photo_id,
       look_id,
       generate_caption,
+      aspect_ratio,
+      dimension,
     })
 
-    if (!topic || !style || !duration) {
-      return res.status(400).json({ error: 'Topic, style, and duration are required' })
+    // Validate required fields
+    if (!topic || topic.trim().length === 0) {
+      return res.status(400).json({ error: 'Topic is required' })
     }
 
-    if (duration < 15 || duration > 180) {
-      return res.status(400).json({ error: 'Duration must be between 15 and 180 seconds' })
-    }
-
-    // Check and deduct credits
-    const { CreditsService } = await import('../services/creditsService.js')
-    try {
-      await CreditsService.checkAndDeduct(userId, CreditsService.COSTS.VIDEO_GENERATION, 'video generation')
-    } catch (creditError: any) {
-      return res.status(402).json({ error: creditError.message || 'Insufficient credits' })
-    }
-
+    // Create the video using VideoService (which handles credit deduction)
     const video = await VideoService.requestManualVideo(userId, {
-      topic,
-      script: script || undefined,
-      style,
-      duration,
-      avatar_id: avatar_id || undefined,
-      talking_photo_id: talking_photo_id || look_id || undefined,
-      generate_caption: generate_caption !== false, // Default to true if not specified
-      aspect_ratio: typeof aspect_ratio === 'string' ? aspect_ratio : undefined,
-      dimension: typeof dimension === 'object' ? dimension : undefined,
+      topic: topic.trim(),
+      script: script?.trim() || null,
+      style: style || 'default',
+      duration: duration || 'short',
+      avatar_id: avatar_id || null,
+      talking_photo_id: talking_photo_id || null,
+      look_id: look_id || null,
+      generate_caption: generate_caption || false,
+      aspect_ratio: aspect_ratio || null,
+      dimension: dimension || null,
+      provider: 'sora', // Always use Sora
+      output_resolution: null,
     })
 
-    res.json({ video })
+    console.log('✅ Video generation initiated successfully:', {
+      videoId: video.id,
+      topic: video.topic,
+      status: video.status,
+    })
+
+    res.json({
+      success: true,
+      video,
+      message: 'Video generation initiated successfully',
+    })
   } catch (error: any) {
-    handleServiceError(res, error, 'Generate video error:')
+    console.error('Video generation error:', {
+      error: error?.message || error,
+      stack: error?.stack,
+      userId: req.userId,
+    })
+
+    // Return appropriate error response
+    const errorMessage = error?.message || 'Video generation failed'
+    res.status(500).json({ error: errorMessage })
   }
 })
 
