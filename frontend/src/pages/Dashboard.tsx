@@ -27,7 +27,7 @@ interface PostStats {
 export function Dashboard() {
   const { t } = useLanguage()
   const { user } = useAuth()
-  const { credits, unlimited } = useCreditsContext()
+  const { unlimited } = useCreditsContext()
   const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')
   const safeCanCreate = hasSubscription || unlimited
   const [videoStats, setVideoStats] = useState<VideoStats | null>(null)

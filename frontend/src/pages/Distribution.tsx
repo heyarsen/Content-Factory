@@ -54,7 +54,7 @@ const platformNames = {
 
 export function Distribution() {
   const { user } = useAuth()
-  const { credits, unlimited } = useCreditsContext()
+  const { unlimited } = useCreditsContext()
   const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
   const safeCanCreate = hasSubscription || unlimited
 

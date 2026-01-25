@@ -16,7 +16,7 @@ import { useCreditsContext } from '../contexts/CreditContext'
 
 export function ProfileSettings() {
   const { user, signOut } = useAuth()
-  const { credits, unlimited } = useCreditsContext()
+  const { unlimited } = useCreditsContext()
   const { toast } = useToast()
   const { t } = useLanguage()
 
