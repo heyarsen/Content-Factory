@@ -25,7 +25,7 @@ export class CreditsService {
       try {
         const { data: newProfile } = await supabase
           .from('user_profiles')
-          .insert({ id: userId, credits: 3, preferred_language: 'en' })
+          .insert({ id: userId, credits: 3 })
           .select('credits')
           .single()
         return newProfile?.credits ?? 0
