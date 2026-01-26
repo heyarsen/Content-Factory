@@ -186,16 +186,16 @@ export function GenerateVideo() {
               </div>
               <input
                 type="range"
-                min="15"
-                max="180"
-                step="15"
+                min="5"
+                max="300"
+                step="5"
                 value={duration}
                 onChange={(e) => setDuration(Number(e.target.value))}
                 className="mt-4 w-full accent-brand-500"
               />
               <div className="mt-2 flex justify-between text-[11px] uppercase tracking-wide text-slate-400">
-                <span>15s</span>
-                <span>180s</span>
+                <span>5s</span>
+                <span>300s</span>
               </div>
             </div>
 

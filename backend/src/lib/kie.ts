@@ -32,6 +32,7 @@ export interface CreateSoraTaskRequest {
         n_frames?: string // Duration in frames, default "10"
         remove_watermark?: boolean
         character_id_list?: string[]
+        language?: string // Optional language parameter (e.g., 'en', 'es', 'fr')
     }
 }
 
@@ -103,6 +104,7 @@ export async function createSoraTask(
         removeWatermark?: boolean
         characterIdList?: string[]
         callBackUrl?: string
+        language?: string // Optional language parameter
     } = {}
 ): Promise<CreateSoraTaskResponse> {
     const apiKey = getKieApiKey()
@@ -116,6 +118,7 @@ export async function createSoraTask(
             n_frames: options.nFrames || '10',
             remove_watermark: options.removeWatermark ?? true,
             character_id_list: options.characterIdList,
+            ...(options.language && { language: options.language }),
         },
     }
 
