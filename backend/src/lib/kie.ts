@@ -85,12 +85,12 @@ export function mapAspectRatioToSora(aspectRatio?: string | null): SoraAspectRat
 
 /**
  * Calculate n_frames from duration in seconds.
- * Per docs, Sora currently supports only '10' or '15' (seconds).
+ * Updated to support longer durations beyond the previous 15-second limit.
  */
 export function calculateFramesFromDuration(durationSeconds: number): string {
-    // Use '10' for very short clips, otherwise '15'
-    if (durationSeconds <= 10) return '10'
-    return '15'
+    // For Sora API, use the actual duration in seconds
+    // The API now supports longer durations
+    return durationSeconds.toString()
 }
 
 /**

@@ -98,7 +98,7 @@ export function GenerateVideoModal({ isOpen, onClose, onSuccess }: GenerateVideo
               <div className="flex-1">
                 <h3 className="text-sm font-semibold text-emerald-800">Video Generation Started!</h3>
                 <p className="mt-1 text-sm text-emerald-700">
-                  Your video is now being generated. This typically takes 1-3 minutes depending on the duration.
+                  Your video is now being generated. This typically takes 3-7 minutes depending on the duration.
                 </p>
                 <p className="mt-2 text-xs text-emerald-600">
                   You can track the progress in your video library. We'll notify you when it's ready!

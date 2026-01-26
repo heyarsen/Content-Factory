@@ -291,7 +291,7 @@ export const en = {
         regenerate: "Regenerate",
         continue_to_video: "Continue to Video",
         gen_start_title: "Video Generation Started!",
-        gen_start_desc: "Your video is now being generated. This typically takes 1-3 minutes depending on the duration.",
+        gen_start_desc: "Your video is now being generated. This typically takes 3-7 minutes depending on the duration.",
         gen_start_sub: "We'll automatically move to the next step when your video is ready!",
         video_style: "Video Style",
         gen_caption_label: "Generate Social Media Caption",
