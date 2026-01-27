@@ -188,8 +188,8 @@ export function QuickCreate() {
   }
 
   const handleGenerateScript = async () => {
-    if (!topic) {
-      setScriptError(t('quick_create.topic_label'))
+    if (!topic.trim()) {
+      setScriptError(t('quick_create.topic_required'))
       return
     }
 
@@ -197,9 +197,37 @@ export function QuickCreate() {
     setScriptError('')
 
     try {
+      // Enhanced prompt for AI to generate engaging, specific content optimized for 10 seconds
+      const enhancedPrompt = `
+Create a 10-second video script that is engaging, specific, and has personality. 
+
+TOPIC: ${topic}
+DETAILS: ${description || 'No additional details provided'}
+
+SCRIPT REQUIREMENTS:
+- Between 40-45 words total (fits in 12-15 seconds when spoken naturally)
+- Start with a shocking question, surprising fact, or bold statement
+- Include 1-2 specific tips or examples (keep it concise)
+- Add personality with conversational, energetic tone
+- Include at least one surprising element or "wow" factor
+- End with "Follow for daily tips!"
+- Use simple, punchy sentences - no complex words or long phrases
+
+AVOID:
+- Generic phrases like "in today's world" or "it's important to"
+- Long explanations or background context
+- More than 1 main point (no time)
+- Corporate or robotic language
+- Complex vocabulary or long sentences
+
+FORMAT: Write as a continuous spoken script without timing cues. Make it sound like you're talking to a friend.
+
+EXAMPLE OUTPUT:
+"Did you know 80% of traders fail? Use stop-losses religiously! It's not sexy but it works. Follow for daily tips!"
+`
+
       const response = await api.post('/api/content/quick-create/generate-script', {
-        category: 'general', // Default category
-        topic,
+        topic: enhancedPrompt, // Send enhanced prompt instead of just topic
         description: description || undefined,
       })
 
@@ -470,9 +498,32 @@ export function QuickCreate() {
                 required
               />
 
+              {/* Compact Prompt Guidance */}
+              <div className="rounded-xl border border-amber-200/60 bg-amber-50/40 p-3">
+                <div className="mb-2 flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-amber-600" />
+                  <h4 className="text-sm font-semibold text-amber-900">💡 Write Specific Prompts</h4>
+                </div>
+                
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs font-medium text-amber-800">❌ Too vague:</p>
+                    <p className="text-xs text-slate-600">"video about marketing"</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-green-700">✅ Much better:</p>
+                    <p className="text-xs text-green-800">"3 productivity hacks for remote workers who struggle with focus"</p>
+                  </div>
+                </div>
+                
+                <p className="mt-2 text-xs text-amber-700">
+                  Include: target audience, specific problem, desired tone, format (tips/story/review)
+                </p>
+              </div>
+
               <Textarea
                 label={t('quick_create.desc_label')}
-                placeholder={t('quick_create.desc_placeholder')}
+                placeholder="Add specific details: target audience, desired tone, key points to include, or any specific format you want (e.g., 'make it funny', 'include a shocking statistic', 'focus on beginners')"
                 rows={4}
                 value={description}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value)}

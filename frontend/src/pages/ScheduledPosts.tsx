@@ -11,6 +11,7 @@ import { Textarea } from '../components/ui/Textarea'
 import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useCreditsContext } from '../contexts/CreditContext'
+import { useLanguage } from '../contexts/LanguageContext'
 import { Sparkles, Calendar, ChevronLeft, ChevronRight, Instagram, Users, Youtube, Facebook } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
@@ -43,10 +44,12 @@ const platformNames = {
 }
 
 export function ScheduledPosts() {
+  const { t } = useLanguage()
   const { user } = useAuth()
-  const { unlimited } = useCreditsContext()
+  const { credits, unlimited } = useCreditsContext()
   const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
-  const safeCanCreate = hasSubscription || unlimited
+  const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
+  const shouldShowBanner = !hasSubscription && !unlimited // Show banner for trial users and non-subscribers
   const [posts, setPosts] = useState<Post[]>([])
   const [videos, setVideos] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -293,19 +296,35 @@ export function ScheduledPosts() {
           </div>
         </div>
 
-        {!safeCanCreate && (
+        {shouldShowBanner && (
           <Card className="border-amber-200 bg-amber-50 p-4 sm:p-5">
             <div className="flex items-center gap-4 text-amber-800">
               <Sparkles className="h-6 w-6 text-amber-500" />
               <div>
-                <h3 className="font-semibold">Subscription Required</h3>
-                <p className="text-sm opacity-90">Your subscription is inactive. Please upgrade or use credits to schedule posts to social media.</p>
+                <h3 className="font-semibold">
+                  {credits !== null && credits > 0 ? t('common.trial_credits_available', { count: credits }) : t('common.upgrade_required')}
+                </h3>
+                <p className="text-sm opacity-90">
+                  {credits !== null && credits > 0 
+                    ? t('common.trial_credits_message', { count: credits, plural: credits > 1 ? 's' : '' })
+                    : 'Your subscription is inactive. Please upgrade or use credits to schedule posts to social media.'
+                  }
+                </p>
               </div>
-              <Link to="/credits" className="ml-auto">
-                <Button size="sm" variant="primary" className="bg-amber-600 hover:bg-amber-700 border-none">
-                  Upgrade Now
-                </Button>
-              </Link>
+              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto shrink-0">
+                {credits !== null && credits > 0 && (
+                  <Link to="/videos" className="w-full sm:w-auto">
+                    <Button variant="primary" className="w-full bg-blue-600 hover:bg-blue-700 text-white border-none shadow-md">
+                      {t('common.create_video') || 'Create Video'}
+                    </Button>
+                  </Link>
+                )}
+                <Link to="/credits" className="w-full sm:w-auto">
+                  <Button variant="secondary" className="w-full bg-amber-600 hover:bg-amber-700 text-white border-none shadow-md">
+                    {t('common.upgrade_now') || 'Upgrade Now'}
+                  </Button>
+                </Link>
+              </div>
             </div>
           </Card>
         )}

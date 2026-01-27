@@ -12,6 +12,72 @@ import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useCreditsContext } from '../contexts/CreditContext'
 
+// Russian pluralization helper
+const getRussianPlural = (count: number): string => {
+  const lastDigit = count % 10
+  const lastTwoDigits = count % 100
+  
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) {
+    return 'ов'
+  }
+  
+  if (lastDigit === 1) {
+    return ''
+  }
+  
+  if (lastDigit >= 2 && lastDigit <= 4) {
+    return 'а'
+  }
+  
+  return 'ов'
+}
+
+// Ukrainian pluralization helper (same rules as Russian)
+const getUkrainianPlural = (count: number): string => {
+  const lastDigit = count % 10
+  const lastTwoDigits = count % 100
+  
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) {
+    return 'ів'
+  }
+  
+  if (lastDigit === 1) {
+    return ''
+  }
+  
+  if (lastDigit >= 2 && lastDigit <= 4) {
+    return 'и'
+  }
+  
+  return 'ів'
+}
+
+// German pluralization helper
+const getGermanPlural = (count: number): string => {
+  return count === 1 ? '' : 'n'
+}
+
+// Spanish pluralization helper
+const getSpanishPlural = (count: number): string => {
+  return count === 1 ? '' : 's'
+}
+
+// Get pluralization based on language
+const getPluralization = (language: string, count: number): string => {
+  switch (language) {
+    case 'ru':
+      return getRussianPlural(count)
+    case 'uk':
+      return getUkrainianPlural(count)
+    case 'de':
+      return getGermanPlural(count)
+    case 'es':
+      return getSpanishPlural(count)
+    default:
+      return count === 1 ? '' : 's' // English fallback
+  }
+}
+
 interface VideoStats {
   total: number
   completed: number
@@ -25,11 +91,11 @@ interface PostStats {
 }
 
 export function Dashboard() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { user } = useAuth()
-  const { unlimited } = useCreditsContext()
+  const { credits, unlimited } = useCreditsContext()
   const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')
-  const safeCanCreate = hasSubscription || unlimited
+  const shouldShowBanner = !hasSubscription && !unlimited // Show banner for trial users and non-subscribers
   const [videoStats, setVideoStats] = useState<VideoStats | null>(null)
   const [postStats, setPostStats] = useState<PostStats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -99,21 +165,40 @@ export function Dashboard() {
   return (
     <Layout>
       <div className="space-y-10">
-        {!safeCanCreate && (
+        {shouldShowBanner && (
           <Card className="border-amber-200 bg-amber-50 p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-amber-800">
               <div className="flex items-center gap-4">
                 <Sparkles className="h-6 w-6 text-amber-500 shrink-0" />
                 <div>
-                  <h3 className="font-semibold text-amber-900">{t('videos.subscription_required') || 'Subscription Required'}</h3>
-                  <p className="text-sm opacity-90">{t('videos.subscription_expire_desc') || 'Your subscription is inactive. Please upgrade or use credits to continue generating videos and scheduling posts.'}</p>
+                  <h3 className="font-semibold text-amber-900">
+                    {credits !== null && credits > 0 ? t('common.trial_credits_available', { count: credits }) : t('common.upgrade_required')}
+                  </h3>
+                  <p className="text-sm opacity-90">
+                    {credits !== null && credits > 0 
+                      ? t('common.trial_credits_message', { 
+                          count: credits, 
+                          plural: getPluralization(language, credits) 
+                        })
+                      : t('common.subscription_inactive_message')
+                    }
+                  </p>
                 </div>
               </div>
-              <Link to="/credits" className="w-full sm:w-auto shrink-0">
-                <Button variant="secondary" className="w-full bg-amber-600 hover:bg-amber-700 text-white border-none shadow-md">
-                  {t('common.upgrade_now') || 'Upgrade Now'}
-                </Button>
-              </Link>
+              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto shrink-0">
+                {credits !== null && credits > 0 && (
+                  <Link to="/quick-create" className="w-full sm:w-auto">
+                    <Button variant="primary" className="w-full bg-blue-600 hover:bg-blue-700 text-white border-none shadow-md">
+                      {t('common.create_video') || 'Create Video'}
+                    </Button>
+                  </Link>
+                )}
+                <Link to="/credits" className="w-full sm:w-auto">
+                  <Button variant="primary" className="w-full bg-amber-600 hover:bg-amber-700 text-white border-none shadow-md">
+                    {t('common.upgrade_now') || 'Upgrade Now'}
+                  </Button>
+                </Link>
+              </div>
             </div>
           </Card>
         )}

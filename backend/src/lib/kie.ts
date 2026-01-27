@@ -88,9 +88,9 @@ export function mapAspectRatioToSora(aspectRatio?: string | null): SoraAspectRat
  * Updated to support longer durations beyond the previous 15-second limit.
  */
 export function calculateFramesFromDuration(durationSeconds: number): string {
-    // For Sora API, use the actual duration in seconds
-    // The API now supports longer durations
-    return durationSeconds.toString()
+    // Cap at 15 frames based on KIE Sora2 API maximum limit
+    const maxFrames = 15
+    return Math.min(durationSeconds, maxFrames).toString()
 }
 
 /**

@@ -131,12 +131,25 @@ export async function generateVideoWithSora(
         // Build the prompt from topic, style, and script
         let prompt = `Style: ${video.style}. Topic: ${video.topic}`
         if (video.script) {
-            // Combine topic, style and script for a more detailed prompt
-            prompt = `Style: ${video.style}. Topic: ${video.topic}. Script: ${video.script}`
+            // Remove timing cues from script for video generation
+            const cleanScript = video.script
+                .replace(/\[0:00-0:03\] Hook: /g, '')
+                .replace(/\[0:03-0:12\] Main: /g, '')
+                .replace(/\[0:12-0:15\] CTA: /g, '')
+                .replace(/\[0:00-0:03\]/g, '')
+                .replace(/\[0:03-0:12\]/g, '')
+                .replace(/\[0:12-0:15\]/g, '')
+                .replace(/Hook: /g, '')
+                .replace(/Main: /g, '')
+                .replace(/CTA: /g, '')
+                .trim()
+            
+            // Combine topic, style and cleaned script for a more detailed prompt
+            prompt = `Style: ${video.style}. Topic: ${video.topic}. Script: ${cleanScript}`
         }
 
-        // Limit prompt length (Sora may have limits)
-        const maxPromptLength = 1000
+        // Limit prompt length (Sora may have limits) - increased to accommodate full scripts
+        const maxPromptLength = 2000
         if (prompt.length > maxPromptLength) {
             prompt = prompt.substring(0, maxPromptLength) + '...'
             console.log('[Sora Service] Prompt truncated to max length:', maxPromptLength)
