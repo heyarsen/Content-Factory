@@ -44,7 +44,6 @@ export class ScriptService {
       description: research.Description || '',
       whyItMatters: research.WhyItMatters || '',
       usefulTips: research.UsefulTips || '',
-      category: contentItem.category,
       persona,
     }
 

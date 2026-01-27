@@ -239,7 +239,6 @@ export class AutomationService {
           description: descriptionToUse,
           whyItMatters: whyItMattersToUse,
           usefulTips: usefulTipsToUse,
-          category: item.category || research?.Category || 'general',
         }, userId)
 
         const newStatus = autoApprove ? 'approved' : 'draft'
@@ -693,7 +692,6 @@ export class AutomationService {
               description: item.description || research?.Description || '',
               whyItMatters: item.why_important || research?.WhyItMatters || '',
               usefulTips: item.useful_tips || research?.UsefulTips || '',
-              category: item.category || research?.Category || 'general',
             }, plan.user_id)
 
             console.log(`[Script Generation] Generated script for today's item ${item.id}, topic: "${topicToUse}"`)
@@ -2028,7 +2026,6 @@ export class AutomationService {
         ].filter(Boolean).join('\n'),
         whyItMatters: whyItMattersToUse,
         usefulTips: usefulTipsToUse,
-        category: item.category || enrichedResearch?.category || enrichedResearch?.Category || 'Lifestyle',
       },
       userId
     )

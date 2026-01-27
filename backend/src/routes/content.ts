@@ -675,7 +675,6 @@ router.post('/quick-create/generate-script', authenticate, async (req: AuthReque
       description: description || '',
       whyItMatters: whyImportant || '',
       usefulTips: usefulTips || '',
-      category: categoryName,
     }, userId)
 
     return res.json({ script })
