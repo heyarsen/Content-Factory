@@ -40,8 +40,17 @@ export function CreditProvider({ children }: { children: ReactNode }) {
 
         try {
             const response = await api.get('/api/credits')
-            setCredits(response.data.credits ?? 0)
-            setUnlimited(response.data.unlimited === true || response.data.credits === null)
+            const newCredits = response.data.credits ?? 0
+            const newUnlimited = response.data.unlimited === true || response.data.credits === null
+            
+            console.log('[CreditContext] Fetched credits:', { 
+                response: response.data, 
+                newCredits, 
+                newUnlimited 
+            })
+            
+            setCredits(newCredits)
+            setUnlimited(newUnlimited)
             setSubscription(response.data.subscription)
         } catch (error) {
             console.error('Failed to fetch credits:', error)
