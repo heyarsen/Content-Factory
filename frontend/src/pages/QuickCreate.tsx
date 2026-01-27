@@ -224,9 +224,36 @@ export function QuickCreate() {
         category = 'review'
       }
 
+      // Enhanced prompt for AI to generate engaging, specific content
+      const enhancedPrompt = `
+Create a 15-second video script that is engaging, specific, and has personality. 
+
+TOPIC: ${topic}
+DETAILS: ${description || 'No additional details provided'}
+CATEGORY: ${category}
+
+CRITICAL REQUIREMENTS:
+- Start with a strong hook that grabs attention in first 3 seconds
+- Include specific examples, not generic advice
+- Add personality, humor, or emotion - be conversational, not robotic
+- Include at least one surprising fact, statistic, or insight
+- End with a clear call-to-action or thought-provoking question
+- Make it feel authentic and relatable, not corporate or vague
+- Use conversational language like you're talking to a friend
+
+AVOID:
+- Generic phrases like "in today's world" or "it's important to"
+- Vague advice without specific examples
+- Corporate or robotic language
+- Boring statistics without context
+- Obvious or common sense tips
+
+FORMAT: Write as a spoken script, not bullet points. Include timing cues [pause] and emphasis *like this*.
+`
+
       const response = await api.post('/api/content/quick-create/generate-script', {
         category,
-        topic,
+        topic: enhancedPrompt, // Send enhanced prompt instead of just topic
         description: description || undefined,
       })
 
@@ -497,66 +524,27 @@ export function QuickCreate() {
                 required
               />
 
-              {/* Prompt Guidance Section */}
-              <div className="rounded-2xl border border-amber-200/60 bg-amber-50/40 p-4">
-                <div className="mb-4 flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-amber-600" />
-                  <h3 className="font-semibold text-amber-900">💡 Pro Tip: Write Specific, Engaging Prompts</h3>
+              {/* Compact Prompt Guidance */}
+              <div className="rounded-xl border border-amber-200/60 bg-amber-50/40 p-3">
+                <div className="mb-2 flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-amber-600" />
+                  <h4 className="text-sm font-semibold text-amber-900">💡 Write Specific Prompts</h4>
                 </div>
                 
-                <div className="space-y-4">
+                <div className="grid gap-2 sm:grid-cols-2">
                   <div>
-                    <p className="mb-2 text-sm font-medium text-amber-800">❌ Generic (gets boring results):</p>
-                    <div className="rounded-lg bg-white/50 p-3 font-mono text-xs text-slate-600">
-                      "Make a video about marketing"
-                    </div>
+                    <p className="text-xs font-medium text-amber-800">❌ Too vague:</p>
+                    <p className="text-xs text-slate-600">"video about marketing"</p>
                   </div>
-                  
                   <div>
-                    <p className="mb-2 text-sm font-medium text-green-700">✅ Specific (gets engaging results):</p>
-                    <div className="rounded-lg bg-green-50/50 p-3 font-mono text-xs text-green-800">
-                      "Create a 15-second TikTok video showing 3 productivity hacks for remote workers who struggle with focus. Include a surprising statistic about attention spans."
-                    </div>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-lg border border-white/50 bg-white/30 p-3">
-                      <p className="mb-1 text-xs font-semibold text-amber-900">🎯 Target Audience</p>
-                      <p className="text-xs text-amber-700">"for busy moms", "college students", "small business owners"</p>
-                    </div>
-                    <div className="rounded-lg border border-white/50 bg-white/30 p-3">
-                      <p className="mb-1 text-xs font-semibold text-amber-900">🔥 Hook/Problem</p>
-                      <p className="text-xs text-amber-700">"struggling with...", "tired of...", "secret to..."</p>
-                    </div>
-                    <div className="rounded-lg border border-white/50 bg-white/30 p-3">
-                      <p className="mb-1 text-xs font-semibold text-amber-900">📊 Specific Format</p>
-                      <p className="text-xs text-amber-700">"3 tips", "step-by-step", "myth vs fact"</p>
-                    </div>
-                    <div className="rounded-lg border border-white/50 bg-white/30 p-3">
-                      <p className="mb-1 text-xs font-semibold text-amber-900">🎨 Style/Tone</p>
-                      <p className="text-xs text-amber-700">"funny", "inspiring", "educational", "shocking"</p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg bg-amber-100/50 p-3">
-                    <p className="mb-2 text-xs font-semibold text-amber-900">🚀 Quick Templates:</p>
-                    <div className="space-y-1 text-xs text-amber-800">
-                      <p>• "Show [NUMBER] [TOPIC] tips for [AUDIENCE] who struggle with [PROBLEM]"</p>
-                      <p>• "Myth vs fact: [COMMON MISCONCEPTION] about [TOPIC]"</p>
-                      <p>• "Day in the life of [PERSONA] - [SURPRISING ELEMENT]"</p>
-                      <p>• "Stop doing [BAD HABIT]. Try this [BETTER ALTERNATIVE] instead"</p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg bg-blue-50/50 border border-blue-200/50 p-3">
-                    <p className="mb-1 text-xs font-semibold text-blue-900">📚 Advanced: Video Prompts Library</p>
-                    <p className="text-xs text-blue-700">
-                      Want more structured templates? Visit our 
-                      <Link to="/video-prompts" className="font-medium text-blue-600 underline hover:text-blue-800"> Video Prompts Library</Link> 
-                      for research-backed templates and scripts.
-                    </p>
+                    <p className="text-xs font-medium text-green-700">✅ Much better:</p>
+                    <p className="text-xs text-green-800">"3 productivity hacks for remote workers who struggle with focus"</p>
                   </div>
                 </div>
+                
+                <p className="mt-2 text-xs text-amber-700">
+                  Include: target audience, specific problem, desired tone, format (tips/story/review)
+                </p>
               </div>
 
               <Textarea
