@@ -106,12 +106,12 @@ export function Dashboard() {
                 <Sparkles className="h-6 w-6 text-amber-500 shrink-0" />
                 <div>
                   <h3 className="font-semibold text-amber-900">
-                    {credits !== null && credits > 0 ? `${credits} Trial Credits Available` : 'Subscription Required'}
+                    {credits !== null && credits > 0 ? t('common.trial_credits_available', { count: credits }) : t('common.upgrade_required')}
                   </h3>
                   <p className="text-sm opacity-90">
                     {credits !== null && credits > 0 
-                      ? `You have ${credits} trial credit${credits > 1 ? 's' : ''} to try manual video generation. For automation, connecting social media, and scheduling posts, you need a subscription.`
-                      : 'Your subscription is inactive. Please upgrade or use credits to continue generating videos and scheduling posts.'
+                      ? t('common.trial_credits_message', { count: credits, plural: credits > 1 ? 's' : '' })
+                      : t('common.subscription_inactive_message')
                     }
                   </p>
                 </div>

@@ -25,6 +25,10 @@ export const en = {
         upgrade_to_create: 'Upgrade to Create',
         upgrade_to_generate: 'Upgrade to Generate',
         go_to_credits: 'View Plans',
+        create_video: 'Create Video',
+        trial_credits_available: '{{count}} Trial Credits Available',
+        trial_credits_message: 'You have {{count}} trial credit{{plural}} to try manual video generation. For automation, connecting social media, and scheduling posts, you need a subscription.',
+        subscription_inactive_message: 'Your subscription is inactive. Please upgrade or use credits to continue generating videos and scheduling posts.',
     },
     dashboard: {
         title: "Video Creator",

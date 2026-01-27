@@ -225,11 +225,11 @@ export function ProfileSettings() {
                     <Sparkles className="mt-0.5 h-4 w-4 text-amber-500" />
                     <div>
                       <p className="text-sm font-medium text-amber-900">
-                        {credits !== null && credits > 0 ? `${credits} Trial Credits Available` : 'Subscription Required'}
+                        {credits !== null && credits > 0 ? t('common.trial_credits_available', { count: credits }) : t('common.upgrade_required')}
                       </p>
                       <p className="text-xs text-amber-700">
                         {credits !== null && credits > 0 
-                          ? `You have ${credits} trial credit${credits > 1 ? 's' : ''} to try manual video generation. For automation, connecting social media, and scheduling posts, you need a subscription.`
+                          ? t('common.trial_credits_message', { count: credits, plural: credits > 1 ? 's' : '' })
                           : 'Your subscription is inactive. Please upgrade to enable video generation and planning features.'
                         }
                       </p>
