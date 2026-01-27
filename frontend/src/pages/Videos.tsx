@@ -496,7 +496,7 @@ export function Videos() {
                 {credits !== null && credits > 0 && (
                   <Link to="/videos" className="w-full sm:w-auto">
                     <Button size="sm" variant="primary" className="bg-blue-600 hover:bg-blue-700 text-white border-none">
-                      Create Video
+                      {t('common.create_video') || 'Create Video'}
                     </Button>
                   </Link>
                 )}

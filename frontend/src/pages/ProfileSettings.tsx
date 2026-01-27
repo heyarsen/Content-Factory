@@ -239,7 +239,7 @@ export function ProfileSettings() {
                     {credits !== null && credits > 0 && (
                       <Link to="/videos" className="w-full sm:w-auto">
                         <Button size="sm" className="w-full bg-blue-600 hover:bg-blue-700 text-white border-none">
-                          Create Video
+                          {t('common.create_video') || 'Create Video'}
                         </Button>
                       </Link>
                     )}

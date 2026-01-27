@@ -283,7 +283,7 @@ export function SocialAccounts() {
                 {credits !== null && credits > 0 && (
                   <Link to="/videos" className="w-full sm:w-auto">
                     <Button size="sm" variant="primary" className="w-full bg-blue-600 hover:bg-blue-700 border-none text-white">
-                      Create Video
+                      {t('common.create_video') || 'Create Video'}
                     </Button>
                   </Link>
                 )}
