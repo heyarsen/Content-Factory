@@ -197,72 +197,36 @@ export function QuickCreate() {
     setScriptError('')
 
     try {
-      // Smart category detection based on user input
-      let category = 'general'
-      const topicLower = topic.toLowerCase()
-      const descLower = description.toLowerCase()
-      
-      // Check for educational content
-      if (topicLower.includes('tutorial') || topicLower.includes('how to') || topicLower.includes('learn') || 
-          topicLower.includes('tips') || topicLower.includes('guide') || descLower.includes('teach') ||
-          descLower.includes('explain') || descLower.includes('step by step')) {
-        category = 'educational'
-      }
-      // Check for storytelling/personal content
-      else if (topicLower.includes('story') || topicLower.includes('my') || topicLower.includes('experience') ||
-               topicLower.includes('journey') || descLower.includes('personal') || descLower.includes('my story')) {
-        category = 'storytelling'
-      }
-      // Check for listicle/content
-      else if (topicLower.includes('top') || topicLower.includes('best') || topicLower.includes('list') ||
-               topicLower.includes('number') || /\d+/.test(topic) || descLower.includes('number')) {
-        category = 'listicle'
-      }
-      // Check for review/comparison
-      else if (topicLower.includes('review') || topicLower.includes('vs') || topicLower.includes('compare') ||
-               topicLower.includes('test') || descLower.includes('comparison')) {
-        category = 'review'
-      }
-
-      // Enhanced prompt for AI to generate engaging, specific content optimized for 15 seconds
+      // Enhanced prompt for AI to generate engaging, specific content optimized for 10 seconds
       const enhancedPrompt = `
-Create a 15-second video script that is engaging, specific, and has personality. 
+Create a 10-second video script that is engaging, specific, and has personality. 
 
 TOPIC: ${topic}
 DETAILS: ${description || 'No additional details provided'}
-CATEGORY: ${category}
-
-CRITICAL TIMING REQUIREMENTS (15 seconds total):
-- Hook: 0-3 seconds (must grab attention immediately)
-- Main content: 3-12 seconds (deliver value quickly)
-- CTA/ending: 12-15 seconds (clear call-to-action)
 
 SCRIPT REQUIREMENTS:
-- Maximum 45-50 words total (fits in 15 seconds when spoken naturally)
+- Between 40-45 words total (fits in 12-15 seconds when spoken naturally)
 - Start with a shocking question, surprising fact, or bold statement
-- Include 1-2 specific examples or tips (not more - no time)
+- Include 1-2 specific tips or examples (keep it concise)
 - Add personality with conversational, energetic tone
 - Include at least one surprising element or "wow" factor
-- End with a strong call-to-action or engaging question
+- End with "Follow for daily tips!"
 - Use simple, punchy sentences - no complex words or long phrases
 
 AVOID:
 - Generic phrases like "in today's world" or "it's important to"
 - Long explanations or background context
-- More than 2-3 main points (no time)
+- More than 1 main point (no time)
 - Corporate or robotic language
 - Complex vocabulary or long sentences
 
-FORMAT: Write as a spoken script with timing cues like [0:03] for timing. Make it sound like you're talking to a friend, not giving a lecture.
+FORMAT: Write as a continuous spoken script without timing cues. Make it sound like you're talking to a friend.
 
-EXAMPLE TIMING:
-[0:00-0:03] Hook: "Did you know 80% of remote workers are secretly less productive?"
-[0:03-0:12] Main: "Here are 2 quick fixes: First, use noise-canceling headphones. Second? Try the Pomodoro Technique - 25 minutes of pure focus."
-[0:12-0:15] CTA: "Which hack will you try? Comment below!"
+EXAMPLE OUTPUT:
+"Did you know 80% of traders fail? Use stop-losses religiously! It's not sexy but it works. Follow for daily tips!"
 `
 
       const response = await api.post('/api/content/quick-create/generate-script', {
-        category,
         topic: enhancedPrompt, // Send enhanced prompt instead of just topic
         description: description || undefined,
       })
