@@ -11,6 +11,7 @@ import { Users, Link2, X, Instagram, Youtube, Facebook, Share2, Sparkles } from 
 import api from '../lib/api'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
+import { useCreditsContext } from '../contexts/CreditContext'
 import { useToast } from '../hooks/useToast'
 import { Link } from 'react-router-dom'
 
@@ -40,7 +41,9 @@ const platformIcons = {
 export function SocialAccounts() {
   const { t } = useLanguage()
   const { user, refreshSubscriptionStatus } = useAuth()
+  const { credits, unlimited } = useCreditsContext()
   const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
+  const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
   const { toast } = useToast()
   const [accounts, setAccounts] = useState<SocialAccount[]>([])
   const [loading, setLoading] = useState(true)
@@ -110,7 +113,8 @@ export function SocialAccounts() {
     console.log('[Social] User Email:', user?.email)
 
     const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin')
-    const safeCanCreate = hasSubscription
+    const { credits, unlimited } = useCreditsContext()
+    const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
 
     if (!safeCanCreate) {
       toast.error(t('social_accounts.subscription_needed_alert'))
@@ -260,13 +264,20 @@ export function SocialAccounts() {
           </p>
         </div>
 
-        {!hasSubscription && (
+        {!safeCanCreate && (
           <Card className="border-amber-200 bg-amber-50 p-4 sm:p-5">
             <div className="flex flex-col sm:flex-row items-center gap-4 text-amber-800">
               <Sparkles className="h-6 w-6 text-amber-500 shrink-0" />
               <div className="text-center sm:text-left">
-                <h3 className="font-semibold text-amber-900">{t('videos.subscription_required') || 'Subscription Required'}</h3>
-                <p className="text-sm opacity-90">{t('videos.subscription_expire_desc') || 'Your subscription is inactive. Please upgrade or use credits to continue connecting social media and scheduling posts.'}</p>
+                <h3 className="font-semibold text-amber-900">
+                  {credits !== null && credits > 0 ? `${credits} Trial Credits Available` : 'Subscription Required'}
+                </h3>
+                <p className="text-sm opacity-90">
+                  {credits !== null && credits > 0 
+                    ? `You have ${credits} trial credit${credits > 1 ? 's' : ''} to try manual video generation. For automation, connecting social media, and scheduling posts, you need a subscription.`
+                    : 'Your subscription is inactive. Please upgrade or use credits to continue connecting social media and scheduling posts.'
+                  }
+                </p>
               </div>
               <Link to="/credits" className="w-full sm:w-auto mt-2 sm:mt-0 sm:ml-auto">
                 <Button size="sm" variant="primary" className="w-full bg-amber-600 hover:bg-amber-700 border-none text-white">

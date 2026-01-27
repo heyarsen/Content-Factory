@@ -27,9 +27,9 @@ interface PostStats {
 export function Dashboard() {
   const { t } = useLanguage()
   const { user } = useAuth()
-  const { unlimited } = useCreditsContext()
+  const { credits, unlimited } = useCreditsContext()
   const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')
-  const safeCanCreate = hasSubscription || unlimited
+  const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
   const [videoStats, setVideoStats] = useState<VideoStats | null>(null)
   const [postStats, setPostStats] = useState<PostStats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -105,8 +105,15 @@ export function Dashboard() {
               <div className="flex items-center gap-4">
                 <Sparkles className="h-6 w-6 text-amber-500 shrink-0" />
                 <div>
-                  <h3 className="font-semibold text-amber-900">{t('videos.subscription_required') || 'Subscription Required'}</h3>
-                  <p className="text-sm opacity-90">{t('videos.subscription_expire_desc') || 'Your subscription is inactive. Please upgrade or use credits to continue generating videos and scheduling posts.'}</p>
+                  <h3 className="font-semibold text-amber-900">
+                    {credits !== null && credits > 0 ? `${credits} Trial Credits Available` : 'Subscription Required'}
+                  </h3>
+                  <p className="text-sm opacity-90">
+                    {credits !== null && credits > 0 
+                      ? `You have ${credits} trial credit${credits > 1 ? 's' : ''} to try manual video generation. For automation, connecting social media, and scheduling posts, you need a subscription.`
+                      : 'Your subscription is inactive. Please upgrade or use credits to continue generating videos and scheduling posts.'
+                    }
+                  </p>
                 </div>
               </div>
               <Link to="/credits" className="w-full sm:w-auto shrink-0">

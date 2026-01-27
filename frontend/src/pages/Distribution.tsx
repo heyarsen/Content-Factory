@@ -54,9 +54,9 @@ const platformNames = {
 
 export function Distribution() {
   const { user } = useAuth()
-  const { unlimited } = useCreditsContext()
+  const { credits, unlimited } = useCreditsContext()
   const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
-  const safeCanCreate = hasSubscription || unlimited
+  const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
 
   // Social Accounts state
   const [accounts, setAccounts] = useState<SocialAccount[]>([])
@@ -455,8 +455,15 @@ export function Distribution() {
             <div className="flex flex-col sm:flex-row items-center gap-4 text-amber-800">
               <Sparkles className="h-6 w-6 text-amber-500 shrink-0" />
               <div className="text-center sm:text-left">
-                <h3 className="font-semibold text-amber-900">Subscription Required</h3>
-                <p className="text-sm opacity-90">Your subscription is inactive. Please upgrade or use credits to continue connecting social media and scheduling posts.</p>
+                <h3 className="font-semibold text-amber-900">
+                  {credits !== null && credits > 0 ? `${credits} Trial Credits Available` : 'Subscription Required'}
+                </h3>
+                <p className="text-sm opacity-90">
+                  {credits !== null && credits > 0 
+                    ? `You have ${credits} trial credit${credits > 1 ? 's' : ''} to try manual video generation. For automation, connecting social media, and scheduling posts, you need a subscription.`
+                    : 'Your subscription is inactive. Please upgrade or use credits to continue connecting social media and scheduling posts.'
+                  }
+                </p>
               </div>
               <Link to="/credits" className="w-full sm:w-auto mt-2 sm:mt-0 sm:ml-auto">
                 <Button size="sm" variant="primary" className="w-full bg-amber-600 hover:bg-amber-700 border-none text-white">

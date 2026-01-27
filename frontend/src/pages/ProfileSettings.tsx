@@ -16,12 +16,12 @@ import { useCreditsContext } from '../contexts/CreditContext'
 
 export function ProfileSettings() {
   const { user, signOut } = useAuth()
-  const { unlimited } = useCreditsContext()
+  const { credits, unlimited } = useCreditsContext()
   const { toast } = useToast()
   const { t } = useLanguage()
 
   const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')
-  const safeCanCreate = hasSubscription || unlimited
+  const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
   const navigate = useNavigate()
   const [emailForm, setEmailForm] = useState({
     email: '',
@@ -223,8 +223,15 @@ export function ProfileSettings() {
                   <div className="mb-3 flex items-start gap-3">
                     <Sparkles className="mt-0.5 h-4 w-4 text-amber-500" />
                     <div>
-                      <p className="text-sm font-medium text-amber-900">Subscription Required</p>
-                      <p className="text-xs text-amber-700">Your subscription is inactive. Please upgrade or use credits to enable video generation and planning features.</p>
+                      <p className="text-sm font-medium text-amber-900">
+                        {credits !== null && credits > 0 ? `${credits} Trial Credits Available` : 'Subscription Required'}
+                      </p>
+                      <p className="text-xs text-amber-700">
+                        {credits !== null && credits > 0 
+                          ? `You have ${credits} trial credit${credits > 1 ? 's' : ''} to try manual video generation. For automation, connecting social media, and scheduling posts, you need a subscription.`
+                          : 'Your subscription is inactive. Please upgrade to enable video generation and planning features.'
+                        }
+                      </p>
                     </div>
                   </div>
                   <Link to="/credits">
