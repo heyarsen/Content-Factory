@@ -1,6 +1,7 @@
 import { Router, Response } from 'express'
 import { authenticate, AuthRequest, requireSubscription } from '../middleware/auth.js'
 import { VideoService } from '../services/videoService.js'
+import { detectLanguage, enhancePromptWithLanguage } from '../lib/languageDetection.js'
 import OpenAI from 'openai'
 import dotenv from 'dotenv'
 
@@ -41,8 +42,12 @@ router.post('/generate', authenticate, async (req: AuthRequest, res: Response) =
   })
 
   try {
-    const { topic, script, style, duration, avatar_id, talking_photo_id, generate_caption, aspect_ratio, dimension } = req.body
+    const { topic, script, style, duration, avatar_id, talking_photo_id, generate_caption, aspect_ratio, dimension, language } = req.body
     const userId = req.userId!
+
+    // Detect language from topic and script if not explicitly provided
+    const textToAnalyze = script || topic || ''
+    const detectedLanguage = language || await detectLanguage(textToAnalyze)
 
     console.log('Video generation request:', {
       userId,
@@ -55,6 +60,8 @@ router.post('/generate', authenticate, async (req: AuthRequest, res: Response) =
       generate_caption,
       aspect_ratio,
       dimension,
+      detectedLanguage: detectedLanguage.language,
+      confidence: detectedLanguage.confidence,
     })
 
     // Validate required fields
@@ -75,6 +82,7 @@ router.post('/generate', authenticate, async (req: AuthRequest, res: Response) =
       dimension: dimension || null,
       provider: 'sora', // Always use Sora
       output_resolution: undefined,
+      detectedLanguage, // Pass detected language
     })
 
     console.log('✅ Video generation initiated successfully:', {

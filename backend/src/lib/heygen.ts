@@ -508,6 +508,7 @@ export interface GenerateVideoRequest {
   dimension?: HeyGenDimensionInput
   force_vertical?: boolean
   motion_config?: MotionConfig // Optional motion configuration
+  voice_id?: string // Optional voice ID for language-specific voice
 }
 
 export interface GenerateTemplateVideoRequest {

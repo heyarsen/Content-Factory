@@ -6,6 +6,7 @@ import {
   generateVideoFromTemplate,
   getVideoStatus,
 } from '../lib/heygen.js'
+import { detectLanguage, enhancePromptWithLanguage, type DetectedLanguage } from '../lib/languageDetection.js'
 import type {
   GenerateVideoRequest,
   HeyGenDimensionInput,
@@ -14,7 +15,7 @@ import type {
 import type { Reel, Video } from '../types/database.js'
 
 const DEFAULT_REEL_STYLE = 'Cinematic'
-const DEFAULT_REEL_DURATION = 15
+const DEFAULT_REEL_DURATION = 60
 
 type VideoStyle = Video['style']
 
@@ -210,6 +211,7 @@ export interface ManualVideoInput {
   aspect_ratio?: string | null
   dimension?: HeyGenDimensionInput
   provider?: 'heygen' | 'sora'
+  detectedLanguage?: DetectedLanguage // Add detected language
 }
 
 type ServiceError = Error & { status?: number }
@@ -230,7 +232,7 @@ function mapHeygenStatus(status: string): Video['status'] {
   return 'generating'
 }
 
-function buildHeygenPayload(
+async function buildHeygenPayload(
   topic: string,
   script: string | undefined,
   style: VideoStyle,
@@ -240,20 +242,34 @@ function buildHeygenPayload(
   outputResolution: string = DEFAULT_HEYGEN_RESOLUTION,
   aspectRatio: string | null = DEFAULT_VERTICAL_ASPECT_RATIO, // e.g., "9:16" for vertical videos
   dimension?: HeyGenDimensionInput,
-  motionConfig?: import('../lib/heygen.js').MotionConfig // Optional motion configuration
-): GenerateVideoRequest {
+  motionConfig?: import('../lib/heygen.js').MotionConfig, // Optional motion configuration
+  detectedLanguage?: DetectedLanguage
+): Promise<GenerateVideoRequest> {
   const isVertical = aspectRatio === DEFAULT_VERTICAL_ASPECT_RATIO
   const resolvedOutputResolution = isVertical ? DEFAULT_VERTICAL_OUTPUT_RESOLUTION : outputResolution
   const resolvedDimension =
     dimension || (isVertical ? { ...DEFAULT_VERTICAL_DIMENSION } : undefined)
 
+  // Detect language from topic and script if not provided
+  const textToAnalyze = script || topic
+  const language = detectedLanguage || await detectLanguage(textToAnalyze)
+  
+  // Enhance script/topic with language instruction if needed
+  const enhancedScript = script ? enhancePromptWithLanguage(script, language.language) : script
+  const enhancedTopic = enhancePromptWithLanguage(topic, language.language)
+
   const payload: GenerateVideoRequest = {
-    topic,
-    script: script || topic,
+    topic: enhancedTopic,
+    script: enhancedScript || enhancedTopic,
     style,
     duration,
     ...(isPhotoAvatar ? { talking_photo_id: avatarId } : { avatar_id: avatarId }),
     force_vertical: isVertical,
+  }
+
+  // Add voice_id if language is detected and voice is available
+  if (language.voiceId) {
+    payload.voice_id = language.voiceId
   }
 
   if (resolvedOutputResolution) {
@@ -273,17 +289,18 @@ function buildHeygenPayload(
     payload.motion_config = motionConfig
   }
 
-  // Log payload details including aspect ratio
-  if (aspectRatio) {
-    console.log(`[HeyGen Payload] Built payload with aspect_ratio: ${aspectRatio}`, {
-      hasAspectRatio: !!aspectRatio,
-      aspectRatio,
-      outputResolution: resolvedOutputResolution,
-      hasAvatar: !!avatarId,
-      dimension: resolvedDimension,
-      hasMotionConfig: !!motionConfig,
-    })
-  }
+  // Log payload details including language detection
+  console.log(`[HeyGen Payload] Built payload with language detection: ${language.language}`, {
+    detectedLanguage: language.language,
+    confidence: language.confidence,
+    hasVoiceId: !!language.voiceId,
+    hasAspectRatio: !!aspectRatio,
+    aspectRatio,
+    outputResolution: resolvedOutputResolution,
+    hasAvatar: !!avatarId,
+    dimension: resolvedDimension,
+    hasMotionConfig: !!motionConfig,
+  })
 
   return payload
 }
@@ -379,7 +396,7 @@ async function runHeygenGeneration(
 
     const resolvedAvatarId = await resolveCharacterIdentifier(avatarId, isPhotoAvatar)
 
-    const payload = buildHeygenPayload(
+    const payload = await buildHeygenPayload(
       video.topic,
       video.script || undefined,
       video.style,
@@ -388,7 +405,9 @@ async function runHeygenGeneration(
       isPhotoAvatar,
       outputResolution,
       aspectRatio,
-      dimension
+      dimension,
+      undefined, // motionConfig
+      undefined  // detectedLanguage - will be auto-detected
     )
 
     console.log('Calling HeyGen API with payload:', {
@@ -1384,7 +1403,7 @@ export class VideoService {
       }
 
       const { avatarId, isPhotoAvatar } = await resolveAvatarContext(reel.user_id, null)
-      const payload = buildHeygenPayload(
+      const payload = await buildHeygenPayload(
         reel.topic,
         scriptText,
         DEFAULT_REEL_STYLE,

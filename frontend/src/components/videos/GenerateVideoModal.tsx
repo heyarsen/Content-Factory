@@ -98,7 +98,7 @@ export function GenerateVideoModal({ isOpen, onClose, onSuccess }: GenerateVideo
               <div className="flex-1">
                 <h3 className="text-sm font-semibold text-emerald-800">Video Generation Started!</h3>
                 <p className="mt-1 text-sm text-emerald-700">
-                  Your video is now being generated. This typically takes 1-3 minutes depending on the duration.
+                  Your video is now being generated. This typically takes 3-7 minutes depending on the duration.
                 </p>
                 <p className="mt-2 text-xs text-emerald-600">
                   You can track the progress in your video library. We'll notify you when it's ready!
@@ -144,16 +144,16 @@ export function GenerateVideoModal({ isOpen, onClose, onSuccess }: GenerateVideo
           </div>
           <input
             type="range"
-            min="15"
-            max="180"
-            step="15"
+            min="5"
+            max="300"
+            step="5"
             value={duration}
             onChange={(e) => setDuration(Number(e.target.value))}
             className="mt-4 w-full accent-brand-500"
           />
           <div className="mt-2 flex justify-between text-[11px] uppercase tracking-wide text-slate-400">
-            <span>15s</span>
-            <span>180s</span>
+            <span>5s</span>
+            <span>300s</span>
           </div>
         </div>
 
