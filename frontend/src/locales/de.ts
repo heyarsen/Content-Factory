@@ -26,8 +26,8 @@ export const de = {
         upgrade_to_generate: 'Upgrade zum Generieren',
         go_to_credits: 'Pläne ansehen',
         create_video: 'Video erstellen',
-        trial_credits_available: '{{count}} Testguthaben verfügbar',
-        trial_credits_message: 'Sie haben {{count}} Testguthaben{{plural}} zum Ausprobieren der manuellen Videoerstellung. Für Automatisierung, Verbindung sozialer Medien und Planung von Beiträgen benötigen Sie ein Abonnement.',
+        trial_credits_available: '{count} Testguthaben verfügbar',
+        trial_credits_message: 'Sie haben {count} Testguthaben{plural} zum Ausprobieren der manuellen Videoerstellung. Für Automatisierung, Verbindung sozialer Medien und Planung von Beiträgen benötigen Sie ein Abonnement.',
         subscription_inactive_message: 'Ihr Abonnement ist inaktiv. Bitte upgraden Sie oder verwenden Sie Guthaben, um Videos zu erstellen und Beiträge zu planen.',
     },
     dashboard: {

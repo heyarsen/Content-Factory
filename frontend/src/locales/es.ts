@@ -26,8 +26,8 @@ export const es = {
         upgrade_to_generate: 'Mejorar para generar',
         go_to_credits: 'Ver planes',
         create_video: 'Crear Video',
-        trial_credits_available: '{{count}} Créditos de prueba disponibles',
-        trial_credits_message: 'Tienes {{count}} crédito{{plural}} de prueba para probar la creación manual de videos. Para la automatización, conectar redes sociales y programar publicaciones, necesitas una suscripción.',
+        trial_credits_available: '{count} Créditos de prueba disponibles',
+        trial_credits_message: 'Tienes {count} crédito{plural} de prueba para probar la creación manual de videos. Para la automatización, conectar redes sociales y programar publicaciones, necesitas una suscripción.',
         subscription_inactive_message: 'Tu suscripción está inactiva. Por favor, actualiza o usa créditos para continuar creando videos y programando publicaciones.',
     },
     dashboard: {
