@@ -30,6 +30,7 @@ export function Dashboard() {
   const { credits, unlimited } = useCreditsContext()
   const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')
   const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
+  const shouldShowBanner = !hasSubscription && !unlimited // Show banner for trial users and non-subscribers
   const [videoStats, setVideoStats] = useState<VideoStats | null>(null)
   const [postStats, setPostStats] = useState<PostStats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -99,7 +100,7 @@ export function Dashboard() {
   return (
     <Layout>
       <div className="space-y-10">
-        {!safeCanCreate && (
+        {shouldShowBanner && (
           <Card className="border-amber-200 bg-amber-50 p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-amber-800">
               <div className="flex items-center gap-4">

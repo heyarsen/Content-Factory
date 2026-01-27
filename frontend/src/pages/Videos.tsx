@@ -39,8 +39,9 @@ export function Videos() {
   const { t } = useLanguage()
   const { user } = useAuth()
   const { credits, unlimited, loading: creditsLoading } = useCreditsContext()
-  const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
+  const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')
   const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
+  const shouldShowBanner = !hasSubscription && !unlimited // Show banner for trial users and non-subscribers
   
   // Debug logging
   console.log('[Videos] Debug:', { hasSubscription, credits, unlimited, safeCanCreate, creditsLoading })
@@ -476,7 +477,7 @@ export function Videos() {
           </Link>
         </div>
 
-        {!safeCanCreate && (
+        {shouldShowBanner && (
           <Card className="border-amber-200 bg-amber-50 p-4 sm:p-6 mb-6">
             <div className="flex items-center gap-4 text-amber-800">
               <Sparkles className="h-6 w-6 text-amber-500" />

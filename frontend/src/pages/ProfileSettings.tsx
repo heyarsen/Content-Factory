@@ -22,6 +22,7 @@ export function ProfileSettings() {
 
   const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')
   const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
+  const shouldShowBanner = !hasSubscription && !unlimited // Show banner for trial users and non-subscribers
   const navigate = useNavigate()
   const [emailForm, setEmailForm] = useState({
     email: '',
@@ -218,7 +219,7 @@ export function ProfileSettings() {
                   {safeCanCreate ? 'Active' : 'Inactive'}
                 </Badge>
               </div>
-              {!safeCanCreate && (
+              {shouldShowBanner && (
                 <div className="rounded-xl bg-amber-50 p-4 border border-amber-100">
                   <div className="mb-3 flex items-start gap-3">
                     <Sparkles className="mt-0.5 h-4 w-4 text-amber-500" />

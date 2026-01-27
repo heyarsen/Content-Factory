@@ -44,6 +44,7 @@ export function SocialAccounts() {
   const { credits, unlimited } = useCreditsContext()
   const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
   const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
+  const shouldShowBanner = !hasSubscription && !unlimited // Show banner for trial users and non-subscribers
   const { toast } = useToast()
   const [accounts, setAccounts] = useState<SocialAccount[]>([])
   const [loading, setLoading] = useState(true)
@@ -264,7 +265,7 @@ export function SocialAccounts() {
           </p>
         </div>
 
-        {!safeCanCreate && (
+        {shouldShowBanner && (
           <Card className="border-amber-200 bg-amber-50 p-4 sm:p-5">
             <div className="flex flex-col sm:flex-row items-center gap-4 text-amber-800">
               <Sparkles className="h-6 w-6 text-amber-500 shrink-0" />

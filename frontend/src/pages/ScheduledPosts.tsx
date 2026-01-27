@@ -47,6 +47,7 @@ export function ScheduledPosts() {
   const { credits, unlimited } = useCreditsContext()
   const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
   const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
+  const shouldShowBanner = !hasSubscription && !unlimited // Show banner for trial users and non-subscribers
   const [posts, setPosts] = useState<Post[]>([])
   const [videos, setVideos] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -293,7 +294,7 @@ export function ScheduledPosts() {
           </div>
         </div>
 
-        {!safeCanCreate && (
+        {shouldShowBanner && (
           <Card className="border-amber-200 bg-amber-50 p-4 sm:p-5">
             <div className="flex items-center gap-4 text-amber-800">
               <Sparkles className="h-6 w-6 text-amber-500" />
