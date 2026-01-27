@@ -224,7 +224,7 @@ export function QuickCreate() {
         category = 'review'
       }
 
-      // Enhanced prompt for AI to generate engaging, specific content
+      // Enhanced prompt for AI to generate engaging, specific content optimized for 15 seconds
       const enhancedPrompt = `
 Create a 15-second video script that is engaging, specific, and has personality. 
 
@@ -232,23 +232,33 @@ TOPIC: ${topic}
 DETAILS: ${description || 'No additional details provided'}
 CATEGORY: ${category}
 
-CRITICAL REQUIREMENTS:
-- Start with a strong hook that grabs attention in first 3 seconds
-- Include specific examples, not generic advice
-- Add personality, humor, or emotion - be conversational, not robotic
-- Include at least one surprising fact, statistic, or insight
-- End with a clear call-to-action or thought-provoking question
-- Make it feel authentic and relatable, not corporate or vague
-- Use conversational language like you're talking to a friend
+CRITICAL TIMING REQUIREMENTS (15 seconds total):
+- Hook: 0-3 seconds (must grab attention immediately)
+- Main content: 3-12 seconds (deliver value quickly)
+- CTA/ending: 12-15 seconds (clear call-to-action)
+
+SCRIPT REQUIREMENTS:
+- Maximum 45-50 words total (fits in 15 seconds when spoken naturally)
+- Start with a shocking question, surprising fact, or bold statement
+- Include 1-2 specific examples or tips (not more - no time)
+- Add personality with conversational, energetic tone
+- Include at least one surprising element or "wow" factor
+- End with a strong call-to-action or engaging question
+- Use simple, punchy sentences - no complex words or long phrases
 
 AVOID:
 - Generic phrases like "in today's world" or "it's important to"
-- Vague advice without specific examples
+- Long explanations or background context
+- More than 2-3 main points (no time)
 - Corporate or robotic language
-- Boring statistics without context
-- Obvious or common sense tips
+- Complex vocabulary or long sentences
 
-FORMAT: Write as a spoken script, not bullet points. Include timing cues [pause] and emphasis *like this*.
+FORMAT: Write as a spoken script with timing cues like [0:03] for timing. Make it sound like you're talking to a friend, not giving a lecture.
+
+EXAMPLE TIMING:
+[0:00-0:03] Hook: "Did you know 80% of remote workers are secretly less productive?"
+[0:03-0:12] Main: "Here are 2 quick fixes: First, use noise-canceling headphones. Second? Try the Pomodoro Technique - 25 minutes of pure focus."
+[0:12-0:15] CTA: "Which hack will you try? Comment below!"
 `
 
       const response = await api.post('/api/content/quick-create/generate-script', {
