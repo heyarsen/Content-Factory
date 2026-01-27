@@ -14,6 +14,7 @@ import { Calendar, X, Instagram, Youtube, Facebook, Users, Link2, Sparkles } fro
 import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useCreditsContext } from '../contexts/CreditContext'
+import { useLanguage } from '../contexts/LanguageContext'
 import { Link } from 'react-router-dom'
 
 interface SocialAccount {
@@ -53,6 +54,7 @@ const platformNames = {
 }
 
 export function Distribution() {
+  const { t } = useLanguage()
   const { user } = useAuth()
   const { credits, unlimited } = useCreditsContext()
   const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')

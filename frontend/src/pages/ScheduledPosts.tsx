@@ -11,6 +11,7 @@ import { Textarea } from '../components/ui/Textarea'
 import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useCreditsContext } from '../contexts/CreditContext'
+import { useLanguage } from '../contexts/LanguageContext'
 import { Sparkles, Calendar, ChevronLeft, ChevronRight, Instagram, Users, Youtube, Facebook } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
@@ -43,6 +44,7 @@ const platformNames = {
 }
 
 export function ScheduledPosts() {
+  const { t } = useLanguage()
   const { user } = useAuth()
   const { credits, unlimited } = useCreditsContext()
   const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
