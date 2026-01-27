@@ -43,12 +43,6 @@ export function CreditProvider({ children }: { children: ReactNode }) {
             const newCredits = response.data.credits ?? 0
             const newUnlimited = response.data.unlimited === true || response.data.credits === null
             
-            console.log('[CreditContext] Fetched credits:', { 
-                response: response.data, 
-                newCredits, 
-                newUnlimited 
-            })
-            
             setCredits(newCredits)
             setUnlimited(newUnlimited)
             setSubscription(response.data.subscription)

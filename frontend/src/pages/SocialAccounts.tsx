@@ -43,7 +43,6 @@ export function SocialAccounts() {
   const { user, refreshSubscriptionStatus } = useAuth()
   const { credits, unlimited } = useCreditsContext()
   const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
-  const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
   const shouldShowBanner = !hasSubscription && !unlimited // Show banner for trial users and non-subscribers
   const { toast } = useToast()
   const [accounts, setAccounts] = useState<SocialAccount[]>([])
