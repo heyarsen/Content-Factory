@@ -12,6 +12,72 @@ import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useCreditsContext } from '../contexts/CreditContext'
 
+// Russian pluralization helper
+const getRussianPlural = (count: number): string => {
+  const lastDigit = count % 10
+  const lastTwoDigits = count % 100
+  
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) {
+    return 'ов'
+  }
+  
+  if (lastDigit === 1) {
+    return ''
+  }
+  
+  if (lastDigit >= 2 && lastDigit <= 4) {
+    return 'а'
+  }
+  
+  return 'ов'
+}
+
+// Ukrainian pluralization helper (same rules as Russian)
+const getUkrainianPlural = (count: number): string => {
+  const lastDigit = count % 10
+  const lastTwoDigits = count % 100
+  
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) {
+    return 'ів'
+  }
+  
+  if (lastDigit === 1) {
+    return ''
+  }
+  
+  if (lastDigit >= 2 && lastDigit <= 4) {
+    return 'и'
+  }
+  
+  return 'ів'
+}
+
+// German pluralization helper
+const getGermanPlural = (count: number): string => {
+  return count === 1 ? '' : 'n'
+}
+
+// Spanish pluralization helper
+const getSpanishPlural = (count: number): string => {
+  return count === 1 ? '' : 's'
+}
+
+// Get pluralization based on language
+const getPluralization = (language: string, count: number): string => {
+  switch (language) {
+    case 'ru':
+      return getRussianPlural(count)
+    case 'uk':
+      return getUkrainianPlural(count)
+    case 'de':
+      return getGermanPlural(count)
+    case 'es':
+      return getSpanishPlural(count)
+    default:
+      return count === 1 ? '' : 's' // English fallback
+  }
+}
+
 interface VideoStats {
   total: number
   completed: number
@@ -25,7 +91,7 @@ interface PostStats {
 }
 
 export function Dashboard() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { user } = useAuth()
   const { credits, unlimited } = useCreditsContext()
   const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')
@@ -110,7 +176,10 @@ export function Dashboard() {
                   </h3>
                   <p className="text-sm opacity-90">
                     {credits !== null && credits > 0 
-                      ? t('common.trial_credits_message', { count: credits, plural: credits > 1 ? 's' : '' })
+                      ? t('common.trial_credits_message', { 
+                          count: credits, 
+                          plural: getPluralization(language, credits) 
+                        })
                       : t('common.subscription_inactive_message')
                     }
                   </p>

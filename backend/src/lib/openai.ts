@@ -58,13 +58,12 @@ AVOID:
 - More than 2-3 main points (no time)
 - Corporate or robotic language
 - Complex vocabulary or long sentences
+- Timing cues or labels like "Hook:", "Main:", "CTA:" or timestamps
 
-FORMAT: Write as a spoken script with timing cues like [0:03] for timing. Make it sound like you're talking to a friend, not giving a lecture.
+FORMAT: Write as a continuous spoken script without timing cues or labels. Make it sound like you're talking to a friend, not giving a lecture.
 
-EXAMPLE TIMING:
-[0:00-0:03] Hook: "Did you know 80% of traders fail in their first year?"
-[0:03-0:12] Main: "Here are 2 quick fixes: First, use stop-losses religiously. Second? Start with paper trading - it's not sexy but it works."
-[0:12-0:15] CTA: "Follow for daily tips, and for deeper insights, use the link in our profile."
+EXAMPLE OUTPUT:
+"Did you know 80% of traders fail in their first year? Here are 2 quick fixes: First, use stop-losses religiously. Second? Start with paper trading - it's not sexy but it works. Follow for daily tips, and for deeper insights, use the link in our profile."
 
 Moderation & Safety Criteria (must always be followed):
 	•	Neutral tone: avoid hype, exaggeration, or misleading claims.
@@ -103,13 +102,12 @@ AVOID:
 - More than 2-3 main points (no time)
 - Corporate or robotic language
 - Complex vocabulary or long sentences
+- Timing cues or labels like "Hook:", "Main:", "CTA:" or timestamps
 
-FORMAT: Write as a spoken script with timing cues like [0:03] for timing. Make it sound like you're talking to a friend, not giving a lecture.
+FORMAT: Write as a continuous spoken script without timing cues or labels. Make it sound like you're talking to a friend, not giving a lecture.
 
-EXAMPLE TIMING:
-[0:00-0:03] Hook: "Want to boost your energy instantly?"
-[0:03-0:12] Main: "Try these 2 hacks: First, drink water before coffee. Second? Do 10 jumping jacks - sounds crazy but it works!"
-[0:12-0:15] CTA: "Follow for daily tips, and for deeper insights, use the link in our profile."
+EXAMPLE OUTPUT:
+"Want to boost your energy instantly? Try these 2 hacks: First, drink water before coffee. Second? Do 10 jumping jacks - sounds crazy but it works! Follow for daily tips, and for deeper insights, use the link in our profile."
 
 Moderation & Safety Criteria (must always be followed):
 	•	Keep a neutral, positive tone: avoid hype, negativity, or offensive wording.
@@ -146,13 +144,12 @@ AVOID:
 - More than 2-3 main points (no time)
 - Corporate or robotic language
 - Complex vocabulary or long sentences
+- Timing cues or labels like "Hook:", "Main:", "CTA:" or timestamps
 
-FORMAT: Write as a spoken script with timing cues like [0:03] for timing. Make it sound like you're talking to a friend, not giving a lecture.
+FORMAT: Write as a continuous spoken script without timing cues or labels. Make it sound like you're talking to a friend, not giving a lecture.
 
-EXAMPLE TIMING:
-[0:00-0:03] Hook: "Did you know the average person has $5,000 in debt?"
-[0:03-0:12] Main: "Break free with 2 steps: First, track every expense for 30 days. Second? Use the 50/30/20 rule - it's boring but it works."
-[0:12-0:15] CTA: "Follow for daily tips, and for deeper insights, use the link in our profile."
+EXAMPLE OUTPUT:
+"Did you know the average person has $5,000 in debt? Break free with 2 steps: First, track every expense for 30 days. Second? Use the 50/30/20 rule - it's boring but it works. Follow for daily tips, and for deeper insights, use the link in our profile."
 
 Moderation & Safety Criteria (must always be followed):
 	•	Keep tone neutral, educational, and factual.
@@ -195,13 +192,12 @@ AVOID:
 - More than 2-3 main points (no time)
 - Corporate or robotic language
 - Complex vocabulary or long sentences
+- Timing cues or labels like "Hook:", "Main:", "CTA:" or timestamps
 
-FORMAT: Write as a spoken script with timing cues like [0:03] for timing. Make it sound like you're talking to a friend, not giving a lecture.
+FORMAT: Write as a continuous spoken script without timing cues or labels. Make it sound like you're talking to a friend, not giving a lecture.
 
-EXAMPLE TIMING:
-[0:00-0:03] Hook: "Did you know 80% of people struggle with focus?"
-[0:03-0:12] Main: "Here are 2 quick fixes: First, turn off notifications. Second? Try the Pomodoro Technique - 25 minutes of pure focus."
-[0:12-0:15] CTA: "Follow for daily tips, and for deeper insights, use the link in our profile."
+EXAMPLE OUTPUT:
+"Did you know 80% of people struggle with focus? Here are 2 quick fixes: First, turn off notifications. Second? Try the Pomodoro Technique - 25 minutes of pure focus. Follow for daily tips, and for deeper insights, use the link in our profile."
 
 Moderation & Safety Criteria (must always be followed):
 	•	Neutral tone: avoid hype, exaggeration, or misleading claims.
