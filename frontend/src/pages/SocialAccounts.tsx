@@ -279,11 +279,20 @@ export function SocialAccounts() {
                   }
                 </p>
               </div>
-              <Link to="/credits" className="w-full sm:w-auto mt-2 sm:mt-0 sm:ml-auto">
-                <Button size="sm" variant="primary" className="w-full bg-amber-600 hover:bg-amber-700 border-none text-white">
-                  {t('common.upgrade_now') || 'Upgrade Now'}
-                </Button>
-              </Link>
+              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto mt-2 sm:mt-0 sm:ml-auto">
+                {credits !== null && credits > 0 && (
+                  <Link to="/videos" className="w-full sm:w-auto">
+                    <Button size="sm" variant="primary" className="w-full bg-blue-600 hover:bg-blue-700 border-none text-white">
+                      Create Video
+                    </Button>
+                  </Link>
+                )}
+                <Link to="/credits" className="w-full sm:w-auto">
+                  <Button size="sm" variant="primary" className="w-full bg-amber-600 hover:bg-amber-700 border-none text-white">
+                    {t('common.upgrade_now') || 'Upgrade Now'}
+                  </Button>
+                </Link>
+              </div>
             </div>
           </Card>
         )}

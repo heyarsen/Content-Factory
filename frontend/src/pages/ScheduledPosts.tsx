@@ -309,11 +309,20 @@ export function ScheduledPosts() {
                   }
                 </p>
               </div>
-              <Link to="/credits" className="ml-auto">
-                <Button size="sm" variant="primary" className="bg-amber-600 hover:bg-amber-700 border-none">
-                  Upgrade Now
-                </Button>
-              </Link>
+              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto shrink-0">
+                {credits !== null && credits > 0 && (
+                  <Link to="/videos" className="w-full sm:w-auto">
+                    <Button variant="primary" className="w-full bg-blue-600 hover:bg-blue-700 text-white border-none shadow-md">
+                      Create Video
+                    </Button>
+                  </Link>
+                )}
+                <Link to="/credits" className="w-full sm:w-auto">
+                  <Button variant="secondary" className="w-full bg-amber-600 hover:bg-amber-700 text-white border-none shadow-md">
+                    {t('common.upgrade_now') || 'Upgrade Now'}
+                  </Button>
+                </Link>
+              </div>
             </div>
           </Card>
         )}

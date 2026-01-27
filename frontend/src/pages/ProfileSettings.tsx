@@ -235,11 +235,20 @@ export function ProfileSettings() {
                       </p>
                     </div>
                   </div>
-                  <Link to="/credits">
-                    <Button size="sm" className="w-full bg-amber-600 hover:bg-amber-700 border-none">
-                      Go to Subscription
-                    </Button>
-                  </Link>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    {credits !== null && credits > 0 && (
+                      <Link to="/videos" className="w-full sm:w-auto">
+                        <Button size="sm" className="w-full bg-blue-600 hover:bg-blue-700 text-white border-none">
+                          Create Video
+                        </Button>
+                      </Link>
+                    )}
+                    <Link to="/credits" className="w-full sm:w-auto">
+                      <Button size="sm" className="w-full bg-amber-600 hover:bg-amber-700 text-white border-none">
+                        {t('common.upgrade_now') || 'Upgrade Now'}
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
               )}
             </div>
