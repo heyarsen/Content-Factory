@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -188,8 +188,8 @@ export function QuickCreate() {
   }
 
   const handleGenerateScript = async () => {
-    if (!topic) {
-      setScriptError(t('quick_create.topic_label'))
+    if (!topic.trim()) {
+      setScriptError(t('quick_create.topic_required'))
       return
     }
 
@@ -197,8 +197,35 @@ export function QuickCreate() {
     setScriptError('')
 
     try {
+      // Smart category detection based on user input
+      let category = 'general'
+      const topicLower = topic.toLowerCase()
+      const descLower = description.toLowerCase()
+      
+      // Check for educational content
+      if (topicLower.includes('tutorial') || topicLower.includes('how to') || topicLower.includes('learn') || 
+          topicLower.includes('tips') || topicLower.includes('guide') || descLower.includes('teach') ||
+          descLower.includes('explain') || descLower.includes('step by step')) {
+        category = 'educational'
+      }
+      // Check for storytelling/personal content
+      else if (topicLower.includes('story') || topicLower.includes('my') || topicLower.includes('experience') ||
+               topicLower.includes('journey') || descLower.includes('personal') || descLower.includes('my story')) {
+        category = 'storytelling'
+      }
+      // Check for listicle/content
+      else if (topicLower.includes('top') || topicLower.includes('best') || topicLower.includes('list') ||
+               topicLower.includes('number') || /\d+/.test(topic) || descLower.includes('number')) {
+        category = 'listicle'
+      }
+      // Check for review/comparison
+      else if (topicLower.includes('review') || topicLower.includes('vs') || topicLower.includes('compare') ||
+               topicLower.includes('test') || descLower.includes('comparison')) {
+        category = 'review'
+      }
+
       const response = await api.post('/api/content/quick-create/generate-script', {
-        category: 'general', // Default category
+        category,
         topic,
         description: description || undefined,
       })
@@ -470,9 +497,71 @@ export function QuickCreate() {
                 required
               />
 
+              {/* Prompt Guidance Section */}
+              <div className="rounded-2xl border border-amber-200/60 bg-amber-50/40 p-4">
+                <div className="mb-4 flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-amber-600" />
+                  <h3 className="font-semibold text-amber-900">💡 Pro Tip: Write Specific, Engaging Prompts</h3>
+                </div>
+                
+                <div className="space-y-4">
+                  <div>
+                    <p className="mb-2 text-sm font-medium text-amber-800">❌ Generic (gets boring results):</p>
+                    <div className="rounded-lg bg-white/50 p-3 font-mono text-xs text-slate-600">
+                      "Make a video about marketing"
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <p className="mb-2 text-sm font-medium text-green-700">✅ Specific (gets engaging results):</p>
+                    <div className="rounded-lg bg-green-50/50 p-3 font-mono text-xs text-green-800">
+                      "Create a 15-second TikTok video showing 3 productivity hacks for remote workers who struggle with focus. Include a surprising statistic about attention spans."
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-lg border border-white/50 bg-white/30 p-3">
+                      <p className="mb-1 text-xs font-semibold text-amber-900">🎯 Target Audience</p>
+                      <p className="text-xs text-amber-700">"for busy moms", "college students", "small business owners"</p>
+                    </div>
+                    <div className="rounded-lg border border-white/50 bg-white/30 p-3">
+                      <p className="mb-1 text-xs font-semibold text-amber-900">🔥 Hook/Problem</p>
+                      <p className="text-xs text-amber-700">"struggling with...", "tired of...", "secret to..."</p>
+                    </div>
+                    <div className="rounded-lg border border-white/50 bg-white/30 p-3">
+                      <p className="mb-1 text-xs font-semibold text-amber-900">📊 Specific Format</p>
+                      <p className="text-xs text-amber-700">"3 tips", "step-by-step", "myth vs fact"</p>
+                    </div>
+                    <div className="rounded-lg border border-white/50 bg-white/30 p-3">
+                      <p className="mb-1 text-xs font-semibold text-amber-900">🎨 Style/Tone</p>
+                      <p className="text-xs text-amber-700">"funny", "inspiring", "educational", "shocking"</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg bg-amber-100/50 p-3">
+                    <p className="mb-2 text-xs font-semibold text-amber-900">🚀 Quick Templates:</p>
+                    <div className="space-y-1 text-xs text-amber-800">
+                      <p>• "Show [NUMBER] [TOPIC] tips for [AUDIENCE] who struggle with [PROBLEM]"</p>
+                      <p>• "Myth vs fact: [COMMON MISCONCEPTION] about [TOPIC]"</p>
+                      <p>• "Day in the life of [PERSONA] - [SURPRISING ELEMENT]"</p>
+                      <p>• "Stop doing [BAD HABIT]. Try this [BETTER ALTERNATIVE] instead"</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg bg-blue-50/50 border border-blue-200/50 p-3">
+                    <p className="mb-1 text-xs font-semibold text-blue-900">📚 Advanced: Video Prompts Library</p>
+                    <p className="text-xs text-blue-700">
+                      Want more structured templates? Visit our 
+                      <Link to="/video-prompts" className="font-medium text-blue-600 underline hover:text-blue-800"> Video Prompts Library</Link> 
+                      for research-backed templates and scripts.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <Textarea
                 label={t('quick_create.desc_label')}
-                placeholder={t('quick_create.desc_placeholder')}
+                placeholder="Add specific details: target audience, desired tone, key points to include, or any specific format you want (e.g., 'make it funny', 'include a shocking statistic', 'focus on beginners')"
                 rows={4}
                 value={description}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value)}
