@@ -612,59 +612,10 @@ router.post('/generate-script', authenticate, async (req: AuthRequest, res: Resp
 router.post('/quick-create/generate-script', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
-    const { category, topic, description, whyImportant, usefulTips } = req.body
+    const { topic, description, whyImportant, usefulTips } = req.body
 
-    if (!category || !topic) {
-      return res.status(400).json({ error: 'category and topic are required' })
-    }
-
-    // Look up category from database
-    const normalizedCategoryKey = category.toLowerCase().trim().replace(/\s+/g, '_')
-
-    // Try to find category by key (exact match first, then normalized)
-    let { data: categoryData } = await supabase
-      .from('content_categories')
-      .select('name, category_key')
-      .eq('user_id', userId)
-      .eq('status', 'active')
-      .eq('category_key', category)
-      .maybeSingle()
-
-    // If not found, try normalized key
-    if (!categoryData) {
-      const { data } = await supabase
-        .from('content_categories')
-        .select('name, category_key')
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .eq('category_key', normalizedCategoryKey)
-        .maybeSingle()
-      categoryData = data || null
-    }
-
-    let categoryName: string
-
-    if (!categoryData) {
-      // If category not found, try legacy mapping
-      const categoryMap: Record<string, string> = {
-        'trading': 'Trading',
-        'lifestyle': 'Lifestyle',
-        'fin_freedom': 'Fin. Freedom',
-        'financial_freedom': 'Fin. Freedom',
-        'fin. freedom': 'Fin. Freedom',
-      }
-
-      const normalizedCategory = category.toLowerCase().trim().replace(/\s+/g, '_')
-      categoryName = categoryMap[normalizedCategory] || categoryMap[category] || category
-
-      // If still not found in legacy map, use the provided category name as-is
-      if (!categoryMap[normalizedCategory] && !categoryMap[category]) {
-        // Use the category name directly if it looks like a name, otherwise use the key
-        categoryName = category
-      }
-    } else {
-      // Use the name from the database
-      categoryName = categoryData.name
+    if (!topic) {
+      return res.status(400).json({ error: 'topic is required' })
     }
 
     const { ScriptService } = await import('../services/scriptService.js')

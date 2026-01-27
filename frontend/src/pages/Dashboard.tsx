@@ -187,7 +187,7 @@ export function Dashboard() {
               </div>
               <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto shrink-0">
                 {credits !== null && credits > 0 && (
-                  <Link to="/videos" className="w-full sm:w-auto">
+                  <Link to="/quick-create" className="w-full sm:w-auto">
                     <Button variant="primary" className="w-full bg-blue-600 hover:bg-blue-700 text-white border-none shadow-md">
                       {t('common.create_video') || 'Create Video'}
                     </Button>
