@@ -218,6 +218,37 @@ router.post('/items/:id/generate-script', authenticate, requireSubscription, asy
   }
 })
 
+// Get content variety analysis
+router.get('/variety-analysis', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const { days = 30 } = req.query
+
+    const { ContentVarietyService } = await import('../services/contentVarietyService.js')
+    const analysis = await ContentVarietyService.analyzeContentVariety(userId, Number(days))
+
+    return res.json({ analysis })
+  } catch (error: any) {
+    console.error('Content variety analysis error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to analyze content variety' })
+  }
+})
+
+// Get daily variety report
+router.get('/daily-variety-report', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+
+    const { ContentVarietyService } = await import('../services/contentVarietyService.js')
+    const report = await ContentVarietyService.getDailyVarietyReport(userId)
+
+    return res.json({ report })
+  } catch (error: any) {
+    console.error('Daily variety report error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to generate daily variety report' })
+  }
+})
+
 // Generate topic for a plan item
 router.post('/items/:id/generate-topic', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {

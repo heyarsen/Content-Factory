@@ -118,6 +118,8 @@ export function VideoPlanning() {
   const [selectedPlan, setSelectedPlan] = useState<VideoPlan | null>(null)
   const [planItems, setPlanItems] = useState<VideoPlanItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [varietyMetrics, setVarietyMetrics] = useState<any>(null)
+  const [loadingVariety, setLoadingVariety] = useState(false)
   const [createModal, setCreateModal] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     // Initialize with today's date in YYYY-MM-DD format using local timezone
@@ -402,13 +404,27 @@ export function VideoPlanning() {
     try {
       const response = await api.get('/api/plans')
       setPlans(response.data.plans || [])
-      if (response.data.plans?.length > 0 && !selectedPlan) {
-        setSelectedPlan(response.data.plans[0])
+      
+      // Load variety metrics if we have plans
+      if (response.data.plans && response.data.plans.length > 0) {
+        loadVarietyMetrics()
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load plans:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadVarietyMetrics = async () => {
+    try {
+      setLoadingVariety(true)
+      const response = await api.get('/api/plans/variety-analysis?days=30')
+      setVarietyMetrics(response.data.analysis)
+    } catch (error: any) {
+      console.error('Failed to load variety metrics:', error)
+    } finally {
+      setLoadingVariety(false)
     }
   }
 
@@ -1163,6 +1179,73 @@ export function VideoPlanning() {
             {safeCanCreate ? t('video_planning.new_plan') : t('common.upgrade_required') || 'Subscription Required'}
           </Button>
         </div>
+
+        {/* Content Variety Metrics */}
+        {varietyMetrics && (
+          <Card className="bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200">
+            <div className="p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <Sparkles className="h-5 w-5 text-purple-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-purple-900">
+                  {t('video_planning.content_variety') || 'Content Variety'}
+                </h3>
+              </div>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-purple-600">
+                    {Math.round(varietyMetrics.overallScore)}%
+                  </div>
+                  <div className="text-xs text-purple-600">
+                    {t('video_planning.overall_score') || 'Overall Score'}
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {Math.round(varietyMetrics.topicDiversity)}%
+                  </div>
+                  <div className="text-xs text-blue-600">
+                    {t('video_planning.topic_diversity') || 'Topic Diversity'}
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    {Math.round(varietyMetrics.scriptDiversity)}%
+                  </div>
+                  <div className="text-xs text-green-600">
+                    {t('video_planning.script_diversity') || 'Script Diversity'}
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-orange-600">
+                    {Math.round(varietyMetrics.hookVariety)}%
+                  </div>
+                  <div className="text-xs text-orange-600">
+                    {t('video_planning.hook_variety') || 'Hook Variety'}
+                  </div>
+                </div>
+              </div>
+
+              {varietyMetrics.recommendations && varietyMetrics.recommendations.length > 0 && (
+                <div className="bg-white/50 rounded-lg p-3">
+                  <div className="text-sm font-medium text-purple-900 mb-2">
+                    {t('video_planning.variety_recommendations') || 'Recommendations for More Variety:'}
+                  </div>
+                  <ul className="text-xs text-purple-700 space-y-1">
+                    {varietyMetrics.recommendations.slice(0, 3).map((rec: string, index: number) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <span className="text-purple-500 mt-0.5">•</span>
+                        <span>{rec}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
 
         {/* Plan Selector */}
         {plans.length > 0 && (

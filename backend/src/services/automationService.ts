@@ -1996,10 +1996,49 @@ export class AutomationService {
         .filter((s: string | null): s is string => !!s)
         .map((s: string) => s.slice(0, 200)) || []
 
-    const antiRepeatHint =
-      recentScripts.length > 0
-        ? `Avoid repeating or slightly rephrasing these recent scripts or angles:\n- ${recentScripts.join('\n- ')}`
-        : ''
+    // Enhanced anti-repeat system: check recent scripts, topics, and angles
+    const { data: recentItemsForAntiRepeat } = await supabase
+      .from('video_plan_items')
+      .select('topic, script, scheduled_date')
+      .eq('user_id', userId)
+      .in('status', ['completed', 'approved'])
+      .order('scheduled_date', { ascending: false })
+      .limit(10)
+
+    const recentTopics = recentItemsForAntiRepeat
+      ?.map((item: any) => item.topic)
+      .filter((topic: string | null): topic is string => !!topic)
+      .slice(0, 5) || []
+
+    const recentScriptsForAntiRepeat = recentItemsForAntiRepeat
+      ?.map((item: any) => item.script)
+      .filter((s: string | null): s is string => !!s)
+      .map((s: string) => s.slice(0, 200)) || []
+
+    // Build comprehensive anti-repeat hints
+    const antiRepeatHints = []
+
+    if (recentTopics.length > 0) {
+      antiRepeatHints.push(
+        `AVOID these recent topics (find fresh angles): ${recentTopics.join(', ')}`
+      )
+    }
+
+    if (recentScriptsForAntiRepeat.length > 0) {
+      antiRepeatHints.push(
+        `AVOID repeating or slightly rephrasing these recent scripts:\n- ${recentScriptsForAntiRepeat.join('\n- ')}`
+      )
+    }
+
+    // Add variety requirements
+    antiRepeatHints.push(
+      'Use different hooks, examples, and angles than previous content',
+      'Explore new aspects of the topic that haven\'t been covered recently',
+      'Vary your approach: if using statistics last time, use a story this time',
+      'Change the format: question → statement → shocking fact → personal story'
+    )
+
+    const antiRepeatHint = antiRepeatHints.join('\n\n')
 
     // Use prompt fields first, then fall back to research data
     const descriptionToUse = item.description || enrichedResearch?.description || enrichedResearch?.Description || ''
