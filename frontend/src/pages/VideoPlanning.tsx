@@ -119,7 +119,6 @@ export function VideoPlanning() {
   const [planItems, setPlanItems] = useState<VideoPlanItem[]>([])
   const [loading, setLoading] = useState(true)
   const [varietyMetrics, setVarietyMetrics] = useState<any>(null)
-  const [loadingVariety, setLoadingVariety] = useState(false)
   const [createModal, setCreateModal] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     // Initialize with today's date in YYYY-MM-DD format using local timezone
@@ -418,13 +417,10 @@ export function VideoPlanning() {
 
   const loadVarietyMetrics = async () => {
     try {
-      setLoadingVariety(true)
       const response = await api.get('/api/plans/variety-analysis?days=30')
       setVarietyMetrics(response.data.analysis)
     } catch (error: any) {
       console.error('Failed to load variety metrics:', error)
-    } finally {
-      setLoadingVariety(false)
     }
   }
 

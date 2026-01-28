@@ -73,7 +73,7 @@ export class ResearchService {
       category: t.category,
     }))
 
-    const recentScriptSummaries = recentScripts?.map(item => ({
+    const recentScriptSummaries = recentScripts?.map((item: any) => ({
       topic: item.topic,
       scriptPreview: item.script ? item.script.slice(0, 150) : '',
     })) || []
