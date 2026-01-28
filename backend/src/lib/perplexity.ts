@@ -17,10 +17,12 @@ export interface PromptConfig {
   categories?: string
   core_message?: string
   rules?: string
+  systemPrompt?: string
 }
 
 export interface TopicGenerationRequest {
   recentTopics?: Array<{ topic: string; category: string }>
+  recentScripts?: Array<{ topic: string; scriptPreview: string }>
   promptConfig?: PromptConfig
 }
 
@@ -133,7 +135,7 @@ export async function generateTopics(
 	•	Avoid clickbait and misleading claims
 	•	Never repeat or slightly rephrase any of the last 10 topics provided in the user prompt. Always suggest new and distinct topics. If needed, invent adjacent but different angles.`
 
-  const systemPrompt = `Every day, find ${categoriesList.length} fresh and relevant topics for short videos (Reels/Shorts) that would interest the target persona. Provide topics ONLY as a list in a JSON array (see "Output Format").
+  const systemPrompt = config.systemPrompt || `Every day, find ${categoriesList.length} fresh and relevant topics for short videos (Reels/Shorts) that would interest the target persona. Provide topics ONLY as a list in a JSON array (see "Output Format").
 
 ${personaSection}
 
@@ -148,8 +150,12 @@ Output format:
 "Idea": short topic in English
 "Category": ${categoriesString}`
 
+  const recentScriptsList = request.recentScripts || []
+  const scriptsArrayString = JSON.stringify(recentScriptsList)
+
   const userPrompt = `Collect ${categoriesList.length} fresh and relevant topics for today.
 Do not repeat or rephrase any of these past topics: ${topicsArrayString}.
+Also avoid topics similar to these recent scripts: ${scriptsArrayString}.
 Output strictly as a JSON array with objects in the form {"Idea": "...", "Category": "..."}.
 Categories and order are fixed: ${categoriesList.join(', ')}.`
 
