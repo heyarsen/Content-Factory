@@ -1,7 +1,9 @@
 export const ru = {
     common: {
         dashboard: "Дашборд",
-        videos: "Видео",
+        my_videos: "Мои видео",
+        manual_creation: "Ручное создание",
+        automation: "Автоматизация",
         create: "Создать",
         settings: "Настройки",
         logout: "Выйти",
@@ -25,7 +27,7 @@ export const ru = {
         upgrade_to_create: 'Улучшить тариф для создания',
         upgrade_to_generate: 'Улучшить тариф для генерации',
         go_to_credits: 'Посмотреть тарифы',
-        create_video: 'Создать видео',
+        create_video: 'Ручное создание',
         credits_available: '{count} кредитов доступно',
         credits_message: 'У вас есть {count} кредит{plural} для создания видео. Для автоматизации, подключения социальных сетей и планирования постов нужна подписка.',
         subscription_inactive_message: 'Ваша подписка неактивна. Пожалуйста, обновите или используйте кредиты для продолжения создания видео и планирования постов.',
@@ -601,5 +603,14 @@ export const ru = {
     avatars: {
         title: "Аватары скоро появятся",
         description: "Мы работаем над созданием функции кастомных ИИ-аватаров. Следите за обновлениями!",
+    },
+    sidebar: {
+        manual_creation: "Ручное создание",
+        automation: "Автоматизация",
+        free_plan: "Бесплатный тариф",
+        credits: "кредитов",
+        unlimited: "Безлимит",
+        buy_subscription: "Подписаться",
+        top_up: "Пополнить",
     },
 }

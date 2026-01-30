@@ -1,7 +1,9 @@
 export const de = {
     common: {
         dashboard: "Dashboard",
-        videos: "Videos",
+        my_videos: "Meine Videos",
+        manual_creation: "Manuelle Erstellung",
+        automation: "Automatisierung",
         create: "Erstellen",
         settings: "Einstellungen",
         logout: "Abmelden",
@@ -25,7 +27,7 @@ export const de = {
         upgrade_to_create: 'Tarif für Erstellen verbessern',
         upgrade_to_generate: 'Tarif für Generieren verbessern',
         go_to_credits: 'Pläne ansehen',
-        create_video: 'Video erstellen',
+        create_video: 'Manuelle Erstellung',
         trial_credits_available: '{count} Testguthaben verfügbar',
         trial_credits_message: 'Sie haben {count} Testguthaben{plural} zum Ausprobieren der manuellen Videoerstellung. Für Automatisierung, Verbindung sozialer Medien und Planung von Beiträgen benötigen Sie ein Abonnement.',
         subscription_inactive_message: 'Ihr Abonnement ist inaktiv. Bitte upgraden Sie oder verwenden Sie Guthaben, um Videos zu erstellen und Beiträge zu planen.',
@@ -541,5 +543,14 @@ export const de = {
     avatars: {
         title: "Avatare bald verfügbar",
         description: "Wir arbeiten derzeit an der Funktion für personalisierte KI-Avatare. Schauen Sie bald wieder vorbei!",
+    },
+    sidebar: {
+        manual_creation: "Manuelle Erstellung",
+        automation: "Automatisierung",
+        free_plan: "Kostenloser Tarif",
+        credits: "Guthaben",
+        unlimited: "Unbegrenzt",
+        buy_subscription: "Abonnieren",
+        top_up: "Aufladen",
     },
 }

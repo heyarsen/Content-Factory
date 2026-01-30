@@ -33,12 +33,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const navigation = [
     { label: t('common.dashboard'), to: '/dashboard', icon: LayoutDashboard },
-    { label: t('dashboard.create_video'), to: '/create', icon: Zap },
-    // { label: 'Prompts', to: '/prompts', icon: Sparkles },
-    { label: t('common.planning') || 'Video Planning', to: '/planning', icon: Calendar },
-    { label: t('common.videos'), to: '/videos', icon: Clapperboard },
+    { label: t('sidebar.manual_creation'), to: '/create', icon: Zap },
+    { label: t('sidebar.automation'), to: '/planning', icon: Calendar },
+    { label: t('common.my_videos'), to: '/videos', icon: Clapperboard },
     { label: t('common.social_accounts') || 'Social Accounts', to: '/social', icon: Share2 },
-    { label: t('common.avatars') || 'Avatars', to: '/avatars', icon: User },
     { label: t('common.settings'), to: '/preferences', icon: Settings },
   ]
 

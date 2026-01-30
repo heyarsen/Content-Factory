@@ -1,7 +1,9 @@
 export const uk = {
     common: {
         dashboard: "Панель приладів",
-        videos: "Відео",
+        my_videos: "Мої відео",
+        manual_creation: "Ручне створення",
+        automation: "Автоматизація",
         create: "Створити",
         settings: "Налаштування",
         logout: "Вийти",
@@ -25,7 +27,7 @@ export const uk = {
         upgrade_to_create: 'Покращити тариф для створення',
         upgrade_to_generate: 'Покращити тариф для генерації',
         go_to_credits: 'Подивитися тарифи',
-        create_video: 'Створити відео',
+        create_video: 'Ручне створення',
         credits_available: '{count} кредитів доступно',
         credits_message: 'У вас є {count} кредит{plural} для створення відео. Для автоматизації, підключення соціальних мереж та планування публікацій потрібна підписка.',
         subscription_inactive_message: 'Ваша підписка неактивна. Будь ласка, оновіть або використовуйте кредити для продовження створення відео та планування публікацій.',
@@ -587,5 +589,14 @@ export const uk = {
     avatars: {
         title: "Аватари незабаром",
         description: "Ми працюємо над створенням функції кастомних ШІ-аватарів. Стежте за оновленнями!",
+    },
+    sidebar: {
+        manual_creation: "Ручне створення",
+        automation: "Автоматизація",
+        free_plan: "Безкоштовний тариф",
+        credits: "кредитів",
+        unlimited: "Безліміт",
+        buy_subscription: "Підписатися",
+        top_up: "Поповнити",
     },
 }

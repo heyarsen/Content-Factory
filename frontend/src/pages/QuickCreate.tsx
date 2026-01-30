@@ -213,7 +213,16 @@ export function QuickCreate() {
 
         setVideoId(response.data.videoId)
         setVideoStatus('generating')
-        setStep('generate')
+        
+        // Show success message and redirect to My Videos
+        addNotification({
+          type: 'success',
+          title: t('quick_create.gen_start_title'),
+          message: t('quick_create.gen_start_desc'),
+        })
+        
+        // Redirect to My Videos page
+        navigate('/videos')
       } else {
         // Traditional ChatGPT script generation
         const enhancedPrompt = `
@@ -299,22 +308,16 @@ EXAMPLE OUTPUT:
       previousStatusRef.current = initialStatus
       setVideoStatus(initialStatus)
 
-      // Show success message immediately
+      // Show success message and redirect to My Videos
       setVideoError('')
       addNotification({
-        type: 'info',
+        type: 'success',
         title: t('quick_create.gen_start_title'),
         message: t('quick_create.gen_start_desc'),
       })
-
-      // If video is already completed (unlikely), go to complete step
-      if (response.data.video.status === 'completed' && response.data.video.video_url) {
-        setVideoUrl(response.data.video.video_url)
-        setStep('complete')
-      } else {
-        // Show success message and keep on generate step to show status
-        // The polling will automatically move to complete step when done
-      }
+      
+      // Redirect to My Videos page
+      navigate('/videos')
     } catch (error: any) {
       console.error('Video generation error - Full error:', {
         message: error.message,

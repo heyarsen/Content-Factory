@@ -1,7 +1,9 @@
 export const es = {
     common: {
         dashboard: "Tablero",
-        videos: "Videos",
+        my_videos: "Mis Videos",
+        manual_creation: "Creación Manual",
+        automation: "Automatización",
         create: "Crear",
         settings: "Ajustes",
         logout: "Cerrar sesión",
@@ -25,7 +27,7 @@ export const es = {
         upgrade_to_create: 'Mejorar suscripción para crear',
         upgrade_to_generate: 'Mejorar suscripción para generar',
         go_to_credits: 'Ver planes',
-        create_video: 'Crear Video',
+        create_video: 'Creación Manual',
         trial_credits_available: '{count} Créditos de prueba disponibles',
         trial_credits_message: 'Tienes {count} crédito{plural} de prueba para probar la creación manual de videos. Para la automatización, conectar redes sociales y programar publicaciones, necesitas una suscripción.',
         subscription_inactive_message: 'Tu suscripción está inactiva. Por favor, actualiza o usa créditos para continuar creando videos y programando publicaciones.',
@@ -543,5 +545,14 @@ export const es = {
     avatars: {
         title: "Avatares próximamente",
         description: "Actualmente estamos construyendo la función de avatares de IA personalizados. ¡Vuelve pronto para ver las actualizaciones!",
+    },
+    sidebar: {
+        manual_creation: "Creación Manual",
+        automation: "Automatización",
+        free_plan: "Plan Gratuito",
+        credits: "créditos",
+        unlimited: "Ilimitado",
+        buy_subscription: "Suscribirse",
+        top_up: "Recargar",
     },
 }
