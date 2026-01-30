@@ -302,11 +302,11 @@ export function ScheduledPosts() {
               <Sparkles className="h-6 w-6 text-amber-500" />
               <div>
                 <h3 className="font-semibold">
-                  {credits !== null && credits > 0 ? t('common.trial_credits_available', { count: credits }) : t('common.upgrade_required')}
+                  {credits !== null && credits > 0 ? t('common.credits_available', { count: credits }) : t('common.upgrade_required')}
                 </h3>
                 <p className="text-sm opacity-90">
                   {credits !== null && credits > 0 
-                    ? t('common.trial_credits_message', { count: credits, plural: credits > 1 ? 's' : '' })
+                    ? t('common.credits_message', { count: credits, plural: credits > 1 ? 's' : '' })
                     : 'Your subscription is inactive. Please upgrade or use credits to schedule posts to social media.'
                   }
                 </p>
