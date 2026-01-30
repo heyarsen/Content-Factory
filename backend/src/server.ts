@@ -20,6 +20,7 @@ import promptsRoutes from './routes/prompts.js'
 import { initializeScheduler } from './jobs/scheduler.js'
 import adminRoutes from './routes/admin.js'
 import supportRoutes from './routes/support.js'
+import adminMigrationRoutes from './routes/admin-migration.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -250,6 +251,7 @@ app.use('/api/credits', creditsRoutes)
 app.use('/api/prompts', promptsRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/support', supportRoutes)
+app.use('/api/admin-migration', adminMigrationRoutes)
 
 // Serve static files from frontend build (if exists)
 // Compiled path: backend/dist/server.js -> go up one level to backend/public

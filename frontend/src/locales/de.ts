@@ -333,7 +333,6 @@ export const de = {
         change_sub_plan: "Abonnement-Plan ändern",
         choose_sub_plan: "Abonnement-Plan wählen",
         current_plan_label: "Aktueller Plan",
-        new_accounts_only: "(Nur für neue Konten/Registrierung)",
         processing: "Verarbeitung...",
         switch_plan: "Plan wechseln",
         subscribe_now: "Jetzt abonnieren",

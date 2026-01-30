@@ -343,7 +343,6 @@ export const en = {
         change_sub_plan: "Change Subscription Plan",
         choose_sub_plan: "Choose a Subscription Plan",
         current_plan_label: "Current Plan",
-        new_accounts_only: "(New accounts/Signup only)",
         processing: "Processing...",
         switch_plan: "Switch Plan",
         subscribe_now: "Subscribe Now",

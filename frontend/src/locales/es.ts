@@ -335,7 +335,6 @@ export const es = {
         change_sub_plan: "Cambiar plan de suscripción",
         choose_sub_plan: "Elige un plan de suscripción",
         current_plan_label: "Plan actual",
-        new_accounts_only: "(Solo para cuentas nuevas/registro)",
         processing: "Procesando...",
         switch_plan: "Cambiar plan",
         subscribe_now: "Suscribirse ahora",

@@ -335,7 +335,6 @@ export const uk = {
         change_sub_plan: "Змінити тарифний план",
         choose_sub_plan: "Виберіть тарифний план",
         current_plan_label: "Поточний тариф",
-        new_accounts_only: "(Тільки для нових акаунтів)",
         processing: "Обробка...",
         switch_plan: "Переключити тариф",
         subscribe_now: "Підписатися",

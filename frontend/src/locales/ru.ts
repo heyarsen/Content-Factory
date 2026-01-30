@@ -343,7 +343,6 @@ export const ru = {
         change_sub_plan: "Сменить тарифный план",
         choose_sub_plan: "Выберите тарифный план",
         current_plan_label: "Текущий тариф",
-        new_accounts_only: "(Только для новых аккаунтов)",
         processing: "Обработка...",
         switch_plan: "Переключить тариф",
         subscribe_now: "Подписаться",

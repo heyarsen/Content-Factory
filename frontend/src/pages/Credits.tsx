@@ -533,11 +533,6 @@ export function Credits() {
                           </span>
                           <span className="text-sm text-slate-500">{t('credits.credits_unit')}</span>
                         </div>
-                        {plan.id === 'plan_free' && (
-                          <p className="mt-1 text-[10px] text-slate-500 italic">
-                            {t('credits.new_accounts_only')}
-                          </p>
-                        )}
                       </div>
                       <div className="mb-6 flex items-baseline gap-2">
                         <span className="text-2xl font-bold text-brand-600">${plan.price_usd.toFixed(2)}</span>
