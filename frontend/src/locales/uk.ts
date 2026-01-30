@@ -126,16 +126,6 @@ export const uk = {
         account: "Аккаунт",
         open_navigation: "Відкрити меню",
     },
-    sidebar: {
-        content_fabrica: "Content Fabrica",
-        creator_studio: "Creator Studio",
-        administration: "Адміністрування",
-        free_plan: "Безкоштовний план",
-        buy_subscription: "Купити підписку",
-        top_up: "Поповнити баланс",
-        unlimited: "Безлімітно",
-        credits: "кредитів",
-    },
     support: {
         title: "Тикети підтримки",
         mark_all_read: "Позначити всі як прочитані",
@@ -589,6 +579,16 @@ export const uk = {
     avatars: {
         title: "Аватари незабаром",
         description: "Ми працюємо над створенням функції кастомних ШІ-аватарів. Стежте за оновленнями!",
+    },
+    confirm: {
+        delete_title: "Підтвердити видалення",
+        delete_message: "Ви впевнені, що хочете видалити цей елемент? Цю дію не можна скасувати.",
+        cancel_title: "Підтвердити скасування",
+        cancel_message: "Ви впевнені, що хочете скасувати цю операцію?",
+        disconnect_title: "Підтвердити відключення",
+        disconnect_message: "Ви впевнені, що хочете відключити цей аккаунт?",
+        yes: "Так",
+        no: "Ні",
     },
     sidebar: {
         manual_creation: "Ручне створення",

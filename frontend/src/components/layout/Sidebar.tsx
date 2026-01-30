@@ -7,7 +7,6 @@ import {
   Sparkles,
   Zap,
   Calendar,
-  User,
   Settings,
   BarChart3,
   MessagesSquare,

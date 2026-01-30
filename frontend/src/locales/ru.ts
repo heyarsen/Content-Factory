@@ -126,16 +126,6 @@ export const ru = {
         account: "Аккаунт",
         open_navigation: "Открыть меню",
     },
-    sidebar: {
-        content_fabrica: "Content Fabrica",
-        creator_studio: "Creator Studio",
-        administration: "Администрирование",
-        free_plan: "Бесплатный план",
-        buy_subscription: "Купить подписку",
-        top_up: "Пополнить баланс",
-        unlimited: "Безлимитно",
-        credits: "кредитов",
-    },
     support: {
         title: "Тикеты поддержки",
         mark_all_read: "Отметить все как прочитанные",
@@ -603,6 +593,16 @@ export const ru = {
     avatars: {
         title: "Аватары скоро появятся",
         description: "Мы работаем над созданием функции кастомных ИИ-аватаров. Следите за обновлениями!",
+    },
+    confirm: {
+        delete_title: "Подтвердить удаление",
+        delete_message: "Вы уверены, что хотите удалить этот элемент? Это действие нельзя отменить.",
+        cancel_title: "Подтвердить отмену",
+        cancel_message: "Вы уверены, что хотите отменить эту операцию?",
+        disconnect_title: "Подтвердить отключение",
+        disconnect_message: "Вы уверены, что хотите отключить этот аккаунт?",
+        yes: "Да",
+        no: "Нет",
     },
     sidebar: {
         manual_creation: "Ручное создание",

@@ -124,16 +124,6 @@ export const de = {
         account: "Konto",
         open_navigation: "Navigation öffnen",
     },
-    sidebar: {
-        content_fabrica: "Content Fabrica",
-        creator_studio: "Creator Studio",
-        administration: "Administration",
-        free_plan: "Kostenloser Plan",
-        buy_subscription: "Abonnement kaufen",
-        top_up: "Credits aufladen",
-        unlimited: "Unbegrenzt",
-        credits: "Credits",
-    },
     support: {
         title: "Support-Tickets",
         mark_all_read: "Alle als gelesen markieren",
@@ -543,6 +533,16 @@ export const de = {
     avatars: {
         title: "Avatare bald verfügbar",
         description: "Wir arbeiten derzeit an der Funktion für personalisierte KI-Avatare. Schauen Sie bald wieder vorbei!",
+    },
+    confirm: {
+        delete_title: "Löschen Bestätigen",
+        delete_message: "Sind Sie sicher, dass Sie dieses Element löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.",
+        cancel_title: "Abbrechen Bestätigen",
+        cancel_message: "Sind Sie sicher, dass Sie diese Operation abbrechen möchten?",
+        disconnect_title: "Trennung Bestätigen",
+        disconnect_message: "Sind Sie sicher, dass Sie dieses Konto trennen möchten?",
+        yes: "Ja",
+        no: "Nein",
     },
     sidebar: {
         manual_creation: "Manuelle Erstellung",

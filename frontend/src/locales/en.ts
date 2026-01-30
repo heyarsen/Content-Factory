@@ -752,8 +752,6 @@ export const en = {
         disconnect_message: "Are you sure you want to disconnect this account?",
         yes: "Yes",
         no: "No",
-        confirm: "Confirm",
-        cancel: "Cancel",
     },
     sidebar: {
         manual_creation: "Manual Creation",
