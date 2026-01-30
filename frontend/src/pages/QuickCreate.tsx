@@ -48,6 +48,7 @@ export function QuickCreate() {
   // Step 1: Idea
   const [topic, setTopic] = useState('')
   const [description, setDescription] = useState('')
+  const [scriptMethod, setScriptMethod] = useState<'as_is' | 'sora_generated'>('as_is')
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([])
 
   // Step 2: Script
@@ -197,15 +198,32 @@ export function QuickCreate() {
     setScriptError('')
 
     try {
-      // Enhanced prompt for AI to generate engaging, specific content optimized for 10 seconds
-      const enhancedPrompt = `
+      if (scriptMethod === 'sora_generated') {
+        // Direct to Sora method - skip script generation step
+        const response = await api.post('/api/videos/generate', {
+          topic,
+          description: description || undefined,
+          style,
+          duration,
+          provider: 'sora',
+          aspectRatio: DEFAULT_VERTICAL_ASPECT_RATIO,
+          dimension: { ...DEFAULT_VERTICAL_DIMENSION },
+          generateScript: true, // Tell Sora to generate the script
+        })
+
+        setVideoId(response.data.videoId)
+        setVideoStatus('generating')
+        setStep('generate')
+      } else {
+        // Traditional ChatGPT script generation
+        const enhancedPrompt = `
 Create a 10-second video script that is engaging, specific, and has personality. 
 
 TOPIC: ${topic}
 DETAILS: ${description || 'No additional details provided'}
 
 SCRIPT REQUIREMENTS:
-- Between 40-45 words total (fits in 12-15 seconds when spoken naturally)
+- Between 40-45 words total (fits in 15 seconds when spoken naturally)
 - Start with a shocking question, surprising fact, or bold statement
 - Include 1-2 specific tips or examples (keep it concise)
 - Add personality with conversational, energetic tone
@@ -226,14 +244,15 @@ EXAMPLE OUTPUT:
 "Did you know 80% of traders fail? Use stop-losses religiously! It's not sexy but it works. Follow for daily tips!"
 `
 
-      const response = await api.post('/api/content/quick-create/generate-script', {
-        topic: enhancedPrompt, // Send enhanced prompt instead of just topic
-        description: description || undefined,
-      })
+        const response = await api.post('/api/content/quick-create/generate-script', {
+          topic: enhancedPrompt,
+          description: description || undefined,
+        })
 
-      setGeneratedScript(response.data.script)
-      setCanEditScript(true)
-      setStep('script')
+        setGeneratedScript(response.data.script)
+        setCanEditScript(true)
+        setStep('script')
+      }
     } catch (error: any) {
       setScriptError(error.response?.data?.error || 'Failed to generate script')
     } finally {
@@ -529,6 +548,42 @@ EXAMPLE OUTPUT:
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value)}
               />
 
+              {/* Script Generation Method Selection */}
+              <div className="space-y-3">
+                <label className="text-sm font-semibold text-primary">{t('quick_create.script_method_label')}</label>
+                <div className="grid gap-3">
+                  <label className="flex items-center gap-3 rounded-xl border-2 border-slate-200 bg-white p-4 cursor-pointer transition-all hover:border-brand-300 hover:bg-brand-50/50">
+                    <input
+                      type="radio"
+                      name="scriptMethod"
+                      value="as_is"
+                      checked={scriptMethod === 'as_is'}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setScriptMethod(e.target.value as 'as_is' | 'sora_generated')}
+                      className="h-4 w-4 text-brand-600 focus:ring-brand-500"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-primary">{t('quick_create.script_method_chatgpt')}</div>
+                      <div className="text-sm text-slate-600">{t('quick_create.script_method_chatgpt_desc')}</div>
+                    </div>
+                  </label>
+                  
+                  <label className="flex items-center gap-3 rounded-xl border-2 border-slate-200 bg-white p-4 cursor-pointer transition-all hover:border-brand-300 hover:bg-brand-50/50">
+                    <input
+                      type="radio"
+                      name="scriptMethod"
+                      value="sora_generated"
+                      checked={scriptMethod === 'sora_generated'}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setScriptMethod(e.target.value as 'as_is' | 'sora_generated')}
+                      className="h-4 w-4 text-brand-600 focus:ring-brand-500"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-primary">{t('quick_create.script_method_sora')}</div>
+                      <div className="text-sm text-slate-600">{t('quick_create.script_method_sora_desc')}</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
 
               <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6">
                 <Button
@@ -545,7 +600,10 @@ EXAMPLE OUTPUT:
                   leftIcon={!generatingScript ? <Sparkles className="h-4 w-4" /> : undefined}
                   className="w-full sm:w-auto shadow-lg shadow-brand-500/20"
                 >
-                  {t('quick_create.generate_script')}
+                  {scriptMethod === 'sora_generated' 
+                    ? t('quick_create.generate_video_sora') 
+                    : t('quick_create.generate_script')
+                  }
                 </Button>
               </div>
             </div>

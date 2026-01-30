@@ -42,17 +42,19 @@ router.post('/generate', authenticate, async (req: AuthRequest, res: Response) =
   })
 
   try {
-    const { topic, script, style, duration, avatar_id, talking_photo_id, generate_caption, aspect_ratio, dimension, language } = req.body
+    const { topic, script, style, duration, avatar_id, talking_photo_id, generate_caption, aspect_ratio, dimension, language, generateScript, description } = req.body
     const userId = req.userId!
 
     // Detect language from topic and script if not explicitly provided
-    const textToAnalyze = script || topic || ''
+    const textToAnalyze = script || topic || description || ''
     const detectedLanguage = language || await detectLanguage(textToAnalyze)
 
     console.log('Video generation request:', {
       userId,
       hasTopic: !!topic,
       hasScript: !!script,
+      hasDescription: !!description,
+      generateScript,
       style,
       duration,
       avatar_id,
@@ -69,10 +71,51 @@ router.post('/generate', authenticate, async (req: AuthRequest, res: Response) =
       return res.status(400).json({ error: 'Topic is required' })
     }
 
+    // If generateScript is true, we need to generate a script first
+    let finalScript = script?.trim() || null
+    if (generateScript && !finalScript) {
+      // Generate script using OpenAI
+      const scriptPrompt = `
+Create a 10-second video script that is engaging, specific, and has personality. 
+
+TOPIC: ${topic}
+DETAILS: ${description || 'No additional details provided'}
+
+SCRIPT REQUIREMENTS:
+- Between 40-45 words total (fits in 15 seconds when spoken naturally)
+- Start with a shocking question, surprising fact, or bold statement
+- Include 1-2 specific tips or examples (keep it concise)
+- Add personality with conversational, energetic tone
+- Include at least one surprising element or "wow" factor
+- End with "Follow for daily tips!"
+- Use simple, punchy sentences - no complex words or long phrases
+
+FORMAT: Write as a continuous spoken script without timing cues. Make it sound like you're talking to a friend.
+`
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert scriptwriter for short-form video content. Create engaging, concise scripts that capture attention immediately."
+          },
+          {
+            role: "user",
+            content: scriptPrompt
+          }
+        ],
+        max_tokens: 150,
+        temperature: 0.7
+      })
+
+      finalScript = completion.choices[0]?.message?.content?.trim() || null
+    }
+
     // Create the video using VideoService (which handles credit deduction)
     const video = await VideoService.requestManualVideo(userId, {
       topic: topic.trim(),
-      script: script?.trim() || null,
+      script: finalScript,
       style: style || 'default',
       duration: duration || 'short',
       avatar_id: avatar_id || null,
@@ -94,6 +137,7 @@ router.post('/generate', authenticate, async (req: AuthRequest, res: Response) =
     res.json({
       success: true,
       video,
+      videoId: video.id, // Add videoId for frontend compatibility
       message: 'Video generation initiated successfully',
     })
   } catch (error: any) {
