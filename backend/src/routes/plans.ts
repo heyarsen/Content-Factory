@@ -461,7 +461,7 @@ router.post('/items/:id/create-video', authenticate, requireSubscription, async 
     const video = await VideoService.requestManualVideo(userId, {
       topic: item.topic!,
       script: item.script!,
-      style: style || 'professional',
+      style: style || 'Cinematic',
       duration: duration || 30,
       plan_item_id: id,
     })

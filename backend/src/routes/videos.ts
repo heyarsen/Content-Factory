@@ -73,7 +73,9 @@ router.post('/generate', authenticate, async (req: AuthRequest, res: Response) =
 
     // If generateScript is true, we need to generate a script first
     let finalScript = script?.trim() || null
-    if (generateScript && !finalScript) {
+    const provider = req.body.provider || 'sora'
+
+    if (generateScript && !finalScript && provider !== 'sora') {
       // Generate script using OpenAI
       const scriptPrompt = `
 Create a 10-second video script that is engaging, specific, and has personality. 
@@ -98,7 +100,7 @@ FORMAT: Write as a continuous spoken script without timing cues. Make it sound l
         messages: [
           {
             role: "system",
-            content: "You are an expert scriptwriter for short-form video content. Create engaging, concise scripts that capture attention immediately."
+            content: "You are an expert short-form video script writer for TikTok, Instagram Reels, and YouTube Shorts."
           },
           {
             role: "user",
@@ -110,14 +112,19 @@ FORMAT: Write as a continuous spoken script without timing cues. Make it sound l
       })
 
       finalScript = completion.choices[0]?.message?.content?.trim() || null
+    } else if (generateScript && !finalScript && provider === 'sora') {
+      // For Sora "Direct to Sora", we skip OpenAI pre-generation
+      // and let Sora's service handle the combined prompt
+      console.log('[Videos Route] Direct to Sora: Skipping OpenAI script generation')
+      finalScript = description?.trim() || null
     }
 
     // Create the video using VideoService (which handles credit deduction)
     const video = await VideoService.requestManualVideo(userId, {
       topic: topic.trim(),
       script: finalScript,
-      style: style || 'default',
-      duration: duration || 'short',
+      style: style || 'Realistic',
+      duration: duration || 60,
       avatar_id: avatar_id || null,
       talking_photo_id: talking_photo_id || null,
       generate_caption: generate_caption || false,

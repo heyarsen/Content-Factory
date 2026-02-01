@@ -326,7 +326,7 @@ export class AutomationService {
                   const video = await VideoService.requestManualVideo(plan.user_id, {
                     topic: updatedItem.topic || 'Video Content',
                     script: updatedItem.script || '',
-                    style: 'professional',
+                    style: 'Cinematic',
                     duration: 30,
                     avatar_id: avatarId, // Can be undefined - will fall back to default
                     talking_photo_id: talkingPhotoId, // Look ID if provided
@@ -468,7 +468,7 @@ export class AutomationService {
         const video = await VideoService.requestManualVideo(userId, {
           topic: item.topic || 'Video Content', // Ensure topic is never empty
           script: item.script, // Script should match the topic
-          style: 'professional',
+          style: 'Cinematic',
           duration: 30,
           avatar_id: avatarId, // Can be undefined - will fall back to default avatar
           talking_photo_id: talkingPhotoId, // Look ID if provided
@@ -882,7 +882,7 @@ export class AutomationService {
             const video = await VideoService.requestManualVideo(plan.user_id, {
               topic: item.topic,
               script: item.script,
-              style: 'professional',
+              style: 'Cinematic',
               duration: 30,
               avatar_id: avatarId, // Can be undefined - will fall back to default avatar
               talking_photo_id: talkingPhotoId, // Look ID if provided
@@ -2152,7 +2152,7 @@ export class AutomationService {
     const video = await VideoService.requestManualVideo(plan.user_id, {
       topic: item.topic!,
       script: item.script,
-      style: 'professional',
+      style: 'Cinematic',
       duration: 30,
       avatar_id: avatarId, // Can be undefined - will fall back to default avatar
       talking_photo_id: talkingPhotoId, // Look ID if provided
