@@ -2461,6 +2461,14 @@ export function VideoPlanning() {
               options={timezones}
             />
 
+            {/* VERY PROMINENT DEBUG SECTION */}
+            <div className="bg-red-500 text-white p-4 rounded-lg border-4 border-red-700">
+              <h3 className="text-xl font-bold mb-2">🚨 DEBUG INFO - TRIGGER TIME SECTION</h3>
+              <p>Current autoScheduleTrigger: <span className="font-mono bg-black px-2 py-1 rounded">{autoScheduleTrigger}</span></p>
+              <p>Should show trigger time: {autoScheduleTrigger === 'daily' || autoScheduleTrigger === 'time_based' ? '✅ YES' : '❌ NO'}</p>
+              <p>Current triggerTime: <span className="font-mono bg-black px-2 py-1 rounded">{triggerTime}</span></p>
+            </div>
+
             <Select
               label={t('video_planning.schedule_trigger')}
               value={autoScheduleTrigger}
