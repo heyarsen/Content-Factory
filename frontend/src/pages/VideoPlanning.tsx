@@ -645,9 +645,8 @@ export function VideoPlanning() {
     setPlanName(plan.name)
     setStartDate(plan.start_date.split('T')[0])
     setEndDate(plan.end_date ? plan.end_date.split('T')[0] : '')
-    setAutoScheduleTrigger(plan.auto_schedule_trigger || 'daily')
     setTriggerTime(
-      plan.trigger_time ? plan.trigger_time.substring(0, 5) : '09:00',
+      plan.trigger_time ? plan.trigger_time.substring(0, 5) : '08:00',
     )
     setDefaultPlatforms(plan.default_platforms || [])
     setTimezone(plan.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone)
