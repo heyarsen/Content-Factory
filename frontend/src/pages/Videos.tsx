@@ -39,7 +39,7 @@ export function Videos() {
   const { addNotification } = useNotifications()
   const { t } = useLanguage()
   const { user } = useAuth()
-  const { credits, unlimited } = useCreditsContext()
+  const { credits, unlimited, loading: creditsLoading } = useCreditsContext()
   const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')
   const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
 

@@ -7,14 +7,13 @@ import { Badge } from '../components/ui/Badge'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Modal } from '../components/ui/Modal'
-import { Users, Link2, X, Instagram, Youtube, Facebook, Share2, Sparkles } from 'lucide-react'
+import { Users, Link2, X, Instagram, Youtube, Facebook, Share2 } from 'lucide-react'
 import api from '../lib/api'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useCreditsContext } from '../contexts/CreditContext'
 import { CreditBanner } from '../components/ui/CreditBanner'
 import { useToast } from '../hooks/useToast'
-import { Link } from 'react-router-dom'
 
 interface SocialAccount {
   id: string

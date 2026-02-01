@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
@@ -15,7 +15,6 @@ import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useCreditsContext } from '../contexts/CreditContext'
 import { useLanguage } from '../contexts/LanguageContext'
-import { Link } from 'react-router-dom'
 import { CreditBanner } from '../components/ui/CreditBanner'
 
 interface SocialAccount {
@@ -55,7 +54,7 @@ const platformNames = {
 }
 
 export function Distribution() {
-  const { t } = useLanguage()
+  useLanguage()
   const { user } = useAuth()
   const { credits, unlimited } = useCreditsContext()
   const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -13,7 +13,6 @@ import { useAuth } from '../contexts/AuthContext'
 import { useCreditsContext } from '../contexts/CreditContext'
 import { useLanguage } from '../contexts/LanguageContext'
 import { Calendar, ChevronLeft, ChevronRight, Instagram, Users, Youtube, Facebook } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import { CreditBanner } from '../components/ui/CreditBanner'
 
 interface Post {
@@ -45,7 +44,7 @@ const platformNames = {
 }
 
 export function ScheduledPosts() {
-  const { t } = useLanguage()
+  useLanguage()
   const { user } = useAuth()
   const { credits, unlimited } = useCreditsContext()
   const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false

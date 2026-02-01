@@ -33,7 +33,6 @@ import { timezones } from '../lib/timezones'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useCreditsContext } from '../contexts/CreditContext'
-import { Link } from 'react-router-dom'
 import { CreditBanner } from '../components/ui/CreditBanner'
 
 const STATUS_FILTER_KEY = 'video_planning_status_filter'

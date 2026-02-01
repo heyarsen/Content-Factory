@@ -28,9 +28,9 @@ interface PostStats {
 }
 
 export function Dashboard() {
-  const { t, language } = useLanguage()
-  const { user } = useAuth()
-  const { credits, unlimited } = useCreditsContext()
+  const { t } = useLanguage()
+  useAuth()
+  useCreditsContext()
   const [videoStats, setVideoStats] = useState<VideoStats | null>(null)
   const [postStats, setPostStats] = useState<PostStats | null>(null)
   const [loading, setLoading] = useState(true)
