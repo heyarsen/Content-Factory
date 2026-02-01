@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
@@ -10,12 +10,13 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { Modal } from '../components/ui/Modal'
 import { Input } from '../components/ui/Input'
 import { Textarea } from '../components/ui/Textarea'
-import { Calendar, X, Instagram, Youtube, Facebook, Users, Link2, Sparkles } from 'lucide-react'
+import { Calendar, X, Instagram, Youtube, Facebook, Users, Link2 } from 'lucide-react'
 import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useCreditsContext } from '../contexts/CreditContext'
 import { useLanguage } from '../contexts/LanguageContext'
 import { Link } from 'react-router-dom'
+import { CreditBanner } from '../components/ui/CreditBanner'
 
 interface SocialAccount {
   id: string
@@ -59,7 +60,6 @@ export function Distribution() {
   const { credits, unlimited } = useCreditsContext()
   const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')
   const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
-  const shouldShowBanner = !hasSubscription && !unlimited // Show banner for trial users and non-subscribers
 
   // Social Accounts state
   const [accounts, setAccounts] = useState<SocialAccount[]>([])
@@ -340,7 +340,7 @@ export function Distribution() {
     setDisconnecting(true)
     try {
       await api.delete(`/api/social/accounts/${id}`)
-      setAccounts(accounts.filter((a) => a.id !== id))
+      setAccounts(accounts.filter((a: SocialAccount) => a.id !== id))
       setDisconnectModal(null)
     } catch (error) {
       console.error('Failed to disconnect:', error)
@@ -430,8 +430,8 @@ export function Distribution() {
 
   const allPlatforms = ['instagram', 'tiktok', 'youtube', 'facebook'] as const
   const connectedPlatforms = accounts
-    .filter((a) => a.status === 'connected')
-    .map((a) => a.platform)
+    .filter((a: SocialAccount) => a.status === 'connected')
+    .map((a: SocialAccount) => a.platform)
   const availablePlatforms = allPlatforms.filter((p) => !connectedPlatforms.includes(p))
 
   const togglePlatform = (platform: string) => {
@@ -453,38 +453,7 @@ export function Distribution() {
           </p>
         </div>
 
-        {shouldShowBanner && (
-          <Card className="border-amber-200 bg-amber-50 p-4 sm:p-5">
-            <div className="flex flex-col sm:flex-row items-center gap-4 text-amber-800">
-              <Sparkles className="h-6 w-6 text-amber-500 shrink-0" />
-              <div className="text-center sm:text-left">
-                <h3 className="font-semibold text-amber-900">
-                  {credits !== null && credits > 0 ? t('common.credits_available', { count: credits }) : t('common.upgrade_required')}
-                </h3>
-                <p className="text-sm opacity-90">
-                  {credits !== null && credits > 0 
-                    ? t('common.credits_message', { count: credits, plural: credits > 1 ? 's' : '' })
-                    : 'Your subscription is inactive. Please upgrade or use credits to continue connecting social media and scheduling posts.'
-                  }
-                </p>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto shrink-0">
-                {credits !== null && credits > 0 && (
-                  <Link to="/videos" className="w-full sm:w-auto">
-                    <Button variant="primary" className="w-full bg-blue-600 hover:bg-blue-700 text-white border-none shadow-md">
-                      {t('common.create_video') || 'Create Video'}
-                    </Button>
-                  </Link>
-                )}
-                <Link to="/credits" className="w-full sm:w-auto">
-                  <Button variant="secondary" className="w-full bg-amber-600 hover:bg-amber-700 text-white border-none shadow-md">
-                    {t('common.upgrade_now') || 'Upgrade Now'}
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </Card>
-        )}
+        <CreditBanner />
 
         {/* Social Accounts Section */}
         <section className="space-y-6">
@@ -510,7 +479,7 @@ export function Distribution() {
           ) : (
             <div className="grid gap-6 md:grid-cols-2">
               {allPlatforms.map((platform) => {
-                const account = accounts.find((a) => a.platform === platform)
+                const account = accounts.find((a: SocialAccount) => a.platform === platform)
                 const Icon = platformIcons[platform]
                 const isConnected = account?.status === 'connected'
 

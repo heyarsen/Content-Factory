@@ -34,6 +34,7 @@ import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useCreditsContext } from '../contexts/CreditContext'
 import { Link } from 'react-router-dom'
+import { CreditBanner } from '../components/ui/CreditBanner'
 
 const STATUS_FILTER_KEY = 'video_planning_status_filter'
 
@@ -110,9 +111,8 @@ export function VideoPlanning() {
   const { t, language } = useLanguage()
   const { user } = useAuth()
   const { credits, unlimited } = useCreditsContext()
-  const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
+  const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')
   const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
-  const shouldShowBanner = !hasSubscription && !unlimited // Show banner for trial users and non-subscribers
   const navigate = useNavigate()
   const [plans, setPlans] = useState<VideoPlan[]>([])
   const [selectedPlan, setSelectedPlan] = useState<VideoPlan | null>(null)
@@ -1267,38 +1267,7 @@ export function VideoPlanning() {
           </Card>
         )}
 
-        {shouldShowBanner && (
-          <Card className="border-amber-200 bg-amber-50 p-4 sm:p-5">
-            <div className="flex items-center gap-4 text-amber-800">
-              <Sparkles className="h-6 w-6 text-amber-500" />
-              <div>
-                <h3 className="font-semibold">
-                  {credits !== null && credits > 0 ? t('common.credits_available', { count: credits }) : t('common.upgrade_required')}
-                </h3>
-                <p className="text-sm opacity-90">
-                  {credits !== null && credits > 0
-                    ? t('common.credits_message', { count: credits, plural: credits > 1 ? 's' : '' })
-                    : 'Your subscription is inactive. Please upgrade to continue generating videos and scheduling posts.'
-                  }
-                </p>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-3 ml-auto">
-                {credits !== null && credits > 0 && (
-                  <Link to="/videos" className="w-full sm:w-auto">
-                    <Button size="sm" variant="primary" className="bg-blue-600 hover:bg-blue-700 text-white border-none">
-                      {t('common.create_video') || 'Create Video'}
-                    </Button>
-                  </Link>
-                )}
-                <Link to="/credits" className="w-full sm:w-auto">
-                  <Button size="sm" variant="primary" className="bg-amber-600 hover:bg-amber-700 text-white border-none">
-                    {t('common.upgrade_now') || 'Upgrade Now'}
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </Card>
-        )}
+        <CreditBanner />
 
         {/* Plan Items Calendar View */}
         {selectedPlan ? (

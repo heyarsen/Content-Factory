@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -12,8 +12,9 @@ import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useCreditsContext } from '../contexts/CreditContext'
 import { useLanguage } from '../contexts/LanguageContext'
-import { Sparkles, Calendar, ChevronLeft, ChevronRight, Instagram, Users, Youtube, Facebook } from 'lucide-react'
+import { Calendar, ChevronLeft, ChevronRight, Instagram, Users, Youtube, Facebook } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { CreditBanner } from '../components/ui/CreditBanner'
 
 interface Post {
   id: string
@@ -49,7 +50,6 @@ export function ScheduledPosts() {
   const { credits, unlimited } = useCreditsContext()
   const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
   const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
-  const shouldShowBanner = !hasSubscription && !unlimited // Show banner for trial users and non-subscribers
   const [posts, setPosts] = useState<Post[]>([])
   const [videos, setVideos] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -279,7 +279,7 @@ export function ScheduledPosts() {
                   { value: 'cancelled', label: 'Cancelled' },
                 ]}
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setStatusFilter(e.target.value)}
               />
             </Card>
             <Button
@@ -296,38 +296,7 @@ export function ScheduledPosts() {
           </div>
         </div>
 
-        {shouldShowBanner && (
-          <Card className="border-amber-200 bg-amber-50 p-4 sm:p-5">
-            <div className="flex items-center gap-4 text-amber-800">
-              <Sparkles className="h-6 w-6 text-amber-500" />
-              <div>
-                <h3 className="font-semibold">
-                  {credits !== null && credits > 0 ? t('common.credits_available', { count: credits }) : t('common.upgrade_required')}
-                </h3>
-                <p className="text-sm opacity-90">
-                  {credits !== null && credits > 0 
-                    ? t('common.credits_message', { count: credits, plural: credits > 1 ? 's' : '' })
-                    : 'Your subscription is inactive. Please upgrade or use credits to schedule posts to social media.'
-                  }
-                </p>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto shrink-0">
-                {credits !== null && credits > 0 && (
-                  <Link to="/videos" className="w-full sm:w-auto">
-                    <Button variant="primary" className="w-full bg-blue-600 hover:bg-blue-700 text-white border-none shadow-md">
-                      {t('common.create_video') || 'Create Video'}
-                    </Button>
-                  </Link>
-                )}
-                <Link to="/credits" className="w-full sm:w-auto">
-                  <Button variant="secondary" className="w-full bg-amber-600 hover:bg-amber-700 text-white border-none shadow-md">
-                    {t('common.upgrade_now') || 'Upgrade Now'}
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </Card>
-        )}
+        <CreditBanner />
 
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
           {/* Calendar - Always visible */}
@@ -514,13 +483,13 @@ export function ScheduledPosts() {
               label="Select video"
               options={[
                 { value: '', label: 'Choose a video...' },
-                ...videos.map((v) => ({
+                ...videos.map((v: any) => ({
                   value: v.id,
                   label: v.topic,
                 })),
               ]}
               value={selectedVideo}
-              onChange={(e) => setSelectedVideo(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedVideo(e.target.value)}
             />
 
             <div>
@@ -553,14 +522,14 @@ export function ScheduledPosts() {
               type="datetime-local"
               label="Schedule time (optional)"
               value={scheduledTime}
-              onChange={(e) => setScheduledTime(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setScheduledTime(e.target.value)}
             />
 
             <Textarea
               label="Caption (optional)"
               rows={3}
               value={caption}
-              onChange={(e) => setCaption(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setCaption(e.target.value)}
               placeholder="Add a caption for your post..."
             />
 

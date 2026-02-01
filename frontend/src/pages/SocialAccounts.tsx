@@ -12,6 +12,7 @@ import api from '../lib/api'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useCreditsContext } from '../contexts/CreditContext'
+import { CreditBanner } from '../components/ui/CreditBanner'
 import { useToast } from '../hooks/useToast'
 import { Link } from 'react-router-dom'
 
@@ -43,7 +44,6 @@ export function SocialAccounts() {
   const { user, refreshSubscriptionStatus } = useAuth()
   const { credits, unlimited } = useCreditsContext()
   const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
-  const shouldShowBanner = !hasSubscription && !unlimited // Show banner for trial users and non-subscribers
   const { toast } = useToast()
   const [accounts, setAccounts] = useState<SocialAccount[]>([])
   const [loading, setLoading] = useState(true)
@@ -112,9 +112,8 @@ export function SocialAccounts() {
     console.log('[Social] User ID:', user?.id)
     console.log('[Social] User Email:', user?.email)
 
-    const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin')
-    const { credits, unlimited } = useCreditsContext()
-    const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
+    const hasSub = (user?.hasActiveSubscription || user?.role === 'admin')
+    const safeCanCreate = hasSub || (credits !== null && credits > 0) || unlimited
 
     if (!safeCanCreate) {
       toast.error(t('social_accounts.subscription_needed_alert'))
@@ -212,7 +211,7 @@ export function SocialAccounts() {
     setDisconnecting(true)
     try {
       await api.delete(`/api/social/accounts/${id}`)
-      setAccounts(accounts.filter((a) => a.id !== id))
+      setAccounts(accounts.filter((a: SocialAccount) => a.id !== id))
     } catch (error) {
       console.error('Failed to disconnect:', error)
       toast.error(t('errors.delete_failed'))
@@ -234,8 +233,8 @@ export function SocialAccounts() {
 
   const allPlatforms = ['instagram', 'tiktok', 'youtube', 'facebook', 'x', 'linkedin', 'pinterest', 'threads'] as const
   const connectedPlatforms = accounts
-    .filter((a) => a.status === 'connected')
-    .map((a) => a.platform)
+    .filter((a: SocialAccount) => a.status === 'connected')
+    .map((a: SocialAccount) => a.platform)
   const availablePlatforms = allPlatforms.filter((p) => !connectedPlatforms.includes(p))
 
   if (loading) {
@@ -264,38 +263,7 @@ export function SocialAccounts() {
           </p>
         </div>
 
-        {shouldShowBanner && (
-          <Card className="border-amber-200 bg-amber-50 p-4 sm:p-5">
-            <div className="flex flex-col sm:flex-row items-center gap-4 text-amber-800">
-              <Sparkles className="h-6 w-6 text-amber-500 shrink-0" />
-              <div className="text-center sm:text-left">
-                <h3 className="font-semibold text-amber-900">
-                  {credits !== null && credits > 0 ? t('common.credits_available', { count: credits }) : t('common.upgrade_required')}
-                </h3>
-                <p className="text-sm opacity-90">
-                  {credits !== null && credits > 0 
-                    ? t('common.credits_message', { count: credits, plural: credits > 1 ? 's' : '' })
-                    : 'Your subscription is inactive. Please upgrade or use credits to continue connecting social media and scheduling posts.'
-                  }
-                </p>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto mt-2 sm:mt-0 sm:ml-auto">
-                {credits !== null && credits > 0 && (
-                  <Link to="/videos" className="w-full sm:w-auto">
-                    <Button size="sm" variant="primary" className="w-full bg-blue-600 hover:bg-blue-700 border-none text-white">
-                      {t('common.create_video') || 'Create Video'}
-                    </Button>
-                  </Link>
-                )}
-                <Link to="/credits" className="w-full sm:w-auto">
-                  <Button size="sm" variant="primary" className="w-full bg-amber-600 hover:bg-amber-700 border-none text-white">
-                    {t('common.upgrade_now') || 'Upgrade Now'}
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </Card>
-        )}
+        <CreditBanner />
 
         {accounts.length === 0 && availablePlatforms.length === 0 ? (
           <EmptyState
@@ -306,7 +274,7 @@ export function SocialAccounts() {
         ) : (
           <div className="grid gap-6 md:grid-cols-2">
             {allPlatforms.map((platform) => {
-              const account = accounts.find((a) => a.platform === platform)
+              const account = accounts.find((a: SocialAccount) => a.platform === platform)
               const Icon = platformIcons[platform]
               const isConnected = account?.status === 'connected'
 

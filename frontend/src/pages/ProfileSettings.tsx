@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Layout } from '../components/layout/Layout'
@@ -11,8 +11,8 @@ import { User, Lock, Mail, LogOut } from 'lucide-react'
 import api from '../lib/api'
 import { useLanguage } from '../contexts/LanguageContext'
 import { Sparkles, CreditCard } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import { useCreditsContext } from '../contexts/CreditContext'
+import { CreditBanner } from '../components/ui/CreditBanner'
 
 export function ProfileSettings() {
   const { user, signOut } = useAuth()
@@ -22,7 +22,6 @@ export function ProfileSettings() {
 
   const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')
   const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
-  const shouldShowBanner = !hasSubscription && !unlimited // Show banner for trial users and non-subscribers
   const navigate = useNavigate()
   const [emailForm, setEmailForm] = useState({
     email: '',
@@ -219,38 +218,7 @@ export function ProfileSettings() {
                   {safeCanCreate ? 'Active' : 'Inactive'}
                 </Badge>
               </div>
-              {shouldShowBanner && (
-                <div className="rounded-xl bg-amber-50 p-4 border border-amber-100">
-                  <div className="mb-3 flex items-start gap-3">
-                    <Sparkles className="mt-0.5 h-4 w-4 text-amber-500" />
-                    <div>
-                      <p className="text-sm font-medium text-amber-900">
-                        {credits !== null && credits > 0 ? t('common.credits_available', { count: credits }) : t('common.upgrade_required')}
-                      </p>
-                      <p className="text-xs text-amber-700">
-                        {credits !== null && credits > 0 
-                          ? t('common.credits_message', { count: credits, plural: credits > 1 ? 's' : '' })
-                          : 'Your subscription is inactive. Please upgrade to enable video generation and planning features.'
-                        }
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    {credits !== null && credits > 0 && (
-                      <Link to="/videos" className="w-full sm:w-auto">
-                        <Button size="sm" className="w-full bg-blue-600 hover:bg-blue-700 text-white border-none">
-                          {t('common.create_video') || 'Create Video'}
-                        </Button>
-                      </Link>
-                    )}
-                    <Link to="/credits" className="w-full sm:w-auto">
-                      <Button size="sm" className="w-full bg-amber-600 hover:bg-amber-700 text-white border-none">
-                        {t('common.upgrade_now') || 'Upgrade Now'}
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              )}
+              <CreditBanner />
             </div>
           </div>
         </Card>
