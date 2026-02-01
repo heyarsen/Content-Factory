@@ -2464,11 +2464,12 @@ export function VideoPlanning() {
             <Select
               label={t('video_planning.schedule_trigger')}
               value={autoScheduleTrigger}
-              onChange={(e: any) =>
+              onChange={(e: any) => {
+                console.log('Changing autoScheduleTrigger from', autoScheduleTrigger, 'to', e.target.value)
                 setAutoScheduleTrigger(
                   e.target.value as 'daily' | 'time_based' | 'manual',
                 )
-              }
+              }}
               options={[
                 { value: 'daily', label: t('video_planning.daily_trigger') },
                 { value: 'time_based', label: t('video_planning.time_based_trigger') },
@@ -2476,8 +2477,17 @@ export function VideoPlanning() {
               ]}
             />
 
+            {/* Debug info */}
+            <div className="bg-yellow-50 border border-yellow-200 rounded p-2 text-xs">
+              Debug: autoScheduleTrigger = {autoScheduleTrigger}
+              {autoScheduleTrigger === 'daily' && ' ✅ Should show trigger time'}
+              {autoScheduleTrigger === 'time_based' && ' ✅ Should show trigger time'}
+              {autoScheduleTrigger === 'manual' && ' ❌ Will NOT show trigger time'}
+            </div>
+
             {(autoScheduleTrigger === 'daily' || autoScheduleTrigger === 'time_based') && (
-              <div className="space-y-3">
+              <div className="space-y-3 border-2 border-green-300 bg-green-50 rounded-lg p-4">
+                <div className="text-green-800 font-bold text-sm">⏰ TRIGGER TIME SELECTION (Visible)</div>
                 <label className="block text-sm font-medium text-slate-700">
                   {t('video_planning.trigger_time')}
                   <span className="ml-2 text-xs text-slate-500">
@@ -2520,6 +2530,7 @@ export function VideoPlanning() {
                   min="00:00"
                   max="23:59"
                 />
+                <div className="text-green-800 font-bold text-sm">🎯 END OF TRIGGER TIME SECTION</div>
               </div>
             )}
 
