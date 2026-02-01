@@ -161,15 +161,7 @@ export function VideoPlanning() {
     new Date().toISOString().split('T')[0],
   )
   const [endDate, setEndDate] = useState('')
-  const [autoScheduleTrigger, setAutoScheduleTrigger] = useState<
-    'daily' | 'time_based' | 'manual'
-  >('daily')
-  const [triggerTime, setTriggerTime] = useState(() => {
-    // Default to 9 AM in user's local time
-    const hours = 9
-    const minutes = 0
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
-  })
+  const [triggerTime, setTriggerTime] = useState('08:00')
   const [defaultPlatforms, setDefaultPlatforms] = useState<string[]>([])
   const [timezone, setTimezone] = useState(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -521,9 +513,9 @@ export function VideoPlanning() {
         start_date: startDate,
         end_date: endDate || null,
         auto_research: true,
-        auto_schedule_trigger: autoScheduleTrigger,
+        auto_schedule_trigger: 'daily',
         trigger_time:
-          (autoScheduleTrigger === 'daily' || autoScheduleTrigger === 'time_based') ? `${triggerTime}:00` : null,
+          `${triggerTime}:00`,
         timezone: timezone,
         default_platforms:
           defaultPlatforms.length > 0 ? defaultPlatforms : null,
@@ -588,8 +580,7 @@ export function VideoPlanning() {
       setStartDate(new Date().toISOString().split('T')[0])
       setEndDate('')
       // Avatar state reset removed - using Sora for video generation
-      setAutoScheduleTrigger('daily')
-      setTriggerTime('09:00')
+      setTriggerTime('08:00')
       setDefaultPlatforms([])
       setVideoTimes(['09:00'])
       setVideoTopics([''])
@@ -683,9 +674,9 @@ export function VideoPlanning() {
         start_date: startDate,
         end_date: endDate || null,
         auto_research: true,
-        auto_schedule_trigger: autoScheduleTrigger,
+        auto_schedule_trigger: 'daily',
         trigger_time:
-          (autoScheduleTrigger === 'daily' || autoScheduleTrigger === 'time_based') ? `${triggerTime}:00` : null,
+          `${triggerTime}:00`,
         default_platforms:
           defaultPlatforms.length > 0 ? defaultPlatforms : null,
         auto_approve: true,
@@ -700,8 +691,7 @@ export function VideoPlanning() {
       setPlanName('')
       setStartDate(new Date().toISOString().split('T')[0])
       setEndDate('')
-      setAutoScheduleTrigger('daily')
-      setTriggerTime('09:00')
+      setTriggerTime('08:00')
       setDefaultPlatforms([])
       setVideoTimes(['09:00'])
       setVideoTopics([''])
@@ -2316,67 +2306,26 @@ export function VideoPlanning() {
               options={timezones}
             />
 
-            <Select
-              label={t('video_planning.schedule_trigger')}
-              value={autoScheduleTrigger}
-              onChange={(e: any) => {
-                setAutoScheduleTrigger(
-                  e.target.value as 'daily' | 'time_based' | 'manual',
-                )
-              }}
-              options={[
-                { value: 'daily', label: t('video_planning.daily_trigger') },
-                { value: 'time_based', label: t('video_planning.time_based_trigger') },
-                { value: 'manual', label: t('video_planning.manual_trigger') },
-              ]}
-            />
+            <div className="space-y-3 border-2 border-brand-300 bg-brand-50 rounded-lg p-4">
+              <label className="block text-sm font-medium text-slate-700">
+                Trigger Time
+              </label>
 
-            {(autoScheduleTrigger === 'daily' || autoScheduleTrigger === 'time_based') && (
-              <div className="space-y-3 border-2 border-brand-300 bg-brand-50 rounded-lg p-4">
-                <label className="block text-sm font-medium text-slate-700">
-                  {t('video_planning.trigger_time')}
-                  <span className="ml-2 text-xs text-slate-500">
-                    ({autoScheduleTrigger === 'daily'
-                      ? 'Time when script writing and video generation starts each day'
-                      : 'Time when script writing and video generation starts'})
-                  </span>
-                  <span className="block text-xs text-slate-400 mt-1">
-                    ({t('video_planning.timezone_label')}: {timezone})
-                  </span>
-                </label>
-
-                <div className="bg-white border border-brand-200 rounded-lg p-3">
-                  <p className="text-xs text-slate-600">
-                    <strong>What happens at this time:</strong> The system will automatically write scripts and generate videos for your scheduled content.
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {timePresets.map((preset) => (
-                    <button
-                      key={preset.value}
-                      type="button"
-                      onClick={() => setTriggerTime(preset.value)}
-                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${triggerTime === preset.value
-                        ? 'border-brand-500 bg-brand-50 text-brand-700'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                        }`}
-                    >
-                      {preset.label.split('(')[0].trim()}
-                    </button>
-                  ))}
-                </div>
-
-                <Input
-                  label={t('video_planning.custom_time')}
-                  type="time"
-                  value={triggerTime}
-                  onChange={(e) => setTriggerTime(e.target.value)}
-                  min="00:00"
-                  max="23:59"
-                />
+              <div className="bg-white border border-brand-200 rounded-lg p-3">
+                <p className="text-xs text-slate-600">
+                  <strong>What happens at this time:</strong> The system will automatically write scripts and generate videos for your scheduled content.
+                </p>
               </div>
-            )}
+
+              <Input
+                label={t('video_planning.custom_time')}
+                type="time"
+                value={triggerTime}
+                onChange={(e) => setTriggerTime(e.target.value)}
+                min="00:00"
+                max="23:59"
+              />
+            </div>
 
             <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
               <label className="block text-sm font-medium text-slate-700">
@@ -2432,8 +2381,7 @@ export function VideoPlanning() {
             setPlanName('')
             setStartDate(new Date().toISOString().split('T')[0])
             setEndDate('')
-            setAutoScheduleTrigger('daily')
-            setTriggerTime('09:00')
+            setTriggerTime('08:00')
             setDefaultPlatforms([])
             setVideoTimes(['09:00'])
             setVideoTopics([''])
@@ -2524,71 +2472,26 @@ export function VideoPlanning() {
             />
 
 
-            <Select
-              label={t('video_planning.schedule_trigger')}
-              value={autoScheduleTrigger}
-              onChange={(e: any) => {
-                console.log('Changing autoScheduleTrigger from', autoScheduleTrigger, 'to', e.target.value)
-                setAutoScheduleTrigger(
-                  e.target.value as 'daily' | 'time_based' | 'manual',
-                )
-              }}
-              options={[
-                { value: 'daily', label: t('video_planning.daily_trigger') },
-                { value: 'time_based', label: t('video_planning.time_based_trigger') },
-                { value: 'manual', label: t('video_planning.manual_trigger') },
-              ]}
-            />
+            <div className="space-y-3 border-2 border-green-300 bg-green-50 rounded-lg p-4">
+              <label className="block text-sm font-medium text-slate-700">
+                Trigger Time
+              </label>
 
-
-            {(autoScheduleTrigger === 'daily' || autoScheduleTrigger === 'time_based') && (
-              <div className="space-y-3 border-2 border-green-300 bg-green-50 rounded-lg p-4">
-                <div className="text-green-800 font-bold text-sm">⏰ TRIGGER TIME SELECTION (Visible)</div>
-                <label className="block text-sm font-medium text-slate-700">
-                  {t('video_planning.trigger_time')}
-                  <span className="ml-2 text-xs text-slate-500">
-                    ({autoScheduleTrigger === 'daily'
-                      ? 'Time when script writing and video generation starts each day'
-                      : 'Time when script writing and video generation starts'})
-                  </span>
-                  <span className="block text-xs text-slate-400 mt-1">
-                    ({t('video_planning.timezone_label')}: {timezone})
-                  </span>
-                </label>
-
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-xs text-blue-700">
-                    <strong>What happens at this time:</strong> The system will automatically write scripts and generate videos for your scheduled content.
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {timePresets.map((preset) => (
-                    <button
-                      key={preset.value}
-                      type="button"
-                      onClick={() => setTriggerTime(preset.value)}
-                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${triggerTime === preset.value
-                        ? 'border-brand-500 bg-brand-50 text-brand-700'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                        }`}
-                    >
-                      {preset.label.split('(')[0].trim()}
-                    </button>
-                  ))}
-                </div>
-
-                <Input
-                  label={t('video_planning.custom_time')}
-                  type="time"
-                  value={triggerTime}
-                  onChange={(e) => setTriggerTime(e.target.value)}
-                  min="00:00"
-                  max="23:59"
-                />
-                <div className="text-green-800 font-bold text-sm">🎯 END OF TRIGGER TIME SECTION</div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-xs text-blue-700">
+                  <strong>What happens at this time:</strong> The system will automatically write scripts and generate videos for your scheduled content.
+                </p>
               </div>
-            )}
+
+              <Input
+                label={t('video_planning.custom_time')}
+                type="time"
+                value={triggerTime}
+                onChange={(e) => setTriggerTime(e.target.value)}
+                min="00:00"
+                max="23:59"
+              />
+            </div>
 
 
             <div className="space-y-2">
@@ -2627,8 +2530,7 @@ export function VideoPlanning() {
                   setPlanName('')
                   setStartDate(new Date().toISOString().split('T')[0])
                   setEndDate('')
-                  setAutoScheduleTrigger('daily')
-                  setTriggerTime('09:00')
+                  setTriggerTime('08:00')
                   setDefaultPlatforms([])
                   setVideoTimes(['09:00'])
                   setVideoTopics([''])
