@@ -135,6 +135,8 @@ export const en = {
         top_up: "Top Up Credits",
         unlimited: "Unlimited",
         credits: "credits",
+        manual_creation: "Manual Creation",
+        automation: "Automation",
     },
     support: {
         title: "Support Tickets",
@@ -752,14 +754,5 @@ export const en = {
         disconnect_message: "Are you sure you want to disconnect this account?",
         yes: "Yes",
         no: "No",
-    },
-    sidebar: {
-        manual_creation: "Manual Creation",
-        automation: "Automation",
-        free_plan: "Free Plan",
-        credits: "credits",
-        unlimited: "Unlimited",
-        buy_subscription: "Subscribe Now",
-        top_up: "Top Up",
     },
 }
