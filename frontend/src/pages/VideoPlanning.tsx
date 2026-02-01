@@ -523,7 +523,7 @@ export function VideoPlanning() {
         auto_research: true,
         auto_schedule_trigger: autoScheduleTrigger,
         trigger_time:
-          autoScheduleTrigger === 'daily' ? `${triggerTime}:00` : null,
+          (autoScheduleTrigger === 'daily' || autoScheduleTrigger === 'time_based') ? `${triggerTime}:00` : null,
         timezone: timezone,
         default_platforms:
           defaultPlatforms.length > 0 ? defaultPlatforms : null,
@@ -685,7 +685,7 @@ export function VideoPlanning() {
         auto_research: true,
         auto_schedule_trigger: autoScheduleTrigger,
         trigger_time:
-          autoScheduleTrigger === 'daily' ? `${triggerTime}:00` : null,
+          (autoScheduleTrigger === 'daily' || autoScheduleTrigger === 'time_based') ? `${triggerTime}:00` : null,
         default_platforms:
           defaultPlatforms.length > 0 ? defaultPlatforms : null,
         auto_approve: true,
@@ -2476,12 +2476,25 @@ export function VideoPlanning() {
               ]}
             />
 
-            {autoScheduleTrigger === 'daily' && (
+            {(autoScheduleTrigger === 'daily' || autoScheduleTrigger === 'time_based') && (
               <div className="space-y-3">
                 <label className="block text-sm font-medium text-slate-700">
                   {t('video_planning.trigger_time')}
-                  ({t('video_planning.timezone_label')}: {timezone})
+                  <span className="ml-2 text-xs text-slate-500">
+                    ({autoScheduleTrigger === 'daily' 
+                      ? 'Time when script writing and video generation starts each day'
+                      : 'Time when script writing and video generation starts'})
+                  </span>
+                  <span className="block text-xs text-slate-400 mt-1">
+                    ({t('video_planning.timezone_label')}: {timezone})
+                  </span>
                 </label>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-xs text-blue-700">
+                    <strong>What happens at this time:</strong> The system will automatically write scripts and generate videos for your scheduled content.
+                  </p>
+                </div>
 
                 <div className="flex flex-wrap gap-2">
                   {timePresets.map((preset) => (
