@@ -253,7 +253,7 @@ async function buildHeygenPayload(
   // Detect language from topic and script if not provided
   const textToAnalyze = script || topic
   const language = detectedLanguage || await detectLanguage(textToAnalyze)
-  
+
   // Enhance script/topic with language instruction if needed
   const enhancedScript = script ? enhancePromptWithLanguage(script, language.language) : script
   const enhancedTopic = enhancePromptWithLanguage(topic, language.language)
@@ -1034,13 +1034,13 @@ export class VideoService {
     // Check if user has sufficient credits (instead of subscription)
     const credits = await CreditsService.getUserCredits(userId)
     const cost = CreditsService.COSTS.VIDEO_GENERATION
-    
+
     if (credits !== null && credits < cost) {
       throw new Error(`Insufficient credits. You have ${credits} credits but need ${cost} credits to generate a video.`)
     }
-    
+
     let videoRecordCreated = false
-    
+
     try {
       // If talking_photo_id is provided, use it directly (it's a specific look ID)
       // Otherwise, resolve the avatar context normally
@@ -1061,7 +1061,7 @@ export class VideoService {
         avatarRecordId = resolved.avatarRecordId
         isPhotoAvatar = resolved.isPhotoAvatar
       }
-      
+
       // Always use the hardcoded template for everyone
       const templatePreference = await fetchUserTemplatePreference(userId)
 
@@ -1117,83 +1117,83 @@ export class VideoService {
 
       const video = await this.createVideoRecord(userId, input, avatarRecordId)
       videoRecordCreated = true
-    const outputResolution = input.output_resolution || DEFAULT_HEYGEN_RESOLUTION
-    const aspectRatio = input.aspect_ratio || DEFAULT_VERTICAL_ASPECT_RATIO
-    const dimension =
-      input.dimension ||
-      (aspectRatio === DEFAULT_VERTICAL_ASPECT_RATIO ? { ...DEFAULT_VERTICAL_DIMENSION } : undefined)
-    const scriptText = (input.script || '').trim() || input.topic
+      const outputResolution = input.output_resolution || DEFAULT_HEYGEN_RESOLUTION
+      const aspectRatio = input.aspect_ratio || DEFAULT_VERTICAL_ASPECT_RATIO
+      const dimension =
+        input.dimension ||
+        (aspectRatio === DEFAULT_VERTICAL_ASPECT_RATIO ? { ...DEFAULT_VERTICAL_DIMENSION } : undefined)
+      const scriptText = (input.script || '').trim() || input.topic
 
-    // Route to Sora if provider is 'sora'
-    if (video.provider === 'sora') {
-      console.log('[Video Generation] Using Sora provider:', {
-        videoId: video.id,
-        topic: video.topic,
-        aspectRatio,
-      })
-
-      // Import and use Sora service
-      const { generateVideoWithSora } = await import('./soraService.js')
-      void generateVideoWithSora(video, { aspectRatio }).catch((error: any) => {
-        console.error('[Video Generation] Sora generation failed:', {
-          error: error?.message || error,
+      // Route to Sora if provider is 'sora'
+      if (video.provider === 'sora') {
+        console.log('[Video Generation] Using Sora provider:', {
           videoId: video.id,
+          topic: video.topic,
+          aspectRatio,
         })
-      })
 
-      return video
-    }
-
-    // Default to HeyGen generation
-    const scheduleManualGeneration = () =>
-      runHeygenGeneration(
-        video,
-        avatarId,
-        isPhotoAvatar,
-        outputResolution,
-        input.plan_item_id || null,
-        aspectRatio,
-        dimension
-      )
-
-    // Always use template - it's hardcoded for everyone
-    if (templatePreference) {
-      console.log('[Video Generation] Attempting template generation:', {
-        templateId: templatePreference.templateId,
-        videoId: video.id,
-        scriptKey: templatePreference.scriptKey,
-        hasScript: !!scriptText,
-        scriptLength: scriptText?.length || 0,
-        avatarId: avatarId,
-        isPhotoAvatar: isPhotoAvatar,
-        hasAvatarId: !!avatarId,
-      })
-
-      // Try template generation (async, fire-and-forget with error handling)
-      void runTemplateGeneration(video, templatePreference, scriptText, input.plan_item_id || null, avatarId, isPhotoAvatar, input.generate_caption).catch(
-        (error: any) => {
-          console.error('[Video Generation] Template generation failed; falling back to avatar-based generation:', {
+        // Import and use Sora service
+        const { generateVideoWithSora } = await import('./soraService.js')
+        void generateVideoWithSora(video, { aspectRatio }).catch((error: any) => {
+          console.error('[Video Generation] Sora generation failed:', {
             error: error?.message || error,
-            errorStack: error?.stack,
-            errorResponse: error?.response?.data,
             videoId: video.id,
-            templateId: templatePreference.templateId,
-            avatarId: avatarId,
-            isPhotoAvatar: isPhotoAvatar,
           })
-          // Fall back to regular generation
-          void scheduleManualGeneration()
-        }
-      )
-    } else {
-      console.error('[Video Generation] ERROR: Template preference is null! This should never happen. Falling back to regular generation.')
-      void scheduleManualGeneration()
-    }
-    return video
-    
-  } catch (error: any) {
+        })
+
+        return video
+      }
+
+      // Default to HeyGen generation
+      const scheduleManualGeneration = () =>
+        runHeygenGeneration(
+          video,
+          avatarId,
+          isPhotoAvatar,
+          outputResolution,
+          input.plan_item_id || null,
+          aspectRatio,
+          dimension
+        )
+
+      // Always use template - it's hardcoded for everyone
+      if (templatePreference) {
+        console.log('[Video Generation] Attempting template generation:', {
+          templateId: templatePreference.templateId,
+          videoId: video.id,
+          scriptKey: templatePreference.scriptKey,
+          hasScript: !!scriptText,
+          scriptLength: scriptText?.length || 0,
+          avatarId: avatarId,
+          isPhotoAvatar: isPhotoAvatar,
+          hasAvatarId: !!avatarId,
+        })
+
+        // Try template generation (async, fire-and-forget with error handling)
+        void runTemplateGeneration(video, templatePreference, scriptText, input.plan_item_id || null, avatarId, isPhotoAvatar, input.generate_caption).catch(
+          (error: any) => {
+            console.error('[Video Generation] Template generation failed; falling back to avatar-based generation:', {
+              error: error?.message || error,
+              errorStack: error?.stack,
+              errorResponse: error?.response?.data,
+              videoId: video.id,
+              templateId: templatePreference.templateId,
+              avatarId: avatarId,
+              isPhotoAvatar: isPhotoAvatar,
+            })
+            // Fall back to regular generation
+            void scheduleManualGeneration()
+          }
+        )
+      } else {
+        console.error('[Video Generation] ERROR: Template preference is null! This should never happen. Falling back to regular generation.')
+        void scheduleManualGeneration()
+      }
+      return video
+
+    } catch (error: any) {
       console.error('[VideoService] Video generation failed:', error)
-      
+
       // Refund credits if video record was created but generation failed
       if (videoRecordCreated) {
         try {
@@ -1203,7 +1203,7 @@ export class VideoService {
           console.error('[VideoService] Failed to refund credits:', refundError)
         }
       }
-      
+
       throw error
     }
   }
@@ -1432,7 +1432,7 @@ export class VideoService {
     // Deduct credits for video generation
     const cost = CreditsService.COSTS.VIDEO_GENERATION
     await CreditsService.deductCredits(userId, cost, 'VIDEO_GENERATION')
-    
+
     const { data, error } = await supabase
       .from('videos')
       .insert({
@@ -1463,7 +1463,7 @@ export class VideoService {
         provider: input.provider,
         avatarRecordId,
       })
-      
+
       // Refund credits since video creation failed
       try {
         await CreditsService.addCredits(userId, cost, 'Refund for failed video generation')
@@ -1471,7 +1471,7 @@ export class VideoService {
       } catch (refundError) {
         console.error('[VideoService] Failed to refund credits:', refundError)
       }
-      
+
       const errorMessage = error?.message || 'Failed to create video record'
       const detailedMessage = error?.details ? `${errorMessage}: ${error.details}` : errorMessage
       throw new Error(detailedMessage)
@@ -1488,12 +1488,12 @@ export class VideoService {
   static async refreshAllGeneratingVideos(): Promise<{ processed: number; updated: number }> {
     console.log('[VideoStatusWorker] Starting background status refresh for all generating videos...')
 
-    // Fetch all videos with generating/pending status
+    // Fetch all videos with generating/pending status that have an external task ID (HeyGen or Sora)
     const { data: generatingVideos, error } = await supabase
       .from('videos')
       .select('*')
       .in('status', ['generating', 'pending'])
-      .not('heygen_video_id', 'is', null)
+      .or('heygen_video_id.not.is.null,sora_task_id.not.is.null')
       .limit(50) // Process in chunks to avoid overwhelming API
 
     if (error) {
@@ -1508,31 +1508,45 @@ export class VideoService {
     console.log(`[VideoStatusWorker] Found ${generatingVideos.length} videos to check status...`)
 
     let updatedCount = 0
-    const { getVideoStatus } = await import('../lib/heygen.js')
 
     for (const video of generatingVideos) {
       try {
-        const status = await getVideoStatus(video.heygen_video_id)
-        const mappedStatus = mapHeygenStatus(status.status)
+        let wasUpdated = false
 
-        // Only update if status or video_url has changed
-        if (mappedStatus !== video.status || (status.video_url && status.video_url !== video.video_url)) {
-          const { error: updateError } = await supabase
-            .from('videos')
-            .update({
-              status: mappedStatus,
-              video_url: status.video_url || video.video_url,
-              error_message: status.error || null,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', video.id)
+        if (video.sora_task_id) {
+          // Handle Sora videos
+          const { SoraService } = await import('./soraService.js')
+          await SoraService.checkSoraTaskStatus(video.id, video.sora_task_id)
+          wasUpdated = true // SoraService handles its own DB updates and logging
+        } else if (video.heygen_video_id) {
+          // Handle HeyGen videos
+          const { getVideoStatus } = await import('../lib/heygen.js')
+          const status = await getVideoStatus(video.heygen_video_id)
+          const mappedStatus = mapHeygenStatus(status.status)
 
-          if (updateError) {
-            console.error(`[VideoStatusWorker] Error updating status for video ${video.id}:`, updateError)
-          } else {
-            console.log(`[VideoStatusWorker] Updated video ${video.id} status to ${mappedStatus}`)
-            updatedCount++
+          // Only update if status or video_url has changed
+          if (mappedStatus !== video.status || (status.video_url && status.video_url !== video.video_url)) {
+            const { error: updateError } = await supabase
+              .from('videos')
+              .update({
+                status: mappedStatus,
+                video_url: status.video_url || video.video_url,
+                error_message: status.error || null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', video.id)
+
+            if (updateError) {
+              console.error(`[VideoStatusWorker] Error updating status for HeyGen video ${video.id}:`, updateError)
+            } else {
+              console.log(`[VideoStatusWorker] Updated HeyGen video ${video.id} status to ${mappedStatus}`)
+              wasUpdated = true
+            }
           }
+        }
+
+        if (wasUpdated) {
+          updatedCount++
         }
       } catch (err: any) {
         console.error(`[VideoStatusWorker] Error checking status for video ${video.id}:`, err?.message)

@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import api from '../lib/api'
 
 const profileCache = new Map<string, { data: any; timestamp: number }>()
-const pendingFetches = new Set<string>()
+const pendingFetches = new Map<string, Promise<any>>()
 
 interface User {
   id: string
@@ -33,57 +33,64 @@ const fetchUserRoleAndSubscription = async (userId: string, userEmail: string, f
   const cached = profileCache.get(userId)
   if (!forceRefresh && cached && Date.now() - cached.timestamp < 300000) return cached.data
 
-  if (pendingFetches.has(userId)) {
-    console.log(`[Auth] Fetch already in progress for ${userEmail}, skipping...`)
-    return cached?.data || null
+  const existingFetch = pendingFetches.get(userId)
+  if (existingFetch) {
+    console.log(`[Auth] Fetch already in progress for ${userEmail}, returning existing promise...`)
+    return existingFetch
   }
-
-  pendingFetches.add(userId)
 
   console.log(`[Auth] Fetching role/sub for ${userEmail}...`)
 
-  // Add a 15-second timeout to the combined profile/sub fetch
-  const timeoutPromise = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('Profile fetch timeout')), 15000)
-  )
+  const fetchPromise = (async () => {
+    // Add a 15-second timeout to the combined profile/sub fetch
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Profile fetch timeout')), 15000)
+    )
+
+    try {
+      const dbFetchPromise = Promise.all([
+        supabase.from('user_profiles').select('role, has_active_subscription').eq('id', userId).maybeSingle(),
+        supabase.from('user_subscriptions').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle()
+      ])
+
+      const [profileRes, subRes] = await Promise.race([dbFetchPromise, timeoutPromise]) as [any, any]
+
+      const profileData = profileRes.data
+      const latestSub = subRes.data
+      const isAdmin = userEmail === 'heyarsen@icloud.com' || profileData?.role === 'admin'
+
+      let hasActive = false
+      let reason = 'NONE'
+
+      if (isAdmin) {
+        hasActive = true; reason = 'Admin'
+      } else if (latestSub) {
+        const active = ['active', 'pending'].includes(latestSub.status)
+        const expired = latestSub.expires_at && new Date(latestSub.expires_at).getTime() < Date.now()
+        hasActive = active && !expired
+        reason = `Sub: ${latestSub.status}${expired ? ' (EXP)' : ''}`
+      } else {
+        // No sub record found and not admin
+        hasActive = false
+        reason = 'No Sub Record'
+      }
+
+      const res = { role: isAdmin ? 'admin' : 'user', hasActiveSubscription: hasActive, debugReason: reason, rawLatestSub: latestSub }
+      console.log(`[Auth] Role/sub fetched for ${userEmail}:`, { role: res.role, hasActive: res.hasActiveSubscription, reason })
+      profileCache.set(userId, { data: res, timestamp: Date.now() })
+      return res
+    } catch (err: any) {
+      console.error('[Auth] Profile Fetch Error or Timeout:', err)
+      return { role: 'user', hasActiveSubscription: false, debugReason: err.message === 'Profile fetch timeout' ? 'Timeout' : 'Error' }
+    }
+  })()
+
+  pendingFetches.set(userId, fetchPromise)
 
   try {
-    const fetchPromise = Promise.all([
-      supabase.from('user_profiles').select('role, has_active_subscription').eq('id', userId).maybeSingle(),
-      supabase.from('user_subscriptions').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle()
-    ])
-
-    const [profileRes, subRes] = await Promise.race([fetchPromise, timeoutPromise]) as [any, any]
-
-    const profileData = profileRes.data
-    const latestSub = subRes.data
-    const isAdmin = userEmail === 'heyarsen@icloud.com' || profileData?.role === 'admin'
-
-    let hasActive = false
-    let reason = 'NONE'
-
-    if (isAdmin) {
-      hasActive = true; reason = 'Admin'
-    } else if (latestSub) {
-      const active = ['active', 'pending'].includes(latestSub.status)
-      const expired = latestSub.expires_at && new Date(latestSub.expires_at).getTime() < Date.now()
-      hasActive = active && !expired
-      reason = `Sub: ${latestSub.status}${expired ? ' (EXP)' : ''}`
-    } else {
-      // No sub record found and not admin
-      hasActive = false
-      reason = 'No Sub Record'
-    }
-
-    const res = { role: isAdmin ? 'admin' : 'user', hasActiveSubscription: hasActive, debugReason: reason, rawLatestSub: latestSub }
-    console.log(`[Auth] Role/sub fetched for ${userEmail}:`, { role: res.role, hasActive: res.hasActiveSubscription, reason })
-    profileCache.set(userId, { data: res, timestamp: Date.now() })
+    return await fetchPromise
+  } finally {
     pendingFetches.delete(userId)
-    return res
-  } catch (err: any) {
-    pendingFetches.delete(userId)
-    console.error('[Auth] Profile Fetch Error or Timeout:', err)
-    return { role: 'user', hasActiveSubscription: false, debugReason: err.message === 'Profile fetch timeout' ? 'Timeout' : 'Error' }
   }
 }
 

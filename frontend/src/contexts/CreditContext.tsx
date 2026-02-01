@@ -29,7 +29,13 @@ export function CreditProvider({ children }: { children: ReactNode }) {
     const [subscription, setSubscription] = useState<Subscription | null>(null)
     const [loading, setLoading] = useState(true)
 
-    const fetchCredits = useCallback(async () => {
+    const lastFetchRef = (import.meta as any).lastCreditsFetchRef || { current: 0 }
+    if (!(import.meta as any).lastCreditsFetchRef) (import.meta as any).lastCreditsFetchRef = lastFetchRef
+
+    const pendingFetchRef = (import.meta as any).pendingCreditsFetchRef || { current: null }
+    if (!(import.meta as any).pendingCreditsFetchRef) (import.meta as any).pendingCreditsFetchRef = pendingFetchRef
+
+    const fetchCredits = useCallback(async (force = false) => {
         if (!user) {
             setCredits(null)
             setUnlimited(false)
@@ -38,21 +44,37 @@ export function CreditProvider({ children }: { children: ReactNode }) {
             return
         }
 
-        try {
-            const response = await api.get('/api/credits')
-            const newCredits = response.data.credits ?? 0
-            const newUnlimited = response.data.unlimited === true || response.data.credits === null
-            
-            setCredits(newCredits)
-            setUnlimited(newUnlimited)
-            setSubscription(response.data.subscription)
-        } catch (error) {
-            console.error('Failed to fetch credits:', error)
-            // On error, don't clear data immediately if we already have it
-            // to avoid UI flickering
-        } finally {
-            setLoading(false)
+        const now = Date.now()
+        // Deduplicate: if a fetch is already in progress, return it
+        if (pendingFetchRef.current) {
+            return pendingFetchRef.current
         }
+
+        // Throttling: if we fetched very recently, skip unless forced
+        if (!force && (now - lastFetchRef.current < 5000)) {
+            return
+        }
+
+        pendingFetchRef.current = (async () => {
+            try {
+                console.log(`[Credits] Fetching credits for ${user.email}...`)
+                const response = await api.get('/api/credits')
+                const newCredits = response.data.credits ?? 0
+                const newUnlimited = response.data.unlimited === true || response.data.credits === null
+
+                setCredits(newCredits)
+                setUnlimited(newUnlimited)
+                setSubscription(response.data.subscription)
+                lastFetchRef.current = Date.now()
+            } catch (error) {
+                console.error('Failed to fetch credits:', error)
+            } finally {
+                setLoading(false)
+                pendingFetchRef.current = null
+            }
+        })()
+
+        return pendingFetchRef.current
     }, [user])
 
     useEffect(() => {
@@ -61,7 +83,7 @@ export function CreditProvider({ children }: { children: ReactNode }) {
         // Refresh credits every 30 seconds if user is logged in
         let interval: NodeJS.Timeout | null = null
         if (user) {
-            interval = setInterval(fetchCredits, 30000)
+            interval = setInterval(() => fetchCredits(), 30000)
         }
 
         return () => {
