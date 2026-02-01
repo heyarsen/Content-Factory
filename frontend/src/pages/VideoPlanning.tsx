@@ -403,7 +403,7 @@ export function VideoPlanning() {
     try {
       const response = await api.get('/api/plans')
       setPlans(response.data.plans || [])
-      
+
       // Load variety metrics if we have plans
       if (response.data.plans && response.data.plans.length > 0) {
         loadVarietyMetrics()
@@ -1188,7 +1188,7 @@ export function VideoPlanning() {
                   {t('video_planning.content_variety') || 'Content Variety'}
                 </h3>
               </div>
-              
+
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-purple-600">
@@ -1287,7 +1287,7 @@ export function VideoPlanning() {
                   {credits !== null && credits > 0 ? t('common.credits_available', { count: credits }) : t('common.upgrade_required')}
                 </h3>
                 <p className="text-sm opacity-90">
-                  {credits !== null && credits > 0 
+                  {credits !== null && credits > 0
                     ? t('common.credits_message', { count: credits, plural: credits > 1 ? 's' : '' })
                     : 'Your subscription is inactive. Please upgrade to continue generating videos and scheduling posts.'
                   }
@@ -2316,6 +2316,68 @@ export function VideoPlanning() {
               options={timezones}
             />
 
+            <Select
+              label={t('video_planning.schedule_trigger')}
+              value={autoScheduleTrigger}
+              onChange={(e: any) => {
+                setAutoScheduleTrigger(
+                  e.target.value as 'daily' | 'time_based' | 'manual',
+                )
+              }}
+              options={[
+                { value: 'daily', label: t('video_planning.daily_trigger') },
+                { value: 'time_based', label: t('video_planning.time_based_trigger') },
+                { value: 'manual', label: t('video_planning.manual_trigger') },
+              ]}
+            />
+
+            {(autoScheduleTrigger === 'daily' || autoScheduleTrigger === 'time_based') && (
+              <div className="space-y-3 border-2 border-brand-300 bg-brand-50 rounded-lg p-4">
+                <label className="block text-sm font-medium text-slate-700">
+                  {t('video_planning.trigger_time')}
+                  <span className="ml-2 text-xs text-slate-500">
+                    ({autoScheduleTrigger === 'daily'
+                      ? 'Time when script writing and video generation starts each day'
+                      : 'Time when script writing and video generation starts'})
+                  </span>
+                  <span className="block text-xs text-slate-400 mt-1">
+                    ({t('video_planning.timezone_label')}: {timezone})
+                  </span>
+                </label>
+
+                <div className="bg-white border border-brand-200 rounded-lg p-3">
+                  <p className="text-xs text-slate-600">
+                    <strong>What happens at this time:</strong> The system will automatically write scripts and generate videos for your scheduled content.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {timePresets.map((preset) => (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      onClick={() => setTriggerTime(preset.value)}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${triggerTime === preset.value
+                        ? 'border-brand-500 bg-brand-50 text-brand-700'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                        }`}
+                    >
+                      {preset.label.split('(')[0].trim()}
+                    </button>
+                  ))}
+                </div>
+
+                <Input
+                  label={t('video_planning.custom_time')}
+                  type="time"
+                  value={triggerTime}
+                  onChange={(e) => setTriggerTime(e.target.value)}
+                  min="00:00"
+                  max="23:59"
+                />
+              </div>
+            )}
+
             <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
               <label className="block text-sm font-medium text-slate-700">
                 {t('video_planning.social_media_platforms')}
@@ -2461,13 +2523,6 @@ export function VideoPlanning() {
               options={timezones}
             />
 
-            {/* VERY PROMINENT DEBUG SECTION */}
-            <div className="bg-red-500 text-white p-4 rounded-lg border-4 border-red-700">
-              <h3 className="text-xl font-bold mb-2">🚨 DEBUG INFO - TRIGGER TIME SECTION</h3>
-              <p>Current autoScheduleTrigger: <span className="font-mono bg-black px-2 py-1 rounded">{autoScheduleTrigger}</span></p>
-              <p>Should show trigger time: {autoScheduleTrigger === 'daily' || autoScheduleTrigger === 'time_based' ? '✅ YES' : '❌ NO'}</p>
-              <p>Current triggerTime: <span className="font-mono bg-black px-2 py-1 rounded">{triggerTime}</span></p>
-            </div>
 
             <Select
               label={t('video_planning.schedule_trigger')}
@@ -2485,13 +2540,6 @@ export function VideoPlanning() {
               ]}
             />
 
-            {/* Debug info */}
-            <div className="bg-yellow-50 border border-yellow-200 rounded p-2 text-xs">
-              Debug: autoScheduleTrigger = {autoScheduleTrigger}
-              {autoScheduleTrigger === 'daily' && ' ✅ Should show trigger time'}
-              {autoScheduleTrigger === 'time_based' && ' ✅ Should show trigger time'}
-              {autoScheduleTrigger === 'manual' && ' ❌ Will NOT show trigger time'}
-            </div>
 
             {(autoScheduleTrigger === 'daily' || autoScheduleTrigger === 'time_based') && (
               <div className="space-y-3 border-2 border-green-300 bg-green-50 rounded-lg p-4">
@@ -2499,7 +2547,7 @@ export function VideoPlanning() {
                 <label className="block text-sm font-medium text-slate-700">
                   {t('video_planning.trigger_time')}
                   <span className="ml-2 text-xs text-slate-500">
-                    ({autoScheduleTrigger === 'daily' 
+                    ({autoScheduleTrigger === 'daily'
                       ? 'Time when script writing and video generation starts each day'
                       : 'Time when script writing and video generation starts'})
                   </span>
