@@ -8,6 +8,7 @@ import {
     type SoraTaskDetail,
 } from '../lib/kie.js'
 import type { Video } from '../types/database.js'
+import { VideoService } from './videoService.js'
 
 /**
  * Map Sora task status to internal video status
@@ -83,23 +84,7 @@ async function updateVideoWithSoraFailure(
     videoId: string,
     error: Error
 ): Promise<void> {
-    console.error('[Sora Service] Updating video record with failure:', {
-        videoId,
-        error: error.message,
-    })
-
-    const { error: dbError } = await supabase
-        .from('videos')
-        .update({
-            status: 'failed',
-            error_message: error.message,
-            updated_at: new Date().toISOString(),
-        })
-        .eq('id', videoId)
-
-    if (dbError) {
-        console.error('[Sora Service] Failed to persist video failure:', dbError)
-    }
+    await VideoService.failVideo(videoId, error.message)
 }
 
 /**
@@ -131,27 +116,22 @@ export async function generateVideoWithSora(
         // Build the prompt from topic, style, and script
         let prompt = `Style: ${video.style}. Topic: ${video.topic}`
         if (video.script) {
-            // Remove timing cues from script for video generation
+            // Aggressively remove timing cues, speaker labels, and metadata from script
             const cleanScript = video.script
-                .replace(/\[0:00-0:03\] Hook: /g, '')
-                .replace(/\[0:03-0:12\] Main: /g, '')
-                .replace(/\[0:12-0:15\] CTA: /g, '')
-                .replace(/\[0:00-0:03\]/g, '')
-                .replace(/\[0:03-0:12\]/g, '')
-                .replace(/\[0:12-0:15\]/g, '')
-                .replace(/Hook: /g, '')
-                .replace(/Main: /g, '')
-                .replace(/CTA: /g, '')
+                .replace(/\[\d+:\d+-\d+:\d+\]/g, '') // Remove [0:00-0:03] etc
+                .replace(/Hook:|Main:|CTA:|Scene \d+:|Action:|Visual:/gi, '') // Remove labels
+                .replace(/\(.*?\)/g, '') // Remove parenthetical directions
+                .replace(/\s+/g, ' ') // Collapse whitespace
                 .trim()
-            
+
             // Combine topic, style and cleaned script for a more detailed prompt
             prompt = `Style: ${video.style}. Topic: ${video.topic}. Script: ${cleanScript}`
         }
 
-        // Limit prompt length (Sora may have limits) - increased to accommodate full scripts
-        const maxPromptLength = 2000
+        // Limit prompt length (Sora has limits and long prompts can cause failures)
+        const maxPromptLength = 1000 // Safer limit for Sora 2
         if (prompt.length > maxPromptLength) {
-            prompt = prompt.substring(0, maxPromptLength) + '...'
+            prompt = prompt.substring(0, maxPromptLength)
             console.log('[Sora Service] Prompt truncated to max length:', maxPromptLength)
         }
 

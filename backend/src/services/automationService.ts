@@ -331,6 +331,7 @@ export class AutomationService {
                     avatar_id: avatarId, // Can be undefined - will fall back to default
                     talking_photo_id: talkingPhotoId, // Look ID if provided
                     plan_item_id: item.id,
+                    skipDeduction: true,
                   })
 
                   // ATOMIC UPDATE: Set video_id and keep status as 'generating'
@@ -473,6 +474,7 @@ export class AutomationService {
           avatar_id: avatarId, // Can be undefined - will fall back to default avatar
           talking_photo_id: talkingPhotoId, // Look ID if provided
           plan_item_id: item.id,
+          skipDeduction: true,
         })
 
         console.log(`[Video Generation] Video created with ID: ${video.id}, topic: "${video.topic}"`)
@@ -887,6 +889,7 @@ export class AutomationService {
               avatar_id: avatarId, // Can be undefined - will fall back to default avatar
               talking_photo_id: talkingPhotoId, // Look ID if provided
               plan_item_id: item.id,
+              skipDeduction: true,
             })
 
             // IMMEDIATE ATOMIC UPDATE: Set video_id right after video record is created to prevent duplicates
@@ -2157,6 +2160,7 @@ export class AutomationService {
       avatar_id: avatarId, // Can be undefined - will fall back to default avatar
       talking_photo_id: talkingPhotoId, // Look ID if provided
       plan_item_id: item.id,
+      skipDeduction: true,
     })
 
     // ATOMIC UPDATE: Set video_id and keep status as 'generating' until video is ready

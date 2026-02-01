@@ -212,6 +212,7 @@ export interface ManualVideoInput {
   dimension?: HeyGenDimensionInput
   provider?: 'heygen' | 'sora'
   detectedLanguage?: DetectedLanguage // Add detected language
+  skipDeduction?: boolean // Flag to skip credit deduction if already handled (e.g. by automation)
 }
 
 type ServiceError = Error & { status?: number }
@@ -356,18 +357,7 @@ async function updatePlanItemStatus(planItemId: string | null | undefined, statu
 // Removed automatic caption generation to avoid metadata column dependency
 
 async function applyManualGenerationFailure(videoId: string, error: Error): Promise<void> {
-  const { error: dbError } = await supabase
-    .from('videos')
-    .update({
-      status: 'failed',
-      error_message: error.message,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', videoId)
-
-  if (dbError) {
-    console.error('Failed to persist video generation failure:', dbError)
-  }
+  await VideoService.failVideo(videoId, error.message)
 }
 
 async function runHeygenGeneration(
@@ -1285,13 +1275,25 @@ export class VideoService {
     // Handle HeyGen videos
     if (video.heygen_video_id && (video.status === 'pending' || video.status === 'generating')) {
       try {
-        const status = await getVideoStatus(video.heygen_video_id)
+        const heygenStatus = await getVideoStatus(video.heygen_video_id)
+        const mappedStatus = mapHeygenStatus(heygenStatus.status)
+
+        if (mappedStatus === 'failed') {
+          await VideoService.failVideo(video.id, heygenStatus.error || 'HeyGen generation failed')
+          const { data: refreshed } = await supabase
+            .from('videos')
+            .select('*')
+            .eq('id', video.id)
+            .single()
+          return refreshed
+        }
+
         const { data, error } = await supabase
           .from('videos')
           .update({
-            status: mapHeygenStatus(status.status),
-            video_url: status.video_url || video.video_url,
-            error_message: status.error || null,
+            status: mappedStatus,
+            video_url: heygenStatus.video_url || video.video_url,
+            error_message: heygenStatus.error || null,
             updated_at: new Date().toISOString(),
           })
           .eq('id', video.id)
@@ -1305,7 +1307,7 @@ export class VideoService {
 
         return {
           ...data,
-          progress: status.progress,
+          progress: heygenStatus.progress,
         }
       } catch (error) {
         console.error('HeyGen status check error:', error)
@@ -1377,6 +1379,55 @@ export class VideoService {
       throw new Error('Failed to delete video')
     }
   }
+  /**
+   * Fail a video and refund credits
+   */
+  static async failVideo(videoId: string, errorMessage: string): Promise<void> {
+    console.log(`[Video Service] Failing video ${videoId}: ${errorMessage}`)
+
+    // 1. Get the video and user info
+    const { data: video, error: fetchError } = await supabase
+      .from('videos')
+      .select('user_id, status')
+      .eq('id', videoId)
+      .single()
+
+    if (fetchError || !video) {
+      console.error(`[Video Service] Could not find video ${videoId} to fail it:`, fetchError)
+      return
+    }
+
+    // 2. If already failed, don't refund again
+    if (video.status === 'failed') {
+      console.log(`[Video Service] Video ${videoId} is already failed, skipping refund.`)
+      return
+    }
+
+    // 3. Update status to failed
+    const { error: updateError } = await supabase
+      .from('videos')
+      .update({
+        status: 'failed',
+        error_message: errorMessage,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', videoId)
+
+    if (updateError) {
+      console.error(`[Video Service] Failed to update video ${videoId} to failed status:`, updateError)
+      return
+    }
+
+    // 4. Refund credits
+    try {
+      const cost = CreditsService.COSTS.VIDEO_GENERATION
+      await CreditsService.addCredits(video.user_id, cost, `Refund for failed video generation (${videoId})`)
+      console.log(`[Video Service] Successfully failed video ${videoId} and refunded ${cost} credits to user ${video.user_id}`)
+    } catch (refundError) {
+      console.error(`[Video Service] Failed to refund credits for failed video ${videoId}:`, refundError)
+    }
+  }
+
 
   /**
    * Generate video for a reel based on category
@@ -1429,9 +1480,14 @@ export class VideoService {
    * Get template for category
    */
   private static async createVideoRecord(userId: string, input: ManualVideoInput, avatarRecordId?: string): Promise<Video> {
-    // Deduct credits for video generation
     const cost = CreditsService.COSTS.VIDEO_GENERATION
-    await CreditsService.deductCredits(userId, cost, 'VIDEO_GENERATION')
+
+    // Deduct credits for video generation unless skipped
+    if (!input.skipDeduction) {
+      await CreditsService.deductCredits(userId, cost, 'VIDEO_GENERATION')
+    } else {
+      console.log(`[Video Service] Skipping credit deduction for user ${userId} (skipDeduction: true)`)
+    }
 
     const { data, error } = await supabase
       .from('videos')
@@ -1464,12 +1520,14 @@ export class VideoService {
         avatarRecordId,
       })
 
-      // Refund credits since video creation failed
-      try {
-        await CreditsService.addCredits(userId, cost, 'Refund for failed video generation')
-        console.log(`[VideoService] Refunded ${cost} credits to user ${userId} due to video creation failure`)
-      } catch (refundError) {
-        console.error('[VideoService] Failed to refund credits:', refundError)
+      // Refund credits since video creation failed, only if we actually deducted them
+      if (!input.skipDeduction) {
+        try {
+          await CreditsService.addCredits(userId, cost, 'Refund for failed video generation')
+          console.log(`[VideoService] Refunded ${cost} credits to user ${userId} due to video creation failure`)
+        } catch (refundError) {
+          console.error('[VideoService] Failed to refund credits:', refundError)
+        }
       }
 
       const errorMessage = error?.message || 'Failed to create video record'
@@ -1520,18 +1578,22 @@ export class VideoService {
           wasUpdated = true // SoraService handles its own DB updates and logging
         } else if (video.heygen_video_id) {
           // Handle HeyGen videos
-          const { getVideoStatus } = await import('../lib/heygen.js')
-          const status = await getVideoStatus(video.heygen_video_id)
-          const mappedStatus = mapHeygenStatus(status.status)
+          const heygenStatus = await getVideoStatus(video.heygen_video_id)
+          const mappedStatus = mapHeygenStatus(heygenStatus.status)
 
-          // Only update if status or video_url has changed
-          if (mappedStatus !== video.status || (status.video_url && status.video_url !== video.video_url)) {
+          // Handle failure with refund
+          if (mappedStatus === 'failed') {
+            await VideoService.failVideo(video.id, heygenStatus.error || 'HeyGen generation failed')
+            wasUpdated = true
+          }
+          // Only update if status or video_url has changed for non-failures
+          else if (mappedStatus !== video.status || (heygenStatus.video_url && heygenStatus.video_url !== video.video_url)) {
             const { error: updateError } = await supabase
               .from('videos')
               .update({
                 status: mappedStatus,
-                video_url: status.video_url || video.video_url,
-                error_message: status.error || null,
+                video_url: heygenStatus.video_url || video.video_url,
+                error_message: heygenStatus.error || null,
                 updated_at: new Date().toISOString(),
               })
               .eq('id', video.id)

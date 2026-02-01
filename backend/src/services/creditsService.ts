@@ -9,6 +9,12 @@ export class CreditsService {
   } as const
 
   /**
+   * IMPORTANT: When adding new credit-deducting operations, ensure that the deduction
+   * is centralized. Automated flows (e.g. AutomationService) should deduct once
+   * and pass a skip flag to underlying services (e.g. VideoService) to prevent double-charging.
+   */
+
+  /**
    * Get user's current credits
    * Returns null if user has unlimited credits
    */
@@ -39,7 +45,7 @@ export class CreditsService {
     return data?.credits ?? 0
   }
 
-  
+
   /**
    * Set user's credit balance to a specific amount
    * (Used for subscription renewals or resets)
@@ -144,7 +150,7 @@ export class CreditsService {
         payment_id: paymentId,
         payment_status: paymentStatus,
       }).select('id')
-      
+
       if (error) {
         console.error('[Credits] Error creating transaction record:', error)
       } else {
@@ -204,7 +210,7 @@ export class CreditsService {
 
     // Sum all top-up amounts (they are stored as positive numbers)
     const topupTotal = data?.reduce((sum, transaction) => sum + transaction.amount, 0) || 0
-    
+
     console.log('[Credits] User top-up credits calculated:', {
       userId,
       topupTotal,

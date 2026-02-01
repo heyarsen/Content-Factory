@@ -24,12 +24,12 @@ export type SoraAspectRatio = 'landscape' | 'portrait'
  * Request payload for creating a Sora text-to-video task
  */
 export interface CreateSoraTaskRequest {
-    model: 'sora-2-text-to-video'
+    model: string // support different models (sora-2-text-to-video, sora-2-pro-text-to-video, etc)
     callBackUrl?: string
     input: {
         prompt: string
         aspect_ratio: SoraAspectRatio
-        n_frames?: string // Duration in frames, default "10"
+        n_frames?: string // Duration in seconds, default "10"
         remove_watermark?: boolean
         character_id_list?: string[]
         language?: string // Optional language parameter (e.g., 'en', 'es', 'fr')
@@ -85,12 +85,13 @@ export function mapAspectRatioToSora(aspectRatio?: string | null): SoraAspectRat
 
 /**
  * Calculate n_frames from duration in seconds.
- * Updated to support longer durations beyond the previous 15-second limit.
+ * NOTE: For Kie.ai Sora API, n_frames represents seconds.
+ * Standard Sora 2 limit is typically 10 seconds.
  */
 export function calculateFramesFromDuration(durationSeconds: number): string {
-    // Cap at 15 frames based on KIE Sora2 API maximum limit
-    const maxFrames = 15
-    return Math.min(durationSeconds, maxFrames).toString()
+    // Cap at 10 seconds based on standard Sora 2 API limit to prevent 'internal error'
+    const maxSeconds = 10
+    return Math.min(durationSeconds, maxSeconds).toString()
 }
 
 /**
@@ -105,12 +106,13 @@ export async function createSoraTask(
         characterIdList?: string[]
         callBackUrl?: string
         language?: string // Optional language parameter
+        model?: string // Optional model override
     } = {}
 ): Promise<CreateSoraTaskResponse> {
     const apiKey = getKieApiKey()
 
     const payload: CreateSoraTaskRequest = {
-        model: 'sora-2-text-to-video',
+        model: options.model || 'sora-2-text-to-video',
         callBackUrl: options.callBackUrl,
         input: {
             prompt,
