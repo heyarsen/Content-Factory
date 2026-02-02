@@ -29,9 +29,10 @@ export interface CreateSoraTaskRequest {
     input: {
         prompt: string
         aspect_ratio: SoraAspectRatio
-        n_frames?: string // Duration in seconds, default "10"
+        n_frames?: string // Duration in frames, default "10"
         remove_watermark?: boolean
         character_id_list?: string[]
+        language?: string // Optional language parameter (e.g., 'en', 'es', 'fr')
     }
 }
 
@@ -84,12 +85,12 @@ export function mapAspectRatioToSora(aspectRatio?: string | null): SoraAspectRat
 
 /**
  * Calculate n_frames from duration in seconds.
- * NOTE: For Kie.ai Sora API, n_frames represents seconds, not frames.
+ * Updated to support longer durations beyond the previous 15-second limit.
  */
 export function calculateFramesFromDuration(durationSeconds: number): string {
-    // Use '10' for very short clips, otherwise '15'
-    if (durationSeconds <= 10) return '10'
-    return '15'
+    // Cap at 15 frames based on KIE Sora2 API maximum limit
+    const maxFrames = 15
+    return Math.min(durationSeconds, maxFrames).toString()
 }
 
 /**
@@ -103,6 +104,7 @@ export async function createSoraTask(
         removeWatermark?: boolean
         characterIdList?: string[]
         callBackUrl?: string
+        language?: string // Optional language parameter
     } = {}
 ): Promise<CreateSoraTaskResponse> {
     const apiKey = getKieApiKey()
@@ -116,6 +118,7 @@ export async function createSoraTask(
             n_frames: options.nFrames || '10',
             remove_watermark: options.removeWatermark ?? true,
             character_id_list: options.characterIdList,
+            ...(options.language && { language: options.language }),
         },
     }
 
@@ -152,13 +155,6 @@ export async function createSoraTask(
         return response.data
     } catch (error: any) {
         console.error('[KIE Sora] Failed to create task:', error)
-        console.error('[KIE Sora] Full error details:', {
-            status: error.response?.status,
-            statusText: error.response?.statusText,
-            data: error.response?.data,
-            message: error.message,
-            code: error.code,
-        })
 
         let errorMessage = 'Failed to create Sora video generation task'
 
@@ -280,13 +276,6 @@ export async function pollTaskUntilComplete(
         if (state === 'fail') {
             const errorMsg = taskDetail.data.failMsg || taskDetail.data.failCode || 'Video generation failed'
             console.error(`[KIE Sora] Task ${taskId} failed:`, errorMsg)
-            console.error(`[KIE Sora] Full failure details:`, {
-                failMsg: taskDetail.data.failMsg,
-                failCode: taskDetail.data.failCode,
-                state: taskDetail.data.state,
-                taskId: taskId,
-                fullResponse: JSON.stringify(taskDetail.data, null, 2)
-            })
             throw new Error(`Sora video generation failed: ${errorMsg}`)
         }
 
