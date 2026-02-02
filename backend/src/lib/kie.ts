@@ -85,13 +85,12 @@ export function mapAspectRatioToSora(aspectRatio?: string | null): SoraAspectRat
 
 /**
  * Calculate n_frames from duration in seconds.
- * NOTE: For Kie.ai Sora API, n_frames represents seconds.
- * Standard Sora 2 limit is typically 10 seconds.
+ * NOTE: For Kie.ai Sora API, n_frames represents seconds, not frames.
  */
 export function calculateFramesFromDuration(durationSeconds: number): string {
-    // Cap at 10 seconds based on standard Sora 2 API limit to prevent 'internal error'
-    const maxSeconds = 10
-    return Math.min(durationSeconds, maxSeconds).toString()
+    // Use '10' for very short clips, otherwise '15'
+    if (durationSeconds <= 10) return '10'
+    return '15'
 }
 
 /**
