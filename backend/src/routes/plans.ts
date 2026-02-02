@@ -8,6 +8,32 @@ import { ScriptService } from '../services/scriptService.js'
 
 const router = Router()
 
+function normalizeVideoStyleForDb(style: any): string {
+  const raw = (typeof style === 'string' ? style : '').trim()
+  if (!raw) return 'Cinematic'
+
+  const allowed = [
+    'Cinematic',
+    'Realistic',
+    'Anime',
+    '3D Render',
+    'Cyberpunk',
+    'Minimalist',
+    'Documentary',
+  ]
+
+  if (allowed.includes(raw)) return raw
+
+  const lower = raw.toLowerCase()
+  if (lower === 'professional') return 'Realistic'
+  if (lower === '3d' || lower === '3d_render' || lower === '3drender') return '3D Render'
+
+  const ci = allowed.find(s => s.toLowerCase() === lower)
+  if (ci) return ci
+
+  return 'Realistic'
+}
+
 // Create a new plan
 router.post('/', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
@@ -447,21 +473,15 @@ router.post('/items/:id/create-video', authenticate, requireSubscription, async 
       })
     }
 
-    // Check and deduct credits
-    const { CreditsService } = await import('../services/creditsService.js')
-    try {
-      await CreditsService.checkAndDeduct(userId, CreditsService.COSTS.VIDEO_GENERATION, 'plan video generation')
-    } catch (creditError: any) {
-      return res.status(402).json({ error: creditError.message || 'Insufficient credits' })
-    }
-
     // Create video using existing endpoint logic
     const { VideoService } = await import('../services/videoService.js')
+
+    const normalizedStyle = normalizeVideoStyleForDb(style)
 
     const video = await VideoService.requestManualVideo(userId, {
       topic: item.topic!,
       script: item.script!,
-      style: style || 'Cinematic',
+      style: normalizedStyle,
       duration: duration || 30,
       plan_item_id: id,
     })

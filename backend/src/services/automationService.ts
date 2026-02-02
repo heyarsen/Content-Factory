@@ -306,22 +306,6 @@ export class AutomationService {
                     talkingPhotoId: talkingPhotoId || 'none'
                   })
 
-                  // Check and deduct credits before generating video
-                  const { CreditsService } = await import('./creditsService.js')
-                  try {
-                    await CreditsService.checkAndDeduct(plan.user_id, CreditsService.COSTS.VIDEO_GENERATION, 'automated video generation')
-                  } catch (creditError: any) {
-                    console.error(`[Automation] Insufficient credits for user ${plan.user_id} to generate video for item ${item.id}:`, creditError.message)
-                    await supabase
-                      .from('video_plan_items')
-                      .update({
-                        status: 'failed',
-                        error_message: `Insufficient credits: ${creditError.message}`,
-                      })
-                      .eq('id', item.id)
-                    continue // Skip this item
-                  }
-
                   // VideoService.requestManualVideo will automatically use default avatar if avatar_id is not provided
                   const video = await VideoService.requestManualVideo(plan.user_id, {
                     topic: updatedItem.topic || 'Video Content',
@@ -331,7 +315,6 @@ export class AutomationService {
                     avatar_id: avatarId, // Can be undefined - will fall back to default
                     talking_photo_id: talkingPhotoId, // Look ID if provided
                     plan_item_id: item.id,
-                    skipDeduction: true,
                   })
 
                   // ATOMIC UPDATE: Set video_id and keep status as 'generating'
@@ -856,20 +839,6 @@ export class AutomationService {
             }
 
             // Check and deduct credits before generating video
-            const { CreditsService } = await import('./creditsService.js')
-            try {
-              await CreditsService.checkAndDeduct(plan.user_id, CreditsService.COSTS.VIDEO_GENERATION, 'automated video generation')
-            } catch (creditError: any) {
-              console.error(`[Automation] Insufficient credits for user ${plan.user_id} to generate video for item ${item.id}:`, creditError.message)
-              await supabase
-                .from('video_plan_items')
-                .update({
-                  status: 'failed',
-                  error_message: `Insufficient credits: ${creditError.message}`,
-                })
-                .eq('id', item.id)
-              continue // Skip this item
-            }
 
             // Get avatar_id and talking_photo_id from plan item
             const avatarId = (item as any).avatar_id
@@ -889,7 +858,6 @@ export class AutomationService {
               avatar_id: avatarId, // Can be undefined - will fall back to default avatar
               talking_photo_id: talkingPhotoId, // Look ID if provided
               plan_item_id: item.id,
-              skipDeduction: true,
             })
 
             // IMMEDIATE ATOMIC UPDATE: Set video_id right after video record is created to prevent duplicates
@@ -2134,20 +2102,6 @@ export class AutomationService {
     const plan = item.plan as any
 
     // Check and deduct credits before generating video
-    const { CreditsService } = await import('./creditsService.js')
-    try {
-      await CreditsService.checkAndDeduct(plan.user_id, CreditsService.COSTS.VIDEO_GENERATION, 'automated video generation')
-    } catch (creditError: any) {
-      console.error(`[Automation] Insufficient credits for user ${plan.user_id} to generate video for item ${itemId}:`, creditError.message)
-      await supabase
-        .from('video_plan_items')
-        .update({
-          status: 'failed',
-          error_message: `Insufficient credits: ${creditError.message}`,
-        })
-        .eq('id', itemId)
-      return // Stop processing this item
-    }
 
     const avatarId = (item as any).avatar_id
     const talkingPhotoId = (item as any).talking_photo_id
@@ -2160,7 +2114,6 @@ export class AutomationService {
       avatar_id: avatarId, // Can be undefined - will fall back to default avatar
       talking_photo_id: talkingPhotoId, // Look ID if provided
       plan_item_id: item.id,
-      skipDeduction: true,
     })
 
     // ATOMIC UPDATE: Set video_id and keep status as 'generating' until video is ready
