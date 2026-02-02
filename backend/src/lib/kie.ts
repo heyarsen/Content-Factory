@@ -288,6 +288,13 @@ export async function pollTaskUntilComplete(
         if (state === 'fail') {
             const errorMsg = taskDetail.data.failMsg || taskDetail.data.failCode || 'Video generation failed'
             console.error(`[KIE Sora] Task ${taskId} failed:`, errorMsg)
+            console.error(`[KIE Sora] Full failure details:`, {
+                failMsg: taskDetail.data.failMsg,
+                failCode: taskDetail.data.failCode,
+                state: taskDetail.data.state,
+                taskId: taskId,
+                fullResponse: JSON.stringify(taskDetail.data, null, 2)
+            })
             throw new Error(`Sora video generation failed: ${errorMsg}`)
         }
 
