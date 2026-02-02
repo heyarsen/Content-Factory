@@ -8,6 +8,7 @@ import { Textarea } from '../components/ui/Textarea'
 import { Select } from '../components/ui/Select'
 import { Video, Sparkles } from 'lucide-react'
 import { createVideo } from '../lib/videos'
+import { countWords, getMaxCharsForDuration, getMaxWordsForDuration } from '../lib/scriptLimits'
 import { useNotifications } from '../contexts/NotificationContext'
 import api from '../lib/api'
 
@@ -23,10 +24,23 @@ export function GenerateVideo() {
   const [success, setSuccess] = useState(false)
   const [prompts, setPrompts] = useState<Array<{ id: string; name: string; topic: string | null }>>([])
   const [selectedPromptId, setSelectedPromptId] = useState<string>('')
+  const maxWords = getMaxWordsForDuration(duration)
+  const maxChars = getMaxCharsForDuration(duration)
+  const scriptWordCount = countWords(script)
 
   useEffect(() => {
     loadPrompts()
   }, [])
+
+  useEffect(() => {
+    if (!script) {
+      return
+    }
+    if (maxWords && countWords(script) > maxWords) {
+      const trimmed = script.trim().split(/\s+/).filter(Boolean).slice(0, maxWords).join(' ')
+      setScript(trimmed)
+    }
+  }, [duration, maxWords, script])
 
   const loadPrompts = async () => {
     try {
@@ -176,8 +190,23 @@ export function GenerateVideo() {
               placeholder="Add a detailed script or talking points if you have them - otherwise we'll generate it."
               rows={8}
               value={script}
-              onChange={(e) => setScript(e.target.value)}
+              onChange={(e) => {
+                const nextValue = e.target.value
+                if (maxWords) {
+                  const words = nextValue.trim().split(/\s+/).filter(Boolean)
+                  if (words.length > maxWords) {
+                    setScript(words.slice(0, maxWords).join(' '))
+                    return
+                  }
+                }
+                setScript(nextValue)
+              }}
+              maxLength={maxChars || undefined}
             />
+            <div className="flex items-center justify-between text-xs text-slate-400">
+              <span>Keep scripts concise for short videos to avoid cutoffs.</span>
+              <span>{scriptWordCount}/{maxWords} words</span>
+            </div>
 
             <div className="rounded-2xl border border-white/60 bg-white/70 px-5 py-6">
               <div className="flex items-center justify-between">

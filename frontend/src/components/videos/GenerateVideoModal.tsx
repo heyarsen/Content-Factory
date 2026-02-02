@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { Textarea } from '../ui/Textarea'
@@ -6,6 +6,7 @@ import { Select } from '../ui/Select'
 import { Modal } from '../ui/Modal'
 import { Video } from 'lucide-react'
 import { createVideo } from '../../lib/videos'
+import { countWords, getMaxCharsForDuration, getMaxWordsForDuration } from '../../lib/scriptLimits'
 import { useNotifications } from '../../contexts/NotificationContext'
 
 interface GenerateVideoModalProps {
@@ -23,6 +24,19 @@ export function GenerateVideoModal({ isOpen, onClose, onSuccess }: GenerateVideo
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const maxWords = getMaxWordsForDuration(duration)
+  const maxChars = getMaxCharsForDuration(duration)
+  const scriptWordCount = countWords(script)
+
+  useEffect(() => {
+    if (!script) {
+      return
+    }
+    if (maxWords && countWords(script) > maxWords) {
+      const trimmed = script.trim().split(/\s+/).filter(Boolean).slice(0, maxWords).join(' ')
+      setScript(trimmed)
+    }
+  }, [duration, maxWords, script])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -134,8 +148,23 @@ export function GenerateVideoModal({ isOpen, onClose, onSuccess }: GenerateVideo
           placeholder="Add a detailed script or talking points if you have them - otherwise we'll generate it."
           rows={8}
           value={script}
-          onChange={(e) => setScript(e.target.value)}
+          onChange={(e) => {
+            const nextValue = e.target.value
+            if (maxWords) {
+              const words = nextValue.trim().split(/\s+/).filter(Boolean)
+              if (words.length > maxWords) {
+                setScript(words.slice(0, maxWords).join(' '))
+                return
+              }
+            }
+            setScript(nextValue)
+          }}
+          maxLength={maxChars || undefined}
         />
+        <div className="flex items-center justify-between text-xs text-slate-400">
+          <span>Keep scripts concise for short videos to avoid cutoffs.</span>
+          <span>{scriptWordCount}/{maxWords} words</span>
+        </div>
 
         <div className="rounded-2xl border border-white/60 bg-white/70 px-5 py-6">
           <div className="flex items-center justify-between">
@@ -176,4 +205,3 @@ export function GenerateVideoModal({ isOpen, onClose, onSuccess }: GenerateVideo
     </Modal>
   )
 }
-

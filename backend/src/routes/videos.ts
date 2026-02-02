@@ -2,6 +2,7 @@ import { Router, Response } from 'express'
 import { authenticate, AuthRequest, requireSubscription } from '../middleware/auth.js'
 import { VideoService } from '../services/videoService.js'
 import { detectLanguage, enhancePromptWithLanguage } from '../lib/languageDetection.js'
+import { enforceScriptWordLimit, getMaxWordsForDuration } from '../lib/scriptLimits.js'
 import OpenAI from 'openai'
 import dotenv from 'dotenv'
 
@@ -44,6 +45,7 @@ router.post('/generate', authenticate, async (req: AuthRequest, res: Response) =
   try {
     const { topic, script, style, duration, avatar_id, talking_photo_id, generate_caption, aspect_ratio, dimension, language, generateScript, description } = req.body
     const userId = req.userId!
+    const durationSeconds = Number(duration) || 60
 
     // Detect language from topic and script if not explicitly provided
     const textToAnalyze = script || topic || description || ''
@@ -119,12 +121,33 @@ FORMAT: Write as a continuous spoken script without timing cues. Make it sound l
       finalScript = description?.trim() || null
     }
 
+    if (finalScript) {
+      const maxWords = getMaxWordsForDuration(durationSeconds)
+      const { script: trimmedScript, wasTrimmed, wordCount } = enforceScriptWordLimit(finalScript, durationSeconds)
+
+      if (script && wordCount > maxWords) {
+        return res.status(400).json({
+          error: `Script is too long for a ${durationSeconds}s video. Please keep it under ${maxWords} words.`,
+        })
+      }
+
+      if (wasTrimmed) {
+        console.warn('[Videos Route] Script trimmed to fit duration.', {
+          userId,
+          durationSeconds,
+          maxWords,
+          originalWordCount: wordCount,
+        })
+        finalScript = trimmedScript
+      }
+    }
+
     // Create the video using VideoService (which handles credit deduction)
     const video = await VideoService.requestManualVideo(userId, {
       topic: topic.trim(),
       script: finalScript,
       style: style || 'Realistic',
-      duration: duration || 60,
+      duration: durationSeconds,
       avatar_id: avatar_id || null,
       talking_photo_id: talking_photo_id || null,
       generate_caption: generate_caption || false,
@@ -323,4 +346,3 @@ router.post('/:id/share', authenticate, async (req: AuthRequest, res: Response) 
 })
 
 export default router
-
