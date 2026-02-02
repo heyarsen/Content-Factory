@@ -4,10 +4,16 @@ import { supabase } from '../lib/supabase.js'
 
 const router = Router()
 
+type CountFilter =
+  | { column: string; value: any }
+  | { column: string; values: any[]; op: 'in' }
+
+const isInFilter = (filter: CountFilter): filter is { column: string; values: any[]; op: 'in' } => 'values' in filter
+
 const countRows = async (
   table: string,
   userId: string,
-  filter?: { column: string; value: any } | { column: string; values: any[]; op: 'in' },
+  filter?: CountFilter,
 ) => {
   let query = supabase
     .from(table)
@@ -15,7 +21,7 @@ const countRows = async (
     .eq('user_id', userId)
 
   if (filter) {
-    if ('op' in filter && filter.op === 'in') {
+    if (isInFilter(filter)) {
       query = query.in(filter.column, filter.values)
     } else {
       query = query.eq(filter.column, filter.value)
@@ -102,7 +108,7 @@ router.get('/activity', authenticate, async (req: AuthRequest, res: Response) =>
     const postActivity = (postsResponse.data || []).map((post) => ({
       id: post.id,
       type: 'post',
-      title: post.videos?.topic || 'Scheduled post',
+      title: Array.isArray(post.videos) ? post.videos?.[0]?.topic || 'Scheduled post' : post.videos?.topic || 'Scheduled post',
       status: post.status,
       platform: post.platform,
       timestamp: post.posted_at || post.scheduled_time || post.created_at,
@@ -132,7 +138,9 @@ router.get('/activity', authenticate, async (req: AuthRequest, res: Response) =>
         scheduled_time: nextScheduledResponse.data[0].scheduled_time,
         platform: nextScheduledResponse.data[0].platform,
         status: nextScheduledResponse.data[0].status,
-        topic: nextScheduledResponse.data[0].videos?.topic,
+        topic: Array.isArray(nextScheduledResponse.data[0].videos)
+          ? nextScheduledResponse.data[0].videos?.[0]?.topic
+          : nextScheduledResponse.data[0].videos?.topic,
       }
       : null
 
