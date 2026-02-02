@@ -63,10 +63,13 @@ export const en = {
         active_plans: "active plans",
         items_in_flight: "items in flight",
         items_failed: "items failed",
+        posted_videos: "Posted videos",
+        posted_videos_desc: "videos published to your channels",
         activity_video: "Video update",
         activity_post: "Post update",
         live_badge: "Live",
         in_flight_badge: "In flight",
+        status_unknown: "Unknown",
     },
     preferences: {
         description: "Configure your default settings for video creation and automation.",

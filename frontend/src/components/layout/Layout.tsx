@@ -10,7 +10,7 @@ import { useLanguage } from '../../contexts/LanguageContext'
 export function Layout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { user } = useAuth()
-  const { credits, unlimited, subscription } = useCreditsContext()
+  const { credits, unlimited, subscription, loading: creditsLoading } = useCreditsContext()
   const { t } = useLanguage()
 
   const hasSubscription = user && (
@@ -18,7 +18,7 @@ export function Layout({ children }: { children: ReactNode }) {
     (subscription && ['active', 'pending'].includes(subscription.status))
   )
   const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
-  const showBanner = user && !safeCanCreate
+  const showBanner = user && !creditsLoading && !safeCanCreate
   return (
     <div className="relative flex min-h-screen bg-background">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />

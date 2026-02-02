@@ -109,9 +109,10 @@ interface ScheduledPost {
 export function VideoPlanning() {
   const { t, language } = useLanguage()
   const { user } = useAuth()
-  const { credits, unlimited } = useCreditsContext()
+  const { credits, unlimited, loading: creditsLoading } = useCreditsContext()
   const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')
   const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
+  const showUpgrade = !creditsLoading && !safeCanCreate
   const navigate = useNavigate()
   const [plans, setPlans] = useState<VideoPlan[]>([])
   const [selectedPlan, setSelectedPlan] = useState<VideoPlan | null>(null)
@@ -519,6 +520,9 @@ export function VideoPlanning() {
   }
 
   const handleCreatePlan = async () => {
+    if (creditsLoading) {
+      return
+    }
     if (!safeCanCreate) {
       alert(t('common.upgrade_required') || 'Subscription Required')
       return
@@ -1186,9 +1190,9 @@ export function VideoPlanning() {
             onClick={() => setCreateModal(true)}
             leftIcon={<Plus className="h-4 w-4" />}
             className="w-full md:w-auto"
-            disabled={!safeCanCreate}
+            disabled={showUpgrade}
           >
-            {safeCanCreate ? t('video_planning.new_plan') : t('common.upgrade_required') || 'Subscription Required'}
+            {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : t('video_planning.new_plan')}
           </Button>
         </div>
 
@@ -1913,9 +1917,9 @@ export function VideoPlanning() {
                                     variant="ghost"
                                     onClick={() => handleGenerateTopic(item.id)}
                                     leftIcon={<Sparkles className="h-4 w-4" />}
-                                    disabled={!safeCanCreate}
+                                    disabled={showUpgrade}
                                   >
-                                    {!safeCanCreate ? (t('common.upgrade_needed') || 'Upgrade') : (item.topic ? t('video_planning.regenerate') : t('video_planning.auto_generate'))}
+                                    {showUpgrade ? (t('common.upgrade_needed') || 'Upgrade') : (item.topic ? t('video_planning.regenerate') : t('video_planning.auto_generate'))}
                                   </Button>
                                 )}
                                 {item.script_status === 'draft' &&
@@ -1932,7 +1936,7 @@ export function VideoPlanning() {
                                 {item.status === 'ready' && !item.script && (
                                   <Button
                                     size="sm"
-                                    disabled={!safeCanCreate}
+                                    disabled={showUpgrade}
                                     onClick={async () => {
                                       try {
                                         await api.post(
