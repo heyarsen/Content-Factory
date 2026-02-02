@@ -32,10 +32,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const navigation = [
     { label: t('common.dashboard'), to: '/dashboard', icon: LayoutDashboard },
-    { label: t('sidebar.manual_creation'), to: '/create', icon: Zap },
-    { label: t('sidebar.automation'), to: '/planning', icon: Calendar },
+    { label: t('sidebar.manual_creation'), to: '/create', icon: Zap, tourId: 'manual' },
+    { label: t('sidebar.automation'), to: '/planning', icon: Calendar, tourId: 'automation' },
     { label: t('common.my_videos'), to: '/videos', icon: Clapperboard },
-    { label: t('common.social_accounts') || 'Social Accounts', to: '/social', icon: Share2 },
+    { label: t('common.social_accounts') || 'Social Accounts', to: '/social', icon: Share2, tourId: 'social' },
     { label: t('common.settings'), to: '/preferences', icon: Settings },
   ]
 
@@ -80,13 +80,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
 
           <nav className="mt-10 flex flex-1 flex-col gap-2 overflow-y-auto">
-            {navigation.map(({ label, to, icon: Icon }) => {
+            {navigation.map(({ label, to, icon: Icon, tourId }) => {
               const isActive = location.pathname === to || location.pathname.startsWith(to + '/')
               return (
                 <NavLink
                   key={to}
                   to={to}
                   onClick={onClose}
+                  data-tour-id={tourId}
                   className={`group relative flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold transition-all duration-200 touch-manipulation active:scale-[0.98] ${isActive
                     ? 'bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-transparent text-brand-600'
                     : 'text-slate-500 hover:bg-white hover:text-primary'
@@ -207,4 +208,3 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     </Fragment>
   )
 }
-
