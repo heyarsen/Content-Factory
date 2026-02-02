@@ -97,6 +97,18 @@ router.get('/activity', authenticate, async (req: AuthRequest, res: Response) =>
       throw postsResponse.error
     }
 
+    type ScheduledPostWithVideo = {
+      id: string
+      status: string | null
+      platform: string | null
+      scheduled_time: string | null
+      posted_at: string | null
+      created_at: string | null
+      videos?: { topic?: string | null } | { topic?: string | null }[] | null
+    }
+
+    const postsData = (postsResponse.data ?? []) as ScheduledPostWithVideo[]
+
     const videoActivity = (videosResponse.data || []).map((video) => ({
       id: video.id,
       type: 'video',
@@ -105,7 +117,7 @@ router.get('/activity', authenticate, async (req: AuthRequest, res: Response) =>
       timestamp: video.updated_at || video.created_at,
     }))
 
-    const postActivity = (postsResponse.data || []).map((post) => ({
+    const postActivity = postsData.map((post) => ({
       id: post.id,
       type: 'post',
       title: Array.isArray(post.videos) ? post.videos?.[0]?.topic || 'Scheduled post' : post.videos?.topic || 'Scheduled post',
@@ -132,15 +144,23 @@ router.get('/activity', authenticate, async (req: AuthRequest, res: Response) =>
       throw nextScheduledResponse.error
     }
 
-    const nextScheduled = nextScheduledResponse.data?.[0]
+    const nextScheduledData = (nextScheduledResponse.data ?? []) as Array<{
+      id: string
+      scheduled_time: string | null
+      platform: string | null
+      status: string | null
+      videos?: { topic?: string | null } | { topic?: string | null }[] | null
+    }>
+
+    const nextScheduled = nextScheduledData[0]
       ? {
-        id: nextScheduledResponse.data[0].id,
-        scheduled_time: nextScheduledResponse.data[0].scheduled_time,
-        platform: nextScheduledResponse.data[0].platform,
-        status: nextScheduledResponse.data[0].status,
-        topic: Array.isArray(nextScheduledResponse.data[0].videos)
-          ? nextScheduledResponse.data[0].videos?.[0]?.topic
-          : nextScheduledResponse.data[0].videos?.topic,
+        id: nextScheduledData[0].id,
+        scheduled_time: nextScheduledData[0].scheduled_time,
+        platform: nextScheduledData[0].platform,
+        status: nextScheduledData[0].status,
+        topic: Array.isArray(nextScheduledData[0].videos)
+          ? nextScheduledData[0].videos?.[0]?.topic
+          : nextScheduledData[0].videos?.topic,
       }
       : null
 
