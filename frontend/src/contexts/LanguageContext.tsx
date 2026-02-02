@@ -36,7 +36,9 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         if (variables) {
             Object.entries(variables).forEach(([key, value]) => {
-                translation = translation.replace(`{${key}}`, String(value))
+                // Replace both {{key}} (i18next format) and {key} (simple format)
+                translation = translation.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), String(value))
+                translation = translation.replace(new RegExp(`\\{${key}\\}`, 'g'), String(value))
             })
         }
 
