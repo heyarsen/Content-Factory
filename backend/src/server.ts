@@ -21,6 +21,7 @@ import { initializeScheduler } from './jobs/scheduler.js'
 import adminRoutes from './routes/admin.js'
 import supportRoutes from './routes/support.js'
 import adminMigrationRoutes from './routes/admin-migration.js'
+import dashboardRoutes from './routes/dashboard.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -252,6 +253,7 @@ app.use('/api/prompts', promptsRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/support', supportRoutes)
 app.use('/api/admin-migration', adminMigrationRoutes)
+app.use('/api/dashboard', dashboardRoutes)
 
 // Serve static files from frontend build (if exists)
 // Compiled path: backend/dist/server.js -> go up one level to backend/public
@@ -332,4 +334,3 @@ app.listen(PORT, () => {
     console.log('Job scheduler enabled')
   }
 })
-

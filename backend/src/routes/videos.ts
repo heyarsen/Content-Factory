@@ -13,6 +13,19 @@ const openai = new OpenAI({
 
 const router = Router()
 
+const MAX_SCRIPT_CHARACTERS = 320
+
+const clampScriptLength = (script?: string | null) => {
+  if (!script) return { script, truncated: false }
+  if (script.length <= MAX_SCRIPT_CHARACTERS) return { script, truncated: false }
+  const trimmed = script.slice(0, MAX_SCRIPT_CHARACTERS)
+  const lastSpace = trimmed.lastIndexOf(' ')
+  return {
+    script: (lastSpace > 0 ? trimmed.slice(0, lastSpace) : trimmed).trim(),
+    truncated: true,
+  }
+}
+
 function handleServiceError(res: Response, error: any, fallbackMessage: string) {
   if (error?.status) {
     return res.status(error.status).json({ error: error.message })
@@ -117,6 +130,12 @@ FORMAT: Write as a continuous spoken script without timing cues. Make it sound l
       // and let Sora's service handle the combined prompt
       console.log('[Videos Route] Direct to Sora: Skipping OpenAI script generation')
       finalScript = description?.trim() || null
+    }
+
+    const clamped = clampScriptLength(finalScript)
+    finalScript = clamped.script
+    if (clamped.truncated) {
+      console.warn('[Videos Route] Script truncated to fit duration constraints.')
     }
 
     // Create the video using VideoService (which handles credit deduction)
@@ -323,4 +342,3 @@ router.post('/:id/share', authenticate, async (req: AuthRequest, res: Response) 
 })
 
 export default router
-
