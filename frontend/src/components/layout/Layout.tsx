@@ -9,13 +9,14 @@ import { useLanguage } from '../../contexts/LanguageContext'
 
 export function Layout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const { credits, unlimited } = useCreditsContext()
   const { t } = useLanguage()
 
   const hasSubscription = user && (user.role === 'admin' || user.hasActiveSubscription)
   const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
-  const showBanner = user && !safeCanCreate
+  const subscriptionReady = !authLoading && (user?.hasActiveSubscription !== undefined || user?.role === 'admin')
+  const showBanner = subscriptionReady && user && !safeCanCreate
   return (
     <div className="relative flex min-h-screen bg-background">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />

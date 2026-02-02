@@ -37,11 +37,13 @@ interface SocialAccount {
 export function Videos() {
   const { addNotification } = useNotifications()
   const { t } = useLanguage()
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const { credits, unlimited, loading: creditsLoading } = useCreditsContext()
   const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')
   const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
-  const shouldShowBanner = !hasSubscription && !unlimited // Show banner for trial users and non-subscribers
+  const subscriptionReady = !authLoading && (user?.hasActiveSubscription !== undefined || user?.role === 'admin')
+  const shouldShowBanner = subscriptionReady && !hasSubscription && !unlimited // Show banner for trial users and non-subscribers
+  const canCreate = subscriptionReady ? safeCanCreate : true
   
   // Debug logging
   console.log('[Videos] Debug:', { hasSubscription, credits, unlimited, safeCanCreate, creditsLoading })
@@ -466,13 +468,17 @@ export function Videos() {
             <h1 className="text-3xl font-semibold text-primary">{t('videos.library_title')}</h1>
             <p className="text-sm text-slate-500">{t('videos.library_desc')}</p>
           </div>
-          <Link to={safeCanCreate ? "/create" : "/credits"} className="w-full md:w-auto">
+          <Link to={canCreate ? "/create" : "/credits"} className="w-full md:w-auto">
             <Button
               className="w-full md:w-auto shadow-[0_20px_45px_-25px_rgba(99,102,241,0.6)]"
-              variant={safeCanCreate ? "primary" : "secondary"}
+              variant={canCreate ? "primary" : "secondary"}
             >
               <VideoIcon className="mr-2 h-4 w-4" />
-              {safeCanCreate ? t('videos.create_video') : t('common.upgrade_required') || 'Subscription Required'}
+              {subscriptionReady
+                ? safeCanCreate
+                  ? t('videos.create_video')
+                  : t('common.upgrade_required') || 'Subscription Required'
+                : t('videos.create_video')}
             </Button>
           </Link>
         </div>
@@ -636,10 +642,10 @@ export function Videos() {
                         size="sm"
                         className="border border-white/60 bg-white/70 text-brand-600 hover:border-brand-200 hover:bg-white"
                         onClick={() => handleOpenPostModal(video)}
-                        disabled={!safeCanCreate}
+                        disabled={subscriptionReady && !safeCanCreate}
                       >
                         <Share2 className="mr-2 h-4 w-4" />
-                        {!safeCanCreate ? (t('common.upgrade_needed') || 'Upgrade') : t('videos.post')}
+                        {subscriptionReady && !safeCanCreate ? (t('common.upgrade_needed') || 'Upgrade') : t('videos.post')}
                         <ArrowRight className="ml-2 h-3 w-3 opacity-60" />
                       </Button>
                       <Button
@@ -670,10 +676,10 @@ export function Videos() {
                       size="sm"
                       className="border border-white/60 bg-white/70 text-amber-500 hover:border-amber-200 hover:bg-white"
                       onClick={() => handleRetry(video.id)}
-                      disabled={!safeCanCreate}
+                      disabled={subscriptionReady && !safeCanCreate}
                     >
                       <RefreshCw className="mr-2 h-4 w-4" />
-                      {!safeCanCreate ? (t('common.upgrade_needed') || 'Upgrade') : t('videos.retry')}
+                      {subscriptionReady && !safeCanCreate ? (t('common.upgrade_needed') || 'Upgrade') : t('videos.retry')}
                     </Button>
                   )}
                   <Button
@@ -728,9 +734,9 @@ export function Videos() {
                         onClick={() => handleOpenPostModal(selectedVideo)}
                         leftIcon={<Share2 className="h-4 w-4" />}
                         className="w-full justify-center"
-                        disabled={!safeCanCreate}
+                        disabled={subscriptionReady && !safeCanCreate}
                       >
-                        {!safeCanCreate ? (t('common.upgrade_needed') || 'Upgrade') : t('videos.post')}
+                        {subscriptionReady && !safeCanCreate ? (t('common.upgrade_needed') || 'Upgrade') : t('videos.post')}
                       </Button>
                       <Button
                         variant="secondary"
@@ -809,9 +815,9 @@ export function Videos() {
                         onClick={() => handleOpenPostModal(selectedVideo)}
                         leftIcon={<Share2 className="h-4 w-4" />}
                         rightIcon={<ArrowRight className="h-4 w-4" />}
-                        disabled={!safeCanCreate}
+                        disabled={subscriptionReady && !safeCanCreate}
                       >
-                        {!safeCanCreate ? (t('common.upgrade_needed') || 'Upgrade') : t('videos.post')}
+                        {subscriptionReady && !safeCanCreate ? (t('common.upgrade_needed') || 'Upgrade') : t('videos.post')}
                       </Button>
                     )}
                     <Button

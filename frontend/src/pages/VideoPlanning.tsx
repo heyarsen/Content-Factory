@@ -108,11 +108,12 @@ interface ScheduledPost {
 
 export function VideoPlanning() {
   const { t, language } = useLanguage()
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const { credits, unlimited } = useCreditsContext()
   const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
   const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
-  const shouldShowBanner = !hasSubscription && !unlimited // Show banner for trial users and non-subscribers
+  const subscriptionReady = !authLoading && (user?.hasActiveSubscription !== undefined || user?.role === 'admin')
+  const shouldShowBanner = subscriptionReady && !hasSubscription && !unlimited // Show banner for trial users and non-subscribers
   const navigate = useNavigate()
   const [plans, setPlans] = useState<VideoPlan[]>([])
   const [selectedPlan, setSelectedPlan] = useState<VideoPlan | null>(null)
@@ -155,6 +156,11 @@ export function VideoPlanning() {
   })
 
   // Create plan form
+  const defaultVideoTimes = ['09:00', '12:00', '15:00', '18:00', '21:00']
+  const defaultVideoCount = 3
+  const getDefaultVideoTime = (index: number) => defaultVideoTimes[index] || '09:00'
+  const buildDefaultVideoTimes = (count: number) =>
+    Array.from({ length: count }, (_, index) => getDefaultVideoTime(index))
   const [planName, setPlanName] = useState('')
   const [startDate, setStartDate] = useState(
     new Date().toISOString().split('T')[0],
@@ -173,8 +179,8 @@ export function VideoPlanning() {
   const [timezone, setTimezone] = useState(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone,
   )
-  const [videoTimes, setVideoTimes] = useState<string[]>(['09:00']) // Initial video slot
-  const [videoTopics, setVideoTopics] = useState<string[]>(['']) // Topics for each video slot
+  const [videoTimes, setVideoTimes] = useState<string[]>(() => buildDefaultVideoTimes(defaultVideoCount))
+  const [videoTopics, setVideoTopics] = useState<string[]>(() => Array(defaultVideoCount).fill(''))
   // Avatar-related state removed - using Sora for video generation
   const [deleteModal, setDeleteModal] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -233,11 +239,16 @@ export function VideoPlanning() {
   const loadUserPreferences = async () => {
     try {
       const response = await api.get('/api/preferences')
+      const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
       if (response.data.preferences?.timezone) {
-        setTimezone(response.data.preferences.timezone)
+        const prefTimezone = response.data.preferences.timezone
+        setTimezone(prefTimezone && prefTimezone !== 'UTC' ? prefTimezone : detectedTimezone)
+      } else {
+        setTimezone(detectedTimezone)
       }
     } catch (error) {
       console.error('Failed to load user preferences:', error)
+      setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone)
     }
   }
 
@@ -466,7 +477,8 @@ export function VideoPlanning() {
   }
 
   const addVideoSlot = () => {
-    setVideoTimes([...videoTimes, '12:00'])
+    const nextIndex = videoTimes.length
+    setVideoTimes([...videoTimes, getDefaultVideoTime(nextIndex)])
     setVideoTopics([...videoTopics, ''])
   }
 
@@ -476,6 +488,21 @@ export function VideoPlanning() {
     const newTopics = videoTopics.filter((_: any, i: number) => i !== index)
     setVideoTimes(newTimes)
     setVideoTopics(newTopics)
+  }
+
+  const updateVideoSlotCount = (count: number) => {
+    setVideoTimes((prev) => {
+      if (count <= prev.length) return prev.slice(0, count)
+      const next = [...prev]
+      for (let i = prev.length; i < count; i += 1) {
+        next.push(getDefaultVideoTime(i))
+      }
+      return next
+    })
+    setVideoTopics((prev) => {
+      if (count <= prev.length) return prev.slice(0, count)
+      return [...prev, ...Array(count - prev.length).fill('')]
+    })
   }
 
   const updateVideoSlotTime = (index: number, time: string) => {
@@ -579,8 +606,8 @@ export function VideoPlanning() {
       setAutoScheduleTrigger('daily')
       setTriggerTime('09:00')
       setDefaultPlatforms([])
-      setVideoTimes(['09:00'])
-      setVideoTopics([''])
+      setVideoTimes(buildDefaultVideoTimes(defaultVideoCount))
+      setVideoTopics(Array(defaultVideoCount).fill(''))
     } catch (error: any) {
       alert(error.response?.data?.error || 'Failed to create plan')
     } finally {
@@ -650,10 +677,7 @@ export function VideoPlanning() {
     setTimezone(plan.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone)
     // Load existing video times and topics from plan items if needed
     // For now, use defaults based on plan.videos_per_day count
-    setVideoTimes(Array(plan.videos_per_day).fill('09:00').map((_, i) => {
-      // Very rough approximation - ideally we fetch items here
-      return ['09:00', '14:00', '19:00', '21:00', '12:00'][i] || '09:00'
-    }).slice(0, plan.videos_per_day))
+    setVideoTimes(buildDefaultVideoTimes(plan.videos_per_day))
     setVideoTopics(Array(plan.videos_per_day).fill(''))
   }
 
@@ -691,8 +715,8 @@ export function VideoPlanning() {
       setAutoScheduleTrigger('daily')
       setTriggerTime('09:00')
       setDefaultPlatforms([])
-      setVideoTimes(['09:00'])
-      setVideoTopics([''])
+      setVideoTimes(buildDefaultVideoTimes(defaultVideoCount))
+      setVideoTopics(Array(defaultVideoCount).fill(''))
     } catch (error: any) {
       alert(error.response?.data?.error || t('video_planning.update_plan_failed'))
     } finally {
@@ -1158,9 +1182,13 @@ export function VideoPlanning() {
             onClick={() => setCreateModal(true)}
             leftIcon={<Plus className="h-4 w-4" />}
             className="w-full md:w-auto"
-            disabled={!safeCanCreate}
+            disabled={subscriptionReady && !safeCanCreate}
           >
-            {safeCanCreate ? t('video_planning.new_plan') : t('common.upgrade_required') || 'Subscription Required'}
+            {subscriptionReady
+              ? safeCanCreate
+                ? t('video_planning.new_plan')
+                : t('common.upgrade_required') || 'Subscription Required'
+              : t('video_planning.new_plan')}
           </Button>
         </div>
 
@@ -2181,6 +2209,19 @@ export function VideoPlanning() {
               />
             </div>
 
+            <Input
+              label={t('video_planning.videos_per_day')}
+              type="number"
+              min={1}
+              max={10}
+              value={videoTimes.length}
+              onChange={(e: any) => {
+                const value = Number(e.target.value)
+                if (Number.isNaN(value)) return
+                updateVideoSlotCount(Math.max(1, Math.min(10, value)))
+              }}
+            />
+
             <div className="space-y-4">
               <label className="block text-sm font-medium text-slate-700">
                 Videos & Topics
@@ -2294,8 +2335,8 @@ export function VideoPlanning() {
             setAutoScheduleTrigger('daily')
             setTriggerTime('09:00')
             setDefaultPlatforms([])
-            setVideoTimes(['09:00'])
-            setVideoTopics([''])
+            setVideoTimes(buildDefaultVideoTimes(defaultVideoCount))
+            setVideoTopics(Array(defaultVideoCount).fill(''))
           }}
           title={t('video_planning.edit_plan')}
         >
@@ -2325,6 +2366,19 @@ export function VideoPlanning() {
                 min={startDate}
               />
             </div>
+
+            <Input
+              label={t('video_planning.videos_per_day')}
+              type="number"
+              min={1}
+              max={10}
+              value={videoTimes.length}
+              onChange={(e: any) => {
+                const value = Number(e.target.value)
+                if (Number.isNaN(value)) return
+                updateVideoSlotCount(Math.max(1, Math.min(10, value)))
+              }}
+            />
 
             <div className="space-y-4">
               <label className="block text-sm font-medium text-slate-700">
@@ -2471,8 +2525,8 @@ export function VideoPlanning() {
                   setAutoScheduleTrigger('daily')
                   setTriggerTime('09:00')
                   setDefaultPlatforms([])
-                  setVideoTimes(['09:00'])
-                  setVideoTopics([''])
+                  setVideoTimes(buildDefaultVideoTimes(defaultVideoCount))
+                  setVideoTopics(Array(defaultVideoCount).fill(''))
 
                 }}
               >

@@ -40,10 +40,11 @@ const platformIcons = {
 
 export function SocialAccounts() {
   const { t } = useLanguage()
-  const { user, refreshSubscriptionStatus } = useAuth()
+  const { user, refreshSubscriptionStatus, loading: authLoading } = useAuth()
   const { credits, unlimited } = useCreditsContext()
   const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
-  const shouldShowBanner = !hasSubscription && !unlimited // Show banner for trial users and non-subscribers
+  const subscriptionReady = !authLoading && (user?.hasActiveSubscription !== undefined || user?.role === 'admin')
+  const shouldShowBanner = subscriptionReady && !hasSubscription && !unlimited // Show banner for trial users and non-subscribers
   const { toast } = useToast()
   const [accounts, setAccounts] = useState<SocialAccount[]>([])
   const [loading, setLoading] = useState(true)
@@ -430,4 +431,3 @@ export function SocialAccounts() {
     </Layout>
   )
 }
-

@@ -75,9 +75,13 @@ export function Preferences() {
       if (response.data.preferences) {
         // Auto-detect timezone if not set
         const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+        const resolvedTimezone =
+          response.data.preferences.timezone && response.data.preferences.timezone !== 'UTC'
+            ? response.data.preferences.timezone
+            : detectedTimezone
         setPreferences({
           ...response.data.preferences,
-          timezone: response.data.preferences.timezone || detectedTimezone,
+          timezone: resolvedTimezone,
         })
       } else {
         // No preferences exist, use detected timezone

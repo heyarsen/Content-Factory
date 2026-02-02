@@ -15,14 +15,15 @@ import { Link } from 'react-router-dom'
 import { useCreditsContext } from '../contexts/CreditContext'
 
 export function ProfileSettings() {
-  const { user, signOut } = useAuth()
+  const { user, signOut, loading: authLoading } = useAuth()
   const { credits, unlimited } = useCreditsContext()
   const { toast } = useToast()
   const { t } = useLanguage()
 
   const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')
   const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
-  const shouldShowBanner = !hasSubscription && !unlimited // Show banner for trial users and non-subscribers
+  const subscriptionReady = !authLoading && (user?.hasActiveSubscription !== undefined || user?.role === 'admin')
+  const shouldShowBanner = subscriptionReady && !hasSubscription && !unlimited // Show banner for trial users and non-subscribers
   const navigate = useNavigate()
   const [emailForm, setEmailForm] = useState({
     email: '',

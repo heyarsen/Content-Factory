@@ -5,7 +5,7 @@ import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Badge } from '../components/ui/Badge'
-import { Video, Calendar, Users, Zap, ArrowRight, Sparkles } from 'lucide-react'
+import { Video, Calendar, Users, Zap, ArrowRight, Sparkles, CheckCircle2, Share2 } from 'lucide-react'
 import api from '../lib/api'
 
 import { useLanguage } from '../contexts/LanguageContext'
@@ -92,12 +92,21 @@ interface PostStats {
 
 export function Dashboard() {
   const { t, language } = useLanguage()
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const { credits, unlimited } = useCreditsContext()
   const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')
-  const shouldShowBanner = !hasSubscription && !unlimited // Show banner for trial users and non-subscribers
+  const subscriptionReady = !authLoading && (user?.hasActiveSubscription !== undefined || user?.role === 'admin')
+  const shouldShowBanner = subscriptionReady && !hasSubscription && !unlimited // Show banner for trial users and non-subscribers
   const [videoStats, setVideoStats] = useState<VideoStats | null>(null)
   const [postStats, setPostStats] = useState<PostStats | null>(null)
+  const [recentActivity, setRecentActivity] = useState<Array<{
+    id: string
+    title: string
+    status: string
+    timestamp: string
+    kind: 'video' | 'post'
+    platform?: string
+  }>>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -124,17 +133,42 @@ export function Dashboard() {
       const videos = videosRes.data.videos || []
       const posts = postsRes.data.posts || []
 
-      setVideoStats({
+      const updatedVideoStats = {
         total: videos.length,
         completed: videos.filter((v: any) => v.status === 'completed').length,
         generating: videos.filter((v: any) => v.status === 'generating').length,
         failed: videos.filter((v: any) => v.status === 'failed').length,
-      })
+      }
 
-      setPostStats({
+      const updatedPostStats = {
         pending: posts.filter((p: any) => p.status === 'pending').length,
         posted: posts.filter((p: any) => p.status === 'posted').length,
-      })
+      }
+
+      const activityItems = [
+        ...videos.map((video: any) => ({
+          id: `video-${video.id}`,
+          title: video.topic || 'Video',
+          status: video.status || 'pending',
+          timestamp: video.updated_at || video.created_at,
+          kind: 'video' as const,
+        })),
+        ...posts.map((post: any) => ({
+          id: `post-${post.id}`,
+          title: post.videos?.topic || post.caption || 'Post',
+          status: post.status || 'pending',
+          timestamp: post.posted_at || post.updated_at || post.created_at || post.scheduled_time,
+          kind: 'post' as const,
+          platform: post.platform,
+        })),
+      ]
+        .filter((item) => Boolean(item.timestamp))
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, 6)
+
+      setVideoStats(updatedVideoStats)
+      setPostStats(updatedPostStats)
+      setRecentActivity(activityItems)
     } catch (error) {
       console.error('Failed to load stats:', error)
     } finally {
@@ -221,6 +255,15 @@ export function Dashboard() {
                   {t('dashboard.create_video')}
                 </Button>
               </Link>
+              <Link to="/planning" className="w-full sm:w-auto">
+                <Button
+                  variant="ghost"
+                  className="w-full sm:w-auto border border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/20 hover:text-white active:scale-[0.98]"
+                >
+                  <Calendar className="mr-2 h-4 w-4" />
+                  {t('video_planning.create_plan') || 'Create Plan'}
+                </Button>
+              </Link>
               <Link to="/videos" className="w-full sm:w-auto">
                 <Button
                   variant="ghost"
@@ -234,7 +277,7 @@ export function Dashboard() {
           </div>
         </section>
 
-        <section className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-6 sm:grid-cols-2 xl:grid-cols-5">
           <Card className="relative overflow-hidden p-5 sm:p-6">
             <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-brand-100/60 blur-3xl pointer-events-none" />
             <div className="relative z-10 flex items-start justify-between gap-4">
@@ -271,9 +314,27 @@ export function Dashboard() {
                   <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 leading-none">{t('dashboard.generating')}</p>
                   <p className="mt-3 text-3xl sm:text-4xl font-bold text-slate-900 leading-tight truncate">{videoStats?.generating || 0}</p>
                 </div>
-                <Badge variant="info" className="shrink-0">{t('common.in_flight') || 'In flight'}</Badge>
+                <Badge variant="info" className="shrink-0">{t('dashboard.in_flight_badge') || 'In flight'}</Badge>
               </div>
               <p className="mt-4 text-[10px] sm:text-xs text-slate-400 leading-tight">{t('dashboard.generating_desc')}</p>
+            </div>
+          </Card>
+
+          <Card className="relative overflow-hidden p-5 sm:p-6">
+            <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-emerald-100/60 blur-3xl pointer-events-none" />
+            <div className="relative z-10 flex h-full flex-col justify-between">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 leading-none">{t('dashboard.posted_videos')}</p>
+                  <p className="mt-3 text-3xl sm:text-4xl font-bold text-slate-900 leading-tight truncate">{postStats?.posted || 0}</p>
+                </div>
+                <div className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-[18px] bg-emerald-50 text-emerald-600 shadow-sm border border-emerald-100/60">
+                  <CheckCircle2 className="h-5 w-5" />
+                </div>
+              </div>
+              <p className="mt-4 text-[10px] sm:text-xs text-slate-400 leading-tight">
+                {t('dashboard.posted_videos_desc')}
+              </p>
             </div>
           </Card>
 
@@ -321,6 +382,22 @@ export function Dashboard() {
                 </Link>
 
                 <Link
+                  to="/planning"
+                  className="group flex items-center justify-between rounded-2xl border border-white/60 bg-white/70 px-4 py-3 sm:px-5 sm:py-4 transition-all hover:border-brand-200 hover:shadow-[0_18px_45px_-30px_rgba(99,102,241,0.45)] touch-manipulation active:scale-[0.98]"
+                >
+                  <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                    <div className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-[18px] bg-emerald-50 text-emerald-600">
+                      <Calendar className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-slate-900 leading-tight truncate">{t('video_planning.create_plan') || 'Create Plan'}</p>
+                      <p className="mt-0.5 text-[10px] sm:text-xs text-slate-500 leading-none truncate">{t('video_planning.subtitle')}</p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-brand-600 transition group-hover:translate-x-0.5 shrink-0" />
+                </Link>
+
+                <Link
                   to="/social"
                   className="group flex items-center justify-between rounded-2xl border border-white/60 bg-white/70 px-4 py-3 sm:px-5 sm:py-4 transition-all hover:border-brand-200 hover:shadow-[0_18px_45px_-30px_rgba(99,102,241,0.45)] touch-manipulation active:scale-[0.98]"
                 >
@@ -346,10 +423,34 @@ export function Dashboard() {
                 <h2 className="text-lg font-semibold text-primary">{t('dashboard.recent_activity')}</h2>
                 <Badge variant="default">{t('dashboard.live_feed')}</Badge>
               </div>
-              <div className="mt-6 space-y-4 text-sm text-slate-500">
-                <p>{t('dashboard.no_activity')}</p>
-                <p className="text-xs text-slate-400">{t('dashboard.keep_shipping')}</p>
-              </div>
+              {recentActivity.length === 0 ? (
+                <div className="mt-6 space-y-4 text-sm text-slate-500">
+                  <p>{t('dashboard.no_activity')}</p>
+                  <p className="text-xs text-slate-400">{t('dashboard.keep_shipping')}</p>
+                </div>
+              ) : (
+                <div className="mt-6 space-y-3">
+                  {recentActivity.map((activity) => (
+                    <div key={activity.id} className="flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-white/80 px-4 py-3 text-sm text-slate-600 shadow-sm">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${activity.kind === 'video' ? 'bg-brand-50 text-brand-600' : 'bg-sky-50 text-sky-500'}`}>
+                          {activity.kind === 'video' ? <Video className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-900 truncate">{activity.title}</p>
+                          <p className="text-xs text-slate-400">
+                            {activity.platform ? `${activity.platform.toUpperCase()} • ` : ''}
+                            {new Date(activity.timestamp).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant={activity.status === 'posted' || activity.status === 'completed' ? 'success' : activity.status === 'failed' ? 'error' : 'info'} className="shrink-0">
+                        {activity.status.replace(/_/g, ' ')}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </Card>
         </section>
@@ -357,4 +458,3 @@ export function Dashboard() {
     </Layout>
   )
 }
-

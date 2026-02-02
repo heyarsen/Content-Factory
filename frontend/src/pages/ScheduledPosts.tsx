@@ -45,11 +45,12 @@ const platformNames = {
 
 export function ScheduledPosts() {
   const { t } = useLanguage()
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const { credits, unlimited } = useCreditsContext()
   const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
   const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
-  const shouldShowBanner = !hasSubscription && !unlimited // Show banner for trial users and non-subscribers
+  const subscriptionReady = !authLoading && (user?.hasActiveSubscription !== undefined || user?.role === 'admin')
+  const shouldShowBanner = subscriptionReady && !hasSubscription && !unlimited // Show banner for trial users and non-subscribers
   const [posts, setPosts] = useState<Post[]>([])
   const [videos, setVideos] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -609,4 +610,3 @@ export function ScheduledPosts() {
     </Layout>
   )
 }
-

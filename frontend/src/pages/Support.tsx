@@ -203,14 +203,24 @@ export function Support() {
 
     return (
         <Layout>
-            <div className="flex h-[calc(100vh-140px)] sm:h-[calc(100vh-160px)] gap-6 overflow-hidden relative">
+            <div className="flex min-h-[calc(100vh-140px)] flex-col gap-6 overflow-hidden relative sm:h-[calc(100vh-160px)] lg:flex-row">
                 {/* Sidebar - Ticket List */}
                 <div className={`${view === 'chat' || showCreate ? 'hidden' : 'flex'} w-full lg:flex lg:w-1/3 flex-col gap-4 overflow-hidden`}>
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <h2 className="text-xl font-semibold text-primary">{t('support.title')}</h2>
-                        <div className="flex gap-2">
-                            <Button variant="ghost" size="sm" onClick={markAllSupportAsRead}>{t('support.mark_all_read')}</Button>
-                            <Button size="sm" onClick={() => { setShowCreate(true); setSelectedTicket(null); }}>
+                        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                            <Button variant="ghost" size="sm" onClick={markAllSupportAsRead} className="w-full sm:w-auto">
+                                {t('support.mark_all_read')}
+                            </Button>
+                            <Button
+                                size="sm"
+                                className="w-full sm:w-auto"
+                                onClick={() => {
+                                    setShowCreate(true)
+                                    setSelectedTicket(null)
+                                    setView('chat')
+                                }}
+                            >
                                 <Plus className="mr-2 h-4 w-4" />
                                 {t('support.new_ticket')}
                             </Button>
@@ -255,7 +265,20 @@ export function Support() {
                 <div className="flex flex-1 flex-col overflow-hidden">
                     {showCreate ? (
                         <Card className="flex h-full flex-col">
-                            <h3 className="mb-6 text-xl font-semibold text-primary">{t('support.new_ticket')}</h3>
+                            <div className="mb-6 flex items-center gap-3">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="sm:hidden"
+                                    onClick={() => {
+                                        setShowCreate(false)
+                                        setView('list')
+                                    }}
+                                >
+                                    {t('common.back')}
+                                </Button>
+                                <h3 className="text-xl font-semibold text-primary">{t('support.new_ticket')}</h3>
+                            </div>
                             <form onSubmit={handleCreateTicket} className="space-y-4">
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-slate-700">{t('support.subject')}</label>
@@ -286,10 +309,20 @@ export function Support() {
                         <Card className="flex h-full flex-col overflow-hidden p-0">
                             {/* Header */}
                             <div className="border-b border-slate-100 p-4">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <h3 className="text-lg font-semibold text-primary">{selectedTicket.ticket.subject}</h3>
-                                        <p className="text-xs text-slate-400">{t('support.ticket_id')}: {selectedTicket.ticket.id}</p>
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="sm:hidden"
+                                            onClick={() => setView('list')}
+                                        >
+                                            {t('common.back')}
+                                        </Button>
+                                        <div className="min-w-0">
+                                            <h3 className="text-lg font-semibold text-primary truncate">{selectedTicket.ticket.subject}</h3>
+                                            <p className="text-xs text-slate-400">{t('support.ticket_id')}: {selectedTicket.ticket.id}</p>
+                                        </div>
                                     </div>
                                     {getStatusBadge(selectedTicket.ticket.status)}
                                 </div>
