@@ -24,7 +24,7 @@ export type SoraAspectRatio = 'landscape' | 'portrait'
  * Request payload for creating a Sora text-to-video task
  */
 export interface CreateSoraTaskRequest {
-    model: string // support different models (sora-2-text-to-video, sora-2-pro-text-to-video, etc)
+    model: 'sora-2-text-to-video'
     callBackUrl?: string
     input: {
         prompt: string
@@ -32,7 +32,6 @@ export interface CreateSoraTaskRequest {
         n_frames?: string // Duration in seconds, default "10"
         remove_watermark?: boolean
         character_id_list?: string[]
-        language?: string // Optional language parameter (e.g., 'en', 'es', 'fr')
     }
 }
 
@@ -104,14 +103,12 @@ export async function createSoraTask(
         removeWatermark?: boolean
         characterIdList?: string[]
         callBackUrl?: string
-        language?: string // Optional language parameter
-        model?: string // Optional model override
     } = {}
 ): Promise<CreateSoraTaskResponse> {
     const apiKey = getKieApiKey()
 
     const payload: CreateSoraTaskRequest = {
-        model: options.model || 'sora-2-text-to-video',
+        model: 'sora-2-text-to-video',
         callBackUrl: options.callBackUrl,
         input: {
             prompt,
@@ -119,17 +116,13 @@ export async function createSoraTask(
             n_frames: options.nFrames || '10',
             remove_watermark: options.removeWatermark ?? true,
             character_id_list: options.characterIdList,
-            ...(options.language && { language: options.language }),
         },
     }
 
     console.log('[KIE Sora] Creating task with payload:', {
         prompt: prompt.substring(0, 100) + '...',
-        promptLength: prompt.length,
         aspect_ratio: aspectRatio,
         n_frames: payload.input.n_frames,
-        model: payload.model,
-        remove_watermark: payload.input.remove_watermark,
     })
 
     try {
