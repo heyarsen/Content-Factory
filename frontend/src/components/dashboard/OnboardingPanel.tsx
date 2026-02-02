@@ -13,12 +13,29 @@ type OnboardingState = {
   completed: Record<string, boolean>
 }
 
-const steps = [
+type OnboardingStep = {
+  id: string
+  title: string
+  description: string
+  ctaLabel: string
+  icon: LucideIcon
+} & (
+  | {
+      ctaType: 'modal'
+    }
+  | {
+      ctaType: 'link'
+      ctaLink: string
+    }
+)
+
+const steps: OnboardingStep[] = [
   {
     id: 'distribution',
     title: 'Connect social media',
     description: 'Link your channels now so every render can publish instantly.',
     ctaLabel: 'Connect accounts',
+    ctaType: 'link',
     ctaLink: '/distribution',
     icon: Wand2,
   },
@@ -35,6 +52,7 @@ const steps = [
     title: 'Manual generation',
     description: 'Kick off a single video to test prompts, voice, and pacing.',
     ctaLabel: 'Open Quick Create',
+    ctaType: 'link',
     ctaLink: '/quick-create',
     icon: Sparkles,
   },
@@ -43,10 +61,11 @@ const steps = [
     title: 'My videos tab',
     description: 'Review every render, download assets, and schedule when you are ready to post.',
     ctaLabel: 'Open My Videos',
+    ctaType: 'link',
     ctaLink: '/videos',
     icon: Video,
   },
-] as const
+]
 
 const starterVideos = [
   { title: '3 hooks for viral Reels', status: 'Rendered · 24s' },
