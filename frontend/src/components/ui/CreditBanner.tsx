@@ -75,12 +75,12 @@ const getPluralization = (language: string, count: number): string => {
 export function CreditBanner() {
     const { t, language } = useLanguage()
     const { user, loading: authLoading } = useAuth()
-    const { credits, unlimited, loading: creditsLoading } = useCreditsContext()
+    const { credits, unlimited, subscription, loading: creditsLoading } = useCreditsContext()
 
     // During loading, don't show the banner at all to avoid flickering
     if (authLoading || creditsLoading) return null
 
-    const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')
+    const hasSubscription = !!(user?.role === 'admin' || (subscription && ['active', 'pending'].includes(subscription.status)))
 
     // Only show banner if user has NO subscription AND is NOT unlimited (trial/free users)
     if (hasSubscription || unlimited) return null

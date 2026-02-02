@@ -10,10 +10,13 @@ import { useLanguage } from '../../contexts/LanguageContext'
 export function Layout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { user } = useAuth()
-  const { credits, unlimited } = useCreditsContext()
+  const { credits, unlimited, subscription } = useCreditsContext()
   const { t } = useLanguage()
 
-  const hasSubscription = user && (user.role === 'admin' || user.hasActiveSubscription)
+  const hasSubscription = user && (
+    user.role === 'admin' ||
+    (subscription && ['active', 'pending'].includes(subscription.status))
+  )
   const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
   const showBanner = user && !safeCanCreate
   return (

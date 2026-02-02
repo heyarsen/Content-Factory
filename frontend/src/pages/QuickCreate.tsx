@@ -123,7 +123,7 @@ export function QuickCreate() {
         <Card className="p-4 sm:p-6 lg:p-8">
           <div className="mb-6 flex items-center gap-3">
             <Sparkles className="h-5 w-5 text-brand-500" />
-            <h2 className="text-xl font-semibold text-primary">{t('quick_create.step_idea_title')}</h2>
+            <h2 className="text-xl font-semibold text-primary">{t('common.manual_creation')}</h2>
           </div>
 
           {connectedPlatforms.length > 0 && (
@@ -164,14 +164,6 @@ export function QuickCreate() {
               value={description}
               onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value)}
             />
-
-            <div className="space-y-3">
-              <label className="text-sm font-semibold text-primary">{t('quick_create.script_method_label')}</label>
-              <div className="rounded-xl border-2 border-slate-200 bg-white p-4">
-                <div className="font-medium text-primary">{t('quick_create.script_method_sora')}</div>
-                <div className="text-sm text-slate-600">{t('quick_create.script_method_sora_desc')}</div>
-              </div>
-            </div>
 
             <Select
               label={t('quick_create.video_style')}

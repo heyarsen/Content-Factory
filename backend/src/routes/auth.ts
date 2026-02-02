@@ -5,6 +5,40 @@ import { authLimiter } from '../middleware/rateLimiter.js'
 
 const router = Router()
 
+const getClientIp = (req: Request) => {
+  const forwarded = req.headers['x-forwarded-for']
+  if (typeof forwarded === 'string') {
+    return forwarded.split(',')[0]?.trim()
+  }
+  if (Array.isArray(forwarded)) {
+    return forwarded[0]?.trim()
+  }
+  return req.ip
+}
+
+const normalizeTimezone = (timezone?: string | null) => {
+  if (!timezone) return null
+  try {
+    return new Intl.DateTimeFormat('en-US', { timeZone: timezone }).resolvedOptions().timeZone
+  } catch (error) {
+    console.warn('Failed to normalize timezone:', error)
+    return null
+  }
+}
+
+const fetchTimezoneFromIp = async (ip?: string | null) => {
+  if (!ip || ip === '127.0.0.1' || ip === '::1') return null
+  try {
+    const response = await fetch(`https://ipapi.co/${ip}/json/`)
+    if (!response.ok) return null
+    const data = await response.json()
+    return typeof data?.timezone === 'string' ? data.timezone : null
+  } catch (error) {
+    console.warn('Failed to resolve timezone from IP:', error)
+    return null
+  }
+}
+
 // Signup
 router.post('/signup', authLimiter, async (req: Request, res: Response) => {
   try {
@@ -49,6 +83,24 @@ router.post('/signup', authLimiter, async (req: Request, res: Response) => {
         .from('user_profiles')
         .update({ preferred_language: preferredLanguage || 'en' })
         .eq('id', data.user.id)
+
+      const ipTimezone = await fetchTimezoneFromIp(getClientIp(req))
+      const detectedTimezone = normalizeTimezone(ipTimezone) || normalizeTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone) || 'UTC'
+      const { error: prefError } = await supabase
+        .from('user_preferences')
+        .upsert({
+          user_id: data.user.id,
+          timezone: detectedTimezone,
+          default_platforms: [],
+          notifications_enabled: true,
+          auto_research_default: true,
+          auto_approve_default: false,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' })
+
+      if (prefError) {
+        console.warn('Failed to initialize user preferences:', prefError)
+      }
     }
 
     res.json({
@@ -591,4 +643,3 @@ router.patch('/language', authenticate, async (req: AuthRequest, res: Response) 
 })
 
 export default router
-
