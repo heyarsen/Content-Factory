@@ -156,7 +156,7 @@ export function Dashboard() {
                   <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 leading-none">{t('dashboard.completed')}</p>
                   <p className="mt-3 text-3xl sm:text-4xl font-bold text-slate-900 leading-tight truncate">{videoStats?.completed || 0}</p>
                 </div>
-                <Badge variant="success" className="shrink-0">{t('common.live') || 'Live'}</Badge>
+                <Badge variant="success" className="shrink-0">{t('dashboard.live_badge') || 'Live'}</Badge>
               </div>
               <p className="mt-4 text-[10px] sm:text-xs text-slate-400 leading-tight">{t('dashboard.completed_desc')}</p>
             </div>
@@ -256,4 +256,3 @@ export function Dashboard() {
     </Layout>
   )
 }
-
