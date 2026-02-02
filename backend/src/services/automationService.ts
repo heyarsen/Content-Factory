@@ -1,13 +1,33 @@
 import { supabase } from '../lib/supabase.js'
 import { PlanService } from './planService.js'
 import { ResearchService } from './researchService.js'
-import { ScriptService } from './scriptService.js'
 import { VideoService } from './videoService.js'
 import { SubscriptionService } from './subscriptionService.js'
 import { postVideo } from '../lib/uploadpost.js'
 import { DateTime } from 'luxon'
 
 export class AutomationService {
+  private static buildScriptPrompt({
+    topic,
+    description,
+    whyImportant,
+    usefulTips,
+  }: {
+    topic?: string | null
+    description?: string | null
+    whyImportant?: string | null
+    usefulTips?: string | null
+  }) {
+    const promptParts = [
+      topic ? `Topic: ${topic}` : null,
+      description ? `Description: ${description}` : null,
+      whyImportant ? `Why it matters: ${whyImportant}` : null,
+      usefulTips ? `Useful tips: ${usefulTips}` : null,
+    ].filter(Boolean) as string[]
+
+    return promptParts.join('\n')
+  }
+
   /**
    * Process scheduled plans - generate topics for due dates
    */
@@ -233,13 +253,12 @@ export class AutomationService {
           usefulTipsSource: item.useful_tips ? 'prompt' : (research?.UsefulTips ? 'research' : 'empty'),
         })
 
-        // If no research but has topic, use topic directly
-        const script = await ScriptService.generateScriptCustom({
-          idea: item.topic || research?.Idea || '',
+        const script = this.buildScriptPrompt({
+          topic: item.topic || research?.Idea || '',
           description: descriptionToUse,
-          whyItMatters: whyItMattersToUse,
+          whyImportant: whyItMattersToUse,
           usefulTips: usefulTipsToUse,
-        }, userId)
+        })
 
         const newStatus = autoApprove ? 'approved' : 'draft'
         const scriptStatus = autoApprove ? 'approved' : 'draft'
@@ -671,13 +690,12 @@ export class AutomationService {
               throw new Error('No topic available for script generation')
             }
 
-            // If no research but has topic, use topic directly
-            const script = await ScriptService.generateScriptCustom({
-              idea: topicToUse, // Always use the item's topic first
+            const script = this.buildScriptPrompt({
+              topic: topicToUse,
               description: item.description || research?.Description || '',
-              whyItMatters: item.why_important || research?.WhyItMatters || '',
+              whyImportant: item.why_important || research?.WhyItMatters || '',
               usefulTips: item.useful_tips || research?.UsefulTips || '',
-            }, plan.user_id)
+            })
 
             console.log(`[Script Generation] Generated script for today's item ${item.id}, topic: "${topicToUse}"`)
 
@@ -2027,18 +2045,12 @@ export class AutomationService {
       usefulTipsSource: item.useful_tips ? 'prompt' : (enrichedResearch?.usefulTips ? 'research' : 'empty'),
     })
 
-    const script = await ScriptService.generateScriptCustom(
-      {
-        idea: topicToUse, // Always use the item's topic first
-        description: [
-          descriptionToUse,
-          antiRepeatHint,
-        ].filter(Boolean).join('\n'),
-        whyItMatters: whyItMattersToUse,
-        usefulTips: usefulTipsToUse,
-      },
-      userId
-    )
+    const script = this.buildScriptPrompt({
+      topic: topicToUse,
+      description: [descriptionToUse, antiRepeatHint].filter(Boolean).join('\n'),
+      whyImportant: whyItMattersToUse,
+      usefulTips: usefulTipsToUse,
+    })
 
     console.log(`[Script Generation] Generated script for topic: "${topicToUse}" (item topic: "${item.topic || 'N/A'}")`)
 
@@ -2493,4 +2505,3 @@ export class AutomationService {
     }
   }
 }
-
