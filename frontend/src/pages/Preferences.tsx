@@ -7,7 +7,7 @@ import { Badge } from '../components/ui/Badge'
 import { useToast } from '../hooks/useToast'
 import { Settings, Globe, Bell, Share2, Instagram, Youtube, Facebook, Users } from 'lucide-react'
 import api from '../lib/api'
-import { timezones } from '../lib/timezones'
+import { normalizeTimezone, timezones } from '../lib/timezones'
 import { useLanguage } from '../contexts/LanguageContext'
 
 interface Preferences {
@@ -46,7 +46,7 @@ export function Preferences() {
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([])
   const [preferences, setPreferences] = useState<Preferences>({
     user_id: '',
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timezone: normalizeTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone) || 'UTC',
     default_platforms: [],
     notifications_enabled: true,
     auto_research_default: true,
@@ -74,20 +74,20 @@ export function Preferences() {
       const response = await api.get('/api/preferences')
       if (response.data.preferences) {
         // Auto-detect timezone if not set
-        const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+        const detectedTimezone = normalizeTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone) || 'UTC'
         setPreferences({
           ...response.data.preferences,
-          timezone: response.data.preferences.timezone || detectedTimezone,
+          timezone: normalizeTimezone(response.data.preferences.timezone) || detectedTimezone,
         })
       } else {
         // No preferences exist, use detected timezone
-        const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+        const detectedTimezone = normalizeTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone) || 'UTC'
         setPreferences(prev => ({ ...prev, timezone: detectedTimezone }))
       }
     } catch (error) {
       console.error('Failed to load preferences:', error)
       // Use detected timezone as fallback
-      const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+      const detectedTimezone = normalizeTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone) || 'UTC'
       setPreferences(prev => ({ ...prev, timezone: detectedTimezone }))
     } finally {
       setLoading(false)

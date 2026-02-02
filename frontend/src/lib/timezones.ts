@@ -36,3 +36,42 @@ export function getAllTimezones() {
 }
 
 export const timezones = getAllTimezones()
+
+const TIMEZONE_ALIASES: Record<string, string> = {
+    'Europe/Kiev': 'Europe/Kyiv',
+    'US/Eastern': 'America/New_York',
+    'US/Central': 'America/Chicago',
+    'US/Mountain': 'America/Denver',
+    'US/Pacific': 'America/Los_Angeles',
+    'Etc/UTC': 'UTC',
+    'Etc/GMT': 'UTC',
+}
+
+const timezoneValues = new Set(timezones.map((tz) => tz.value))
+
+export function normalizeTimezone(timezone?: string | null) {
+    if (!timezone || typeof timezone !== 'string') {
+        return timezoneValues.has('UTC') ? 'UTC' : timezones[0]?.value
+    }
+
+    const trimmed = timezone.trim()
+    if (timezoneValues.has(trimmed)) {
+        return trimmed
+    }
+
+    const alias = TIMEZONE_ALIASES[trimmed]
+    if (alias && timezoneValues.has(alias)) {
+        return alias
+    }
+
+    try {
+        const resolved = new Intl.DateTimeFormat('en-US', { timeZone: trimmed }).resolvedOptions().timeZone
+        if (timezoneValues.has(resolved)) {
+            return resolved
+        }
+    } catch (error) {
+        console.warn('Failed to normalize timezone:', error)
+    }
+
+    return timezoneValues.has('UTC') ? 'UTC' : timezones[0]?.value
+}

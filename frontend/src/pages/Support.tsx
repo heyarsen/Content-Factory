@@ -45,6 +45,11 @@ export function Support() {
     const [view, setView] = useState<'list' | 'chat'>('list')
     const { addNotification, refreshSupportCount, markAllSupportAsRead } = useNotifications()
     const { user } = useAuth() // Need user ID for subscription filtering if desired, or just use ticket ID
+    const handleBackToList = () => {
+        setShowCreate(false)
+        setSelectedTicket(null)
+        setView('list')
+    }
 
     // Use a ref to track the currently selected ticket without triggering re-renders or stale closures in the effect
     const selectedTicketRef = React.useRef<{ ticket: Ticket, messages: Message[] } | null>(null)
@@ -210,7 +215,7 @@ export function Support() {
                         <h2 className="text-xl font-semibold text-primary">{t('support.title')}</h2>
                         <div className="flex gap-2">
                             <Button variant="ghost" size="sm" onClick={markAllSupportAsRead}>{t('support.mark_all_read')}</Button>
-                            <Button size="sm" onClick={() => { setShowCreate(true); setSelectedTicket(null); }}>
+                            <Button size="sm" onClick={() => { setShowCreate(true); setSelectedTicket(null); setView('chat') }}>
                                 <Plus className="mr-2 h-4 w-4" />
                                 {t('support.new_ticket')}
                             </Button>
@@ -253,6 +258,16 @@ export function Support() {
 
                 {/* Main Content - Chat or Create */}
                 <div className="flex flex-1 flex-col overflow-hidden">
+                    {(showCreate || selectedTicket) && (
+                        <div className="mb-4 flex items-center gap-2 lg:hidden">
+                            <Button variant="ghost" size="sm" onClick={handleBackToList}>
+                                {t('common.back')}
+                            </Button>
+                            <span className="text-sm font-semibold text-slate-700">
+                                {showCreate ? t('support.new_ticket') : t('support.title')}
+                            </span>
+                        </div>
+                    )}
                     {showCreate ? (
                         <Card className="flex h-full flex-col">
                             <h3 className="mb-6 text-xl font-semibold text-primary">{t('support.new_ticket')}</h3>
@@ -277,7 +292,7 @@ export function Support() {
                                     />
                                 </div>
                                 <div className="flex justify-end gap-3 pt-4">
-                                    <Button variant="ghost" onClick={() => setShowCreate(false)}>{t('common.cancel')}</Button>
+                                    <Button variant="ghost" onClick={handleBackToList}>{t('common.cancel')}</Button>
                                     <Button type="submit" loading={sending}>{t('support.submit_ticket')}</Button>
                                 </div>
                             </form>
