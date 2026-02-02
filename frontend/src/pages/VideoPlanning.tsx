@@ -628,7 +628,7 @@ export function VideoPlanning() {
   const handleCreateVideo = async (item: VideoPlanItem) => {
     try {
       await api.post(`/api/plans/items/${item.id}/create-video`, {
-        style: 'professional',
+        style: 'Realistic',
         duration: 30,
       })
       if (selectedPlan) {
@@ -1095,7 +1095,7 @@ export function VideoPlanning() {
 
       if (scheduledDateTime > now) {
         // Video is ready but waiting for post time
-        label = 'Waiting for Post Time'
+        label = 'Waiting for Trigger Time'
         variant = 'success'
       } else {
         // Post time has passed - likely publishing or about to publish

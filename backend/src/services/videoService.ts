@@ -19,6 +19,49 @@ const DEFAULT_REEL_DURATION = 60
 
 type VideoStyle = Video['style']
 
+const ALLOWED_VIDEO_STYLES = [
+  'Cinematic',
+  'Realistic',
+  'Anime',
+  '3D Render',
+  'Cyberpunk',
+  'Minimalist',
+  'Documentary',
+] as const
+
+function normalizeVideoStyle(style?: string | null): VideoStyle {
+  const raw = (style ?? '').trim()
+  if (!raw) {
+    return DEFAULT_REEL_STYLE
+  }
+
+  // First, accept canonical values as-is.
+  if ((ALLOWED_VIDEO_STYLES as readonly string[]).includes(raw)) {
+    return raw as VideoStyle
+  }
+
+  const lower = raw.toLowerCase()
+
+  // Common aliases / legacy values
+  if (lower === 'professional') {
+    return 'Realistic' as VideoStyle
+  }
+  if (lower === '3d' || lower === '3d_render' || lower === '3drender') {
+    return '3D Render' as VideoStyle
+  }
+
+  // Case-insensitive match against allowed set
+  const caseInsensitiveMatch = (ALLOWED_VIDEO_STYLES as readonly string[]).find(
+    (s) => s.toLowerCase() === lower
+  )
+  if (caseInsensitiveMatch) {
+    return caseInsensitiveMatch as VideoStyle
+  }
+
+  // Fallback for anything unknown: keep DB insert safe.
+  return 'Realistic' as VideoStyle
+}
+
 const DEFAULT_HEYGEN_RESOLUTION =
   process.env.HEYGEN_OUTPUT_RESOLUTION && process.env.HEYGEN_OUTPUT_RESOLUTION.trim().length > 0
     ? process.env.HEYGEN_OUTPUT_RESOLUTION.trim()
@@ -1030,6 +1073,7 @@ export class VideoService {
     }
 
     let videoRecordCreated = false
+    const normalizedStyle = normalizeVideoStyle(input.style as any)
 
     try {
       // If talking_photo_id is provided, use it directly (it's a specific look ID)
@@ -1088,7 +1132,7 @@ export class VideoService {
         .eq('user_id', userId)
         .eq('topic', input.topic)
         .eq('script', input.script || null)
-        .eq('style', input.style || DEFAULT_REEL_STYLE)
+        .eq('style', normalizedStyle)
         .eq('duration', input.duration || DEFAULT_REEL_DURATION)
         .eq('avatar_id', avatarRecordId || null)
         .gte('created_at', sinceIso)
@@ -1105,7 +1149,11 @@ export class VideoService {
         return candidate
       }
 
-      const video = await this.createVideoRecord(userId, input, avatarRecordId)
+      const video = await this.createVideoRecord(
+        userId,
+        { ...input, style: normalizedStyle },
+        avatarRecordId
+      )
       videoRecordCreated = true
       const outputResolution = input.output_resolution || DEFAULT_HEYGEN_RESOLUTION
       const aspectRatio = input.aspect_ratio || DEFAULT_VERTICAL_ASPECT_RATIO
@@ -1495,7 +1543,7 @@ export class VideoService {
         user_id: userId,
         topic: input.topic,
         script: input.script || null,
-        style: input.style || DEFAULT_REEL_STYLE,
+        style: normalizeVideoStyle(input.style as any),
         duration: input.duration || DEFAULT_REEL_DURATION,
         status: 'pending',
         provider: input.provider || 'sora',

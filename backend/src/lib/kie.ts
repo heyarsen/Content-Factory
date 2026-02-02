@@ -1,7 +1,47 @@
 import axios from 'axios'
-import { retryWithBackoff } from './perplexity.js'
 
 const KIE_API_URL = 'https://api.kie.ai/api/v1'
+
+/**
+ * Retry function with exponential backoff for handling rate limits
+ * (inlined here to avoid coupling KIE/Sora to Perplexity module resolution)
+ */
+async function retryWithBackoff<T>(
+    fn: () => Promise<T>,
+    maxRetries: number = 3,
+    initialDelay: number = 1000
+): Promise<T> {
+    let lastError: any
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            return await fn()
+        } catch (error: any) {
+            lastError = error
+            const status = error.response?.status
+
+            // Only retry on 429 (rate limit) or 5xx errors
+            if (status === 429 || (status >= 500 && status < 600)) {
+                if (attempt < maxRetries - 1) {
+                    const delay = initialDelay * Math.pow(2, attempt)
+
+                    const retryAfter = error.response?.headers?.['retry-after']
+                    const waitTime = retryAfter ? parseInt(retryAfter, 10) * 1000 : delay
+
+                    console.log(
+                        `Rate limit or server error (${status}), retrying in ${waitTime}ms (attempt ${attempt + 1}/${maxRetries})`
+                    )
+                    await new Promise(resolve => setTimeout(resolve, waitTime))
+                    continue
+                }
+            }
+
+            throw error
+        }
+    }
+
+    throw lastError || new Error('Max retries exceeded')
+}
 
 /**
  * Get KIE API key from environment

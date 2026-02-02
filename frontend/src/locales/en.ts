@@ -469,7 +469,7 @@ export const en = {
         generating_video: "Generating Video",
         publishing: "Publishing",
         published: "Published",
-        waiting_for_post_time: "Waiting for Post Time",
+        waiting_for_post_time: "Waiting for Trigger Time",
         video_ready: "Video Ready",
         scheduled_to_post: "Scheduled to Post",
         error_occurred: "Error Occurred",
