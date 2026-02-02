@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { retryWithBackoff } from './perplexity.js'
+import { retryWithBackoff } from './diagnostic_perplexity.js'
 
 const KIE_API_URL = 'https://api.kie.ai/api/v1'
 
@@ -126,11 +126,8 @@ export async function createSoraTask(
 
     console.log('[KIE Sora] Creating task with payload:', {
         prompt: prompt.substring(0, 100) + '...',
-        promptLength: prompt.length,
         aspect_ratio: aspectRatio,
         n_frames: payload.input.n_frames,
-        model: payload.model,
-        remove_watermark: payload.input.remove_watermark,
     })
 
     try {
@@ -160,13 +157,6 @@ export async function createSoraTask(
         return response.data
     } catch (error: any) {
         console.error('[KIE Sora] Failed to create task:', error)
-        console.error('[KIE Sora] Full error details:', {
-            status: error.response?.status,
-            statusText: error.response?.statusText,
-            data: error.response?.data,
-            message: error.message,
-            code: error.code,
-        })
 
         let errorMessage = 'Failed to create Sora video generation task'
 

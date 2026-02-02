@@ -29,6 +29,27 @@ function mapSoraStatusToVideoStatus(soraStatus: string): Video['status'] {
 }
 
 /**
+ * Sanitize prompt to remove potentially problematic content
+ * that might trigger content moderation or cause API errors
+ */
+function sanitizePrompt(prompt: string): string {
+    return prompt
+        // Remove URLs
+        .replace(/https?:\/\/[^\s]+/g, '')
+        // Remove email addresses
+        .replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '')
+        // Remove excessive punctuation
+        .replace(/[!?]{3,}/g, '!')
+        // Remove special characters that might cause issues
+        .replace(/[<>{}[\]]/g, '')
+        // Collapse multiple spaces
+        .replace(/\s+/g, ' ')
+        // Trim
+        .trim()
+}
+
+
+/**
  * Update video record with Sora task success
  * KIE API returns results in resultJson as a JSON string: {"resultUrls": ["url1", "url2"]}
  */
@@ -128,12 +149,20 @@ export async function generateVideoWithSora(
             prompt = `Style: ${video.style}. Topic: ${video.topic}. Script: ${cleanScript}`
         }
 
+        // Sanitize prompt to remove potentially problematic content
+        prompt = sanitizePrompt(prompt)
+
         // Limit prompt length (Sora has limits and long prompts can cause failures)
         const maxPromptLength = 1000 // Safer limit for Sora 2
         if (prompt.length > maxPromptLength) {
             prompt = prompt.substring(0, maxPromptLength)
             console.log('[Sora Service] Prompt truncated to max length:', maxPromptLength)
         }
+
+        console.log('[Sora Service] Final sanitized prompt:', {
+            length: prompt.length,
+            preview: prompt.substring(0, 200),
+        })
 
         // Map aspect ratio
         const soraAspectRatio = mapAspectRatioToSora(options.aspectRatio)
