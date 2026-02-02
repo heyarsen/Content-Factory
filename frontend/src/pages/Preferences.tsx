@@ -44,6 +44,9 @@ export function Preferences() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([])
+  const [detectedTimezone, setDetectedTimezone] = useState(
+    normalizeTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone) || 'UTC',
+  )
   const [preferences, setPreferences] = useState<Preferences>({
     user_id: '',
     timezone: normalizeTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone) || 'UTC',
@@ -69,26 +72,52 @@ export function Preferences() {
     loadSocialAccounts()
   }, [])
 
+  const resolveDetectedTimezone = async () => {
+    const browserTimezone = normalizeTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone) || 'UTC'
+    try {
+      const response = await fetch('https://ipapi.co/json/')
+      if (!response.ok) return browserTimezone
+      const data = await response.json()
+      const ipTimezone = normalizeTimezone(typeof data?.timezone === 'string' ? data.timezone : null)
+      return ipTimezone || browserTimezone
+    } catch (error) {
+      console.warn('Failed to resolve timezone from IP:', error)
+      return browserTimezone
+    }
+  }
+
   const loadPreferences = async () => {
     try {
       const response = await api.get('/api/preferences')
-      if (response.data.preferences) {
-        // Auto-detect timezone if not set
-        const detectedTimezone = normalizeTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone) || 'UTC'
+      const resolvedTimezone = await resolveDetectedTimezone()
+      setDetectedTimezone(resolvedTimezone)
+
+      const storedPreferences = response.data.preferences
+      const normalizedStoredTimezone = normalizeTimezone(storedPreferences?.timezone)
+      const shouldApplyDetectedTimezone = !storedPreferences?.timezone || normalizedStoredTimezone === 'UTC'
+      const timezoneToApply = shouldApplyDetectedTimezone ? resolvedTimezone : normalizedStoredTimezone
+
+      if (storedPreferences) {
         setPreferences({
-          ...response.data.preferences,
-          timezone: normalizeTimezone(response.data.preferences.timezone) || detectedTimezone,
+          ...storedPreferences,
+          timezone: timezoneToApply,
         })
       } else {
-        // No preferences exist, use detected timezone
-        const detectedTimezone = normalizeTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone) || 'UTC'
-        setPreferences(prev => ({ ...prev, timezone: detectedTimezone }))
+        setPreferences(prev => ({ ...prev, timezone: timezoneToApply }))
+      }
+
+      if (shouldApplyDetectedTimezone && timezoneToApply && normalizedStoredTimezone !== timezoneToApply) {
+        try {
+          await api.put('/api/preferences', { timezone: timezoneToApply })
+        } catch (error) {
+          console.warn('Failed to persist detected timezone:', error)
+        }
       }
     } catch (error) {
       console.error('Failed to load preferences:', error)
-      // Use detected timezone as fallback
-      const detectedTimezone = normalizeTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone) || 'UTC'
-      setPreferences(prev => ({ ...prev, timezone: detectedTimezone }))
+      const resolvedTimezone = await resolveDetectedTimezone()
+      setDetectedTimezone(resolvedTimezone)
+      setPreferences(prev => ({ ...prev, timezone: resolvedTimezone }))
     } finally {
       setLoading(false)
     }
@@ -238,7 +267,7 @@ export function Preferences() {
             <p className="text-xs text-slate-500">
               {t('preferences.timezone_desc')}
               <br />
-              {t('preferences.detected_timezone')} <strong>{Intl.DateTimeFormat().resolvedOptions().timeZone}</strong>
+              {t('preferences.detected_timezone')} <strong>{detectedTimezone}</strong>
             </p>
           </div>
         </Card>

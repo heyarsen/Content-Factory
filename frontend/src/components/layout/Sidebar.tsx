@@ -23,7 +23,7 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { user } = useAuth()
-  const { credits, subscription, unlimited } = useCredits()
+  const { credits, subscription, unlimited, loading: creditsLoading } = useCredits()
   const { t } = useLanguage()
 
   const location = useLocation()
@@ -158,10 +158,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-medium text-slate-600">
-                      {subscription?.plan_name || t('sidebar.free_plan')}
+                      {creditsLoading ? t('loading.loading') : (subscription?.plan_name || t('sidebar.free_plan'))}
                     </p>
                     <p className="text-base font-bold text-primary leading-tight">
-                      {unlimited ? t('sidebar.unlimited') : `${credits ?? 0}`}
+                      {creditsLoading ? '—' : (unlimited ? t('sidebar.unlimited') : `${credits ?? 0}`)}
                       {!unlimited && (
                         <span className="ml-1 text-[10px] font-medium text-slate-500 uppercase tracking-wide">
                           {t('sidebar.credits')}
@@ -170,7 +170,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     </p>
                   </div>
                 </div>
-                {!unlimited && subscription?.credits_included && (
+                {!creditsLoading && !unlimited && subscription?.credits_included && (
                   <div className="flex-shrink-0 text-right">
                     <p className="text-[10px] text-slate-400">/ {subscription.credits_included}</p>
                   </div>
@@ -178,7 +178,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               </div>
 
               {/* Minimal Progress Bar */}
-              {!unlimited && subscription?.credits_included && (
+              {!creditsLoading && !unlimited && subscription?.credits_included && (
                 <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
                   <div
                     className="h-full bg-brand-500 transition-all duration-500"
@@ -188,7 +188,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               )}
 
               {/* Compact Action Button */}
-              {!unlimited && (
+              {!creditsLoading && !unlimited && (
                 <div className="mt-2">
                   {!subscription || subscription.status !== 'active' ? (
                     <button className="w-full rounded-md bg-amber-600 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700 shadow-md">

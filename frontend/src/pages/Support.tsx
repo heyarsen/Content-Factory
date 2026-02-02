@@ -208,14 +208,20 @@ export function Support() {
 
     return (
         <Layout>
-            <div className="flex h-[calc(100vh-140px)] sm:h-[calc(100vh-160px)] gap-6 overflow-hidden relative">
+            <div className="flex min-h-[calc(100vh-140px)] flex-col gap-6 overflow-hidden relative lg:h-[calc(100vh-160px)] lg:flex-row">
                 {/* Sidebar - Ticket List */}
                 <div className={`${view === 'chat' || showCreate ? 'hidden' : 'flex'} w-full lg:flex lg:w-1/3 flex-col gap-4 overflow-hidden`}>
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <h2 className="text-xl font-semibold text-primary">{t('support.title')}</h2>
-                        <div className="flex gap-2">
-                            <Button variant="ghost" size="sm" onClick={markAllSupportAsRead}>{t('support.mark_all_read')}</Button>
-                            <Button size="sm" onClick={() => { setShowCreate(true); setSelectedTicket(null); setView('chat') }}>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                            <Button variant="ghost" size="sm" className="w-full sm:w-auto" onClick={markAllSupportAsRead}>
+                                {t('support.mark_all_read')}
+                            </Button>
+                            <Button
+                                size="sm"
+                                className="w-full sm:w-auto"
+                                onClick={() => { setShowCreate(true); setSelectedTicket(null); setView('chat') }}
+                            >
                                 <Plus className="mr-2 h-4 w-4" />
                                 {t('support.new_ticket')}
                             </Button>
@@ -259,8 +265,8 @@ export function Support() {
                 {/* Main Content - Chat or Create */}
                 <div className="flex flex-1 flex-col overflow-hidden">
                     {(showCreate || selectedTicket) && (
-                        <div className="mb-4 flex items-center gap-2 lg:hidden">
-                            <Button variant="ghost" size="sm" onClick={handleBackToList}>
+                        <div className="mb-4 flex flex-wrap items-center gap-2 lg:hidden">
+                            <Button variant="ghost" size="sm" className="shrink-0" onClick={handleBackToList}>
                                 {t('common.back')}
                             </Button>
                             <span className="text-sm font-semibold text-slate-700">
@@ -326,14 +332,20 @@ export function Support() {
 
                             {/* Input */}
                             <div className="border-t border-slate-100 p-4">
-                                <form onSubmit={handleSendReply} className="flex gap-2">
+                                <form onSubmit={handleSendReply} className="flex flex-col gap-2 sm:flex-row">
                                     <Input
                                         placeholder={t('support.reply_placeholder')}
                                         value={reply}
                                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => setReply(e.target.value)}
                                         disabled={selectedTicket.ticket.status === 'resolved' || selectedTicket.ticket.status === 'closed'}
                                     />
-                                    <Button type="submit" size="sm" disabled={!reply || selectedTicket.ticket.status === 'resolved' || selectedTicket.ticket.status === 'closed'} loading={sending}>
+                                    <Button
+                                        type="submit"
+                                        size="sm"
+                                        className="w-full sm:w-auto"
+                                        disabled={!reply || selectedTicket.ticket.status === 'resolved' || selectedTicket.ticket.status === 'closed'}
+                                        loading={sending}
+                                    >
                                         <Send className="h-4 w-4" />
                                     </Button>
                                 </form>

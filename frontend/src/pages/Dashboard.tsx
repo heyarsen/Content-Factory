@@ -63,6 +63,12 @@ export function Dashboard() {
   const [planHealth, setPlanHealth] = useState<PlanHealth | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const formatStatus = (status?: string) => {
+    if (!status) return t('dashboard.status_unknown') || 'Unknown'
+    const cleaned = status.replace(/^COMMON\./i, '').replace(/_/g, ' ').toLowerCase()
+    return cleaned.replace(/\b\w/g, (char) => char.toUpperCase())
+  }
+
   useEffect(() => {
     loadStats()
 
@@ -226,10 +232,20 @@ export function Dashboard() {
           <Card className="relative overflow-hidden">
             <div className="absolute inset-x-8 top-0 h-32 rounded-3xl bg-gradient-to-r from-brand-100/70 via-brand-50/50 to-transparent blur-3xl" />
             <div className="relative z-10">
-              <h2 className="text-lg font-semibold text-primary">{t('dashboard.quick_actions')}</h2>
-              <p className="mt-2 text-sm text-slate-500">
-                {t('dashboard.quick_actions_desc')}
-              </p>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-primary">{t('dashboard.quick_actions')}</h2>
+                  <p className="mt-2 text-sm text-slate-500">
+                    {t('dashboard.quick_actions_desc')}
+                  </p>
+                </div>
+                <Link to="/planning" className="inline-flex">
+                  <Button size="sm" variant="secondary" className="whitespace-nowrap">
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {t('dashboard.create_plan')}
+                  </Button>
+                </Link>
+              </div>
 
               <div className="mt-6 grid gap-4">
                 <Link
@@ -291,7 +307,7 @@ export function Dashboard() {
                 <Badge variant="default">{t('dashboard.live_feed')}</Badge>
               </div>
               <div className="mt-5 space-y-4 text-sm text-slate-500">
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <div className="rounded-2xl border border-slate-200 bg-white/80 p-4">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">{t('dashboard.next_scheduled')}</p>
                     {nextScheduled ? (
@@ -316,6 +332,13 @@ export function Dashboard() {
                       </p>
                     </div>
                   </div>
+                  <div className="rounded-2xl border border-slate-200 bg-white/80 p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">{t('dashboard.posted_videos')}</p>
+                    <div className="mt-2 space-y-1">
+                      <p className="text-2xl font-semibold text-slate-900">{postStats?.posted ?? 0}</p>
+                      <p className="text-xs text-slate-500">{t('dashboard.posted_videos_desc')}</p>
+                    </div>
+                  </div>
                 </div>
 
                 {activity.length > 0 ? (
@@ -323,14 +346,16 @@ export function Dashboard() {
                     {activity.map((item) => (
                       <div key={item.id} className="flex items-start justify-between gap-3 rounded-2xl border border-white/70 bg-white/70 px-4 py-3">
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-slate-900 line-clamp-1">{item.title}</p>
+                          <p className="text-sm font-medium text-slate-900 line-clamp-1">
+                            {item.title || (item.type === 'video' ? t('dashboard.activity_video') : t('dashboard.activity_post'))}
+                          </p>
                           <p className="mt-1 text-xs text-slate-500">
                             {item.type === 'video' ? t('dashboard.activity_video') : t('dashboard.activity_post')}
                             {item.platform ? ` · ${item.platform}` : ''}
                           </p>
                         </div>
                         <div className="text-right text-xs text-slate-400 whitespace-nowrap">
-                          <p className="capitalize">{item.status}</p>
+                          <p>{formatStatus(item.status)}</p>
                           <p>{new Date(item.timestamp).toLocaleString()}</p>
                         </div>
                       </div>
