@@ -68,7 +68,7 @@ interface VideoPlanItem {
   script_status?: 'draft' | 'approved' | 'rejected' | null
   platforms?: string[] | null
   caption?: string | null
-  // avatar_id removed - using Sora for video generation
+  // avatar_id removed - using AI video generation
   status:
   | 'pending'
   | 'researching'
@@ -167,7 +167,7 @@ export function VideoPlanning() {
   )
   const [videoTimes, setVideoTimes] = useState<string[]>(['09:00']) // Initial video slot
   const [videoTopics, setVideoTopics] = useState<string[]>(['']) // Topics for each video slot
-  // Avatar-related state removed - using Sora for video generation
+  // Avatar-related state removed - using AI video generation
   const [deleteModal, setDeleteModal] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [editPlanModal, setEditPlanModal] = useState<VideoPlan | null>(null)
@@ -195,7 +195,7 @@ export function VideoPlanning() {
     }
   }, [statusFilter])
 
-  // Avatar-related functions removed - using Sora for video generation
+  // Avatar-related functions removed - using AI video generation
 
 
   const [creating, setCreating] = useState(false)
@@ -238,7 +238,7 @@ export function VideoPlanning() {
     localStorage.setItem('videoPlanning.statusFilter', statusFilter)
   }, [statusFilter])
 
-  // Avatar-related useEffect removed - using Sora for video generation
+  // Avatar-related useEffect removed - using AI video generation
 
   useEffect(() => {
     if (selectedPlan) {
@@ -526,7 +526,7 @@ export function VideoPlanning() {
           return cleanTime.length === 5 ? cleanTime : time
         }), // Send custom times in HH:MM format
         video_topics: videoTopics.filter((t: string) => t.trim() !== ''), // Send only non-empty topics
-        // Avatars removed - using Sora for video generation
+        // Avatars removed - using AI video generation
       })
 
       console.log(`[VideoPlanning] Plan creation response:`, {
@@ -578,7 +578,7 @@ export function VideoPlanning() {
       setPlanName('')
       setStartDate(new Date().toISOString().split('T')[0])
       setEndDate('')
-      // Avatar state reset removed - using Sora for video generation
+      // Avatar state reset removed - using AI video generation
       setTriggerTime('08:00')
       setDefaultPlatforms([])
       setVideoTimes(['09:00'])
@@ -2787,7 +2787,7 @@ export function VideoPlanning() {
                   </div>
                 )}
 
-                {/* Avatar display removed - using Sora for video generation */}
+                {/* Avatar display removed - using AI video generation */}
 
                 {/* Description */}
                 {selectedItem.description && (
@@ -3036,7 +3036,7 @@ export function VideoPlanning() {
           })()}
         </Modal>
 
-        {/* Avatar and Look Selection Modals removed - using Sora for video generation */}
+        {/* Avatar and Look Selection Modals removed - using AI video generation */}
       </div >
     </Layout >
   )

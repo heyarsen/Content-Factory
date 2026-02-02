@@ -58,7 +58,7 @@ export function GenerateVideo() {
         script: script || undefined,
         style,
         duration,
-        provider: 'sora', // Always use Sora via KIE
+        provider: 'sora',
       })
 
       // Show success immediately
@@ -66,7 +66,7 @@ export function GenerateVideo() {
       addNotification({
         type: 'info',
         title: 'Video Generation Started!',
-        message: `"${topic}" is now being generated with Sora. This typically takes 1-3 minutes. You'll be notified when it's ready!`,
+        message: `"${topic}" is now being generated. This typically takes 1-3 minutes. You'll be notified when it's ready!`,
       })
 
       // Navigate after showing success message
@@ -219,4 +219,3 @@ export function GenerateVideo() {
     </Layout>
   )
 }
-

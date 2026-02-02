@@ -49,7 +49,7 @@ const fetchUserRoleAndSubscription = async (userId: string, userEmail: string, f
 
     try {
       const dbFetchPromise = Promise.all([
-        supabase.from('user_profiles').select('role, has_active_subscription').eq('id', userId).maybeSingle(),
+        supabase.from('user_profiles').select('role, has_active_subscription, subscription_status').eq('id', userId).maybeSingle(),
         supabase.from('user_subscriptions').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle()
       ])
 
@@ -62,13 +62,21 @@ const fetchUserRoleAndSubscription = async (userId: string, userEmail: string, f
       let hasActive = false
       let reason = 'NONE'
 
+      const profileHasActive = profileData?.has_active_subscription === true
+      const profileStatus = profileData?.subscription_status
+      const profileStatusActive = ['active', 'trialing'].includes(profileStatus)
+
       if (isAdmin) {
         hasActive = true; reason = 'Admin'
+      } else if (profileHasActive || profileStatusActive) {
+        hasActive = true
+        reason = profileHasActive ? 'Profile Flag' : `Profile Status: ${profileStatus}`
       } else if (latestSub) {
-        const active = ['active', 'pending'].includes(latestSub.status)
+        const active = ['active', 'trialing', 'pending'].includes(latestSub.status)
+        const paymentActive = latestSub.payment_status === 'completed'
         const expired = latestSub.expires_at && new Date(latestSub.expires_at).getTime() < Date.now()
-        hasActive = active && !expired
-        reason = `Sub: ${latestSub.status}${expired ? ' (EXP)' : ''}`
+        hasActive = (active || paymentActive) && !expired
+        reason = `Sub: ${latestSub.status}${latestSub.payment_status ? `/${latestSub.payment_status}` : ''}${expired ? ' (EXP)' : ''}`
       } else {
         // No sub record found and not admin
         hasActive = false
