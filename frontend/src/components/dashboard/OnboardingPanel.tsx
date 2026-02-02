@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Calendar, CheckCircle2, Lock, Sparkles, Video, Wand2 } from 'lucide-react'
+import { Calendar, CheckCircle2, Lock, Sparkles, Video, Wand2, type LucideIcon } from 'lucide-react'
 import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
 import { Modal } from '../ui/Modal'
