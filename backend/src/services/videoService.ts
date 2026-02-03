@@ -20,7 +20,11 @@ const DEFAULT_REEL_DURATION = 60
 type VideoStyle = Video['style']
 
 const ALLOWED_VIDEO_STYLES = [
+  'Casual',
   'Cinematic',
+  'Educational',
+  'Energetic',
+  'Professional',
   'Realistic',
   'Anime',
   '3D Render',
@@ -44,7 +48,16 @@ function normalizeVideoStyle(style?: string | null): VideoStyle {
 
   // Common aliases / legacy values
   if (lower === 'professional') {
-    return 'Realistic' as VideoStyle
+    return 'Professional' as VideoStyle
+  }
+  if (lower === 'casual') {
+    return 'Casual' as VideoStyle
+  }
+  if (lower === 'energetic') {
+    return 'Energetic' as VideoStyle
+  }
+  if (lower === 'educational') {
+    return 'Educational' as VideoStyle
   }
   if (lower === '3d' || lower === '3d_render' || lower === '3drender') {
     return '3D Render' as VideoStyle
