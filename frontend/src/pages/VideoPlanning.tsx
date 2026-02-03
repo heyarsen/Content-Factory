@@ -922,6 +922,11 @@ export function VideoPlanning() {
     )
   }, [filteredPosts])
 
+  const connectedAccounts = useMemo(
+    () => socialAccounts.filter((acc) => acc.status === 'connected'),
+    [socialAccounts],
+  )
+
   // Combine plan items and scheduled posts by date
   type CalendarItem = VideoPlanItem | (ScheduledPost & { _isScheduledPost: true; scheduled_date: string; topic: string })
   const itemsByDate = useMemo(() => {
@@ -1052,11 +1057,28 @@ export function VideoPlanning() {
       : []
     const hasPendingPosts = itemScheduledPosts.some((p: ScheduledPost) => p.status === 'pending' || p.status === 'scheduled')
     const allPostsPublished = itemScheduledPosts.length > 0 && itemScheduledPosts.every((p: ScheduledPost) => p.status === 'posted')
+    const scheduledDateTime = item?.scheduled_date && item?.scheduled_time
+      ? new Date(`${item.scheduled_date}T${item.scheduled_time}`)
+      : null
+    const isBeforePostTime = scheduledDateTime ? scheduledDateTime > new Date() : false
 
     // Determine the most descriptive label based on status and script_status
     let label = ''
     let variant: 'default' | 'success' | 'error' | 'warning' | 'info' = 'default'
     let showLoader = false
+
+    if (hasPendingPosts) {
+      return (
+        <Badge variant="info">
+          <Loader className="h-3 w-3 animate-spin" />
+          {t('video_planning.publishing')}
+        </Badge>
+      )
+    }
+
+    if (allPostsPublished) {
+      return <Badge variant="success">{t('video_planning.posted')}</Badge>
+    }
 
     switch (status) {
       case 'pending':
@@ -1087,53 +1109,25 @@ export function VideoPlanning() {
         showLoader = true;
         break;
       case 'completed':
-        label = t('video_planning.published');
-        variant = 'success';
+        label = isBeforePostTime ? t('video_planning.waiting_for_post_time') : t('video_planning.video_ready');
+        variant = isBeforePostTime ? 'info' : 'success';
         break;
       case 'failed':
         label = t('video_planning.error_occurred');
         variant = 'error';
         break;
       case 'scheduled':
-        label = t('video_planning.scheduled_to_post');
+        label = t('video_planning.waiting_for_post_time');
         variant = 'info';
         break;
       case 'posted':
-        label = t('video_planning.published');
+        label = t('video_planning.posted');
         variant = 'success';
         break;
       default:
         label = status;
         variant = 'default';
     }
-    if (hasPendingPosts) {
-      label = 'Publishing'
-      variant = 'info'
-      showLoader = true
-    } else if (allPostsPublished) {
-      // All posts are published, but status might not be updated yet
-      label = 'Published'
-      variant = 'success'
-    } else if (item?.scheduled_date && item?.scheduled_time) {
-      const now = new Date()
-      const scheduledDateTime = new Date(`${item.scheduled_date}T${item.scheduled_time}`)
-
-      if (scheduledDateTime > now) {
-        // Video is ready but waiting for post time
-        label = 'Waiting for Trigger Time'
-        variant = 'success'
-      } else {
-        // Post time has passed - likely publishing or about to publish
-        label = 'Publishing'
-        variant = 'info'
-        showLoader = true
-      }
-    } else {
-      // No scheduled time, video is ready
-      label = 'Video Ready'
-      variant = 'success'
-    }
-
 
     return (
       <Badge variant={variant}>
@@ -2347,10 +2341,35 @@ export function VideoPlanning() {
               <label className="block text-sm font-medium text-slate-700">
                 {t('video_planning.social_media_platforms')}
               </label>
-              <div className="flex flex-wrap gap-2">
-                {socialAccounts
-                  .filter((acc) => acc.status === 'connected')
-                  .map((acc) => (
+              {connectedAccounts.length === 0 ? (
+                <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  <p className="font-medium">{t('video_planning.no_social_accounts_title')}</p>
+                  <p className="text-xs text-amber-800">{t('video_planning.no_social_accounts_body')}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        setCreateModal(false)
+                        navigate('/social')
+                      }}
+                    >
+                      {t('video_planning.connect_social_media')}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleCreatePlan}
+                      loading={creating}
+                    >
+                      {t('video_planning.create_plan_anyway')}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {connectedAccounts.map((acc) => (
                     <button
                       key={acc.platform}
                       type="button"
@@ -2374,13 +2393,15 @@ export function VideoPlanning() {
                       )}
                     </button>
                   ))}
-              </div>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-end pt-2">
               <Button
                 onClick={handleCreatePlan}
                 loading={creating}
+                disabled={connectedAccounts.length === 0}
               >
                 {t('video_planning.create_plan')}
               </Button>
