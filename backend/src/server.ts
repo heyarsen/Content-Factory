@@ -37,7 +37,8 @@ const PORT = process.env.PORT || 3001
 // Trust proxy - required for Railway and other reverse proxies
 app.set('trust proxy', true)
 
-const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
+const corsOriginEnv = process.env.CORS_ORIGIN || process.env.FRONTEND_URL || ''
+const corsOrigins = corsOriginEnv
   .split(',')
   .map(origin => origin.trim())
   .filter(Boolean)
@@ -54,6 +55,10 @@ app.use(helmet({
 app.use(cors({
   origin(origin, callback) {
     if (!origin) {
+      return callback(null, true)
+    }
+
+    if (allowedOrigins.size === 0) {
       return callback(null, true)
     }
 
