@@ -21,8 +21,8 @@ export class AutomationService {
     const promptParts = [
       topic ? `Topic: ${topic}` : null,
       description ? `Description: ${description}` : null,
-      whyImportant ? `Why it matters: ${whyImportant}` : null,
-      usefulTips ? `Useful tips: ${usefulTips}` : null,
+      whyImportant ? `Why Important: ${whyImportant}` : null,
+      usefulTips ? `Useful Tips: ${usefulTips}` : null,
     ].filter(Boolean) as string[]
 
     return promptParts.join('\n')
