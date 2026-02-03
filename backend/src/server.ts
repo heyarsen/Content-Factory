@@ -47,6 +47,9 @@ const allowedOrigins = new Set(corsOrigins)
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
+  headers: {
+    'X-Frame-Options': null,
+  },
 }))
 app.use(cors({
   origin(origin, callback) {
