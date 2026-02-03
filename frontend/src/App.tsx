@@ -8,6 +8,7 @@ import { AuthHashHandler } from './components/auth/AuthHashHandler'
 import { LanguageProvider } from './contexts/LanguageContext'
 import { ToastContainer } from './components/ui/Toast'
 import { useToast } from './hooks/useToast'
+import { supabaseConfigError } from './lib/supabase'
 
 // Pages
 import { Login } from './pages/Login'
@@ -214,6 +215,27 @@ import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { CreditProvider } from './contexts/CreditContext'
 
 function App() {
+  if (supabaseConfigError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6 text-center">
+        <div className="w-full max-w-lg space-y-4 rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-100">
+            <span className="text-3xl">⚙️</span>
+          </div>
+          <h1 className="text-xl font-bold text-slate-900">Supabase configuration required</h1>
+          <p className="text-sm text-slate-500">
+            The app is missing the Supabase environment variables needed to start. Please set
+            <span className="font-semibold text-slate-700"> VITE_SUPABASE_URL</span> and
+            <span className="font-semibold text-slate-700"> VITE_SUPABASE_ANON_KEY</span> and reload.
+          </p>
+          <div className="rounded-lg bg-slate-100 p-3 text-left">
+            <p className="font-mono text-xs text-amber-700">{supabaseConfigError}</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <ErrorBoundary>
       <BrowserRouter>
@@ -234,4 +256,3 @@ function App() {
 }
 
 export default App
-
