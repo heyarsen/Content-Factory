@@ -73,6 +73,7 @@ WORKDIR /app
 
 # Copy only production files
 COPY --from=backend-builder /app/backend/package*.json ./
+COPY --from=backend-builder /app/backend/vendor/helmet ./vendor/helmet
 COPY --from=backend-builder /app/backend/dist ./dist
 COPY --from=backend-builder /app/backend/public ./public
 
@@ -96,4 +97,3 @@ EXPOSE 3001
 
 # Start the server
 CMD ["node", "dist/server.js"]
-
