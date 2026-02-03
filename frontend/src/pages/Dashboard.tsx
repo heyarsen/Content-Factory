@@ -12,7 +12,6 @@ import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useCreditsContext } from '../contexts/CreditContext'
 import { CreditBanner } from '../components/ui/CreditBanner'
-import { OnboardingPanel } from '../components/dashboard/OnboardingPanel'
 
 
 
@@ -126,8 +125,6 @@ export function Dashboard() {
     <Layout>
       <div className="space-y-10">
         <CreditBanner />
-        <OnboardingPanel />
-
         <section className="relative overflow-hidden rounded-[32px] border border-white/30 bg-gradient-to-br from-brand-600 via-brand-500 to-indigo-500 p-6 sm:p-8 text-white shadow-[0_60px_120px_-70px_rgba(79,70,229,0.9)]">
           <div className="absolute -left-16 top-1/2 h-56 w-56 -translate-y-1/2 rounded-full bg-white/10 blur-3xl" />
           <div className="absolute -right-16 top-8 h-44 w-44 rounded-full bg-cyan-400/30 blur-3xl" />
