@@ -4,6 +4,8 @@ import dotenv from 'dotenv'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { existsSync, readdirSync } from 'fs'
+import helmet from 'helmet'
+import { randomUUID } from 'crypto'
 import { errorHandler } from './middleware/errorHandler.js'
 import { apiLimiter } from './middleware/rateLimiter.js'
 import authRoutes from './routes/auth.js'
@@ -35,11 +37,40 @@ const PORT = process.env.PORT || 3001
 // Trust proxy - required for Railway and other reverse proxies
 app.set('trust proxy', true)
 
+const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean)
+const allowedOrigins = new Set(corsOrigins)
+
 // Middleware
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+}))
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin(origin, callback) {
+    if (!origin) {
+      return callback(null, true)
+    }
+
+    if (allowedOrigins.has(origin)) {
+      return callback(null, true)
+    }
+
+    const error = new Error('Not allowed by CORS')
+    ;(error as any).status = 403
+    return callback(error)
+  },
   credentials: true,
 }))
+app.use((req, res, next) => {
+  const incomingId = req.get('X-Request-Id')?.trim()
+  const requestId = incomingId || randomUUID()
+  res.setHeader('X-Request-Id', requestId)
+  res.locals.requestId = requestId
+  next()
+})
 // Increase JSON payload size limit to 50MB for large image uploads (base64 encoded images can be large)
 app.use(express.json({ limit: '50mb' }))
 app.use(express.urlencoded({ extended: true, limit: '50mb' }))

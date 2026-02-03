@@ -25,9 +25,12 @@ export function errorHandler(
   
   // Return error message if available, otherwise generic message
   const errorMessage = err.message || 'Internal server error'
-  
+
+  const requestId = res.locals.requestId
+
   res.status(status).json({
     error: errorMessage,
+    requestId,
     details: process.env.NODE_ENV === 'development' ? {
       stack: err.stack,
       name: err.name,
@@ -35,4 +38,3 @@ export function errorHandler(
     } : undefined,
   })
 }
-
