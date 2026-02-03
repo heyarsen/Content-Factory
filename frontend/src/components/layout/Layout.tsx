@@ -6,7 +6,6 @@ import { useCreditsContext } from '../../contexts/CreditContext'
 import { AlertCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useLanguage } from '../../contexts/LanguageContext'
-import { OnboardingPanel } from '../dashboard/OnboardingPanel'
 
 export function Layout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -45,7 +44,6 @@ export function Layout({ children }: { children: ReactNode }) {
 
         <main className="relative z-0 flex-1 px-4 pb-12 pt-8 sm:px-8 lg:px-14">
           <div className="mx-auto w-full max-w-6xl space-y-6 sm:space-y-8">
-            <OnboardingPanel />
             {children}
           </div>
         </main>

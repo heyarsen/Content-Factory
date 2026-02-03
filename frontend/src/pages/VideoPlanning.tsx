@@ -34,7 +34,6 @@ import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useCreditsContext } from '../contexts/CreditContext'
 import { CreditBanner } from '../components/ui/CreditBanner'
-import { getOnboardingActiveStep, isOnboardingActive } from '../lib/onboarding'
 
 const STATUS_FILTER_KEY = 'video_planning_status_filter'
 
@@ -178,10 +177,6 @@ export function VideoPlanning() {
   const [selectedItem, setSelectedItem] = useState<VideoPlanItem | null>(null)
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([])
   const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false)
-  const [onboardingStep, setOnboardingStep] = useState<string | null>(null)
-  const [onboardingActive, setOnboardingActive] = useState(false)
-
-
   // Preset times for quick selection
   const timePresets = [
     { label: t('video_planning.morning_preset'), value: '09:00' },
@@ -189,10 +184,6 @@ export function VideoPlanning() {
     { label: t('video_planning.afternoon_preset'), value: '15:00' },
     { label: t('video_planning.evening_preset'), value: '18:00' },
   ]
-
-
-
-
   // Persist compact status filter choice
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -204,32 +195,6 @@ export function VideoPlanning() {
 
 
   const [creating, setCreating] = useState(false)
-  const samplePlan = useMemo(() => {
-    const today = new Date()
-    const endDate = new Date()
-    endDate.setDate(today.getDate() + 14)
-    const formatDate = (date: Date) => date.toISOString().split('T')[0]
-
-    return {
-      name: 'Lumen Fitness Launch Plan',
-      startDate: formatDate(today),
-      endDate: formatDate(endDate),
-      videosPerDay: 3,
-      videoTimes: ['09:00', '13:00', '18:00'],
-      videoTopics: [
-        'Morning motivation: 3 tips to stay consistent',
-        'Behind the scenes: trainer spotlight + program intro',
-        'Community shout-out + call-to-action for the free trial',
-      ],
-      triggerTime: '08:00',
-      platforms: ['instagram', 'tiktok'],
-    }
-  }, [])
-  const tourPlanStepIds = useMemo(
-    () => new Set(['plan-name', 'plan-dates', 'plan-videos-per-day', 'plan-video-slot', 'plan-trigger-time']),
-    [],
-  )
-
   const loadSocialAccounts = async () => {
     try {
       const response = await api.get('/api/social/accounts')
@@ -251,43 +216,6 @@ export function VideoPlanning() {
     loadUserPreferences()
     loadSocialAccounts()
   }, [])
-
-  useEffect(() => {
-    const updateOnboarding = () => {
-      setOnboardingStep(getOnboardingActiveStep())
-      setOnboardingActive(isOnboardingActive())
-    }
-
-    updateOnboarding()
-    const handleStep = (event: Event) => {
-      const detail = (event as CustomEvent).detail as { stepId?: string } | undefined
-      if (detail?.stepId) {
-        setOnboardingStep(detail.stepId)
-      }
-      setOnboardingActive(isOnboardingActive())
-    }
-
-    window.addEventListener('onboarding:step', handleStep)
-    return () => window.removeEventListener('onboarding:step', handleStep)
-  }, [])
-
-  useEffect(() => {
-    if (!onboardingActive || !onboardingStep) {
-      return
-    }
-
-    if (tourPlanStepIds.has(onboardingStep)) {
-      setCreateModal(true)
-      setPlanName((prev) => prev || samplePlan.name)
-      setStartDate(samplePlan.startDate)
-      setEndDate(samplePlan.endDate)
-      setVideosPerDay(samplePlan.videosPerDay)
-      setVideoTimes(samplePlan.videoTimes)
-      setVideoTopics(samplePlan.videoTopics)
-      setTriggerTime(samplePlan.triggerTime)
-      setDefaultPlatforms((prev) => (prev.length ? prev : samplePlan.platforms))
-    }
-  }, [onboardingActive, onboardingStep, samplePlan, tourPlanStepIds])
 
   const loadUserPreferences = async () => {
     try {
@@ -1235,8 +1163,6 @@ export function VideoPlanning() {
     )
   }
 
-  const showSamplePlan = onboardingActive
-
   return (
     <Layout>
       <div className="space-y-8">
@@ -1258,28 +1184,10 @@ export function VideoPlanning() {
             leftIcon={<Plus className="h-4 w-4" />}
             className="w-full md:w-auto"
             disabled={showUpgrade}
-            data-tour-id="create-plan"
           >
             {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : t('video_planning.new_plan')}
           </Button>
         </div>
-
-        {showSamplePlan && (
-          <Card className="border-dashed border-brand-200 bg-brand-50/40" data-tour-id="sample-plan">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-500">Sample project plan</p>
-                <h2 className="text-xl font-semibold text-slate-900">{samplePlan.name}</h2>
-                <p className="text-sm text-slate-600">
-                  {samplePlan.videosPerDay} videos per day · {samplePlan.startDate} → {samplePlan.endDate}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-white/60 bg-white/80 px-4 py-3 text-xs text-slate-600">
-                Trigger time: {samplePlan.triggerTime} · Topics ready
-              </div>
-            </div>
-          </Card>
-        )}
 
         {/* Content Variety Metrics */}
         {varietyMetrics && (
@@ -2084,7 +1992,6 @@ export function VideoPlanning() {
               <Button
                 onClick={() => setCreateModal(true)}
                 leftIcon={<Plus className="h-4 w-4" />}
-                data-tour-id="create-plan"
               >
                 {t('video_planning.create_plan')}
               </Button>
@@ -2316,7 +2223,7 @@ export function VideoPlanning() {
           </div>
 
           <div className="space-y-4">
-            <div data-tour-id="plan-name">
+            <div>
               <Input
                 label="Plan Name"
                 placeholder="e.g., Daily Trading Content"
@@ -2326,7 +2233,7 @@ export function VideoPlanning() {
               />
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2" data-tour-id="plan-dates">
+            <div className="grid gap-4 md:grid-cols-2">
               <Input
                 label={t('video_planning.start_date')}
                 type="date"
@@ -2344,7 +2251,7 @@ export function VideoPlanning() {
               />
             </div>
 
-            <div data-tour-id="plan-videos-per-day">
+            <div>
               <Select
                 label={t('video_planning.videos_per_day')}
                 value={String(videosPerDay)}
@@ -2365,7 +2272,6 @@ export function VideoPlanning() {
                   <div
                     key={index}
                     className="relative space-y-2 rounded-lg border border-slate-200 bg-white p-3 shadow-sm"
-                    data-tour-id={index === 0 ? 'plan-video-slot-0' : undefined}
                   >
                     {videoTimes.length > 1 && (
                       <button
@@ -2416,7 +2322,7 @@ export function VideoPlanning() {
               options={timezones}
             />
 
-            <div className="space-y-3 border-2 border-brand-300 bg-brand-50 rounded-lg p-4" data-tour-id="plan-trigger-time">
+            <div className="space-y-3 border-2 border-brand-300 bg-brand-50 rounded-lg p-4">
               <label className="block text-sm font-medium text-slate-700">
                 Trigger Time
               </label>

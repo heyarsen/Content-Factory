@@ -13,7 +13,11 @@ function normalizeVideoStyleForDb(style: any): string {
   if (!raw) return 'Cinematic'
 
   const allowed = [
+    'Casual',
     'Cinematic',
+    'Educational',
+    'Energetic',
+    'Professional',
     'Realistic',
     'Anime',
     '3D Render',
@@ -25,7 +29,10 @@ function normalizeVideoStyleForDb(style: any): string {
   if (allowed.includes(raw)) return raw
 
   const lower = raw.toLowerCase()
-  if (lower === 'professional') return 'Realistic'
+  if (lower === 'professional') return 'Professional'
+  if (lower === 'casual') return 'Casual'
+  if (lower === 'energetic') return 'Energetic'
+  if (lower === 'educational') return 'Educational'
   if (lower === '3d' || lower === '3d_render' || lower === '3drender') return '3D Render'
 
   const ci = allowed.find(s => s.toLowerCase() === lower)

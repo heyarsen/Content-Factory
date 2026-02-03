@@ -14,7 +14,6 @@ import { useAuth } from '../contexts/AuthContext'
 import { useCreditsContext } from '../contexts/CreditContext'
 import { CreditBanner } from '../components/ui/CreditBanner'
 import { useToast } from '../hooks/useToast'
-import { isOnboardingActive } from '../lib/onboarding'
 
 interface SocialAccount {
   id: string
@@ -48,7 +47,6 @@ export function SocialAccounts() {
   const [accounts, setAccounts] = useState<SocialAccount[]>([])
   const [loading, setLoading] = useState(true)
   const [connectingPlatform, setConnectingPlatform] = useState<SocialAccount['platform'] | null>(null)
-  const [onboardingActive, setOnboardingActive] = useState(false)
 
   const platformNames: Record<string, string> = {
     instagram: t('platforms.instagram') !== 'platforms.instagram' ? t('platforms.instagram') : 'Instagram',
@@ -78,20 +76,6 @@ export function SocialAccounts() {
   useEffect(() => {
     loadAccounts()
   }, [loadAccounts])
-
-  useEffect(() => {
-    const updateOnboarding = () => {
-      setOnboardingActive(isOnboardingActive())
-    }
-
-    updateOnboarding()
-    const handleStep = () => {
-      setOnboardingActive(isOnboardingActive())
-    }
-
-    window.addEventListener('onboarding:step', handleStep)
-    return () => window.removeEventListener('onboarding:step', handleStep)
-  }, [])
 
   // Refresh subscription status when component mounts
   useEffect(() => {
@@ -251,8 +235,6 @@ export function SocialAccounts() {
     .filter((a: SocialAccount) => a.status === 'connected')
     .map((a: SocialAccount) => a.platform)
   const availablePlatforms = allPlatforms.filter((p) => !connectedPlatforms.includes(p))
-  const sampleConnectedDate = new Date(Date.now() - 86400000)
-  const showSampleProject = onboardingActive
 
   if (loading) {
     return (
@@ -281,40 +263,6 @@ export function SocialAccounts() {
         </div>
 
         <CreditBanner />
-
-        {showSampleProject && (
-          <Card className="border-dashed border-brand-200 bg-brand-50/40" data-tour-id="social-sample">
-            <div className="flex flex-col gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-500">Sample project</p>
-                <h2 className="text-lg font-semibold text-slate-900">Lumen Fitness Launch</h2>
-                <p className="text-sm text-slate-600">
-                  Two channels are already connected so you can visualize the finished setup.
-                </p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {(['instagram', 'tiktok'] as const).map((platform) => {
-                  const Icon = platformIcons[platform]
-                  return (
-                    <div
-                      key={platform}
-                      className="flex items-center gap-3 rounded-2xl border border-white/70 bg-white/80 px-4 py-3"
-                    >
-                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
-                        <Icon className="h-5 w-5" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold text-slate-800">{platformNames[platform]}</p>
-                        <p className="text-xs text-slate-500">Connected · {sampleConnectedDate.toLocaleDateString()}</p>
-                      </div>
-                      <Badge variant="success">Connected</Badge>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </Card>
-        )}
 
         {accounts.length === 0 && availablePlatforms.length === 0 ? (
           <EmptyState
@@ -406,7 +354,6 @@ export function SocialAccounts() {
                         loading={connectingPlatform === platform}
                         disabled={!hasSubscription}
                         className="w-full"
-                        data-tour-id={platform === 'instagram' ? 'social-connect' : undefined}
                       >
                         <Link2 className="mr-2 h-4 w-4" />
                         {t('social_accounts.connect')}

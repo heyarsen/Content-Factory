@@ -11,7 +11,6 @@ import api from '../lib/api'
 import { DEFAULT_VERTICAL_ASPECT_RATIO, DEFAULT_VERTICAL_DIMENSION } from '../lib/videos'
 import { useNotifications } from '../contexts/NotificationContext'
 import { useLanguage } from '../contexts/LanguageContext'
-import { getOnboardingActiveStep, isOnboardingActive } from '../lib/onboarding'
 
 interface SocialAccount {
   id: string
@@ -47,46 +46,10 @@ export function QuickCreate() {
   const [generatingVideo, setGeneratingVideo] = useState(false)
   const [formError, setFormError] = useState('')
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([])
-  const [onboardingStep, setOnboardingStep] = useState<string | null>(null)
-  const [onboardingActive, setOnboardingActive] = useState(false)
 
   useEffect(() => {
     loadSocialAccounts()
   }, [])
-
-  useEffect(() => {
-    const updateOnboarding = () => {
-      setOnboardingStep(getOnboardingActiveStep())
-      setOnboardingActive(isOnboardingActive())
-    }
-
-    updateOnboarding()
-    const handleStep = (event: Event) => {
-      const detail = (event as CustomEvent).detail as { stepId?: string } | undefined
-      if (detail?.stepId) {
-        setOnboardingStep(detail.stepId)
-      }
-      setOnboardingActive(isOnboardingActive())
-    }
-
-    window.addEventListener('onboarding:step', handleStep)
-    return () => window.removeEventListener('onboarding:step', handleStep)
-  }, [])
-
-  useEffect(() => {
-    if (!onboardingActive) {
-      return
-    }
-
-    if (onboardingStep && onboardingStep.startsWith('manual')) {
-      setTopic((prev) => prev || 'Launch a 30-second teaser for the Lumen Fitness app')
-      setDescription((prev) =>
-        prev ||
-        'Mention the 3 biggest benefits (energy, consistency, community) and end with a free-trial CTA.',
-      )
-      setStyle((prev) => prev || 'Cinematic')
-    }
-  }, [onboardingActive, onboardingStep])
 
   const loadSocialAccounts = async () => {
     try {
@@ -186,7 +149,7 @@ export function QuickCreate() {
           )}
 
           <div className="space-y-6">
-            <div data-tour-id="manual-topic">
+            <div>
               <Input
                 label={t('quick_create.topic_label')}
                 placeholder={t('quick_create.topic_placeholder')}
@@ -196,7 +159,7 @@ export function QuickCreate() {
               />
             </div>
 
-            <div data-tour-id="manual-description">
+            <div>
               <Textarea
                 label={t('quick_create.desc_label')}
                 placeholder={t('quick_create.desc_placeholder')}
@@ -206,7 +169,7 @@ export function QuickCreate() {
               />
             </div>
 
-            <div data-tour-id="manual-style">
+            <div>
               <Select
                 label={t('quick_create.video_style')}
                 value={style}
@@ -261,7 +224,6 @@ export function QuickCreate() {
                 loading={generatingVideo}
                 leftIcon={!generatingVideo ? <Video className="h-4 w-4" /> : undefined}
                 className="w-full sm:w-auto shadow-lg shadow-brand-500/20"
-                data-tour-id="manual-generate"
               >
                 {t('quick_create.generate_video_sora')}
               </Button>
