@@ -118,6 +118,11 @@ export function VideoPlanning() {
   const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')
   const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
   const showUpgrade = !creditsLoading && !safeCanCreate
+
+  const normalizeStatusValue = (status?: string | null) => {
+    if (!status) return status
+    return status.toLowerCase()
+  }
   const navigate = useNavigate()
   const [plans, setPlans] = useState<VideoPlan[]>([])
   const [selectedPlan, setSelectedPlan] = useState<VideoPlan | null>(null)
@@ -425,7 +430,18 @@ export function VideoPlanning() {
         itemsCount: items.length,
         responseData: response.data
       })
-      setPlanItems(items)
+      const normalizedItems = items.map((item: VideoPlanItem) => ({
+        ...item,
+        status: normalizeStatusValue(item.status) as VideoPlanItem['status'],
+        script_status: normalizeStatusValue(item.script_status) as VideoPlanItem['script_status'],
+        videos: item.videos
+          ? {
+            ...item.videos,
+            status: normalizeStatusValue(item.videos.status),
+          }
+          : item.videos,
+      }))
+      setPlanItems(normalizedItems)
       console.log(`[VideoPlanning] ✓ Loaded ${items.length} plan items for plan ${planId}`)
       if (items.length > 0) {
         console.log(`[VideoPlanning] Sample items:`, items.slice(0, 5).map((item: VideoPlanItem) => ({
@@ -461,7 +477,11 @@ export function VideoPlanning() {
       // Don't pass status parameter to get all scheduled posts
       const response = await api.get('/api/posts')
       const posts = response.data.posts || []
-      setScheduledPosts(posts)
+      const normalizedPosts = posts.map((post: ScheduledPost) => ({
+        ...post,
+        status: normalizeStatusValue(post.status) as ScheduledPost['status'],
+      }))
+      setScheduledPosts(normalizedPosts)
       console.log(`[VideoPlanning] Loaded ${posts.length} scheduled posts`)
     } catch (error) {
       console.error('Failed to load scheduled posts:', error)
@@ -1050,7 +1070,7 @@ export function VideoPlanning() {
 
   const getStatusBadge = (status: string, scriptStatus?: string | null, item?: VideoPlanItem) => {
     // Clear, user-friendly status labels that explain what's happening in the workflow
-    const effectiveStatus = item?.videos?.status || status
+    const effectiveStatus = normalizeStatusValue(item?.videos?.status || status) || ''
 
     // Handle rejected scripts first (highest priority)
     if (scriptStatus === 'rejected') {
@@ -1494,7 +1514,7 @@ export function VideoPlanning() {
                                 let displayTime: string
 
                                 if (isPost) {
-                                  status = item.status
+                                  status = normalizeStatusValue(item.status) || 'pending'
                                   displayTopic = item.videos?.topic || `${item.platform} Post`
                                   displayTime = item.scheduled_time
                                     ? new Date(item.scheduled_time).toLocaleTimeString('en-US', {
@@ -1504,7 +1524,7 @@ export function VideoPlanning() {
                                     })
                                     : ''
                                 } else {
-                                  status = item.videos?.status || item.status
+                                  status = normalizeStatusValue(item.videos?.status || item.status) || 'pending'
                                   // Show "Planned" or time if no topic, otherwise show topic
                                   if (item.topic) {
                                     displayTopic = item.topic
@@ -1666,8 +1686,14 @@ export function VideoPlanning() {
                                         hour12: true
                                       }) : t('video_planning.no_time_set')}
                                     </span>
-                                    <Badge variant={item.status === 'posted' ? 'success' : item.status === 'pending' ? 'warning' : item.status === 'failed' ? 'error' : 'default'}>
-                                      {item.status === 'posted' ? t('video_planning.posted') : item.status === 'pending' ? t('video_planning.scheduled') : item.status === 'failed' ? t('video_planning.failed') : item.status}
+                                    <Badge variant={item.status === 'posted' ? 'success' : item.status === 'pending' || item.status === 'scheduled' ? 'warning' : item.status === 'failed' ? 'error' : 'default'}>
+                                      {item.status === 'posted'
+                                        ? t('video_planning.posted')
+                                        : item.status === 'pending' || item.status === 'scheduled'
+                                          ? t('video_planning.scheduled')
+                                          : item.status === 'failed'
+                                            ? t('video_planning.failed')
+                                            : item.status}
                                     </Badge>
                                     <Badge variant="info">{item.platform}</Badge>
                                   </div>

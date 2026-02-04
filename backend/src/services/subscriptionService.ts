@@ -41,7 +41,7 @@ export class SubscriptionService {
       return []
     }
 
-    return (data || []).filter(plan => plan.is_active !== false)
+    return (data || []).filter(plan => plan.is_active !== false && plan.id !== 'plan_free')
   }
 
   /**
