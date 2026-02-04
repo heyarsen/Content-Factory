@@ -430,17 +430,30 @@ export function VideoPlanning() {
         itemsCount: items.length,
         responseData: response.data
       })
-      const normalizedItems = items.map((item: VideoPlanItem) => ({
-        ...item,
-        status: normalizeStatusValue(item.status) as VideoPlanItem['status'],
-        script_status: normalizeStatusValue(item.script_status) as VideoPlanItem['script_status'],
-        videos: item.videos
-          ? {
-            ...item.videos,
-            status: normalizeStatusValue(item.videos.status),
-          }
-          : item.videos,
-      }))
+      const normalizedItems = items.map((item: VideoPlanItem) => {
+        const normalizedItemStatus = normalizeStatusValue(item.status) as VideoPlanItem['status']
+        const normalizedScriptStatus = normalizeStatusValue(item.script_status) as VideoPlanItem['script_status']
+        const normalizedVideoStatus = normalizeStatusValue(item.videos?.status)
+        const hasVideoFailure = ['failed', 'error'].includes(normalizedVideoStatus || '')
+        const hasItemFailure = Boolean(item.error_message)
+        const status = (hasVideoFailure || hasItemFailure)
+          ? 'failed'
+          : (item.video_id && normalizedVideoStatus
+            ? normalizedVideoStatus
+            : normalizedItemStatus)
+
+        return {
+          ...item,
+          status,
+          script_status: normalizedScriptStatus,
+          videos: item.videos
+            ? {
+              ...item.videos,
+              status: normalizedVideoStatus,
+            }
+            : item.videos,
+        }
+      })
       setPlanItems(normalizedItems)
       console.log(`[VideoPlanning] ✓ Loaded ${items.length} plan items for plan ${planId}`)
       if (items.length > 0) {
@@ -1070,7 +1083,13 @@ export function VideoPlanning() {
 
   const getStatusBadge = (status: string, scriptStatus?: string | null, item?: VideoPlanItem) => {
     // Clear, user-friendly status labels that explain what's happening in the workflow
-    const effectiveStatus = normalizeStatusValue(item?.videos?.status || status) || ''
+    const normalizedItemStatus = normalizeStatusValue(status) || ''
+    const normalizedVideoStatus = normalizeStatusValue(item?.videos?.status) || ''
+    const hasVideoFailure = ['failed', 'error'].includes(normalizedVideoStatus)
+    const hasItemFailure = Boolean(item?.error_message)
+    const effectiveStatus = (hasVideoFailure || hasItemFailure)
+      ? 'failed'
+      : (normalizedVideoStatus || normalizedItemStatus)
 
     // Handle rejected scripts first (highest priority)
     if (scriptStatus === 'rejected') {
