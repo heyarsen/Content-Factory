@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS videos (
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   topic TEXT NOT NULL,
   script TEXT,
-  style TEXT NOT NULL CHECK (style IN ('casual', 'professional', 'energetic', 'educational')),
+  style TEXT NOT NULL CHECK (lower(style) IN ('casual', 'cinematic', 'educational', 'energetic', 'professional', 'realistic', 'anime', '3d render', 'cyberpunk', 'minimalist', 'documentary')),
   duration INTEGER NOT NULL CHECK (duration >= 15 AND duration <= 180),
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'generating', 'completed', 'failed')),
   heygen_video_id TEXT,
