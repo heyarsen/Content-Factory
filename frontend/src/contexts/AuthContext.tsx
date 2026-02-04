@@ -188,11 +188,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut()
   }
 
+  const appUrl = (import.meta.env.VITE_FRONTEND_URL || window.location.origin).replace(/\/$/, '')
+
   return (
     <AuthContext.Provider value={{
       user, loading, signOut, signIn,
       signUp: async (e, p, l) => { await api.post('/api/auth/signup', { email: e, password: p, preferredLanguage: l }) },
-      signInWithGoogle: async () => { await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/dashboard` } }) },
+      signInWithGoogle: async () => {
+        await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo: `${appUrl}/dashboard` },
+        })
+      },
       resetPassword: async (e) => { await api.post('/api/auth/reset-password', { email: e }) },
       refreshSubscriptionStatus: async () => {
         if (!user) return { hasActiveSubscription: false, role: 'user' }
