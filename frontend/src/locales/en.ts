@@ -774,4 +774,14 @@ export const en = {
         yes: "Yes",
         no: "No",
     },
+    legal: {
+        titles: {
+            public_offer: "Public Offer Agreement",
+            privacy_policy: "Privacy Policy",
+        },
+        links: {
+            public_offer: "Public Offer",
+            privacy_policy: "Privacy Policy",
+        },
+    },
 }

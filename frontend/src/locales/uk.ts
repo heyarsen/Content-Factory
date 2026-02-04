@@ -608,6 +608,16 @@ export const uk = {
         yes: "Так",
         no: "Ні",
     },
+    legal: {
+        titles: {
+            public_offer: "Договір публічної оферти",
+            privacy_policy: "Політика конфіденційності",
+        },
+        links: {
+            public_offer: "Публічна оферта",
+            privacy_policy: "Політика конфіденційності",
+        },
+    },
     sidebar: {
         manual_creation: "Ручне створення",
         automation: "Автоматизація",

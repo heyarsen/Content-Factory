@@ -622,6 +622,16 @@ export const ru = {
         yes: "Да",
         no: "Нет",
     },
+    legal: {
+        titles: {
+            public_offer: "Договор публичной оферты",
+            privacy_policy: "Политика конфиденциальности",
+        },
+        links: {
+            public_offer: "Публичная оферта",
+            privacy_policy: "Политика конфиденциальности",
+        },
+    },
     sidebar: {
         manual_creation: "Ручное создание",
         automation: "Автоматизация",

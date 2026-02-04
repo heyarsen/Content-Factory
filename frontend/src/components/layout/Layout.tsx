@@ -6,6 +6,7 @@ import { useCreditsContext } from '../../contexts/CreditContext'
 import { AlertCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useLanguage } from '../../contexts/LanguageContext'
+import { LegalFooter } from './LegalFooter'
 
 export function Layout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -47,6 +48,7 @@ export function Layout({ children }: { children: ReactNode }) {
             {children}
           </div>
         </main>
+        <LegalFooter />
       </div>
     </div>
   )
