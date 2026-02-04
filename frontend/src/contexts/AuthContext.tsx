@@ -188,7 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut()
   }
 
-  const appUrl = (import.meta.env.VITE_FRONTEND_URL || window.location.origin).replace(/\/$/, '')
+  const appUrl = (window.location.origin || import.meta.env.VITE_FRONTEND_URL || '').replace(/\/$/, '')
 
   return (
     <AuthContext.Provider value={{
