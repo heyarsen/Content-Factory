@@ -659,7 +659,7 @@ export class PlanService {
 
     const { data, error } = await supabase
       .from('video_plan_items')
-      .select('*')
+      .select('*, videos(*)')
       .eq('plan_id', planId)
       .order('scheduled_date', { ascending: true })
       .order('scheduled_time', { ascending: true })
