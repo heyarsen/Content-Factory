@@ -82,8 +82,8 @@ export class AutomationService {
           .eq('status', 'pending')
           .eq('scheduled_date', today)
 
-        // If trigger_time is set, also filter by scheduled_time matching trigger_time
-        if (plan.trigger_time) {
+        // Only filter by scheduled_time for time-based triggers
+        if (plan.auto_schedule_trigger === 'time_based' && plan.trigger_time) {
           query.eq('scheduled_time', plan.trigger_time)
         }
 
@@ -138,7 +138,7 @@ export class AutomationService {
           .is('script', null)
 
         // If trigger_time is set, prioritize items matching that time
-        if (plan.trigger_time) {
+        if (plan.auto_schedule_trigger === 'time_based' && plan.trigger_time) {
           readyQuery.eq('scheduled_time', plan.trigger_time)
         }
 
@@ -158,7 +158,13 @@ export class AutomationService {
 
         // Generate videos for today's approved items
         console.log(`[Automation] Checking for approved items to generate videos for plan ${plan.id}`)
-        await this.generateVideosForTodayItems(plan.id, today, plan.user_id, plan.auto_create || false, plan.trigger_time || undefined)
+        await this.generateVideosForTodayItems(
+          plan.id,
+          today,
+          plan.user_id,
+          plan.auto_create || false,
+          plan.auto_schedule_trigger === 'time_based' ? plan.trigger_time || undefined : undefined
+        )
       } catch (error) {
         console.error(`Error processing plan ${plan.id}:`, error)
       }
@@ -522,7 +528,7 @@ export class AutomationService {
     // Get all enabled plans with trigger times and auto_research enabled
     const { data: plans } = await supabase
       .from('video_plans')
-      .select('id, trigger_time, timezone, user_id, auto_research')
+      .select('id, trigger_time, timezone, user_id, auto_research, auto_schedule_trigger')
       .eq('enabled', true)
       .eq('auto_research', true)
       .in('auto_schedule_trigger', ['daily', 'time_based'])
@@ -569,7 +575,7 @@ export class AutomationService {
           .not('topic', 'is', null)
           .is('research_data', null)
 
-        if (plan.trigger_time) {
+        if (plan.auto_schedule_trigger === 'time_based' && plan.trigger_time) {
           query.eq('scheduled_time', plan.trigger_time)
         }
 
@@ -601,7 +607,7 @@ export class AutomationService {
     // Get all enabled plans with trigger times
     const { data: plans } = await supabase
       .from('video_plans')
-      .select('id, trigger_time, timezone, auto_approve, user_id')
+      .select('id, trigger_time, timezone, auto_approve, user_id, auto_schedule_trigger')
       .eq('enabled', true)
       .in('auto_schedule_trigger', ['daily', 'time_based'])
       .not('trigger_time', 'is', null)
@@ -647,7 +653,7 @@ export class AutomationService {
           .is('script', null)
           .not('research_data', 'is', null)
 
-        if (plan.trigger_time) {
+        if (plan.auto_schedule_trigger === 'time_based' && plan.trigger_time) {
           researchQuery.eq('scheduled_time', plan.trigger_time)
         }
 
@@ -664,7 +670,7 @@ export class AutomationService {
           .is('research_data', null)
           .not('topic', 'is', null)
 
-        if (plan.trigger_time) {
+        if (plan.auto_schedule_trigger === 'time_based' && plan.trigger_time) {
           topicQuery.eq('scheduled_time', plan.trigger_time)
         }
 
@@ -735,7 +741,7 @@ export class AutomationService {
     // Get all enabled plans with trigger times and auto_create enabled
     const { data: plans } = await supabase
       .from('video_plans')
-      .select('id, trigger_time, timezone, user_id, auto_create')
+      .select('id, trigger_time, timezone, user_id, auto_create, auto_schedule_trigger')
       .eq('enabled', true)
       .eq('auto_create', true)
       .in('auto_schedule_trigger', ['daily', 'time_based'])
@@ -784,7 +790,7 @@ export class AutomationService {
           .is('video_id', null)
           .not('script', 'is', null)
 
-        if (plan.trigger_time) {
+        if (plan.auto_schedule_trigger === 'time_based' && plan.trigger_time) {
           query.eq('scheduled_time', plan.trigger_time)
         }
 
