@@ -90,7 +90,8 @@ export function Credits() {
     try {
       setLoadingPlans(true)
       const response = await api.get('/api/credits/plans')
-      setPlans(response.data.plans || [])
+      const availablePlans = (response.data.plans || []).filter((plan: SubscriptionPlan) => plan.id !== 'plan_free')
+      setPlans(availablePlans)
     } catch (error: any) {
       console.error('Failed to load plans:', error)
       addNotification({
@@ -165,13 +166,6 @@ export function Credits() {
   }
 
   const handlePurchase = async (planId: string) => {
-    // If switching to free plan, show confirmation modal
-    if (planId === 'plan_free' && hasSubscription) {
-      setPendingPlanId('plan_free')
-      setShowCancelModal(true)
-      return
-    }
-
     // If switching plans while having an active one, show confirmation modal
     if (hasSubscription && planId !== subscription?.plan_id) {
       setPendingPlanId(planId)
@@ -262,7 +256,7 @@ export function Credits() {
   const handleConfirmCancel = async () => {
     setShowCancelModal(false)
 
-    if (pendingPlanId === 'cancel' || pendingPlanId === 'plan_free') {
+    if (pendingPlanId === 'cancel') {
       await executeCancel()
     } else if (pendingPlanId) {
       await executePurchase(pendingPlanId)
@@ -510,7 +504,7 @@ export function Credits() {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {plans.map((plan: SubscriptionPlan) => {
-                const isCurrentPlan = (subscription?.plan_id === plan.id && subscription?.status === 'active') || (!hasSubscription && plan.id === 'plan_free')
+                const isCurrentPlan = subscription?.plan_id === plan.id && subscription?.status === 'active'
                 return (
                   <Card key={plan.id} className={`p-6 ${isCurrentPlan ? 'border-brand-500 bg-brand-50' : ''}`}>
                     <div className="flex flex-col h-full">
@@ -539,7 +533,7 @@ export function Credits() {
                         <span className="text-sm text-slate-500">USD</span>
                       </div>
                       <Button
-                        onClick={() => plan.id === 'plan_free' ? handleCancelClick() : handlePurchase(plan.id)}
+                        onClick={() => handlePurchase(plan.id)}
                         disabled={purchasing === plan.id || isCurrentPlan}
                         className="w-full mt-auto"
                         variant={isCurrentPlan ? "ghost" : "primary"}

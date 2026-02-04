@@ -9,15 +9,15 @@ router.post('/update-subscription-plans', async (req: any, res: Response) => {
   try {
     console.log('🔄 Updating subscription plans...')
     
-    // Update free plan description
+    // Deactivate free plan
     const { error: freePlanError } = await supabase
       .from('subscription_plans')
-      .update({ description: 'Free plan - no credits included' })
+      .update({ is_active: false })
       .eq('id', 'plan_free')
     
     if (freePlanError) {
-      console.error('Error updating free plan:', freePlanError)
-      return res.status(500).json({ error: 'Failed to update free plan', details: freePlanError })
+      console.error('Error deactivating free plan:', freePlanError)
+      return res.status(500).json({ error: 'Failed to deactivate free plan', details: freePlanError })
     }
     
     // Add new $70 premium plan

@@ -4,16 +4,16 @@ async function updateSubscriptionPlans() {
   try {
     console.log('Updating subscription plans...')
     
-    // Update free plan description
+    // Deactivate free plan
     const { error: freePlanError } = await supabase
       .from('subscription_plans')
-      .update({ description: 'Free plan - no credits included' })
+      .update({ is_active: false })
       .eq('id', 'plan_free')
     
     if (freePlanError) {
       console.error('Error updating free plan:', freePlanError)
     } else {
-      console.log('✅ Updated free plan description')
+      console.log('✅ Deactivated free plan')
     }
     
     // Add new $70 premium plan
