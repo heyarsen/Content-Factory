@@ -38,9 +38,20 @@ const PORT = process.env.PORT || 3001
 app.set('trust proxy', true)
 
 const corsOriginEnv = process.env.CORS_ORIGIN || process.env.FRONTEND_URL || ''
+const normalizeOrigin = (origin: string) => origin.replace(/\/+$/, '')
+const expandOrigin = (origin: string) => {
+  const normalized = normalizeOrigin(origin.trim())
+  if (!normalized) {
+    return []
+  }
+  if (!/^https?:\/\//i.test(normalized)) {
+    return [`http://${normalized}`, `https://${normalized}`]
+  }
+  return [normalized]
+}
 const corsOrigins = corsOriginEnv
   .split(',')
-  .map(origin => origin.trim())
+  .flatMap(expandOrigin)
   .filter(Boolean)
 const allowedOrigins = new Set(corsOrigins)
 
@@ -62,7 +73,8 @@ app.use(cors({
       return callback(null, true)
     }
 
-    if (allowedOrigins.has(origin)) {
+    const normalizedOrigin = normalizeOrigin(origin)
+    if (allowedOrigins.has(normalizedOrigin)) {
       return callback(null, true)
     }
 
