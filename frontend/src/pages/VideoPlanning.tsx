@@ -81,6 +81,11 @@ interface VideoPlanItem {
   | 'posted'
   | 'failed'
   video_id: string | null
+  videos?: {
+    status?: string | null
+    topic?: string | null
+    video_url?: string | null
+  } | null
   error_message: string | null
   created_at?: string
   updated_at?: string
@@ -1045,6 +1050,7 @@ export function VideoPlanning() {
 
   const getStatusBadge = (status: string, scriptStatus?: string | null, item?: VideoPlanItem) => {
     // Clear, user-friendly status labels that explain what's happening in the workflow
+    const effectiveStatus = item?.videos?.status || status
 
     // Handle rejected scripts first (highest priority)
     if (scriptStatus === 'rejected') {
@@ -1080,7 +1086,7 @@ export function VideoPlanning() {
       return <Badge variant="success">{t('video_planning.posted')}</Badge>
     }
 
-    switch (status) {
+    switch (effectiveStatus) {
       case 'pending':
         label = t('video_planning.waiting_to_start');
         variant = 'warning';
@@ -1125,7 +1131,7 @@ export function VideoPlanning() {
         variant = 'success';
         break;
       default:
-        label = status;
+        label = effectiveStatus;
         variant = 'default';
     }
 
@@ -1498,7 +1504,7 @@ export function VideoPlanning() {
                                     })
                                     : ''
                                 } else {
-                                  status = item.status
+                                  status = item.videos?.status || item.status
                                   // Show "Planned" or time if no topic, otherwise show topic
                                   if (item.topic) {
                                     displayTopic = item.topic
