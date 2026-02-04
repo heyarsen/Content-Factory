@@ -63,8 +63,8 @@ export function BillingGateProvider({ children }: { children: ReactNode }) {
           <p className="text-sm text-slate-700">{state.message}</p>
           <p className="text-xs text-slate-500">
             {t('billing_gate.contact_support')}{' '}
-            <a className="text-brand-600 hover:underline" href="mailto:support@contentfabrica.com">
-              support@contentfabrica.com
+            <a className="text-brand-600 hover:underline" href="mailto:support@ai-smm.co">
+              support@ai-smm.co
             </a>
             .
           </p>
@@ -99,5 +99,4 @@ export function useBillingGate() {
   if (!ctx) throw new Error('useBillingGate must be used within a BillingGateProvider')
   return ctx
 }
-
 
