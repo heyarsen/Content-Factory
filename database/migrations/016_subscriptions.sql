@@ -3,7 +3,7 @@
 
 -- Create subscription_plans table
 CREATE TABLE IF NOT EXISTS subscription_plans (
-  id TEXT PRIMARY KEY, -- e.g., 'plan_1', 'plan_2', 'plan_3'
+  id TEXT PRIMARY KEY, -- e.g., 'plan_1', 'plan_2', 'plan_3', 'plan_4'
   name TEXT NOT NULL,
   credits INTEGER NOT NULL,
   price_usd DECIMAL(10, 2) NOT NULL,
@@ -19,7 +19,8 @@ INSERT INTO subscription_plans (id, name, credits, price_usd, display_name, desc
   ('plan_free', 'free', 0, 0.00, 'Free Plan', 'Free plan (3 credits for new accounts)', 0),
   ('plan_1', 'starter', 20, 10.00, 'Starter Plan', '20 credits per month - ongoing until canceled', 1),
   ('plan_2', 'professional', 70, 30.00, 'Professional Plan', '70 credits per month - ongoing until canceled', 2),
-  ('plan_3', 'enterprise', 250, 100.00, 'Enterprise Plan', '250 credits per month - ongoing until canceled', 3)
+  ('plan_4', 'premium', 150, 70.00, 'Premium Plan', '150 credits per month - ongoing until canceled', 3),
+  ('plan_3', 'enterprise', 250, 100.00, 'Enterprise Plan', '250 credits per month - ongoing until canceled', 4)
 ON CONFLICT (id) DO UPDATE SET
   credits = EXCLUDED.credits,
   price_usd = EXCLUDED.price_usd,
@@ -106,4 +107,3 @@ COMMENT ON TABLE subscription_plans IS 'Available subscription plans';
 COMMENT ON TABLE user_subscriptions IS 'User subscription records';
 COMMENT ON COLUMN user_profiles.has_active_subscription IS 'Whether user has an active subscription';
 COMMENT ON COLUMN user_profiles.current_subscription_id IS 'Reference to current active subscription';
-
