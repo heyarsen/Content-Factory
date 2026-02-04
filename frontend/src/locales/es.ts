@@ -564,6 +564,16 @@ export const es = {
         yes: "Sí",
         no: "No",
     },
+    legal: {
+        titles: {
+            public_offer: "Contrato de oferta pública",
+            privacy_policy: "Política de privacidad",
+        },
+        links: {
+            public_offer: "Oferta pública",
+            privacy_policy: "Política de privacidad",
+        },
+    },
     sidebar: {
         manual_creation: "Creación Manual",
         automation: "Automatización",

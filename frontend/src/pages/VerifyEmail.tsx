@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
+import { LegalFooter } from '../components/layout/LegalFooter'
 
 export function VerifyEmail() {
   const [searchParams] = useSearchParams()
@@ -61,13 +62,13 @@ export function VerifyEmail() {
   }, [searchParams, navigate])
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background">
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-background">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-brand-500/10 blur-3xl" />
         <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-emerald-400/10 blur-3xl" />
       </div>
 
-      <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 lg:px-8">
+      <div className="relative z-10 flex flex-1 items-center justify-center px-4 py-16 sm:px-6 lg:px-8">
         <Card className="w-full max-w-lg p-10 text-center shadow-[0_45px_95px_-65px_rgba(15,23,42,0.7)]">
           {status === 'verifying' && (
             <div className="space-y-4">
@@ -122,7 +123,7 @@ export function VerifyEmail() {
           )}
         </Card>
       </div>
+      <LegalFooter className="bg-transparent" />
     </div>
   )
 }
-

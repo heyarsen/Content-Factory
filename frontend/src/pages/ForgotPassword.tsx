@@ -5,6 +5,7 @@ import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { Card } from '../components/ui/Card'
 import { useLanguage } from '../contexts/LanguageContext'
+import { LegalFooter } from '../components/layout/LegalFooter'
 
 export function ForgotPassword() {
   const { t } = useLanguage()
@@ -31,13 +32,13 @@ export function ForgotPassword() {
 
   if (success) {
     return (
-      <div className="relative min-h-screen overflow-hidden bg-background">
+      <div className="relative flex min-h-screen flex-col overflow-hidden bg-background">
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-brand-500/10 blur-3xl" />
           <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-sky-400/10 blur-3xl" />
         </div>
 
-        <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 lg:px-8">
+        <div className="relative z-10 flex flex-1 items-center justify-center px-4 py-16 sm:px-6 lg:px-8">
           <Card className="w-full max-w-lg p-10 text-center shadow-[0_45px_95px_-65px_rgba(15,23,42,0.7)]">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-brand-500 text-white shadow-md">
               <span className="text-xl font-semibold">?</span>
@@ -51,18 +52,19 @@ export function ForgotPassword() {
             </Link>
           </Card>
         </div>
+        <LegalFooter className="bg-transparent" />
       </div>
     )
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background">
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-background">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-20 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-brand-500/10 blur-3xl" />
         <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-purple-400/10 blur-3xl" />
       </div>
 
-      <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 lg:px-8">
+      <div className="relative z-10 flex flex-1 items-center justify-center px-4 py-16 sm:px-6 lg:px-8">
         <Card className="w-full max-w-lg p-8 shadow-[0_45px_95px_-65px_rgba(15,23,42,0.7)]">
           <div className="mb-8 space-y-3 text-center">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-indigo-500 text-white shadow-md">
@@ -102,7 +104,7 @@ export function ForgotPassword() {
           </p>
         </Card>
       </div>
+      <LegalFooter className="bg-transparent" />
     </div>
   )
 }
-

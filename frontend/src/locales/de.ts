@@ -564,6 +564,16 @@ export const de = {
         yes: "Ja",
         no: "Nein",
     },
+    legal: {
+        titles: {
+            public_offer: "Öffentliches Angebot",
+            privacy_policy: "Datenschutzrichtlinie",
+        },
+        links: {
+            public_offer: "Öffentliches Angebot",
+            privacy_policy: "Datenschutzrichtlinie",
+        },
+    },
     sidebar: {
         manual_creation: "Manuelle Erstellung",
         automation: "Automatisierung",

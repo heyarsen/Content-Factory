@@ -33,6 +33,8 @@ import { Credits } from './pages/Credits'
 import { Avatars } from './pages/Avatars'
 import { Support } from './pages/Support'
 import { AdminSupport } from './pages/AdminSupport'
+import { PublicOffer } from './pages/PublicOffer'
+import { PrivacyPolicy } from './pages/PrivacyPolicy'
 
 function AppContent() {
   const { toasts, removeToast } = useToast()
@@ -199,6 +201,8 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
+        <Route path="/public-offer" element={<PublicOffer />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
         <Route path="/" element={<Navigate to="/create" replace />} />
         <Route path="*" element={<Navigate to="/create" replace />} />
