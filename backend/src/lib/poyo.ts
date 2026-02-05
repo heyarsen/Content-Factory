@@ -217,39 +217,34 @@ export async function createSoraTask(
         return response.data
     }
 
-    const primaryModel = options.model || 'sora-2'
     let lastError: any
+    if (options.model && options.model !== 'sora-2') {
+        console.warn(
+            `[Poyo Sora] Overriding requested model "${options.model}" to follow Sora retry policy.`
+        )
+    }
 
-    const attemptModelWithRetries = async (
-        model: CreateSoraTaskRequest['model'],
-        maxAttempts: number
-    ): Promise<CreateSoraTaskResponse> => {
-        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-            try {
-                return await attemptCreate(model)
-            } catch (error: any) {
-                lastError = error
-                console.error(
-                    `[Poyo Sora] Failed to create task with ${model} (attempt ${attempt}/${maxAttempts}):`,
-                    error
-                )
-            }
+    const modelAttempts: CreateSoraTaskRequest['model'][] = [
+        'sora-2',
+        'sora-2',
+        'sora-2-stable',
+        'sora-2-stable',
+    ]
+
+    for (let attemptIndex = 0; attemptIndex < modelAttempts.length; attemptIndex++) {
+        const model = modelAttempts[attemptIndex]
+        const attemptNumber = attemptIndex + 1
+        const attemptLabel = `${attemptNumber}/${modelAttempts.length}`
+
+        try {
+            return await attemptCreate(model)
+        } catch (error: any) {
+            lastError = error
+            console.error(
+                `[Poyo Sora] Failed to create task with ${model} (attempt ${attemptLabel}):`,
+                error
+            )
         }
-
-        throw lastError
-    }
-
-    try {
-        return await attemptModelWithRetries(primaryModel, 3)
-    } catch (error: any) {
-        lastError = error
-    }
-
-    try {
-        console.warn('[Poyo Sora] Falling back to sora-2-stable after 3 failed attempts.')
-        return await attemptModelWithRetries('sora-2-stable', 3)
-    } catch (error: any) {
-        lastError = error
     }
 
     console.error('[Poyo Sora] Failed to create task:', lastError)
