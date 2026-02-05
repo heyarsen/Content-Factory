@@ -92,6 +92,7 @@ export interface CreateSoraTaskResponse {
         status: 'not_started'
         created_time: string
     }
+    message?: string
 }
 
 /**
