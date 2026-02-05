@@ -1,14 +1,12 @@
 # Privacy Policy
 
-**Effective date:** [YYYY-MM-DD]  
-**Version:** [PRIVACY_POLICY_VERSION]
-
-> **Placeholder notice:** Replace all bracketed placeholders before launch.
+**Effective date:** 2026-02-05  
+**Version:** 1.0.0
 
 ## 1. Who we are
-[COMPANY LEGAL NAME] ("Company", "we", "us"), [REGISTERED ADDRESS], is the data controller for the Service located at **ai-smm.co**.
+ФОП ЯШУНІН АРСЕНІЙ ЮРІЙОВИЧ ("Company", "we", "us"), Окіпної 4, 153, Київ, Україна, is the data controller for the Service located at **ai-smm.co**.
 
-**Privacy contact:** [PRIVACY CONTACT EMAIL]
+**Privacy contact:** privacy@ai-smm.co
 
 ## 2. Scope
 This policy applies to visitors, customers, and end users of the Service.
@@ -38,20 +36,20 @@ This policy applies to visitors, customers, and end users of the Service.
 We share personal data with subprocessors listed in **SUBPROCESSORS_PUBLIC.md**, professional advisers, and authorities as required by law. We do not sell personal information.
 
 ## 7. International transfers
-Where data is transferred internationally, we rely on **Standard Contractual Clauses (SCCs)** and/or **EU-U.S. Data Privacy Framework (DPF)** as applicable. 
-**[INSERT TRANSFER MECHANISM DETAILS]**
+Where personal data is transferred outside the EEA/UK, we rely on an adequacy decision where available (for example, the EU–US Data Privacy Framework where applicable) and/or Standard Contractual Clauses, plus supplementary measures as needed.
 
 ## 8. Data retention
 Retention periods are documented in **RETENTION.md**. Example defaults:
 - Account data: retained for account lifetime.
-- Logs: 30–90 days.
-- Backups: [X days].
+- Logs: 60 days.
+- Backups: 30 days.
+- Deletion requests: fulfilled within 30 days after a 30-day grace period (unless a longer period is required by law).
 
 ## 9. Your rights
 - **EEA/UK:** access, rectification, deletion, restriction, portability, objection, withdraw consent.
 - **California:** right to know, delete, correct, opt-out of selling/sharing, non-discrimination.
 
-Contact [PRIVACY CONTACT EMAIL] to exercise rights. We may verify your identity.
+Contact privacy@ai-smm.co to exercise rights. We may verify your identity.
 
 ## 10. Cookies and tracking
 We use necessary cookies for core features and block non-essential cookies until opt-in. See **COOKIE_POLICY.md**.
@@ -60,7 +58,7 @@ We use necessary cookies for core features and block non-essential cookies until
 We implement access controls, encryption in transit, and audit logging. Social OAuth tokens are encrypted at rest.
 
 ## 12. Children
-The Service is not intended for children under [AGE]. We do not knowingly collect data from children.
+The Service is not intended for children under 16. We do not knowingly collect data from children.
 
 ## 13. Changes
 We may update this policy with a new effective date and notice where required.

@@ -16,23 +16,26 @@ const shared: ComplianceDocuments = {
     title: 'Privacy Policy',
     intro: [
       `Effective date: ${PRIVACY_POLICY_VERSION}`,
-      'This Privacy Policy explains how [COMPANY LEGAL NAME] ("Company", "we", "us") collects, uses, discloses, and protects personal data when you use ai-smm.co (the "Service"). This is a baseline policy for GDPR + CCPA/CPRA compliance and includes placeholders you must replace before launch.',
+      'This Privacy Policy explains how ФОП ЯШУНІН АРСЕНІЙ ЮРІЙОВИЧ ("Company", "we", "us") collects, uses, discloses, and protects personal data when you use ai-smm.co (the "Service").',
     ],
     sections: [
       {
         heading: '1. Who we are',
         paragraphs: [
-          '[COMPANY LEGAL NAME], [REGISTERED ADDRESS], is the data controller for the Service. Privacy contact: [PRIVACY CONTACT EMAIL].',
+          'ФОП ЯШУНІН АРСЕНІЙ ЮРІЙОВИЧ, Окіпної 4, 153, Київ, Україна, is the data controller for the Service. Privacy contact: privacy@ai-smm.co.',
         ],
       },
       {
         heading: '2. Personal data we collect',
         paragraphs: [
-          'Account data: name, email, password hash, authentication IDs, language, timezone, and subscription status.',
-          'Content data: prompts, scripts, video metadata, captions, scheduled posts, and connected social account identifiers.',
+          'Account data: name, email, password hash, language, timezone, and subscription status.',
+          'Authentication data: OAuth identifiers, session tokens, and security logs.',
+          'Content data: prompts, scripts, video metadata, captions, and scheduled posts.',
+          'Connected accounts: social platform account identifiers and connection status.',
           'Billing data: transaction IDs, plan, payment timestamps, and payment status (full card data is handled by payment processors).',
           'Support data: ticket messages and attachments you submit.',
           'Usage data: device, browser, IP address, log timestamps, and activity metadata (see Cookie Policy for details).',
+          'Media assets: avatars and generated media.',
         ],
       },
       {
@@ -58,13 +61,14 @@ const shared: ComplianceDocuments = {
       {
         heading: '6. International transfers',
         paragraphs: [
-          'Where data is transferred internationally, we rely on mechanisms such as Standard Contractual Clauses (SCCs) and/or the EU-U.S. Data Privacy Framework (DPF), as applicable. [INSERT TRANSFER MECHANISM DETAILS].',
+          'Where personal data is transferred outside the EEA/UK, we rely on an adequacy decision where available (for example, the EU–US Data Privacy Framework where applicable) and/or Standard Contractual Clauses, plus supplementary measures as needed.',
         ],
       },
       {
         heading: '7. Data retention',
         paragraphs: [
-          'We retain data per the Retention Policy. Examples: account data for the duration of the account; logs retained 30–90 days; backups retained [X days]. See docs/legal/RETENTION.md for defaults.',
+          'We retain data per the Retention Policy. Examples: account data for the duration of the account; logs retained 60 days; backups retained 30 days.',
+          'Deletion requests are fulfilled within 30 days after a 30-day grace period, unless a longer period is required by law.',
         ],
       },
       {
@@ -72,7 +76,7 @@ const shared: ComplianceDocuments = {
         paragraphs: [
           'EEA/UK: access, rectification, deletion, restriction, portability, and objection; you can withdraw consent at any time.',
           'California: right to know, delete, correct, opt-out of selling/sharing, and non-discrimination.',
-          'Contact us at [PRIVACY CONTACT EMAIL] to exercise rights. We may verify your identity before responding.',
+          'Contact us at privacy@ai-smm.co to exercise rights. We may verify your identity before responding.',
         ],
       },
       {
@@ -122,7 +126,7 @@ const shared: ComplianceDocuments = {
       {
         heading: '3. Subscriptions and billing',
         paragraphs: [
-          'Fees, billing cycles, and taxes are described at checkout. [REFUND POLICY DETAILS REQUIRED].',
+          'Fees, billing cycles, and taxes are described at checkout. No free trial is offered. Subscription fees are non-refundable except where required by law. If you believe you were charged in error, contact support; we will review billing issues and correct errors as appropriate. Cancellation takes effect at the end of the current billing period; we do not provide prorated refunds.',
         ],
       },
       {
@@ -158,13 +162,13 @@ const shared: ComplianceDocuments = {
       {
         heading: '9. Governing law',
         paragraphs: [
-          '[GOVERNING LAW/VENTUE PLACEHOLDER].',
+          'These Terms are governed by the laws of Ukraine, and disputes are subject to the courts of Kyiv, Ukraine.',
         ],
       },
       {
         heading: '10. Contact',
         paragraphs: [
-          'Legal contact: [LEGAL CONTACT EMAIL].',
+          'Legal contact: legal@ai-smm.co.',
         ],
       },
     ],
@@ -180,8 +184,8 @@ const shared: ComplianceDocuments = {
         heading: '1. Categories',
         list: [
           'Necessary: required for authentication, security, and core features.',
-          'Analytics: help us understand usage to improve the Service (e.g., Google Analytics).',
-          'Marketing: used for advertising and conversion tracking (e.g., Meta Pixel).',
+          'Analytics: help us understand usage to improve the Service (Google Analytics).',
+          'Marketing: used for advertising and conversion tracking (Meta Pixel).',
         ],
       },
       {
@@ -228,13 +232,17 @@ const shared: ComplianceDocuments = {
     ],
     sections: [
       {
-        heading: 'Current subprocessors (placeholder)',
+        heading: 'Current subprocessors',
         list: [
-          '[Subprocessor Name] — Hosting/Infrastructure — [Region]',
-          '[Subprocessor Name] — Database (Supabase) — [Region]',
-          '[Subprocessor Name] — Payments — [Region]',
-          '[Subprocessor Name] — Analytics — [Region]',
-          '[Subprocessor Name] — Email/Support — [Region]',
+          'Supabase — Database & auth hosting — United States (global)',
+          'Railway — Hosting/Infrastructure — United States',
+          'Upload-Post — Social posting API — Global',
+          'HeyGen — Video generation API — United States',
+          'OpenAI — AI content generation — United States',
+          'WayForPay — Payments — Ukraine',
+          'Google Analytics — Analytics — United States',
+          'Meta Platforms (Meta Pixel) — Marketing — United States',
+          'Supabase (Auth email delivery) — Transactional email — United States (global)',
         ],
       },
       {
@@ -248,7 +256,7 @@ const shared: ComplianceDocuments = {
   dpa: {
     title: 'Data Processing Addendum (DPA)',
     intro: [
-      'This DPA applies to B2B customers who are controllers and appoint [COMPANY LEGAL NAME] as processor. Replace placeholders before use.',
+      'This DPA applies to B2B customers who are controllers and appoint ФОП ЯШУНІН АРСЕНІЙ ЮРІЙОВИЧ as processor.',
     ],
     sections: [
       {
@@ -272,7 +280,7 @@ const shared: ComplianceDocuments = {
       {
         heading: '4. International transfers',
         paragraphs: [
-          '[INSERT SCC/DPF MECHANISM AND MODULES].',
+          'We rely on adequacy decisions where available (including the EU–US Data Privacy Framework where applicable) and/or Standard Contractual Clauses. SCC modules used: Module 2 (controller to processor) and Module 3 (processor to processor) as applicable.',
         ],
       },
       {

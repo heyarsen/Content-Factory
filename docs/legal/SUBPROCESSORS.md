@@ -4,14 +4,15 @@
 
 | Subprocessor | Purpose | Data types | Location | Contract/DPAs |
 | --- | --- | --- | --- | --- |
-| Supabase | Database/Auth | Account data, content data | [REGION] | [LINK] |
-| Railway | Hosting | App logs, metadata | [REGION] | [LINK] |
-| Upload-Post | Social publishing | Social account IDs, post metadata | [REGION] | [LINK] |
-| HeyGen | Video generation | Script/video metadata | [REGION] | [LINK] |
-| OpenAI | AI processing | Prompts and scripts | [REGION] | [LINK] |
-| WayForPay | Payments | Transaction metadata | [REGION] | [LINK] |
-| [Analytics vendor] | Analytics | Usage events (opt-in) | [REGION] | [LINK] |
-| [Email vendor] | Transactional emails | Email addresses | [REGION] | [LINK] |
+| Supabase | Database/Auth | Account data, content data | United States (global) | https://supabase.com/legal |
+| Railway | Hosting | App logs, metadata | United States | https://railway.app/legal |
+| Upload-Post | Social publishing | Social account IDs, post metadata | Global | https://upload-post.com |
+| HeyGen | Video generation | Script/video metadata | United States | https://heygen.com |
+| OpenAI | AI processing | Prompts and scripts | United States | https://openai.com/policies |
+| WayForPay | Payments | Transaction metadata | Ukraine | https://wayforpay.com |
+| Google Analytics | Analytics | Usage events (opt-in) | United States | https://business.safety.google/privacy |
+| Meta Platforms (Meta Pixel) | Marketing analytics | Usage events (opt-in) | United States | https://www.facebook.com/policy.php |
+| Supabase (Auth email delivery) | Transactional emails | Email addresses | United States (global) | https://supabase.com/legal |
 
 ## Change management
 - Add new vendors here first.
