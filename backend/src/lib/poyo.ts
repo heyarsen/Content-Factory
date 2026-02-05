@@ -290,45 +290,71 @@ export async function createSoraTask(
 export async function getTaskDetails(taskId: string): Promise<SoraTaskDetail> {
     const apiKey = getPoyoApiKey()
 
-    try {
-        const response = await axios.get<SoraTaskDetail>(`${POYO_API_URL}/api/task/status`, {
-            params: { task_id: taskId },
-            headers: {
-                Authorization: `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-            },
-            timeout: 15000,
-        })
+    const maxAttempts = 3
+    const baseDelayMs = 1000
 
-        if (response.data.code !== 200) {
-            throw new Error(`Poyo API error: ${response.data.message || 'Unexpected response'}`)
-        }
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            const response = await axios.get<SoraTaskDetail>(`${POYO_API_URL}/api/task/status`, {
+                params: { task_id: taskId },
+                headers: {
+                    Authorization: `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json',
+                },
+                timeout: 15000,
+            })
 
-        return response.data
-    } catch (error: any) {
-        console.error('[Poyo Sora] Failed to get task details:', error)
-
-        let errorMessage = 'Failed to retrieve task status'
-
-        if (error.response) {
-            const status = error.response.status
-            const data = error.response.data
-
-            if (status === 401) {
-                errorMessage = 'Poyo API authentication failed.'
-            } else if (status === 404) {
-                errorMessage = `Task not found: ${taskId}`
-            } else if (data?.error?.message || data?.message) {
-                errorMessage = `Poyo API error: ${data.error?.message || data.message}`
+            if (response.data.code !== 200) {
+                throw new Error(`Poyo API error: ${response.data.message || 'Unexpected response'}`)
             }
-        } else if (error.message) {
-            errorMessage = error.message
-        }
 
-        const enhancedError = new Error(errorMessage)
-        ;(enhancedError as any).status = error.response?.status || 500
-        throw enhancedError
+            return response.data
+        } catch (error: any) {
+            const status = error.response?.status
+
+            if (status === 404 && attempt < maxAttempts) {
+                const delayMs = baseDelayMs * attempt
+                console.warn(
+                    `[Poyo Sora] Task ${taskId} not found yet (attempt ${attempt}/${maxAttempts}). Retrying in ${delayMs}ms...`
+                )
+                await new Promise(resolve => setTimeout(resolve, delayMs))
+                continue
+            }
+
+            if ((status === 429 || (status >= 500 && status < 600)) && attempt < maxAttempts) {
+                const delayMs = baseDelayMs * Math.pow(2, attempt - 1)
+                console.warn(
+                    `[Poyo Sora] Transient status (${status}) fetching task ${taskId} (attempt ${attempt}/${maxAttempts}). Retrying in ${delayMs}ms...`
+                )
+                await new Promise(resolve => setTimeout(resolve, delayMs))
+                continue
+            }
+
+            console.error('[Poyo Sora] Failed to get task details:', error)
+
+            let errorMessage = 'Failed to retrieve task status'
+
+            if (error.response) {
+                const data = error.response.data
+
+                if (status === 401) {
+                    errorMessage = 'Poyo API authentication failed.'
+                } else if (status === 404) {
+                    errorMessage = `Task not found: ${taskId}`
+                } else if (data?.error?.message || data?.message) {
+                    errorMessage = `Poyo API error: ${data.error?.message || data.message}`
+                }
+            } else if (error.message) {
+                errorMessage = error.message
+            }
+
+            const enhancedError = new Error(errorMessage)
+            ;(enhancedError as any).status = status || 500
+            throw enhancedError
+        }
     }
+
+    throw new Error(`Failed to retrieve task status for ${taskId}`)
 }
 
 /**
