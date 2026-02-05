@@ -1,6 +1,6 @@
 # Data Map (ai-smm.co)
 
-> **Generated from repository review.** Replace placeholders before launch.
+> **Generated from repository review.**
 
 ## Systems
 - **Frontend:** Vite + React (SPA).
@@ -33,11 +33,12 @@
 - **HeyGen:** video generation API.
 - **OpenAI:** AI content generation.
 - **WayForPay:** payment processing.
-- **[Analytics vendor]:** optional analytics (opt-in).
-- **[Email vendor]:** transactional email.
+- **Google Analytics:** optional analytics (opt-in).
+- **Meta Pixel:** marketing analytics (opt-in).
+- **Supabase (Auth email delivery):** transactional email.
 
 ## International transfers
-- Use SCCs/DPF as applicable. **[INSERT DETAILS]**
+- Where personal data is transferred outside the EEA/UK, we rely on an adequacy decision where available (for example, the EU–US Data Privacy Framework where applicable) and/or Standard Contractual Clauses, plus supplementary measures as needed.
 
 ## Notes
 - OAuth tokens are encrypted at rest (requires `OAUTH_TOKEN_ENCRYPTION_KEY`).

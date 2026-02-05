@@ -1,17 +1,16 @@
 # Subprocessors (Public)
 
-> **Placeholder notice:** Replace all bracketed placeholders before launch.
-
 | Subprocessor | Purpose | Location | Website |
 | --- | --- | --- | --- |
-| Supabase | Database & auth hosting | [REGION] | https://supabase.com |
-| Railway | Hosting/Infrastructure | [REGION] | https://railway.app |
-| Upload-Post | Social posting API | [REGION] | https://upload-post.com |
-| HeyGen | Video generation API | [REGION] | https://heygen.com |
-| OpenAI | AI content generation | [REGION] | https://openai.com |
-| WayForPay | Payments | [REGION] | https://wayforpay.com |
-| [Analytics Vendor] | Analytics | [REGION] | [URL] |
-| [Email Vendor] | Email delivery | [REGION] | [URL] |
+| Supabase | Database & auth hosting | United States (global) | https://supabase.com |
+| Railway | Hosting/Infrastructure | United States | https://railway.app |
+| Upload-Post | Social posting API | Global | https://upload-post.com |
+| HeyGen | Video generation API | United States | https://heygen.com |
+| OpenAI | AI content generation | United States | https://openai.com |
+| WayForPay | Payments | Ukraine | https://wayforpay.com |
+| Google Analytics | Analytics | United States | https://marketingplatform.google.com/about/analytics |
+| Meta Platforms (Meta Pixel) | Marketing | United States | https://www.facebook.com/business/tools/meta-pixel |
+| Supabase (Auth email delivery) | Email delivery | United States (global) | https://supabase.com |
 
 ## Updates
 We will post updates and provide notice where required.

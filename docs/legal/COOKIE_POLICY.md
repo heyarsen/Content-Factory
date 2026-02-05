@@ -1,15 +1,15 @@
 # Cookie Policy
 
-**Effective date:** [YYYY-MM-DD]  
-**Version:** [COOKIE_POLICY_VERSION]
+**Effective date:** 2026-02-05  
+**Version:** 1.0.0
 
 ## 1. Overview
 We use cookies and similar technologies to operate the Service. Non-essential cookies are blocked until you opt in.
 
 ## 2. Categories
 - **Necessary:** Authentication, security, and core functionality.
-- **Analytics:** Product usage insights (e.g., Google Analytics).
-- **Marketing:** Advertising and conversion tracking (e.g., Meta Pixel).
+- **Analytics:** Product usage insights (Google Analytics).
+- **Marketing:** Advertising and conversion tracking (Meta Pixel).
 
 ## 3. Managing preferences
 You can manage preferences via the cookie banner or Settings → Privacy controls.
