@@ -1,0 +1,11 @@
+export const PRIVACY_POLICY_VERSION = process.env.PRIVACY_POLICY_VERSION || '2024-09-01'
+export const COOKIE_POLICY_VERSION = process.env.COOKIE_POLICY_VERSION || '2024-09-01'
+export const CONSENT_BANNER_VERSION = process.env.CONSENT_BANNER_VERSION || '2024-09-01'
+
+export const DATA_EXPORT_FIELDS_VERSION = '2024-09-01'
+
+export const DATA_DELETION_GRACE_PERIOD_DAYS = Number(
+  process.env.DATA_DELETION_GRACE_PERIOD_DAYS || 30
+)
+
+export const PRIVACY_CONTACT_EMAIL = process.env.PRIVACY_CONTACT_EMAIL || 'privacy@company.example'

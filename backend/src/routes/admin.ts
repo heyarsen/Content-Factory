@@ -2,6 +2,7 @@ import { Router, Response } from 'express'
 import { authenticate, AuthRequest, isAdmin } from '../middleware/auth.js'
 import { AdminService } from '../services/adminService.js'
 import { SupportService } from '../services/supportService.js'
+import { logAdminAction } from '../services/adminAuditService.js'
 import { supabase } from '../lib/supabase.js'
 
 const router = Router()
@@ -71,6 +72,15 @@ router.post('/tickets/:id/message', authenticate, isAdmin, async (req: AuthReque
             return res.status(400).json({ error: 'Message is required' })
         }
         const newMessage = await SupportService.addMessage(req.params.id, req.userId!, message, true)
+        await logAdminAction({
+            actorId: req.userId!,
+            action: 'support_ticket_message',
+            targetType: 'support_ticket',
+            targetId: req.params.id,
+            metadata: { messagePreview: message.slice(0, 200) },
+            ipAddress: req.ip,
+            userAgent: req.get('User-Agent'),
+        })
         res.json(newMessage)
     } catch (error: any) {
         console.error('Admin ticket message error:', error)
@@ -85,6 +95,14 @@ router.post('/tickets/:id/message', authenticate, isAdmin, async (req: AuthReque
 router.post('/tickets/:id/resolve', authenticate, isAdmin, async (req: AuthRequest, res: Response) => {
     try {
         await SupportService.resolveTicket(req.params.id)
+        await logAdminAction({
+            actorId: req.userId!,
+            action: 'support_ticket_resolve',
+            targetType: 'support_ticket',
+            targetId: req.params.id,
+            ipAddress: req.ip,
+            userAgent: req.get('User-Agent'),
+        })
         res.json({ success: true })
     } catch (error: any) {
         console.error('Admin resolve ticket error:', error)
@@ -99,6 +117,14 @@ router.post('/tickets/:id/resolve', authenticate, isAdmin, async (req: AuthReque
 router.post('/tickets/:id/read', authenticate, isAdmin, async (req: AuthRequest, res: Response) => {
     try {
         await SupportService.markAsRead(req.params.id, req.userId!, req.userToken)
+        await logAdminAction({
+            actorId: req.userId!,
+            action: 'support_ticket_mark_read',
+            targetType: 'support_ticket',
+            targetId: req.params.id,
+            ipAddress: req.ip,
+            userAgent: req.get('User-Agent'),
+        })
         res.json({ success: true })
     } catch (error: any) {
         console.error('Admin mark read error:', error)
@@ -113,6 +139,13 @@ router.post('/tickets/:id/read', authenticate, isAdmin, async (req: AuthRequest,
 router.post('/tickets/mark-all-read', authenticate, isAdmin, async (req: AuthRequest, res: Response) => {
     try {
         await SupportService.markAllAsRead(req.userId!, req.role!)
+        await logAdminAction({
+            actorId: req.userId!,
+            action: 'support_ticket_mark_all_read',
+            targetType: 'support_ticket',
+            ipAddress: req.ip,
+            userAgent: req.get('User-Agent'),
+        })
         res.json({ success: true })
     } catch (error: any) {
         console.error('Admin mark all read error:', error)
@@ -205,6 +238,14 @@ router.post('/users/:userId/assign-admin', authenticate, isAdmin, async (req: Au
             return res.status(500).json({ error: 'Failed to assign admin role' })
         }
 
+        await logAdminAction({
+            actorId: req.userId!,
+            action: 'assign_admin_role',
+            targetType: 'user',
+            targetId: userId,
+            ipAddress: req.ip,
+            userAgent: req.get('User-Agent'),
+        })
         res.json({ success: true })
     } catch (error: any) {
         console.error('Admin assign role error:', error)
@@ -231,6 +272,14 @@ router.post('/users/:userId/remove-admin', authenticate, isAdmin, async (req: Au
             return res.status(500).json({ error: 'Failed to remove admin role' })
         }
 
+        await logAdminAction({
+            actorId: req.userId!,
+            action: 'remove_admin_role',
+            targetType: 'user',
+            targetId: userId,
+            ipAddress: req.ip,
+            userAgent: req.get('User-Agent'),
+        })
         res.json({ success: true })
     } catch (error: any) {
         console.error('Admin remove role error:', error)

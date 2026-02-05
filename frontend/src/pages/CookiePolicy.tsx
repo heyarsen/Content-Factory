@@ -3,12 +3,12 @@ import { LegalPageLayout } from '../components/layout/LegalPageLayout'
 import { complianceContent } from '../content/complianceContent'
 import { useLanguage } from '../contexts/LanguageContext'
 
-export function PrivacyPolicy() {
+export function CookiePolicy() {
   const { language, t } = useLanguage()
-  const document = complianceContent[language].privacyPolicy
+  const document = complianceContent[language].cookiePolicy
 
   return (
-    <LegalPageLayout title={t('legal.titles.privacy_policy')}>
+    <LegalPageLayout title={t('legal.titles.cookie_policy')}>
       <LegalDocument document={document} />
     </LegalPageLayout>
   )

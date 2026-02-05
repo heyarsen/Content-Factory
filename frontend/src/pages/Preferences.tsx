@@ -9,6 +9,9 @@ import { Settings, Globe, Bell, Share2, Instagram, Youtube, Facebook, Users } fr
 import api from '../lib/api'
 import { normalizeTimezone, timezones } from '../lib/timezones'
 import { useLanguage } from '../contexts/LanguageContext'
+import { Modal } from '../components/ui/Modal'
+import { Input } from '../components/ui/Input'
+import { PRIVACY_CONTACT_EMAIL } from '../lib/privacyConfig'
 
 interface Preferences {
   user_id: string
@@ -17,6 +20,7 @@ interface Preferences {
   notifications_enabled: boolean
   auto_research_default: boolean
   auto_approve_default: boolean
+  marketing_emails_enabled: boolean
 }
 
 interface SocialAccount {
@@ -54,7 +58,12 @@ export function Preferences() {
     notifications_enabled: true,
     auto_research_default: true,
     auto_approve_default: false,
+    marketing_emails_enabled: true,
   })
+  const [exporting, setExporting] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   const platformNames: Record<string, string> = {
     instagram: t('platforms.instagram'),
@@ -100,6 +109,7 @@ export function Preferences() {
       if (storedPreferences) {
         setPreferences({
           ...storedPreferences,
+          marketing_emails_enabled: storedPreferences?.marketing_emails_enabled ?? true,
           timezone: timezoneToApply,
         })
       } else {
@@ -135,12 +145,53 @@ export function Preferences() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      await api.patch('/api/auth/preferences', preferences)
+      await api.put('/api/preferences', preferences)
       toast.success(t('preferences.preferences_saved'))
     } catch (error) {
       toast.error(t('preferences.preferences_save_failed'))
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleDataExport = async () => {
+    setExporting(true)
+    try {
+      const response = await api.get('/api/privacy/export', { responseType: 'blob' })
+      const blob = new Blob([response.data], { type: 'application/json' })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `content-factory-data-export-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+      toast.success(t('preferences.data_export_success'))
+    } catch (error) {
+      console.error('Failed to export data:', error)
+      toast.error(t('preferences.data_export_failed'))
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const handleDeleteRequest = async () => {
+    if (deleteConfirmText !== 'DELETE') {
+      toast.error(t('preferences.delete_request_warning'))
+      return
+    }
+    setDeleting(true)
+    try {
+      await api.post('/api/privacy/delete', { confirm: deleteConfirmText })
+      toast.success(t('preferences.delete_request_success'))
+      setShowDeleteModal(false)
+      setDeleteConfirmText('')
+    } catch (error) {
+      console.error('Failed to request deletion:', error)
+      toast.error(t('preferences.delete_request_failed'))
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -338,7 +389,106 @@ export function Preferences() {
             </div>
           </div>
         </Card>
+
+        {/* Privacy Controls */}
+        <Card className="p-6">
+          <div className="mb-6 flex items-center gap-3">
+            <Settings className="h-5 w-5 text-slate-400" />
+            <h2 className="text-lg font-semibold text-primary">{t('preferences.privacy_controls')}</h2>
+          </div>
+          <p className="text-sm text-slate-500">{t('preferences.privacy_controls_desc')}</p>
+
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <div className="rounded-2xl border border-slate-200 p-4">
+              <p className="text-sm font-semibold text-slate-700">{t('preferences.data_export')}</p>
+              <p className="mt-1 text-xs text-slate-500">{t('preferences.data_export_desc')}</p>
+              <Button className="mt-4" onClick={handleDataExport} loading={exporting}>
+                {t('preferences.data_export')}
+              </Button>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 p-4">
+              <p className="text-sm font-semibold text-slate-700">{t('preferences.delete_request')}</p>
+              <p className="mt-1 text-xs text-slate-500">{t('preferences.delete_request_desc')}</p>
+              <Button
+                className="mt-4"
+                variant="secondary"
+                onClick={() => setShowDeleteModal(true)}
+              >
+                {t('preferences.delete_request')}
+              </Button>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <div className="rounded-2xl border border-slate-200 p-4">
+              <p className="text-sm font-semibold text-slate-700">{t('preferences.marketing_opt_out')}</p>
+              <p className="mt-1 text-xs text-slate-500">{t('preferences.marketing_opt_out_desc')}</p>
+              <div className="mt-3 flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="marketing_emails"
+                  checked={preferences.marketing_emails_enabled}
+                  onChange={(e) =>
+                    setPreferences({ ...preferences, marketing_emails_enabled: e.target.checked })
+                  }
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
+                />
+                <label htmlFor="marketing_emails" className="text-sm text-slate-600">
+                  {preferences.marketing_emails_enabled ? t('preferences.yes') : t('preferences.no')}
+                </label>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 p-4">
+              <p className="text-sm font-semibold text-slate-700">{t('preferences.cookie_preferences')}</p>
+              <p className="mt-1 text-xs text-slate-500">{t('preferences.cookie_preferences_desc')}</p>
+              <Button
+                className="mt-4"
+                variant="secondary"
+                onClick={() => window.dispatchEvent(new Event('open-cookie-preferences'))}
+              >
+                {t('preferences.cookie_preferences')}
+              </Button>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm text-slate-500">
+            <p>
+              {t('preferences.privacy_contact_desc')}{' '}
+              <a className="font-semibold text-brand-600 hover:underline" href={`mailto:${PRIVACY_CONTACT_EMAIL}`}>
+                {PRIVACY_CONTACT_EMAIL}
+              </a>
+              .
+            </p>
+            <p className="mt-2 text-xs text-slate-400">{t('preferences.delete_request_note')}</p>
+          </div>
+        </Card>
       </div>
+
+      <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title={t('preferences.confirm_delete')}>
+        <div className="space-y-4">
+          <p className="text-sm text-slate-500">{t('preferences.delete_request_warning')}</p>
+          <Input
+            label={t('preferences.confirm_delete')}
+            placeholder={t('preferences.confirm_delete_placeholder')}
+            value={deleteConfirmText}
+            onChange={(e) => setDeleteConfirmText(e.target.value)}
+          />
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              onClick={handleDeleteRequest}
+              loading={deleting}
+              disabled={deleteConfirmText !== 'DELETE'}
+            >
+              {t('preferences.delete_request')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </Layout>
   )
 }
