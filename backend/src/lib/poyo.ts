@@ -292,25 +292,90 @@ export async function getTaskDetails(taskId: string): Promise<SoraTaskDetail> {
 
     const maxAttempts = 3
     const baseDelayMs = 1000
+    const statusEndpoints: Array<{
+        method: 'get' | 'post'
+        path: string
+        buildConfig: () => { params?: Record<string, string>; data?: Record<string, string> }
+    }> = [
+        {
+            method: 'get',
+            path: '/api/task/status',
+            buildConfig: () => ({ params: { task_id: taskId } }),
+        },
+        {
+            method: 'post',
+            path: '/api/task/status',
+            buildConfig: () => ({ data: { task_id: taskId } }),
+        },
+        {
+            method: 'get',
+            path: '/api/generate/status',
+            buildConfig: () => ({ params: { task_id: taskId } }),
+        },
+        {
+            method: 'post',
+            path: '/api/generate/status',
+            buildConfig: () => ({ data: { task_id: taskId } }),
+        },
+    ]
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-            const response = await axios.get<SoraTaskDetail>(`${POYO_API_URL}/api/task/status`, {
-                params: { task_id: taskId },
-                headers: {
-                    Authorization: `Bearer ${apiKey}`,
-                    'Content-Type': 'application/json',
-                },
-                timeout: 15000,
-            })
+            let response: { data: SoraTaskDetail } | null = null
+            let lastNotFoundError: any = null
 
-            if (response.data.code !== 200) {
-                throw new Error(`Poyo API error: ${response.data.message || 'Unexpected response'}`)
+            for (const endpoint of statusEndpoints) {
+                try {
+                    const config = endpoint.buildConfig()
+                    if (endpoint.method === 'get') {
+                        response = await axios.get<SoraTaskDetail>(`${POYO_API_URL}${endpoint.path}`, {
+                            ...config,
+                            headers: {
+                                Authorization: `Bearer ${apiKey}`,
+                                'Content-Type': 'application/json',
+                            },
+                            timeout: 15000,
+                        })
+                    } else {
+                        response = await axios.post<SoraTaskDetail>(
+                            `${POYO_API_URL}${endpoint.path}`,
+                            config.data,
+                            {
+                                headers: {
+                                    Authorization: `Bearer ${apiKey}`,
+                                    'Content-Type': 'application/json',
+                                },
+                                timeout: 15000,
+                            }
+                        )
+                    }
+
+                    if (response.data.code !== 200) {
+                        throw new Error(
+                            `Poyo API error: ${response.data.message || 'Unexpected response'}`
+                        )
+                    }
+
+                    return response.data
+                } catch (innerError: any) {
+                    const innerStatus = innerError.response?.status
+                    if (innerStatus === 404 || innerStatus === 405) {
+                        lastNotFoundError = innerError
+                        continue
+                    }
+                    throw innerError
+                }
             }
 
-            return response.data
+            if (lastNotFoundError) {
+                const notFoundError = new Error('Poyo API error: Task not found on any status endpoint')
+                ;(notFoundError as any).status = 404
+                throw notFoundError
+            }
+
+            throw new Error('Poyo API error: Failed to resolve task status endpoint')
         } catch (error: any) {
-            const status = error.response?.status
+            const status = error.response?.status ?? error.status
 
             if (status === 404 && attempt < maxAttempts) {
                 const delayMs = baseDelayMs * attempt
@@ -334,13 +399,13 @@ export async function getTaskDetails(taskId: string): Promise<SoraTaskDetail> {
 
             let errorMessage = 'Failed to retrieve task status'
 
-            if (error.response) {
+            if (status === 404) {
+                errorMessage = `Task not found: ${taskId}`
+            } else if (error.response) {
                 const data = error.response.data
 
                 if (status === 401) {
                     errorMessage = 'Poyo API authentication failed.'
-                } else if (status === 404) {
-                    errorMessage = `Task not found: ${taskId}`
                 } else if (data?.error?.message || data?.message) {
                     errorMessage = `Poyo API error: ${data.error?.message || data.message}`
                 }

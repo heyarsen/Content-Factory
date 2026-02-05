@@ -90,14 +90,52 @@ async function checkTaskStatus(taskId) {
     await new Promise(resolve => setTimeout(resolve, 5000));
 
     try {
-        const response = await axios.get(`${POYO_API_URL}/api/task/status`, {
-            params: { task_id: taskId },
-            headers: {
-                Authorization: `Bearer ${POYO_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            timeout: 15000,
-        });
+        const statusEndpoints = [
+            { method: 'get', path: '/api/task/status', params: { task_id: taskId } },
+            { method: 'post', path: '/api/task/status', data: { task_id: taskId } },
+            { method: 'get', path: '/api/generate/status', params: { task_id: taskId } },
+            { method: 'post', path: '/api/generate/status', data: { task_id: taskId } },
+        ];
+
+        let response = null;
+
+        for (const endpoint of statusEndpoints) {
+            try {
+                if (endpoint.method === 'get') {
+                    response = await axios.get(`${POYO_API_URL}${endpoint.path}`, {
+                        params: endpoint.params,
+                        headers: {
+                            Authorization: `Bearer ${POYO_API_KEY}`,
+                            'Content-Type': 'application/json',
+                        },
+                        timeout: 15000,
+                    });
+                } else {
+                    response = await axios.post(`${POYO_API_URL}${endpoint.path}`, endpoint.data, {
+                        headers: {
+                            Authorization: `Bearer ${POYO_API_KEY}`,
+                            'Content-Type': 'application/json',
+                        },
+                        timeout: 15000,
+                    });
+                }
+
+                if (response?.data?.code !== 200) {
+                    throw new Error(response?.data?.message || 'Unexpected response');
+                }
+
+                break;
+            } catch (endpointError) {
+                if (endpointError.response?.status === 404 || endpointError.response?.status === 405) {
+                    continue;
+                }
+                throw endpointError;
+            }
+        }
+
+        if (!response) {
+            throw new Error('Task not found on any status endpoint');
+        }
 
         console.log('✅ Task status retrieved!');
         console.log('Status:', response.data.data.status);
