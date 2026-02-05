@@ -35,6 +35,12 @@ import { Support } from './pages/Support'
 import { AdminSupport } from './pages/AdminSupport'
 import { PublicOffer } from './pages/PublicOffer'
 import { PrivacyPolicy } from './pages/PrivacyPolicy'
+import { CookieConsentManager } from './components/legal/CookieConsentManager'
+import { TermsOfService } from './pages/TermsOfService'
+import { CookiePolicy } from './pages/CookiePolicy'
+import { AcceptableUsePolicy } from './pages/AcceptableUsePolicy'
+import { Subprocessors } from './pages/Subprocessors'
+import { Dpa } from './pages/Dpa'
 
 function AppContent() {
   const { toasts, removeToast } = useToast()
@@ -202,12 +208,19 @@ function AppContent() {
           }
         />
         <Route path="/public-offer" element={<PublicOffer />} />
-        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/privacy-policy" element={<Navigate to="/legal/privacy" replace />} />
+        <Route path="/legal/privacy" element={<PrivacyPolicy />} />
+        <Route path="/legal/terms" element={<TermsOfService />} />
+        <Route path="/legal/cookies" element={<CookiePolicy />} />
+        <Route path="/legal/acceptable-use" element={<AcceptableUsePolicy />} />
+        <Route path="/legal/subprocessors" element={<Subprocessors />} />
+        <Route path="/legal/dpa" element={<Dpa />} />
 
         <Route path="/" element={<Navigate to="/create" replace />} />
         <Route path="*" element={<Navigate to="/create" replace />} />
       </Routes>
       <ToastContainer toasts={toasts} onClose={removeToast} />
+      <CookieConsentManager />
     </>
   )
 }

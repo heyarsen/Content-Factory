@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase.js'
 import { getSupabaseClientForUser } from '../lib/supabase.js'
 import { authenticate, AuthRequest, requireSubscription } from '../middleware/auth.js'
 import { createUserProfile, generateUserAccessLink, getUserProfile } from '../lib/uploadpost.js'
+import { maybeEncryptToken } from '../lib/encryption.js'
 
 const router = Router()
 
@@ -97,7 +98,7 @@ router.get('/accounts', authenticate, requireSubscription, async (req: AuthReque
 
     const { data, error } = await userSupabase
       .from('social_accounts')
-      .select('*')
+      .select('id, user_id, platform, platform_account_id, status, connected_at, updated_at')
       .eq('user_id', userId)
       .order('connected_at', { ascending: false })
 
@@ -377,7 +378,7 @@ router.post('/connect', authenticate, requireSubscription, async (req: AuthReque
 // Handle account connection confirmation (after user links account via Upload-Post UI)
 router.post('/callback', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
-    const { platform, uploadPostUsername } = req.body
+    const { platform, uploadPostUsername, access_token, refresh_token } = req.body
     const userId = req.userId!
     const user = req.user!
 
@@ -469,6 +470,14 @@ router.post('/callback', authenticate, requireSubscription, async (req: AuthRequ
       // Use user-specific client for RLS to work properly
       const userSupabase = req.userToken ? getSupabaseClientForUser(req.userToken) : supabase
 
+      const tokenPayload: Record<string, any> = {}
+      if (typeof access_token === 'string' && access_token.trim()) {
+        tokenPayload.access_token = maybeEncryptToken(access_token)
+      }
+      if (typeof refresh_token === 'string' && refresh_token.trim()) {
+        tokenPayload.refresh_token = maybeEncryptToken(refresh_token)
+      }
+
       const { data: existing } = await userSupabase
         .from('social_accounts')
         .select('*')
@@ -495,6 +504,7 @@ router.post('/callback', authenticate, requireSubscription, async (req: AuthRequ
               platform_account_id: finalUploadPostUsername,
               status: 'pending',
               connected_at: null,
+              ...tokenPayload,
             })
             .eq('id', existing.id)
 
@@ -509,6 +519,7 @@ router.post('/callback', authenticate, requireSubscription, async (req: AuthRequ
               platform,
               platform_account_id: finalUploadPostUsername,
               status: 'pending',
+              ...tokenPayload,
             })
 
           if (insertError) {
@@ -531,6 +542,7 @@ router.post('/callback', authenticate, requireSubscription, async (req: AuthRequ
             platform_account_id: finalUploadPostUsername,
             status: 'connected',
             connected_at: new Date().toISOString(),
+            ...tokenPayload,
           })
           .eq('id', existing.id)
 
@@ -549,6 +561,7 @@ router.post('/callback', authenticate, requireSubscription, async (req: AuthRequ
             platform_account_id: finalUploadPostUsername,
             status: 'connected',
             connected_at: new Date().toISOString(),
+            ...tokenPayload,
           })
           .select()
           .single()
@@ -628,4 +641,3 @@ router.get('/accounts/:id/status', authenticate, requireSubscription, async (req
 })
 
 export default router
-

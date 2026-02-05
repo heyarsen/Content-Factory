@@ -228,6 +228,17 @@ export function Login() {
                   {t('auth.create_one')}
                 </Link>
               </p>
+              <p className="mt-4 text-center text-xs text-slate-500">
+                {t('legal.disclosure.login')}{' '}
+                <Link to="/legal/privacy" className="font-semibold text-brand-600 hover:text-brand-700">
+                  {t('legal.links.privacy_policy')}
+                </Link>{' '}
+                &{' '}
+                <Link to="/legal/terms" className="font-semibold text-brand-600 hover:text-brand-700">
+                  {t('legal.links.terms')}
+                </Link>
+                .
+              </p>
             </div>
           </Card>
         </div>

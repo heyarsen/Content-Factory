@@ -271,7 +271,23 @@ export function Signup() {
                 </Button>
               </div>
 
-              <p className="mt-8 text-center text-sm text-slate-500">
+              <p className="mt-6 text-center text-xs text-slate-500">
+                {t('legal.disclosure.signup')}{' '}
+                <Link to="/legal/terms" className="font-semibold text-brand-600 hover:text-brand-700">
+                  {t('legal.links.terms')}
+                </Link>
+                ,{' '}
+                <Link to="/legal/privacy" className="font-semibold text-brand-600 hover:text-brand-700">
+                  {t('legal.links.privacy_policy')}
+                </Link>
+                ,{' '}
+                <Link to="/legal/cookies" className="font-semibold text-brand-600 hover:text-brand-700">
+                  {t('legal.links.cookie_policy')}
+                </Link>
+                .
+              </p>
+
+              <p className="mt-4 text-center text-sm text-slate-500">
                 {t('auth.already_onboarded')}{' '}
                 <Link to="/login" className="font-semibold text-brand-600 hover:text-brand-700">
                   {t('auth.sign_in')}

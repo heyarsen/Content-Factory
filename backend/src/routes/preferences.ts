@@ -28,6 +28,7 @@ router.get('/', authenticate, requireSubscription, async (req: AuthRequest, res:
       notifications_enabled: true,
       auto_research_default: true,
       auto_approve_default: false,
+      marketing_emails_enabled: true,
     }
 
     return res.json({ preferences })
@@ -47,6 +48,7 @@ router.put('/', authenticate, requireSubscription, async (req: AuthRequest, res:
       notifications_enabled,
       auto_research_default,
       auto_approve_default,
+      marketing_emails_enabled,
       heygen_vertical_template_id,
       heygen_vertical_template_script_key,
       heygen_vertical_template_variables,
@@ -69,6 +71,9 @@ router.put('/', authenticate, requireSubscription, async (req: AuthRequest, res:
     if (notifications_enabled !== undefined) updates.notifications_enabled = notifications_enabled
     if (auto_research_default !== undefined) updates.auto_research_default = auto_research_default
     if (auto_approve_default !== undefined) updates.auto_approve_default = auto_approve_default
+    if (marketing_emails_enabled !== undefined) {
+      updates.marketing_emails_enabled = marketing_emails_enabled
+    }
     if (heygen_vertical_template_id !== undefined) {
       updates.heygen_vertical_template_id =
         typeof heygen_vertical_template_id === 'string' && heygen_vertical_template_id.trim().length > 0
