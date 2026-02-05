@@ -216,6 +216,27 @@ export async function checkSoraTaskStatus(
             }
         }
     } catch (error: any) {
+        if (error?.status === 404) {
+            console.warn('[Sora Service] Task not found yet, keeping status as generating:', {
+                videoId,
+                taskId,
+            })
+
+            const { error: updateError } = await supabase
+                .from('videos')
+                .update({
+                    status: 'generating',
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', videoId)
+
+            if (updateError) {
+                console.error('[Sora Service] Failed to update video status after 404:', updateError)
+            }
+
+            return
+        }
+
         console.error('[Sora Service] Failed to check task status:', error)
         throw error
     }
