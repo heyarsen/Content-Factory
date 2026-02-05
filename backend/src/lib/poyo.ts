@@ -64,7 +64,7 @@ export type SoraAspectRatio = '16:9' | '9:16'
  * Request payload for creating a Sora 2 task
  */
 export interface CreateSoraTaskRequest {
-    model: 'sora-2' | 'sora-2-private'
+    model: 'sora-2' | 'sora-2-private' | 'sora-2-stable'
     callback_url?: string
     input: {
         prompt: string
@@ -166,8 +166,8 @@ export async function createSoraTask(
 ): Promise<CreateSoraTaskResponse> {
     const apiKey = getPoyoApiKey()
 
-    const payload: CreateSoraTaskRequest = {
-        model: options.model || 'sora-2-private',
+    const createPayload = (model: CreateSoraTaskRequest['model']): CreateSoraTaskRequest => ({
+        model,
         callback_url: options.callbackUrl,
         input: {
             prompt,
@@ -177,16 +177,20 @@ export async function createSoraTask(
             ...(options.style ? { style: options.style } : {}),
             ...(typeof options.storyboard === 'boolean' ? { storyboard: options.storyboard } : {}),
         },
-    }
-
-    console.log('[Poyo Sora] Creating task with payload:', {
-        prompt: prompt.substring(0, 100) + '...',
-        aspect_ratio: aspectRatio,
-        duration: payload.input.duration,
-        model: payload.model,
     })
 
-    try {
+    const attemptCreate = async (
+        model: CreateSoraTaskRequest['model']
+    ): Promise<CreateSoraTaskResponse> => {
+        const payload = createPayload(model)
+
+        console.log('[Poyo Sora] Creating task with payload:', {
+            prompt: prompt.substring(0, 100) + '...',
+            aspect_ratio: aspectRatio,
+            duration: payload.input.duration,
+            model: payload.model,
+        })
+
         const response = await retryWithBackoff(
             async () => {
                 return await axios.post<CreateSoraTaskResponse>(
@@ -211,38 +215,60 @@ export async function createSoraTask(
 
         console.log('[Poyo Sora] Task created successfully:', response.data.data.task_id)
         return response.data
-    } catch (error: any) {
-        console.error('[Poyo Sora] Failed to create task:', error)
-
-        let errorMessage = 'Failed to create Sora 2 video generation task'
-
-        if (error.response) {
-            const status = error.response.status
-            const data = error.response.data
-
-            if (status === 401) {
-                errorMessage = 'Poyo API authentication failed. Please check your POYO_API_KEY environment variable.'
-            } else if (status === 402) {
-                errorMessage = 'Insufficient credits in your Poyo account.'
-            } else if (status === 422) {
-                errorMessage = `Invalid request parameters: ${data?.error?.message || data?.message || 'Validation error'}`
-            } else if (status === 429) {
-                errorMessage = 'Poyo API rate limit exceeded. Please try again later.'
-            } else if (status >= 500) {
-                errorMessage = 'Poyo API server error. Please try again later.'
-            } else if (data?.error?.message || data?.message) {
-                errorMessage = `Poyo API error: ${data.error?.message || data.message}`
-            }
-        } else if (error.code === 'ECONNABORTED') {
-            errorMessage = 'Request timeout while connecting to Poyo API.'
-        } else if (error.message) {
-            errorMessage = error.message
-        }
-
-        const enhancedError = new Error(errorMessage)
-        ;(enhancedError as any).status = error.response?.status || 500
-        throw enhancedError
     }
+
+    const primaryModel = options.model || 'sora-2'
+    let lastError: any
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+            return await attemptCreate(primaryModel)
+        } catch (error: any) {
+            lastError = error
+            console.error(
+                `[Poyo Sora] Failed to create task with ${primaryModel} (attempt ${attempt}/3):`,
+                error
+            )
+        }
+    }
+
+    try {
+        console.warn('[Poyo Sora] Falling back to sora-2-stable after 3 failed attempts.')
+        return await attemptCreate('sora-2-stable')
+    } catch (error: any) {
+        lastError = error
+    }
+
+    console.error('[Poyo Sora] Failed to create task:', lastError)
+
+    let errorMessage = 'Failed to create Sora 2 video generation task'
+
+    if (lastError?.response) {
+        const status = lastError.response.status
+        const data = lastError.response.data
+
+        if (status === 401) {
+            errorMessage = 'Poyo API authentication failed. Please check your POYO_API_KEY environment variable.'
+        } else if (status === 402) {
+            errorMessage = 'Insufficient credits in your Poyo account.'
+        } else if (status === 422) {
+            errorMessage = `Invalid request parameters: ${data?.error?.message || data?.message || 'Validation error'}`
+        } else if (status === 429) {
+            errorMessage = 'Poyo API rate limit exceeded. Please try again later.'
+        } else if (status >= 500) {
+            errorMessage = 'Poyo API server error. Please try again later.'
+        } else if (data?.error?.message || data?.message) {
+            errorMessage = `Poyo API error: ${data.error?.message || data.message}`
+        }
+    } else if (lastError?.code === 'ECONNABORTED') {
+        errorMessage = 'Request timeout while connecting to Poyo API.'
+    } else if (lastError?.message) {
+        errorMessage = lastError.message
+    }
+
+    const enhancedError = new Error(errorMessage)
+    ;(enhancedError as any).status = lastError?.response?.status || 500
+    throw enhancedError
 }
 
 /**
