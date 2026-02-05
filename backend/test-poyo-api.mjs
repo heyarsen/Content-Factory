@@ -37,7 +37,7 @@ async function testSoraTask() {
         const response = await axios.post(
             `${POYO_API_URL}/api/generate/submit`,
             {
-                model: 'sora-2',
+                model: 'sora-2-private',
                 callback_url: 'https://example.com/callback',
                 input: {
                     prompt: 'A cat sitting on a table',

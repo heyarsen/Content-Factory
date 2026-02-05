@@ -167,7 +167,7 @@ export async function createSoraTask(
     const apiKey = getPoyoApiKey()
 
     const payload: CreateSoraTaskRequest = {
-        model: options.model || 'sora-2',
+        model: options.model || 'sora-2-private',
         callback_url: options.callbackUrl,
         input: {
             prompt,
