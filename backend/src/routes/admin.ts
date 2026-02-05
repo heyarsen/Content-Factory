@@ -130,6 +130,7 @@ router.get('/users', authenticate, isAdmin, async (req: AuthRequest, res: Respon
         const limit = parseInt(req.query.limit as string) || 50
         const search = req.query.search as string || ''
         const offset = (page - 1) * limit
+        const cutoffDate = new Date('2026-02-05T00:00:00.000Z')
 
         let query = supabase
             .from('user_profiles')
@@ -144,6 +145,7 @@ router.get('/users', authenticate, isAdmin, async (req: AuthRequest, res: Respon
                 )
             `, { count: 'exact' })
             .order('created_at', { ascending: false })
+            .gte('created_at', cutoffDate.toISOString())
             .range(offset, offset + limit - 1)
 
         if (search) {
