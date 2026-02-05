@@ -35,6 +35,11 @@ interface AdminStats {
     active: number
     verified: number
     adminCount: number
+    growth: Array<{
+      label: string
+      newUsers: number
+      activeUsers: number
+    }>
   }
   subscriptions: {
     total: number
@@ -42,7 +47,7 @@ interface AdminStats {
     revenue: number
     churnRate: number
     mrr: number
-    new?: number
+    new: number
   }
   videos: {
     total: number
@@ -92,6 +97,7 @@ export function AdminPanel() {
     email: string
   } | null>(null)
   const [processing, setProcessing] = useState(false)
+  const cutoffLabel = 'Feb 5, 2026'
 
   const rangeOptions = [
     { value: '1h', label: '1H' },
@@ -193,6 +199,8 @@ export function AdminPanel() {
     )
   }
 
+  const growth = stats?.users.growth ?? []
+
   return (
     <Layout>
       <div className="space-y-12">
@@ -204,7 +212,7 @@ export function AdminPanel() {
               <h1 className="text-3xl font-semibold lg:text-4xl">Admin Dashboard</h1>
               <p className="max-w-xl text-sm text-white/70">
                 Get a comprehensive view of subscribers, user activity, revenue health, and system stability across the time
-                range you select.
+                range you select. Data is scoped to activity on or after {cutoffLabel}.
               </p>
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-4 py-2">
@@ -363,6 +371,76 @@ export function AdminPanel() {
           <Card>
             <div className="flex items-center justify-between">
               <div>
+                <h2 className="text-lg font-semibold text-primary">New User Growth</h2>
+                <p className="text-xs text-slate-500">New signups over the selected range.</p>
+              </div>
+              <TrendingUp className="h-5 w-5 text-slate-400" />
+            </div>
+            <div className="mt-6">
+              <div className="flex h-20 items-end gap-1">
+                {growth.map((point, index) => {
+                  const max = Math.max(...growth.map((p) => p.newUsers), 1)
+                  const height = Math.round((point.newUsers / max) * 100)
+                  return (
+                    <div
+                      key={`${point.label}-${index}`}
+                      className="flex-1 rounded-full bg-emerald-200/80"
+                      style={{ height: `${height}%` }}
+                      title={`${point.label}: ${point.newUsers} new`}
+                    />
+                  )
+                })}
+              </div>
+              <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                <span>{growth[0]?.label}</span>
+                <span>{growth[growth.length - 1]?.label}</span>
+              </div>
+              <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
+                <span>Total new users</span>
+                <span className="font-semibold text-primary">{stats?.users.new || 0}</span>
+              </div>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-primary">Active User Growth</h2>
+                <p className="text-xs text-slate-500">Users signing in within the range.</p>
+              </div>
+              <Activity className="h-5 w-5 text-slate-400" />
+            </div>
+            <div className="mt-6">
+              <div className="flex h-20 items-end gap-1">
+                {growth.map((point, index) => {
+                  const max = Math.max(...growth.map((p) => p.activeUsers), 1)
+                  const height = Math.round((point.activeUsers / max) * 100)
+                  return (
+                    <div
+                      key={`${point.label}-${index}`}
+                      className="flex-1 rounded-full bg-sky-200/80"
+                      style={{ height: `${height}%` }}
+                      title={`${point.label}: ${point.activeUsers} active`}
+                    />
+                  )
+                })}
+              </div>
+              <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                <span>{growth[0]?.label}</span>
+                <span>{growth[growth.length - 1]?.label}</span>
+              </div>
+              <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
+                <span>Active users</span>
+                <span className="font-semibold text-primary">{stats?.users.active || 0}</span>
+              </div>
+            </div>
+          </Card>
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-2">
+          <Card>
+            <div className="flex items-center justify-between">
+              <div>
                 <h2 className="text-lg font-semibold text-primary">Subscriber Mix</h2>
                 <p className="text-xs text-slate-500">Distribution by plan for the selected range.</p>
               </div>
@@ -495,7 +573,10 @@ export function AdminPanel() {
         {/* Users Management */}
         <Card>
           <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <h2 className="text-lg font-semibold text-primary">User Management</h2>
+            <div>
+              <h2 className="text-lg font-semibold text-primary">User Management</h2>
+              <p className="text-xs text-slate-500">Showing users created on or after {cutoffLabel}.</p>
+            </div>
             <div className="flex items-center gap-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
