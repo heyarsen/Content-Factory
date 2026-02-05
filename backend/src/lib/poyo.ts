@@ -377,7 +377,20 @@ export async function pollTaskUntilComplete(
     while (attempts < maxAttempts) {
         attempts++
 
-        const taskDetail = await getTaskDetails(taskId)
+        let taskDetail: SoraTaskDetail | null = null
+        try {
+            taskDetail = await getTaskDetails(taskId)
+        } catch (error: any) {
+            if (error?.status === 404) {
+                console.warn(
+                    `[Poyo Sora] Task ${taskId} not found yet (attempt ${attempts}/${maxAttempts}). Retrying after ${pollInterval}ms...`
+                )
+                await new Promise(resolve => setTimeout(resolve, pollInterval))
+                continue
+            }
+            throw error
+        }
+
         const state = taskDetail.data.status
 
         console.log(`[Poyo Sora] Task ${taskId} status: ${state} (attempt ${attempts}/${maxAttempts})`)
