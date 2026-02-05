@@ -425,6 +425,8 @@ const ukrainianContent: LegalContent = {
   },
 }
 
+const russianContent: LegalContent = englishContent
+
 export const legalContent: Record<Language, LegalContent> = {
   en: englishContent,
   ru: russianContent,
