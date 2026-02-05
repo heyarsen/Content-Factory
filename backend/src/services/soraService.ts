@@ -3,24 +3,26 @@ import {
     createSoraTask,
     pollTaskUntilComplete,
     mapAspectRatioToSora,
-    calculateFramesFromDuration,
+    calculateDurationFromSeconds,
+    extractVideoUrl,
     type SoraAspectRatio,
     type SoraTaskDetail,
-} from '../lib/kie.js'
+} from '../lib/poyo.js'
 import type { Video } from '../types/database.js'
 import { VideoService } from './videoService.js'
 
 /**
  * Map Sora task status to internal video status
- * KIE API uses: 'waiting', 'success', 'fail'
+ * Poyo API uses: 'not_started', 'in_progress', 'finished', 'failed'
  */
 function mapSoraStatusToVideoStatus(soraStatus: string): Video['status'] {
     switch (soraStatus) {
-        case 'waiting':
+        case 'not_started':
+        case 'in_progress':
             return 'generating'
-        case 'success':
+        case 'finished':
             return 'completed'
-        case 'fail':
+        case 'failed':
             return 'failed'
         default:
             console.warn(`[Sora Service] Unknown Sora status: ${soraStatus}, defaulting to 'generating'`)
@@ -30,33 +32,21 @@ function mapSoraStatusToVideoStatus(soraStatus: string): Video['status'] {
 
 /**
  * Update video record with Sora task success
- * KIE API returns results in resultJson as a JSON string: {"resultUrls": ["url1", "url2"]}
+ * Poyo API returns video URL in the task status payload
  */
 async function updateVideoWithSoraSuccess(
     videoId: string,
     taskDetail: SoraTaskDetail
 ): Promise<void> {
-    // Parse resultJson to get video URL
-    let videoUrl: string | null = null
-
-    if (taskDetail.data.resultJson) {
-        try {
-            const result = JSON.parse(taskDetail.data.resultJson)
-            if (result.resultUrls && Array.isArray(result.resultUrls) && result.resultUrls.length > 0) {
-                videoUrl = result.resultUrls[0] // Get first video URL
-            }
-        } catch (error) {
-            console.error('[Sora Service] Failed to parse resultJson:', error)
-        }
-    }
+    const videoUrl = extractVideoUrl(taskDetail)
 
     if (!videoUrl) {
-        throw new Error('Sora task completed but no video URL was provided in resultJson')
+        throw new Error('Sora task completed but no video URL was provided in the response')
     }
 
     console.log('[Sora Service] Updating video record with success:', {
         videoId,
-        taskId: taskDetail.data.taskId,
+        taskId: taskDetail.data.task_id,
         videoUrl,
     })
 
@@ -130,17 +120,16 @@ export async function generateVideoWithSora(
         // Map aspect ratio
         const soraAspectRatio = mapAspectRatioToSora(options.aspectRatio)
 
-        // Calculate frames from duration
-        const nFrames = calculateFramesFromDuration(video.duration || 30)
+        // Calculate duration
+        const duration = calculateDurationFromSeconds(video.duration || 30)
 
         // Create Sora task
         const createResponse = await createSoraTask(prompt, soraAspectRatio, {
-            nFrames,
-            removeWatermark: true,
-            callBackUrl: options.callBackUrl,
+            duration,
+            callbackUrl: options.callBackUrl,
         })
 
-        const taskId = createResponse.data.taskId
+        const taskId = createResponse.data.task_id
 
         // Update video record with task ID
         const { error: updateError } = await supabase
@@ -173,17 +162,7 @@ export async function generateVideoWithSora(
         await updateVideoWithSoraSuccess(video.id, taskDetail)
 
         // Extract video URL from resultJson for logging
-        let videoUrl: string | null = null
-        if (taskDetail.data.resultJson) {
-            try {
-                const result = JSON.parse(taskDetail.data.resultJson)
-                if (result.resultUrls && Array.isArray(result.resultUrls) && result.resultUrls.length > 0) {
-                    videoUrl = result.resultUrls[0]
-                }
-            } catch (error) {
-                // Ignore parse errors for logging
-            }
-        }
+        const videoUrl = extractVideoUrl(taskDetail)
 
         console.log('[Sora Service] Video generation completed successfully:', {
             videoId: video.id,
@@ -205,22 +184,22 @@ export async function checkSoraTaskStatus(
     taskId: string
 ): Promise<void> {
     try {
-        const { getTaskDetails } = await import('../lib/kie.js')
+        const { getTaskDetails } = await import('../lib/poyo.js')
         const taskDetail = await getTaskDetails(taskId)
 
-        const status = mapSoraStatusToVideoStatus(taskDetail.data.state) // API uses 'state', not 'status'
+        const status = mapSoraStatusToVideoStatus(taskDetail.data.status)
 
         console.log('[Sora Service] Task status check:', {
             videoId,
             taskId,
-            state: taskDetail.data.state,
+            state: taskDetail.data.status,
             mappedStatus: status,
         })
 
-        if (taskDetail.data.state === 'success') {
+        if (taskDetail.data.status === 'finished') {
             await updateVideoWithSoraSuccess(videoId, taskDetail)
-        } else if (taskDetail.data.state === 'fail') {
-            const error = new Error(taskDetail.data.failMsg || taskDetail.data.failCode || 'Sora task failed')
+        } else if (taskDetail.data.status === 'failed') {
+            const error = new Error(taskDetail.data.error?.message || 'Sora task failed')
             await updateVideoWithSoraFailure(videoId, error)
         } else {
             // Update progress

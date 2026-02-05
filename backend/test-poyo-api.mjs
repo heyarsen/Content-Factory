@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * KIE API Diagnostic Script
- * Tests the KIE API key and checks account credits
+ * Poyo API Diagnostic Script
+ * Tests the Poyo API key and checks Sora 2 task flow
  */
 
 import axios from 'axios';
@@ -17,70 +17,37 @@ const __dirname = dirname(__filename);
 dotenv.config({ path: join(__dirname, '../.env') });
 dotenv.config({ path: join(__dirname, '../../.env') });
 
-const KIE_API_KEY = process.env.KIE_API_KEY;
-const KIE_API_URL = 'https://api.kie.ai';
+const POYO_API_KEY = process.env.POYO_API_KEY;
+const POYO_API_URL = 'https://api.poyo.ai';
 
-console.log('🔍 KIE API Diagnostic Tool\n');
+console.log('🔍 Poyo API Diagnostic Tool\n');
 
-if (!KIE_API_KEY) {
-    console.error('❌ ERROR: KIE_API_KEY not found in environment variables');
-    console.log('\nPlease set KIE_API_KEY in your .env file');
+if (!POYO_API_KEY) {
+    console.error('❌ ERROR: POYO_API_KEY not found in environment variables');
+    console.log('\nPlease set POYO_API_KEY in your .env file');
     process.exit(1);
 }
 
-console.log('✅ API Key found:', KIE_API_KEY.substring(0, 10) + '...' + KIE_API_KEY.substring(KIE_API_KEY.length - 4));
-
-// Test 1: Check account credits
-async function checkCredits() {
-    console.log('\n📊 Test 1: Checking account credits...');
-    try {
-        const response = await axios.get(`${KIE_API_URL}/api/v1/account/credits`, {
-            headers: {
-                'Authorization': `Bearer ${KIE_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            timeout: 10000,
-        });
-
-        console.log('✅ Credits check successful!');
-        console.log('Response:', JSON.stringify(response.data, null, 2));
-    } catch (error) {
-        console.error('❌ Credits check failed!');
-        if (error.response) {
-            console.error('Status:', error.response.status);
-            console.error('Data:', JSON.stringify(error.response.data, null, 2));
-
-            if (error.response.status === 401) {
-                console.error('\n⚠️  DIAGNOSIS: Invalid or expired API key');
-                console.error('   → Please check your API key at https://kie.ai/api-key');
-            } else if (error.response.status === 402) {
-                console.error('\n⚠️  DIAGNOSIS: Insufficient credits');
-                console.error('   → Please add credits to your KIE account');
-            }
-        } else {
-            console.error('Error:', error.message);
-        }
-    }
-}
+console.log('✅ API Key found:', POYO_API_KEY.substring(0, 10) + '...' + POYO_API_KEY.substring(POYO_API_KEY.length - 4));
 
 // Test 2: Try creating a minimal Sora task
 async function testSoraTask() {
-    console.log('\n🎬 Test 2: Testing Sora task creation...');
+    console.log('\n🎬 Test 1: Testing Sora task creation...');
     try {
         const response = await axios.post(
-            `${KIE_API_URL}/api/v1/jobs/createTask`,
+            `${POYO_API_URL}/api/generate/submit`,
             {
-                model: 'sora-2-text-to-video',
+                model: 'sora-2',
+                callback_url: 'https://example.com/callback',
                 input: {
                     prompt: 'A cat sitting on a table',
-                    aspect_ratio: 'landscape',
-                    n_frames: '10',
-                    remove_watermark: true,
+                    aspect_ratio: '16:9',
+                    duration: 10,
                 },
             },
             {
                 headers: {
-                    'Authorization': `Bearer ${KIE_API_KEY}`,
+                    Authorization: `Bearer ${POYO_API_KEY}`,
                     'Content-Type': 'application/json',
                 },
                 timeout: 30000,
@@ -88,10 +55,10 @@ async function testSoraTask() {
         );
 
         console.log('✅ Task creation successful!');
-        console.log('Task ID:', response.data.data.taskId);
+        console.log('Task ID:', response.data.data.task_id);
         console.log('Full response:', JSON.stringify(response.data, null, 2));
 
-        return response.data.data.taskId;
+        return response.data.data.task_id;
     } catch (error) {
         console.error('❌ Task creation failed!');
         if (error.response) {
@@ -101,7 +68,7 @@ async function testSoraTask() {
             if (error.response.status === 401) {
                 console.error('\n⚠️  DIAGNOSIS: Invalid or expired API key');
             } else if (error.response.status === 402) {
-                console.error('\n⚠️  DIAGNOSIS: Insufficient credits in KIE account');
+                console.error('\n⚠️  DIAGNOSIS: Insufficient credits in Poyo account');
             } else if (error.response.status === 422) {
                 console.error('\n⚠️  DIAGNOSIS: Invalid request parameters');
             } else if (error.response.status === 501) {
@@ -118,26 +85,26 @@ async function testSoraTask() {
 async function checkTaskStatus(taskId) {
     if (!taskId) return;
 
-    console.log('\n📋 Test 3: Checking task status...');
+    console.log('\n📋 Test 2: Checking task status...');
     console.log('Waiting 5 seconds before checking...');
     await new Promise(resolve => setTimeout(resolve, 5000));
 
     try {
-        const response = await axios.get(`${KIE_API_URL}/api/v1/jobs/recordInfo`, {
-            params: { taskId },
+        const response = await axios.get(`${POYO_API_URL}/api/task/status`, {
+            params: { task_id: taskId },
             headers: {
-                'Authorization': `Bearer ${KIE_API_KEY}`,
+                Authorization: `Bearer ${POYO_API_KEY}`,
                 'Content-Type': 'application/json',
             },
             timeout: 15000,
         });
 
         console.log('✅ Task status retrieved!');
-        console.log('Status:', response.data.data.state);
+        console.log('Status:', response.data.data.status);
         console.log('Full response:', JSON.stringify(response.data, null, 2));
 
-        if (response.data.data.state === 'fail') {
-            console.error('\n⚠️  Task failed with message:', response.data.data.failMsg || response.data.data.failCode);
+        if (response.data.data.status === 'failed') {
+            console.error('\n⚠️  Task failed with message:', response.data.data.error?.message);
         }
     } catch (error) {
         console.error('❌ Status check failed!');
@@ -152,16 +119,15 @@ async function checkTaskStatus(taskId) {
 
 // Run all tests
 async function runDiagnostics() {
-    await checkCredits();
     const taskId = await testSoraTask();
     await checkTaskStatus(taskId);
 
     console.log('\n✅ Diagnostic complete!');
     console.log('\nIf all tests passed but videos still fail, the issue is likely:');
-    console.log('1. Insufficient KIE credits');
+    console.log('1. Insufficient Poyo credits');
     console.log('2. Model access restrictions on your account');
-    console.log('3. KIE service issues');
-    console.log('\nContact KIE support at support@kie.ai for assistance.');
+    console.log('3. Poyo service issues');
+    console.log('\nContact Poyo support for assistance.');
 }
 
 runDiagnostics().catch(console.error);

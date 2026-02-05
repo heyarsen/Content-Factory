@@ -85,7 +85,7 @@ const HEYGEN_VOICE_MAPPING: Record<string, string[]> = {
   hindi: ['5dd018185b7c4f8d9f0e7b4e1c7e8e6ac', '6dd018185b7c4f8d9f0e7b4e1c7e8e6ad'],
 }
 
-// Language to locale mapping for Sora/KIE
+// Language to locale mapping for Sora/Poyo
 const SORA_LANGUAGE_MAPPING: Record<string, string> = {
   english: 'en',
   spanish: 'es',
@@ -228,7 +228,7 @@ export function getHeyGenVoiceId(language: string, gender: 'male' | 'female' = '
 }
 
 /**
- * Get locale for Sora/KIE based on detected language
+ * Get locale for Sora/Poyo based on detected language
  */
 export function getSoraLocale(language: string): string {
   return SORA_LANGUAGE_MAPPING[language] || SORA_LANGUAGE_MAPPING.english
