@@ -8,6 +8,7 @@ import { Eye, EyeOff } from 'lucide-react'
 import api from '../lib/api'
 import { useLanguage } from '../contexts/LanguageContext'
 import { LanguageSelector } from '../components/LanguageSelector'
+import { LegalFooter } from '../components/layout/LegalFooter'
 
 export function Signup() {
   const { t, language } = useLanguage()
@@ -72,13 +73,13 @@ export function Signup() {
 
   if (success) {
     return (
-      <div className="relative min-h-screen overflow-hidden bg-background">
+      <div className="relative flex min-h-screen flex-col overflow-hidden bg-background">
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-brand-500/10 blur-3xl" />
           <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-emerald-400/10 blur-3xl" />
         </div>
 
-        <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 lg:px-8">
+        <div className="relative z-10 flex flex-1 items-center justify-center px-4 py-16 sm:px-6 lg:px-8">
           <Card className="w-full max-w-lg p-10 text-center shadow-[0_45px_95px_-65px_rgba(15,23,42,0.7)]">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-brand-500 text-white shadow-md">
               <span className="text-xl font-semibold">?</span>
@@ -92,18 +93,19 @@ export function Signup() {
             </Button>
           </Card>
         </div>
+        <LegalFooter className="bg-transparent" />
       </div>
     )
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background">
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-background">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-20 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-brand-500/10 blur-3xl" />
         <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-pink-400/10 blur-3xl" />
       </div>
 
-      <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 lg:px-8">
+      <div className="relative z-10 flex flex-1 items-center justify-center px-4 py-16 sm:px-6 lg:px-8">
         <div className="mx-auto grid w-full max-w-5xl gap-12 lg:grid-cols-[1fr_1fr]">
           <div className="hidden flex-col justify-between rounded-[32px] border border-white/40 bg-white/80 p-10 shadow-[0_55px_120px_-70px_rgba(79,70,229,0.8)] backdrop-blur-xl lg:flex">
             <div className="space-y-6">
@@ -269,7 +271,23 @@ export function Signup() {
                 </Button>
               </div>
 
-              <p className="mt-8 text-center text-sm text-slate-500">
+              <p className="mt-6 text-center text-xs text-slate-500">
+                {t('legal.disclosure.signup')}{' '}
+                <Link to="/legal/terms" className="font-semibold text-brand-600 hover:text-brand-700">
+                  {t('legal.links.terms')}
+                </Link>
+                ,{' '}
+                <Link to="/legal/privacy" className="font-semibold text-brand-600 hover:text-brand-700">
+                  {t('legal.links.privacy_policy')}
+                </Link>
+                ,{' '}
+                <Link to="/legal/cookies" className="font-semibold text-brand-600 hover:text-brand-700">
+                  {t('legal.links.cookie_policy')}
+                </Link>
+                .
+              </p>
+
+              <p className="mt-4 text-center text-sm text-slate-500">
                 {t('auth.already_onboarded')}{' '}
                 <Link to="/login" className="font-semibold text-brand-600 hover:text-brand-700">
                   {t('auth.sign_in')}
@@ -279,7 +297,7 @@ export function Signup() {
           </Card>
         </div>
       </div>
+      <LegalFooter className="bg-transparent" />
     </div>
   )
 }
-

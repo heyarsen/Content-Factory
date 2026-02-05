@@ -7,6 +7,7 @@ import { Card } from '../components/ui/Card'
 import { Eye, EyeOff } from 'lucide-react'
 import { useLanguage } from '../contexts/LanguageContext'
 import { LanguageSelector } from '../components/LanguageSelector'
+import { LegalFooter } from '../components/layout/LegalFooter'
 
 export function Login() {
   const { t } = useLanguage()
@@ -79,13 +80,13 @@ export function Login() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background">
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-background">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-20 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-brand-500/10 blur-3xl" />
         <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-cyan-400/10 blur-3xl" />
       </div>
 
-      <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 lg:px-8">
+      <div className="relative z-10 flex flex-1 items-center justify-center px-4 py-16 sm:px-6 lg:px-8">
         <div className="mx-auto grid w-full max-w-5xl gap-12 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="hidden flex-col justify-between rounded-[32px] border border-white/40 bg-white/80 p-10 shadow-[0_55px_120px_-70px_rgba(79,70,229,0.8)] backdrop-blur-xl lg:flex">
             <div className="space-y-6">
@@ -227,11 +228,22 @@ export function Login() {
                   {t('auth.create_one')}
                 </Link>
               </p>
+              <p className="mt-4 text-center text-xs text-slate-500">
+                {t('legal.disclosure.login')}{' '}
+                <Link to="/legal/privacy" className="font-semibold text-brand-600 hover:text-brand-700">
+                  {t('legal.links.privacy_policy')}
+                </Link>{' '}
+                &{' '}
+                <Link to="/legal/terms" className="font-semibold text-brand-600 hover:text-brand-700">
+                  {t('legal.links.terms')}
+                </Link>
+                .
+              </p>
             </div>
           </Card>
         </div>
       </div>
+      <LegalFooter className="bg-transparent" />
     </div>
   )
 }
-
