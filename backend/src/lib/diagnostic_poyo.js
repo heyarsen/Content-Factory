@@ -177,21 +177,34 @@ export async function createSoraTask(
     const primaryModel = options.model || 'sora-2'
     let lastError: any
 
-    for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-            return await attemptCreate(primaryModel)
-        } catch (error: any) {
-            lastError = error
-            console.error(
-                `[Poyo Sora] Failed to create task with ${primaryModel} (attempt ${attempt}/3):`,
-                error
-            )
+    const attemptModelWithRetries = async (
+        model: CreateSoraTaskRequest['model'],
+        maxAttempts: number
+    ): Promise<CreateSoraTaskResponse> => {
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                return await attemptCreate(model)
+            } catch (error: any) {
+                lastError = error
+                console.error(
+                    `[Poyo Sora] Failed to create task with ${model} (attempt ${attempt}/${maxAttempts}):`,
+                    error
+                )
+            }
         }
+
+        throw lastError
+    }
+
+    try {
+        return await attemptModelWithRetries(primaryModel, 3)
+    } catch (error: any) {
+        lastError = error
     }
 
     try {
         console.warn('[Poyo Sora] Falling back to sora-2-stable after 3 failed attempts.')
-        return await attemptCreate('sora-2-stable')
+        return await attemptModelWithRetries('sora-2-stable', 3)
     } catch (error: any) {
         lastError = error
     }
