@@ -2369,12 +2369,13 @@ export function VideoPlanning() {
 
             <div className="space-y-3 border-2 border-brand-300 bg-brand-50 rounded-lg p-4">
               <label className="block text-sm font-medium text-slate-700">
-                Trigger Time
+                {t('video_planning.trigger_time')}
               </label>
 
               <div className="bg-white border border-brand-200 rounded-lg p-3">
                 <p className="text-xs text-slate-600">
-                  <strong>What happens at this time:</strong> The system will automatically write scripts and generate videos for your scheduled content. It is not translated to different languages.
+                  <strong>{t('video_planning.trigger_time_help_title')}</strong>{' '}
+                  {t('video_planning.trigger_time_help_body')}
                 </p>
               </div>
 
@@ -2573,12 +2574,13 @@ export function VideoPlanning() {
 
             <div className="space-y-3 border-2 border-green-300 bg-green-50 rounded-lg p-4">
               <label className="block text-sm font-medium text-slate-700">
-                Trigger Time
+                {t('video_planning.trigger_time')}
               </label>
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <p className="text-xs text-blue-700">
-                  <strong>What happens at this time:</strong> The system will automatically write scripts and generate videos for your scheduled content. It is not translated to different languages.
+                  <strong>{t('video_planning.trigger_time_help_title')}</strong>{' '}
+                  {t('video_planning.trigger_time_help_body')}
                 </p>
               </div>
 

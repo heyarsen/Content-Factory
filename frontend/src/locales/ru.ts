@@ -568,6 +568,8 @@ export const ru = {
         manual_trigger: "Только вручную",
         schedule_trigger: "Запуск по расписанию",
         trigger_time: "Время запуска",
+        trigger_time_help_title: "Что происходит в это время:",
+        trigger_time_help_body: "Система автоматически напишет сценарии и сгенерирует видео для вашего запланированного контента.",
         custom_time: "Свое время",
         timezone_label: "Часовой пояс",
         content_variety: "Разнообразие контента",

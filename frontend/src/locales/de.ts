@@ -516,6 +516,8 @@ export const de = {
         manual_trigger: "Nur manuell",
         schedule_trigger: "Zeitplan-Auslöser",
         trigger_time: "Auslösezeit",
+        trigger_time_help_title: "Was passiert zu dieser Zeit:",
+        trigger_time_help_body: "Das System schreibt automatisch Skripte und erstellt Videos für deine geplanten Inhalte.",
         custom_time: "Benutzerdefinierte Zeit",
         timezone_label: "Zeitzone",
         load_social_failed: "Laden der Social-Media-Accounts fehlgeschlagen",

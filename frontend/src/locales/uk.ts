@@ -560,6 +560,8 @@ export const uk = {
         manual_trigger: "Тільки вручну",
         schedule_trigger: "Запуск за розкладом",
         trigger_time: "Час запуску",
+        trigger_time_help_title: "Що відбувається в цей час:",
+        trigger_time_help_body: "Система автоматично напише сценарії та згенерує відео для вашого запланованого контенту.",
         custom_time: "Свій час",
         timezone_label: "Часовий пояс",
         load_social_failed: "Не вдалося завантажити соціальні акаунти",
