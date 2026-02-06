@@ -7,7 +7,6 @@ export type ComplianceDocuments = {
   terms: LegalDocument
   cookiePolicy: LegalDocument
   acceptableUse: LegalDocument
-  subprocessors: LegalDocument
   dpa: LegalDocument
 }
 
@@ -54,8 +53,20 @@ const shared: ComplianceDocuments = {
       {
         heading: '5. Sharing and disclosures',
         paragraphs: [
-          'We share data with subprocessors listed on the Subprocessors page, professional advisers, and authorities where required. We do not sell personal information.',
+          'We share data with subprocessors listed below, professional advisers, and authorities where required. We do not sell personal information.',
           'We may disclose data in connection with a corporate transaction (merger, acquisition, or asset sale).',
+          'Current subprocessors include:',
+        ],
+        list: [
+          'Supabase — Database & auth hosting — United States (global)',
+          'Railway — Hosting/Infrastructure — United States',
+          'Upload-Post — Social posting API — Global',
+          'HeyGen — Video generation API — United States',
+          'OpenAI — AI content generation — United States',
+          'WayForPay — Payments — Ukraine',
+          'Google Analytics — Analytics — United States',
+          'Meta Platforms (Meta Pixel) — Marketing — United States',
+          'Supabase (Auth email delivery) — Transactional email — United States (global)',
         ],
       },
       {
@@ -221,34 +232,6 @@ const shared: ComplianceDocuments = {
         heading: '2. Enforcement',
         paragraphs: [
           'We may suspend or terminate accounts for violations and cooperate with law enforcement.',
-        ],
-      },
-    ],
-  },
-  subprocessors: {
-    title: 'Subprocessors',
-    intro: [
-      'We use subprocessors to deliver the Service. This list must be reviewed and updated before launch.',
-    ],
-    sections: [
-      {
-        heading: 'Current subprocessors',
-        list: [
-          'Supabase — Database & auth hosting — United States (global)',
-          'Railway — Hosting/Infrastructure — United States',
-          'Upload-Post — Social posting API — Global',
-          'HeyGen — Video generation API — United States',
-          'OpenAI — AI content generation — United States',
-          'WayForPay — Payments — Ukraine',
-          'Google Analytics — Analytics — United States',
-          'Meta Platforms (Meta Pixel) — Marketing — United States',
-          'Supabase (Auth email delivery) — Transactional email — United States (global)',
-        ],
-      },
-      {
-        heading: 'Updates',
-        paragraphs: [
-          'We will post changes with advance notice where required.',
         ],
       },
     ],

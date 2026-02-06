@@ -636,7 +636,6 @@ export const uk = {
             terms: "Умови використання",
             cookie_policy: "Політика cookie",
             acceptable_use: "Політика допустимого використання",
-            subprocessors: "Субпроцесори",
             dpa: "DPA",
         },
         links: {
@@ -645,7 +644,6 @@ export const uk = {
             terms: "Умови",
             cookie_policy: "Політика cookie",
             acceptable_use: "Допустиме використання",
-            subprocessors: "Субпроцесори",
             dpa: "DPA",
         },
         disclosure: {
