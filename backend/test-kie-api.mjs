@@ -70,7 +70,7 @@ async function testSoraTask() {
         const response = await axios.post(
             `${KIE_API_URL}/api/v1/jobs/createTask`,
             {
-                model: 'sora-2-text-to-video',
+                model: 'sora-2-text-to-video-stable',
                 input: {
                     prompt: 'A cat sitting on a table',
                     aspect_ratio: 'landscape',

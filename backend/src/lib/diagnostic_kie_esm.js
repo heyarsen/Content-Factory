@@ -24,7 +24,7 @@ export type SoraAspectRatio = 'landscape' | 'portrait'
  * Request payload for creating a Sora text-to-video task
  */
 export interface CreateSoraTaskRequest {
-    model: string // support different models (sora-2-text-to-video, sora-2-pro-text-to-video, etc)
+    model: string // support different models (sora-2-text-to-video-stable, sora-2-pro-text-to-video, etc)
     callBackUrl?: string
     input: {
         prompt: string
@@ -112,7 +112,7 @@ export async function createSoraTask(
     const apiKey = getKieApiKey()
 
     const payload: CreateSoraTaskRequest = {
-        model: options.model || 'sora-2-text-to-video',
+        model: options.model || 'sora-2-text-to-video-stable',
         callBackUrl: options.callBackUrl,
         input: {
             prompt,
