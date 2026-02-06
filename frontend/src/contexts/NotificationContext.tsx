@@ -55,7 +55,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     if ('Notification' in window && Notification.permission === 'granted') {
       new Notification(notification.title, {
         body: notification.message,
-        icon: '/favicon.ico',
+        icon: '/favicon.svg',
       })
     }
   }, [])
