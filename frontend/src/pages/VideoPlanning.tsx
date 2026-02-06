@@ -2374,7 +2374,7 @@ export function VideoPlanning() {
 
               <div className="bg-white border border-brand-200 rounded-lg p-3">
                 <p className="text-xs text-slate-600">
-                  <strong>What happens at this time:</strong> The system will automatically write scripts and generate videos for your scheduled content.
+                  <strong>What happens at this time:</strong> The system will automatically write scripts and generate videos for your scheduled content. It is not translated to different languages.
                 </p>
               </div>
 
@@ -2578,7 +2578,7 @@ export function VideoPlanning() {
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <p className="text-xs text-blue-700">
-                  <strong>What happens at this time:</strong> The system will automatically write scripts and generate videos for your scheduled content.
+                  <strong>What happens at this time:</strong> The system will automatically write scripts and generate videos for your scheduled content. It is not translated to different languages.
                 </p>
               </div>
 
