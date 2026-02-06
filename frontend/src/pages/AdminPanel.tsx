@@ -91,6 +91,9 @@ export function AdminPanel() {
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [soraProvider, setSoraProvider] = useState<'poyo' | 'kie' | null>(null)
+  const [soraProviderLoading, setSoraProviderLoading] = useState(false)
+  const [soraProviderSaving, setSoraProviderSaving] = useState(false)
   const [actionModal, setActionModal] = useState<{
     type: 'assign' | 'remove'
     userId: string
@@ -114,6 +117,10 @@ export function AdminPanel() {
   }, [range])
 
   useEffect(() => {
+    loadSoraProvider()
+  }, [])
+
+  useEffect(() => {
     if (currentPage === 1) {
       loadUsers()
     }
@@ -134,6 +141,31 @@ export function AdminPanel() {
       console.error('Failed to load stats:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadSoraProvider = async () => {
+    setSoraProviderLoading(true)
+    try {
+      const response = await api.get('/api/admin/settings/sora-provider')
+      setSoraProvider(response.data?.provider || 'poyo')
+    } catch (error) {
+      console.error('Failed to load Sora provider setting:', error)
+    } finally {
+      setSoraProviderLoading(false)
+    }
+  }
+
+  const handleSoraProviderChange = async (provider: 'poyo' | 'kie') => {
+    if (soraProviderSaving) return
+    setSoraProviderSaving(true)
+    try {
+      await api.post('/api/admin/settings/sora-provider', { provider })
+      setSoraProvider(provider)
+    } catch (error: any) {
+      alert(error.response?.data?.error || 'Failed to update Sora provider setting')
+    } finally {
+      setSoraProviderSaving(false)
     }
   }
 
@@ -236,6 +268,41 @@ export function AdminPanel() {
               ))}
             </div>
           </div>
+        </section>
+
+        <section>
+          <Card>
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+              <div className="space-y-2">
+                <h2 className="text-lg font-semibold text-primary">Sora Integration</h2>
+                <p className="text-xs text-slate-500">
+                  Choose which Sora gateway to use for new generations. We try sora-2 twice before
+                  falling back to sora-2-stable.
+                </p>
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <Button
+                    variant={soraProvider === 'poyo' ? 'primary' : 'secondary'}
+                    size="sm"
+                    disabled={soraProviderLoading || soraProviderSaving}
+                    onClick={() => handleSoraProviderChange('poyo')}
+                  >
+                    Poyo
+                  </Button>
+                  <Button
+                    variant={soraProvider === 'kie' ? 'primary' : 'secondary'}
+                    size="sm"
+                    disabled={soraProviderLoading || soraProviderSaving}
+                    onClick={() => handleSoraProviderChange('kie')}
+                  >
+                    Kie
+                  </Button>
+                </div>
+              </div>
+              <Badge variant="info">
+                {soraProviderLoading ? 'Loading…' : `Active: ${soraProvider ?? 'poyo'}`}
+              </Badge>
+            </div>
+          </Card>
         </section>
 
         <section className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">

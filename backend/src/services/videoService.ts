@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase.js'
 import { SubscriptionService } from './subscriptionService.js'
 import { CreditsService } from './creditsService.js'
+import { getSoraProviderSetting } from './appSettingsService.js'
 import {
   generateVideo as requestHeygenVideo,
   generateVideoFromTemplate,
@@ -1325,7 +1326,7 @@ export class VideoService {
     if (video.sora_task_id && (video.status === 'pending' || video.status === 'generating')) {
       try {
         const { checkSoraTaskStatus } = await import('./soraService.js')
-        await checkSoraTaskStatus(video.id, video.sora_task_id)
+        await checkSoraTaskStatus(video.id, video.sora_task_id, video.sora_provider)
         return { ...video, progress: undefined }
       } catch (error: any) {
         console.error('Error checking Sora task status:', error)
@@ -1550,6 +1551,9 @@ export class VideoService {
       console.log(`[Video Service] Skipping credit deduction for user ${userId} (skipDeduction: true)`)
     }
 
+    const resolvedProvider = input.provider || 'sora'
+    const soraProvider = resolvedProvider === 'sora' ? await getSoraProviderSetting() : null
+
     const { data, error } = await supabase
       .from('videos')
       .insert({
@@ -1559,7 +1563,8 @@ export class VideoService {
         style: normalizeVideoStyle(input.style as any),
         duration: input.duration || DEFAULT_REEL_DURATION,
         status: 'pending',
-        provider: input.provider || 'sora',
+        provider: resolvedProvider,
+        sora_provider: soraProvider,
         heygen_video_id: null,
         sora_task_id: null,
         video_url: null,
@@ -1635,7 +1640,7 @@ export class VideoService {
         if (video.sora_task_id) {
           // Handle Sora videos
           const { SoraService } = await import('./soraService.js')
-          await SoraService.checkSoraTaskStatus(video.id, video.sora_task_id)
+          await SoraService.checkSoraTaskStatus(video.id, video.sora_task_id, video.sora_provider)
           wasUpdated = true // SoraService handles its own DB updates and logging
         } else if (video.heygen_video_id) {
           // Handle HeyGen videos
