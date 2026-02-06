@@ -8,4 +8,4 @@ export const PRIVACY_POLICY_VERSION = getEnvValue('VITE_PRIVACY_POLICY_VERSION',
 export const COOKIE_POLICY_VERSION = getEnvValue('VITE_COOKIE_POLICY_VERSION', '2024-09-01')
 export const CONSENT_BANNER_VERSION = getEnvValue('VITE_CONSENT_BANNER_VERSION', '2024-09-01')
 
-export const PRIVACY_CONTACT_EMAIL = getEnvValue('VITE_PRIVACY_CONTACT_EMAIL', 'privacy@company.example')
+export const PRIVACY_CONTACT_EMAIL = getEnvValue('VITE_PRIVACY_CONTACT_EMAIL', 'privacy@ai-smm.co')
