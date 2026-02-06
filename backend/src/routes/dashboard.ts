@@ -36,6 +36,28 @@ const countRows = async (
   return count ?? 0
 }
 
+const countPlanItems = async (userId: string, filter?: CountFilter) => {
+  let query = supabase
+    .from('video_plan_items')
+    .select('id, video_plans!inner(user_id)', { count: 'exact', head: true })
+    .eq('video_plans.user_id', userId)
+
+  if (filter) {
+    if (isInFilter(filter)) {
+      query = query.in(filter.column, filter.values)
+    } else {
+      query = query.eq(filter.column, filter.value)
+    }
+  }
+
+  const { count, error } = await query
+  if (error) {
+    throw error
+  }
+
+  return count ?? 0
+}
+
 router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
@@ -86,8 +108,8 @@ router.get('/activity', authenticate, async (req: AuthRequest, res: Response) =>
         .limit(5),
       countRows('video_plans', userId),
       countRows('video_plans', userId, { column: 'enabled', value: true }),
-      countRows('video_plan_items', userId, { column: 'status', value: 'failed' }),
-      countRows('video_plan_items', userId, { column: 'status', values: ['pending', 'researching', 'ready', 'draft', 'approved', 'generating', 'scheduled'], op: 'in' }),
+      countPlanItems(userId, { column: 'status', value: 'failed' }),
+      countPlanItems(userId, { column: 'status', values: ['pending', 'researching', 'ready', 'draft', 'approved', 'generating', 'scheduled'], op: 'in' }),
     ])
 
     if (videosResponse.error) {

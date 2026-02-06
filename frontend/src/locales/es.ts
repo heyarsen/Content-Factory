@@ -309,6 +309,7 @@ export const es = {
         topic_placeholder: "ej., 5 errores de trading que cometen los principiantes",
         desc_label: "Descripción (opcional)",
         desc_placeholder: "Añade más contexto sobre tu idea...",
+        generate_video_sora: "Generar video",
         generate_script: "Generar guion",
         script_preview: "Vista previa del guion",
         editable: "Editable",
