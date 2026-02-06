@@ -1,4 +1,10 @@
 import axios from 'axios'
+import {
+    type CreateSoraTaskRequest,
+    type CreateSoraTaskResponse,
+    type SoraAspectRatio,
+    type SoraTaskDetail,
+} from './soraUtils.js'
 
 const POYO_API_URL = 'https://api.poyo.ai'
 
@@ -54,100 +60,6 @@ function getPoyoApiKey(): string {
     return key
 }
 
-/**
- * Sora aspect ratio options
- * Per docs: only '16:9' and '9:16' are supported.
- */
-export type SoraAspectRatio = '16:9' | '9:16'
-
-/**
- * Request payload for creating a Sora 2 task
- */
-export interface CreateSoraTaskRequest {
-    model: 'sora-2' | 'sora-2-private' | 'sora-2-stable'
-    callback_url?: string
-    input: {
-        prompt: string
-        image_urls?: string[]
-        duration: 10 | 15
-        aspect_ratio: SoraAspectRatio
-        style?:
-            | 'thanksgiving'
-            | 'comic'
-            | 'news'
-            | 'selfie'
-            | 'nostalgic'
-            | 'anime'
-        storyboard?: boolean
-    }
-}
-
-/**
- * Response from creating a Sora task
- */
-export interface CreateSoraTaskResponse {
-    code: number
-    data: {
-        task_id: string
-        status: 'not_started'
-        created_time: string
-    }
-    message?: string
-}
-
-/**
- * Task status response from Poyo API
- */
-export interface SoraTaskDetail {
-    code: number
-    data: {
-        task_id: string
-        status: 'not_started' | 'in_progress' | 'finished' | 'failed'
-        created_time?: string
-        output?: {
-            video_url?: string
-            url?: string
-            urls?: string[]
-        }
-        result?: {
-            video_url?: string
-            url?: string
-            urls?: string[]
-        }
-        video_url?: string
-        video_urls?: string[]
-        error?: {
-            message?: string
-        }
-    }
-    error?: {
-        message?: string
-        type?: string
-    }
-    message?: string
-}
-
-/**
- * Map aspect ratio from internal format to Sora format
- */
-export function mapAspectRatioToSora(aspectRatio?: string | null): SoraAspectRatio {
-    if (!aspectRatio) return '9:16' // Default to vertical videos
-
-    // Handle common aspect ratio formats
-    if (aspectRatio === '9:16' || aspectRatio === 'vertical' || aspectRatio === 'portrait') return '9:16'
-    if (aspectRatio === '16:9' || aspectRatio === 'horizontal' || aspectRatio === 'landscape') return '16:9'
-
-    // Default to 9:16
-    return '9:16'
-}
-
-/**
- * Calculate duration from requested length, clamped to supported values.
- */
-export function calculateDurationFromSeconds(durationSeconds: number): 10 | 15 {
-    if (durationSeconds >= 15) return 15
-    return 10
-}
 
 /**
  * Create a Sora 2 video generation task
@@ -477,30 +389,4 @@ export async function pollTaskUntilComplete(
     }
 
     throw new Error(`Task ${taskId} timed out after ${maxAttempts} attempts`)
-}
-
-export function extractVideoUrl(taskDetail: SoraTaskDetail): string | null {
-    const candidates: Array<string | undefined> = [
-        taskDetail.data.video_url,
-        taskDetail.data.output?.video_url,
-        taskDetail.data.result?.video_url,
-        taskDetail.data.output?.url,
-        taskDetail.data.result?.url,
-    ]
-
-    for (const candidate of candidates) {
-        if (candidate) return candidate
-    }
-
-    const listCandidates = [
-        taskDetail.data.video_urls?.[0],
-        taskDetail.data.output?.urls?.[0],
-        taskDetail.data.result?.urls?.[0],
-    ]
-
-    for (const candidate of listCandidates) {
-        if (candidate) return candidate
-    }
-
-    return null
 }

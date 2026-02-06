@@ -1,19 +1,17 @@
 import { supabase } from '../lib/supabase.js'
+import { getSoraProviderSetting, type SoraProvider } from './appSettingsService.js'
 import {
-    createSoraTask,
-    pollTaskUntilComplete,
-    mapAspectRatioToSora,
     calculateDurationFromSeconds,
     extractVideoUrl,
-    type SoraAspectRatio,
+    mapAspectRatioToSora,
     type SoraTaskDetail,
-} from '../lib/poyo.js'
+} from '../lib/soraUtils.js'
 import type { Video } from '../types/database.js'
 import { VideoService } from './videoService.js'
 
 /**
  * Map Sora task status to internal video status
- * Poyo API uses: 'not_started', 'in_progress', 'finished', 'failed'
+ * Sora providers return: 'not_started', 'in_progress', 'finished', 'failed'
  */
 function mapSoraStatusToVideoStatus(soraStatus: string): Video['status'] {
     switch (soraStatus) {
@@ -28,6 +26,20 @@ function mapSoraStatusToVideoStatus(soraStatus: string): Video['status'] {
             console.warn(`[Sora Service] Unknown Sora status: ${soraStatus}, defaulting to 'generating'`)
             return 'generating'
     }
+}
+
+async function getSoraClient(provider: SoraProvider) {
+    if (provider === 'kie') {
+        return await import('../lib/kie.js')
+    }
+    return await import('../lib/poyo.js')
+}
+
+async function resolveSoraProvider(video?: Video): Promise<SoraProvider> {
+    if (video?.sora_provider === 'kie' || video?.sora_provider === 'poyo') {
+        return video.sora_provider
+    }
+    return await getSoraProviderSetting()
 }
 
 /**
@@ -123,8 +135,11 @@ export async function generateVideoWithSora(
         // Calculate duration
         const duration = calculateDurationFromSeconds(video.duration || 30)
 
+        const provider = await resolveSoraProvider(video)
+        const soraClient = await getSoraClient(provider)
+
         // Create Sora task
-        const createResponse = await createSoraTask(prompt, soraAspectRatio, {
+        const createResponse = await soraClient.createSoraTask(prompt, soraAspectRatio, {
             duration,
             callbackUrl: options.callBackUrl,
         })
@@ -136,6 +151,7 @@ export async function generateVideoWithSora(
             .from('videos')
             .update({
                 sora_task_id: taskId,
+                sora_provider: provider,
                 status: 'generating',
                 updated_at: new Date().toISOString(),
             })
@@ -150,7 +166,7 @@ export async function generateVideoWithSora(
 
         // Poll for completion
         // Increased timeout: 120 attempts * 10s = 20 minutes (video generation can take longer)
-        const taskDetail = await pollTaskUntilComplete(taskId, {
+        const taskDetail = await soraClient.pollTaskUntilComplete(taskId, {
             maxAttempts: 120, // 20 minutes with 10s interval
             pollInterval: 10000, // 10 seconds between polls
             onProgress: (progress, status) => {
@@ -181,17 +197,23 @@ export async function generateVideoWithSora(
  */
 export async function checkSoraTaskStatus(
     videoId: string,
-    taskId: string
+    taskId: string,
+    provider?: SoraProvider | null
 ): Promise<void> {
     try {
-        const { getTaskDetails } = await import('../lib/poyo.js')
-        const taskDetail = await getTaskDetails(taskId)
+        const resolvedProvider =
+            provider && (provider === 'poyo' || provider === 'kie')
+                ? provider
+                : await getSoraProviderSetting()
+        const soraClient = await getSoraClient(resolvedProvider)
+        const taskDetail = await soraClient.getTaskDetails(taskId)
 
         const status = mapSoraStatusToVideoStatus(taskDetail.data.status)
 
         console.log('[Sora Service] Task status check:', {
             videoId,
             taskId,
+            provider: resolvedProvider,
             state: taskDetail.data.status,
             mappedStatus: status,
         })

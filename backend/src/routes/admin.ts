@@ -4,6 +4,7 @@ import { AdminService } from '../services/adminService.js'
 import { SupportService } from '../services/supportService.js'
 import { logAdminAction } from '../services/adminAuditService.js'
 import { supabase } from '../lib/supabase.js'
+import { getSoraProviderSetting, setSoraProviderSetting, type SoraProvider } from '../services/appSettingsService.js'
 
 const router = Router()
 
@@ -27,6 +28,48 @@ router.get('/stats', authenticate, isAdmin, async (req: AuthRequest, res: Respon
     } catch (error: any) {
         console.error('Admin stats error:', error)
         res.status(500).json({ error: 'Failed to get dashboard stats' })
+    }
+})
+
+/**
+ * GET /api/admin/settings/sora-provider
+ * Get current Sora provider selection
+ */
+router.get('/settings/sora-provider', authenticate, isAdmin, async (_req: AuthRequest, res: Response) => {
+    try {
+        const provider = await getSoraProviderSetting()
+        res.json({ provider })
+    } catch (error: any) {
+        console.error('Admin settings read error:', error)
+        res.status(500).json({ error: 'Failed to load Sora provider setting' })
+    }
+})
+
+/**
+ * POST /api/admin/settings/sora-provider
+ * Update Sora provider selection
+ */
+router.post('/settings/sora-provider', authenticate, isAdmin, async (req: AuthRequest, res: Response) => {
+    try {
+        const { provider } = req.body as { provider?: SoraProvider }
+
+        if (provider !== 'poyo' && provider !== 'kie') {
+            return res.status(400).json({ error: 'Invalid provider value' })
+        }
+
+        await setSoraProviderSetting(provider)
+        await logAdminAction({
+            actorId: req.userId!,
+            action: 'update_sora_provider',
+            targetType: 'app_settings',
+            targetId: 'sora_provider',
+            metadata: { provider },
+        })
+
+        res.json({ provider })
+    } catch (error: any) {
+        console.error('Admin settings update error:', error)
+        res.status(500).json({ error: 'Failed to update Sora provider setting' })
     }
 })
 

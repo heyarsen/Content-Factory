@@ -7,6 +7,7 @@ export interface Video {
   duration: number
   status: 'pending' | 'generating' | 'completed' | 'failed'
   provider?: 'heygen' | 'sora'
+  sora_provider?: 'poyo' | 'kie' | null
   heygen_video_id: string | null
   sora_task_id?: string | null
   video_url: string | null
@@ -123,4 +124,3 @@ export interface ContentResearch {
   research_data: Record<string, any>
   created_at: string
 }
-
