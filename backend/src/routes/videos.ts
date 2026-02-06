@@ -123,11 +123,12 @@ FORMAT: Write as a continuous spoken script without timing cues. Make it sound l
 
     if (finalScript) {
       const maxWords = getMaxWordsForDuration(durationSeconds)
-      const { script: trimmedScript, wasTrimmed, wordCount } = enforceScriptWordLimit(finalScript, durationSeconds)
+      const { script: trimmedScript, wasTrimmed, wordCount, maxCharacters, characterCount } =
+        enforceScriptWordLimit(finalScript, durationSeconds)
 
-      if (script && wordCount > maxWords) {
+      if (script && (wordCount > maxWords || characterCount > maxCharacters)) {
         return res.status(400).json({
-          error: `Script is too long for a ${durationSeconds}s video. Please keep it under ${maxWords} words.`,
+          error: `Script is too long for a ${durationSeconds}s video. Please keep it under ${maxWords} words or ${maxCharacters} characters.`,
         })
       }
 
@@ -136,7 +137,9 @@ FORMAT: Write as a continuous spoken script without timing cues. Make it sound l
           userId,
           durationSeconds,
           maxWords,
+          maxCharacters,
           originalWordCount: wordCount,
+          originalCharacterCount: characterCount,
         })
         finalScript = trimmedScript
       }
