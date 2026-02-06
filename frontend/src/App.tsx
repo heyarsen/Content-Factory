@@ -39,7 +39,6 @@ import { CookieConsentManager } from './components/legal/CookieConsentManager'
 import { TermsOfService } from './pages/TermsOfService'
 import { CookiePolicy } from './pages/CookiePolicy'
 import { AcceptableUsePolicy } from './pages/AcceptableUsePolicy'
-import { Subprocessors } from './pages/Subprocessors'
 import { Dpa } from './pages/Dpa'
 
 function AppContent() {
@@ -213,7 +212,6 @@ function AppContent() {
         <Route path="/legal/terms" element={<TermsOfService />} />
         <Route path="/legal/cookies" element={<CookiePolicy />} />
         <Route path="/legal/acceptable-use" element={<AcceptableUsePolicy />} />
-        <Route path="/legal/subprocessors" element={<Subprocessors />} />
         <Route path="/legal/dpa" element={<Dpa />} />
 
         <Route path="/" element={<Navigate to="/create" replace />} />
