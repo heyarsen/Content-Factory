@@ -98,7 +98,7 @@ router.get('/accounts', authenticate, requireSubscription, async (req: AuthReque
 
     const { data, error } = await userSupabase
       .from('social_accounts')
-      .select('id, user_id, platform, platform_account_id, status, connected_at, updated_at')
+      .select('id, user_id, platform, platform_account_id, status, connected_at')
       .eq('user_id', userId)
       .order('connected_at', { ascending: false })
 
