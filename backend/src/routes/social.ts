@@ -387,7 +387,9 @@ router.post('/callback', authenticate, requireSubscription, async (req: AuthRequ
     }
 
     // Check if user already has an upload-post account
-    const { data: existingAccounts } = await supabase
+    const userSupabase = req.userToken ? getSupabaseClientForUser(req.userToken) : supabase
+
+    const { data: existingAccounts } = await userSupabase
       .from('social_accounts')
       .select('platform_account_id')
       .eq('user_id', userId)
@@ -466,9 +468,6 @@ router.post('/callback', authenticate, requireSubscription, async (req: AuthRequ
 
       // Log the full profile for debugging
       console.log('[Callback] Full Upload-Post profile:', JSON.stringify(userProfile, null, 2))
-
-      // Use user-specific client for RLS to work properly
-      const userSupabase = req.userToken ? getSupabaseClientForUser(req.userToken) : supabase
 
       const tokenPayload: Record<string, any> = {}
       if (typeof access_token === 'string' && access_token.trim()) {
