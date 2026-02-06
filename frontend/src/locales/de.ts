@@ -309,6 +309,7 @@ export const de = {
         topic_placeholder: "z.B. 5 Trading-Fehler, die Anfänger machen",
         desc_label: "Beschreibung (optional)",
         desc_placeholder: "Fügen Sie mehr Kontext zu Ihrer Idee hinzu...",
+        generate_video_sora: "Video generieren",
         generate_script: "Skript generieren",
         script_preview: "Skript-Vorschau",
         editable: "Bearbeitbar",

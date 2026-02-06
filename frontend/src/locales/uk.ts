@@ -309,6 +309,7 @@ export const uk = {
         topic_placeholder: "наприклад, 5 помилок трейдингу, які роблять новачки",
         desc_label: "Опис (необов'язково)",
         desc_placeholder: "Додайте більше контексту про вашу ідею...",
+        generate_video_sora: "Створити відео",
         generate_script: "Створити сценарій",
         script_preview: "Попередній перегляд сценарію",
         editable: "Можна редагувати",
