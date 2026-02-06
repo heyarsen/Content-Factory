@@ -592,7 +592,6 @@ export const de = {
             terms: "Nutzungsbedingungen",
             cookie_policy: "Cookie-Richtlinie",
             acceptable_use: "Acceptable Use Policy",
-            subprocessors: "Subprozessoren",
             dpa: "Datenverarbeitungszusatz",
         },
         links: {
@@ -601,7 +600,6 @@ export const de = {
             terms: "Bedingungen",
             cookie_policy: "Cookie-Richtlinie",
             acceptable_use: "Acceptable Use",
-            subprocessors: "Subprozessoren",
             dpa: "DPA",
         },
         disclosure: {

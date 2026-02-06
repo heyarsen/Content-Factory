@@ -650,7 +650,6 @@ export const ru = {
             terms: "Условия использования",
             cookie_policy: "Политика cookie",
             acceptable_use: "Политика допустимого использования",
-            subprocessors: "Субпроцессоры",
             dpa: "DPA",
         },
         links: {
@@ -659,7 +658,6 @@ export const ru = {
             terms: "Условия",
             cookie_policy: "Политика cookie",
             acceptable_use: "Допустимое использование",
-            subprocessors: "Субпроцессоры",
             dpa: "DPA",
         },
         disclosure: {

@@ -801,7 +801,6 @@ export const en = {
             terms: "Terms of Service",
             cookie_policy: "Cookie Policy",
             acceptable_use: "Acceptable Use Policy",
-            subprocessors: "Subprocessors",
             dpa: "Data Processing Addendum",
         },
         links: {
@@ -810,7 +809,6 @@ export const en = {
             terms: "Terms",
             cookie_policy: "Cookie Policy",
             acceptable_use: "Acceptable Use",
-            subprocessors: "Subprocessors",
             dpa: "DPA",
         },
         disclosure: {

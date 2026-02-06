@@ -27,9 +27,6 @@ export function LegalFooter({ className }: LegalFooterProps) {
           <Link to="/legal/acceptable-use" className="text-slate-500 transition hover:text-slate-900">
             {t('legal.links.acceptable_use')}
           </Link>
-          <Link to="/legal/subprocessors" className="text-slate-500 transition hover:text-slate-900">
-            {t('legal.links.subprocessors')}
-          </Link>
           <Link to="/legal/dpa" className="text-slate-500 transition hover:text-slate-900">
             {t('legal.links.dpa')}
           </Link>
