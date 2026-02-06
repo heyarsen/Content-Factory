@@ -432,6 +432,13 @@ export function Videos() {
     }
   }
 
+  const getEffectiveStatus = (video: VideoRecord): VideoRecord['status'] => {
+    if ((video.status === 'generating' || video.status === 'pending') && video.video_url) {
+      return 'completed'
+    }
+    return video.status
+  }
+
   const getStatusBadge = (status: VideoRecord['status']) => {
     const variants: Record<string, 'default' | 'success' | 'error' | 'warning' | 'info'> = {
       completed: 'success',
@@ -529,7 +536,9 @@ export function Videos() {
           />
         ) : (
           <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
-            {videos.map((video: VideoRecord) => (
+            {videos.map((video: VideoRecord) => {
+              const effectiveStatus = getEffectiveStatus(video)
+              return (
               <Card
                 key={video.id}
                 hover
@@ -544,10 +553,10 @@ export function Videos() {
                     </h3>
                     <p className="text-xs text-slate-400">{new Date(video.created_at).toLocaleString()}</p>
                   </div>
-                  {getStatusBadge(video.status)}
+                  {getStatusBadge(effectiveStatus)}
                 </div>
 
-                {video.status === 'completed' && video.video_url && (
+                {effectiveStatus === 'completed' && video.video_url && (
                   <div
                     className="relative overflow-hidden rounded-2xl border border-white/50 bg-slate-100/70"
                     style={{ aspectRatio: '9 / 16' }}
@@ -556,7 +565,7 @@ export function Videos() {
                   </div>
                 )}
 
-                {(video.status === 'generating' || video.status === 'pending') && (
+                {(effectiveStatus === 'generating' || effectiveStatus === 'pending') && (
                   <div className="relative overflow-hidden rounded-2xl border border-brand-200/50 bg-brand-50/30 px-6 py-8">
                     <div className="flex flex-col items-center justify-center gap-4">
                       <div className="relative h-16 w-16">
@@ -584,7 +593,7 @@ export function Videos() {
                   </div>
                 )}
 
-                {video.status === 'failed' && video.error_message && (
+                {effectiveStatus === 'failed' && video.error_message && (
                   <div className="rounded-2xl border border-rose-200/70 bg-rose-50/70 px-4 py-3 text-xs text-rose-600">
                     {video.error_message}
                   </div>
@@ -599,7 +608,7 @@ export function Videos() {
                 </div>
 
                 <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                  {video.status === 'completed' && video.video_url && (
+                  {effectiveStatus === 'completed' && video.video_url && (
                     <>
                       <Button
                         variant="ghost"
@@ -628,13 +637,13 @@ export function Videos() {
                       </Button>
                     </>
                   )}
-                  {(video.status === 'generating' || video.status === 'pending') && (
+                  {(effectiveStatus === 'generating' || effectiveStatus === 'pending') && (
                     <div className="flex items-center gap-2 text-xs text-slate-400">
                       <div className="h-2 w-2 animate-pulse rounded-full bg-brand-400"></div>
                       <span>{t('videos.status_generating')}...</span>
                     </div>
                   )}
-                  {video.status === 'failed' && (
+                  {effectiveStatus === 'failed' && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -657,7 +666,8 @@ export function Videos() {
                   </Button>
                 </div>
               </Card>
-            ))}
+              )
+            })}
           </div>
         )}
 
@@ -679,7 +689,7 @@ export function Videos() {
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
                   {t('videos.preview')}
                 </h3>
-                {selectedVideo.status === 'completed' ? (
+                {getEffectiveStatus(selectedVideo) === 'completed' ? (
                   <div className="space-y-3">
                     <div
                       className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-900 shadow-md"
@@ -718,7 +728,7 @@ export function Videos() {
                       </Button>
                     </div>
                   </div>
-                ) : (selectedVideo.status === 'generating' || selectedVideo.status === 'pending') ? (
+                ) : (getEffectiveStatus(selectedVideo) === 'generating' || getEffectiveStatus(selectedVideo) === 'pending') ? (
                   <div className="aspect-[9/16] relative overflow-hidden rounded-xl border border-brand-200 bg-brand-50/30 flex items-center justify-center">
                     <div className="text-center p-4">
                       <div className="relative h-16 w-16 mx-auto mb-4">
@@ -773,7 +783,7 @@ export function Videos() {
                 <div className="space-y-3 pt-4 border-t border-slate-100">
                   <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{t('videos.social_distribution')}</h3>
                   <div className="flex flex-col gap-2">
-                    {selectedVideo.status === 'completed' && (
+                    {getEffectiveStatus(selectedVideo) === 'completed' && (
                       <Button
                         className="w-full shadow-lg shadow-brand-500/10"
                         onClick={() => handleOpenPostModal(selectedVideo)}
@@ -896,7 +906,7 @@ export function Videos() {
                     <Music className="h-3 w-3 animate-pulse" />
                     <div className="flex-1 overflow-hidden">
                       <div className="text-[11px] whitespace-nowrap animate-scroll">
-                        Original Sound - Content Fabrica AI
+                        Original Sound - AI SMM
                       </div>
                     </div>
                   </div>
