@@ -80,13 +80,13 @@ router.post('/generate', authenticate, async (req: AuthRequest, res: Response) =
     if (generateScript && !finalScript && provider !== 'sora') {
       // Generate script using OpenAI
       const scriptPrompt = `
-Create a 10-second video script that is engaging, specific, and has personality. 
+Create a 12-15 second video script that is engaging, specific, and has personality. 
 
 TOPIC: ${topic}
 DETAILS: ${description || 'No additional details provided'}
 
 SCRIPT REQUIREMENTS:
-- Between 40-45 words total (fits in 15 seconds when spoken naturally)
+- Between 28-32 words total (fits in 15 seconds when spoken naturally)
 - Start with a shocking question, surprising fact, or bold statement
 - Include 1-2 specific tips or examples (keep it concise)
 - Add personality with conversational, energetic tone
@@ -123,11 +123,12 @@ FORMAT: Write as a continuous spoken script without timing cues. Make it sound l
 
     if (finalScript) {
       const maxWords = getMaxWordsForDuration(durationSeconds)
-      const { script: trimmedScript, wasTrimmed, wordCount } = enforceScriptWordLimit(finalScript, durationSeconds)
+      const { script: trimmedScript, wasTrimmed, wordCount, maxCharacters, characterCount } =
+        enforceScriptWordLimit(finalScript, durationSeconds)
 
-      if (script && wordCount > maxWords) {
+      if (script && (wordCount > maxWords || characterCount > maxCharacters)) {
         return res.status(400).json({
-          error: `Script is too long for a ${durationSeconds}s video. Please keep it under ${maxWords} words.`,
+          error: `Script is too long for a ${durationSeconds}s video. Please keep it under ${maxWords} words or ${maxCharacters} characters.`,
         })
       }
 
@@ -136,7 +137,9 @@ FORMAT: Write as a continuous spoken script without timing cues. Make it sound l
           userId,
           durationSeconds,
           maxWords,
+          maxCharacters,
           originalWordCount: wordCount,
+          originalCharacterCount: characterCount,
         })
         finalScript = trimmedScript
       }

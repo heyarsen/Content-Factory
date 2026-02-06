@@ -114,10 +114,10 @@ export async function generateVideoWithSora(
         })
 
         // Build the prompt from topic, style, and script
-        let prompt = `Style: ${video.style}. Topic: ${video.topic}. VoiceOver must be no more than 15 seconds.`
+        let prompt = `Style: ${video.style}. Topic: ${video.topic}. VoiceOver must be no more than 15 seconds. Match the video pacing to the voiceover timing and avoid fast cuts.`
         if (video.script) {
             // Combine topic, style and script for a more detailed prompt
-            prompt = `Style: ${video.style}. Topic: ${video.topic}. Script: ${video.script}. VoiceOver must be no more than 15 seconds.`
+            prompt = `Style: ${video.style}. Topic: ${video.topic}. Script: ${video.script}. VoiceOver must be no more than 15 seconds. Match the video pacing to the voiceover timing and avoid fast cuts.`
         }
 
         // Limit prompt length (Sora has limits)
