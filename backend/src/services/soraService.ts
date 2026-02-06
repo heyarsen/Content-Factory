@@ -8,6 +8,7 @@ import {
     type SoraTaskDetail,
 } from '../lib/kie.js'
 import type { Video } from '../types/database.js'
+import { getMaxCharactersForDuration, getMaxWordsForDuration } from '../lib/scriptLimits.js'
 import { VideoService } from './videoService.js'
 
 /**
@@ -113,11 +114,14 @@ export async function generateVideoWithSora(
             aspectRatio: options.aspectRatio,
         })
 
+        const maxWords = getMaxWordsForDuration(video.duration || 15)
+        const maxCharacters = getMaxCharactersForDuration(video.duration || 15)
+
         // Build the prompt from topic, style, and script
-        let prompt = `Style: ${video.style}. Topic: ${video.topic}. VoiceOver must be no more than 15 seconds. Match the video pacing to the voiceover timing and avoid fast cuts.`
+        let prompt = `Style: ${video.style}. Topic: ${video.topic}. VoiceOver must be no more than 15 seconds. Keep the voiceover under ${maxWords} words and ${maxCharacters} characters. Match the video pacing to the voiceover timing and avoid fast cuts.`
         if (video.script) {
             // Combine topic, style and script for a more detailed prompt
-            prompt = `Style: ${video.style}. Topic: ${video.topic}. Script: ${video.script}. VoiceOver must be no more than 15 seconds. Match the video pacing to the voiceover timing and avoid fast cuts.`
+            prompt = `Style: ${video.style}. Topic: ${video.topic}. Script: ${video.script}. VoiceOver must be no more than 15 seconds. Keep the voiceover under ${maxWords} words and ${maxCharacters} characters. Match the video pacing to the voiceover timing and avoid fast cuts.`
         }
 
         // Limit prompt length (Sora has limits)

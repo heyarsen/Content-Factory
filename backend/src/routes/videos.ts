@@ -80,13 +80,13 @@ router.post('/generate', authenticate, async (req: AuthRequest, res: Response) =
     if (generateScript && !finalScript && provider !== 'sora') {
       // Generate script using OpenAI
       const scriptPrompt = `
-Create a 12-15 second video script that is engaging, specific, and has personality. 
+Create a 10-second video script that is engaging, specific, and has personality. 
 
 TOPIC: ${topic}
 DETAILS: ${description || 'No additional details provided'}
 
 SCRIPT REQUIREMENTS:
-- Between 28-32 words total (fits in 15 seconds when spoken naturally)
+- Between 40-45 words total (fits in 15 seconds when spoken naturally)
 - Start with a shocking question, surprising fact, or bold statement
 - Include 1-2 specific tips or examples (keep it concise)
 - Add personality with conversational, energetic tone

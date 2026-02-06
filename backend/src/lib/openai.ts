@@ -28,7 +28,7 @@ export interface ScriptGenerationResponse {
 export async function generateScript(
   data: ScriptGenerationRequest
 ): Promise<ScriptGenerationResponse> {
-  const systemPrompt = `You are a scriptwriter for short educational videos (12-15 seconds, about 28-32 words). Your task is to create an engaging, specific script with personality.
+  const systemPrompt = `You are a scriptwriter for short educational videos (12-15 seconds, about 40-45 words). Your task is to create an engaging, specific script with personality.
 
 Input fields you will always receive:
 	•	Idea
@@ -37,7 +37,7 @@ Input fields you will always receive:
 	•	UsefulTips
 
 SCRIPT REQUIREMENTS:
-- Between 28-32 words total (fits in 12-15 seconds when spoken naturally)
+- Between 40-45 words total (fits in 12-15 seconds when spoken naturally)
 - Start with a shocking question, surprising fact, or bold statement
 - Include 1-2 specific tips or examples (keep it concise)
 - Add personality with conversational, energetic tone
