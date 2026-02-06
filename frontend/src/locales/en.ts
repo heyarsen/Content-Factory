@@ -580,6 +580,8 @@ export const en = {
         manual_trigger: "Manual only",
         schedule_trigger: "Schedule Trigger",
         trigger_time: "Trigger Time",
+        trigger_time_help_title: "What happens at this time:",
+        trigger_time_help_body: "The system will automatically write scripts and generate videos for your scheduled content.",
         custom_time: "Custom Time",
         timezone_label: "Timezone",
         content_variety: "Content Variety",

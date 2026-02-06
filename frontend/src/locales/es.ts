@@ -516,6 +516,8 @@ export const es = {
         manual_trigger: "Solo manual",
         schedule_trigger: "Disparador del horario",
         trigger_time: "Hora de activación",
+        trigger_time_help_title: "Qué sucede en este momento:",
+        trigger_time_help_body: "El sistema escribirá automáticamente los guiones y generará videos para tu contenido programado.",
         custom_time: "Hora personalizada",
         timezone_label: "Zona Horaria",
         load_social_failed: "Error al cargar las cuentas sociales",
