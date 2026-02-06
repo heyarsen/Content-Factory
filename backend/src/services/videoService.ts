@@ -1391,33 +1391,62 @@ export class VideoService {
       throw createServiceError('Can only retry failed videos', 400)
     }
 
-    const { error } = await supabase
-      .from('videos')
-      .update({
+    const cost = CreditsService.COSTS.VIDEO_GENERATION
+    const credits = await CreditsService.getUserCredits(userId)
+
+    if (credits !== null && credits < cost) {
+      throw createServiceError(`Insufficient credits. You have ${credits} credits but need ${cost} credits to retry this video.`, 400)
+    }
+
+    let creditsDeducted = false
+    try {
+      await CreditsService.deductCredits(userId, cost, 'VIDEO_GENERATION_RETRY')
+      creditsDeducted = true
+    } catch (error) {
+      console.error('[Video Service] Failed to deduct credits for retry:', error)
+      throw createServiceError('Failed to deduct credits for retry', 500)
+    }
+
+    try {
+      const { error } = await supabase
+        .from('videos')
+        .update({
+          status: 'pending',
+          heygen_video_id: null,
+          video_url: null,
+          error_message: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', video.id)
+
+      if (error) {
+        console.error('Error resetting video for retry:', error)
+        throw new Error('Failed to reset video for retry')
+      }
+
+      const { avatarId, isPhotoAvatar } = await resolveAvatarContext(userId, video.avatar_id)
+
+      const refreshedVideo: Video = {
+        ...video,
         status: 'pending',
         heygen_video_id: null,
         video_url: null,
         error_message: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', video.id)
+      }
 
-    if (error) {
-      console.error('Error resetting video for retry:', error)
-      throw new Error('Failed to reset video for retry')
+      void runHeygenGeneration(refreshedVideo, avatarId, isPhotoAvatar)
+    } catch (error) {
+      if (creditsDeducted) {
+        try {
+          await CreditsService.addCredits(userId, cost, 'Refund for failed video retry')
+          console.log(`[VideoService] Refunded ${cost} credits to user ${userId} due to retry failure`)
+        } catch (refundError) {
+          console.error('[VideoService] Failed to refund credits after retry failure:', refundError)
+        }
+      }
+
+      throw error
     }
-
-    const { avatarId, isPhotoAvatar } = await resolveAvatarContext(userId, video.avatar_id)
-
-    const refreshedVideo: Video = {
-      ...video,
-      status: 'pending',
-      heygen_video_id: null,
-      video_url: null,
-      error_message: null,
-    }
-
-    void runHeygenGeneration(refreshedVideo, avatarId, isPhotoAvatar)
   }
 
   /**
