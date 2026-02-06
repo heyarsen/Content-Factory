@@ -161,7 +161,7 @@ export const en = {
         open_navigation: "Open navigation",
     },
     sidebar: {
-        content_fabrica: "Content Fabrica",
+        content_fabrica: "AI SMM",
         creator_studio: "Creator Studio",
         administration: "Administration",
         free_plan: "Free Plan",

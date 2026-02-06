@@ -65,7 +65,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 <Sparkles className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm font-semibold tracking-wide text-slate-500 uppercase">Content Fabrica</p>
+                <p className="text-sm font-semibold tracking-wide text-slate-500 uppercase">AI SMM</p>
                 <p className="text-lg font-bold text-primary">Creator Studio</p>
               </div>
             </Link>
