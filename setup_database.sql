@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS videos (
   style TEXT NOT NULL CHECK (lower(style) IN ('casual', 'cinematic', 'educational', 'energetic', 'professional', 'realistic', 'anime', '3d render', 'cyberpunk', 'minimalist', 'documentary')),
   duration INTEGER NOT NULL CHECK (duration >= 15 AND duration <= 180),
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'generating', 'completed', 'failed')),
+  caption TEXT,
   heygen_video_id TEXT,
   video_url TEXT,
   error_message TEXT,
