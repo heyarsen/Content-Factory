@@ -10,6 +10,7 @@ import {
 import type { Video } from '../types/database.js'
 import { getMaxCharactersForDuration, getMaxWordsForDuration } from '../lib/scriptLimits.js'
 import { VideoService } from './videoService.js'
+import { ensureVideoCaption } from './captionService.js'
 
 /**
  * Map Sora task status to internal video status
@@ -73,6 +74,12 @@ async function updateVideoWithSoraSuccess(
     if (error) {
         console.error('[Sora Service] Failed to update video record:', error)
         throw new Error(`Failed to update video record: ${error.message}`)
+    }
+
+    try {
+        await ensureVideoCaption(videoId)
+    } catch (captionError: any) {
+        console.error('[Sora Service] Failed to generate caption:', captionError?.message || captionError)
     }
 
     console.log('[Sora Service] Video record updated successfully')
