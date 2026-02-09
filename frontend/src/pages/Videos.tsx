@@ -64,6 +64,7 @@ export function Videos() {
   const [postDescription, setPostDescription] = useState('')
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false)
   const [isPosting, setIsPosting] = useState(false)
+  const autoCaptionedVideoRef = useRef<string | null>(null)
 
   const notifiedVideosRef = useRef<Set<string>>(new Set())
 
@@ -346,12 +347,12 @@ export function Videos() {
 
   const handleOpenPostModal = (video: VideoRecord) => {
     setSelectedVideoForPost(video)
-    setPostDescription(video.topic) // Default description
+    setPostDescription(video.caption || video.topic) // Default description
     setIsPostModalOpen(true)
   }
 
-  const handleGenerateDescription = async () => {
-    if (!selectedVideoForPost) return
+  const handleGenerateDescription = useCallback(async (): Promise<string | null> => {
+    if (!selectedVideoForPost) return null
 
     setIsGeneratingDescription(true)
     try {
@@ -366,6 +367,7 @@ export function Videos() {
         title: t('videos.desc_gen_success_title'),
         message: t('videos.desc_gen_success_message'),
       })
+      return description
     } catch (error) {
       console.error('Failed to generate description:', error)
       addNotification({
@@ -373,10 +375,23 @@ export function Videos() {
         title: t('videos.desc_gen_fail_title'),
         message: t('videos.desc_gen_fail_message'),
       })
+      return null
     } finally {
       setIsGeneratingDescription(false)
     }
-  }
+  }, [addNotification, selectedVideoForPost, t])
+
+  useEffect(() => {
+    if (!isPostModalOpen || !selectedVideoForPost) return
+
+    const defaultDescription = selectedVideoForPost.caption || selectedVideoForPost.topic || ''
+    setPostDescription(defaultDescription)
+
+    if (!selectedVideoForPost.caption && autoCaptionedVideoRef.current !== selectedVideoForPost.id) {
+      autoCaptionedVideoRef.current = selectedVideoForPost.id
+      void handleGenerateDescription()
+    }
+  }, [handleGenerateDescription, isPostModalOpen, selectedVideoForPost])
 
   const handlePostToSocial = async () => {
     if (!selectedVideoForPost || selectedPlatforms.length === 0) {
@@ -390,10 +405,17 @@ export function Videos() {
 
     setIsPosting(true)
     try {
+      let captionToUse = postDescription.trim()
+
+      if (!captionToUse) {
+        const generatedCaption = await handleGenerateDescription()
+        captionToUse = generatedCaption?.trim() || postDescription.trim()
+      }
+
       await api.post('/api/posts/schedule', {
         video_id: selectedVideoForPost.id,
         platforms: selectedPlatforms,
-        caption: postDescription,
+        caption: captionToUse,
       })
 
       addNotification({
