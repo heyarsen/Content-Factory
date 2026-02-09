@@ -4,6 +4,7 @@ import { ResearchService } from './researchService.js'
 import { VideoService } from './videoService.js'
 import { SubscriptionService } from './subscriptionService.js'
 import { postVideo } from '../lib/uploadpost.js'
+import { generateVideoCaption } from './captionService.js'
 import { DateTime } from 'luxon'
 
 export class AutomationService {
@@ -1148,43 +1149,16 @@ export class AutomationService {
 
     // Refresh video statuses
     if (itemsWithVideos && itemsWithVideos.length > 0) {
-      const { getVideoStatus } = await import('../lib/heygen.js')
       for (const item of itemsWithVideos) {
         const video = item.videos as any
 
-        // [FIX] Check if video is already completed (e.g. by Sora service or other background job)
+        // Check if video is already completed (e.g. by Sora service or other background job)
         if (video?.status === 'completed' && video?.video_url) {
           console.log(`[Distribution] Video ${video.id} is already completed, updating plan item ${item.id} status`)
           await supabase
             .from('video_plan_items')
             .update({ status: 'completed' })
             .eq('id', item.id)
-          continue
-        }
-
-        if (video?.heygen_video_id) {
-          try {
-            const status = await getVideoStatus(video.heygen_video_id)
-            await supabase
-              .from('videos')
-              .update({
-                status: status.status === 'completed' ? 'completed' : (status.status === 'failed' ? 'failed' : 'generating'),
-                video_url: status.video_url || video.video_url,
-                error_message: status.error || null,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', video.id)
-
-            // If video completed, update plan item status
-            if (status.status === 'completed' && status.video_url) {
-              await supabase
-                .from('video_plan_items')
-                .update({ status: 'completed' })
-                .eq('id', item.id)
-            }
-          } catch (error: any) {
-            console.error(`[Distribution] Error refreshing video status for ${video.id}:`, error)
-          }
         }
       }
     }
@@ -1483,7 +1457,7 @@ export class AutomationService {
         // Fetch video to check status and URL
         const { data: videoData } = await supabase
           .from('videos')
-          .select('video_url, status, topic, heygen_video_id')
+          .select('video_url, status, topic, script')
           .eq('id', item.video_id)
           .single()
 
@@ -1492,51 +1466,9 @@ export class AutomationService {
           continue
         }
 
-        // If video is still generating, check HeyGen status
         if (videoData.status === 'generating' || videoData.status === 'pending') {
-          if (videoData.heygen_video_id) {
-            try {
-              const { getVideoStatus } = await import('../lib/heygen.js')
-              const heygenStatus = await getVideoStatus(videoData.heygen_video_id)
-
-              if (heygenStatus.status === 'completed' && heygenStatus.video_url) {
-                // Update video status
-                await supabase
-                  .from('videos')
-                  .update({
-                    status: 'completed',
-                    video_url: heygenStatus.video_url,
-                    updated_at: new Date().toISOString(),
-                  })
-                  .eq('id', item.video_id)
-
-                // Update videoData for use below
-                videoData.status = 'completed'
-                videoData.video_url = heygenStatus.video_url
-
-                console.log(`[Distribution] Video ${item.video_id} completed, updated status`)
-              } else if (heygenStatus.status === 'failed') {
-                console.log(`[Distribution] Video ${item.video_id} failed, skipping posting`)
-                await supabase
-                  .from('video_plan_items')
-                  .update({
-                    status: 'failed',
-                    error_message: heygenStatus.error || 'Video generation failed',
-                  })
-                  .eq('id', item.id)
-                continue
-              } else {
-                console.log(`[Distribution] Video ${item.video_id} still generating (status: ${heygenStatus.status}), skipping`)
-                continue
-              }
-            } catch (statusError: any) {
-              console.error(`[Distribution] Error checking video status for ${item.video_id}:`, statusError.message)
-              continue
-            }
-          } else {
-            console.log(`[Distribution] Video ${item.video_id} still generating, skipping`)
-            continue
-          }
+          console.log(`[Distribution] Video ${item.video_id} still generating, skipping`)
+          continue
         }
 
         if (videoData.status !== 'completed' || !videoData.video_url) {
@@ -1662,13 +1594,36 @@ export class AutomationService {
         }
 
         // Call upload-post.com API
+        let captionToUse = item.caption?.trim()
+        if (!captionToUse) {
+          try {
+            captionToUse = await generateVideoCaption({
+              topic: videoData.topic || item.topic || '',
+              script: videoData.script || null,
+            })
+          } catch (captionError) {
+            console.warn(`[Distribution] Failed to auto-generate caption for item ${item.id}:`, captionError)
+          }
+
+          if (captionToUse) {
+            await supabase
+              .from('video_plan_items')
+              .update({ caption: captionToUse })
+              .eq('id', item.id)
+          }
+        }
+
+        if (!captionToUse) {
+          captionToUse = item.topic || videoData.topic || ''
+        }
+
         console.log(`[Distribution] Posting video ${item.video_id} to platforms: ${platforms.join(', ')}`)
         let postResponse
         try {
           postResponse = await postVideo({
             videoUrl: videoData.video_url,
             platforms: platforms as string[],
-            caption: item.caption || item.topic || videoData.topic || '',
+            caption: captionToUse,
             scheduledTime,
             userId: uploadPostUserId,
             asyncUpload: true,
@@ -2175,7 +2130,7 @@ export class AutomationService {
     // Fetch video to verify status and URL
     const { data: videoData } = await supabase
       .from('videos')
-      .select('video_url, status, topic')
+      .select('video_url, status, topic, script')
       .eq('id', item.video_id)
       .single()
 
@@ -2275,10 +2230,33 @@ export class AutomationService {
       }
     } else {
       // Send to Upload-Post immediately (with or without scheduled_date)
+      let captionToUse = item.caption?.trim()
+      if (!captionToUse) {
+        try {
+          captionToUse = await generateVideoCaption({
+            topic: item.topic || videoData.topic || '',
+            script: videoData.script || null,
+          })
+        } catch (captionError) {
+          console.warn(`[Distribution] Failed to auto-generate caption for item ${item.id}:`, captionError)
+        }
+
+        if (captionToUse) {
+          await supabase
+            .from('video_plan_items')
+            .update({ caption: captionToUse })
+            .eq('id', item.id)
+        }
+      }
+
+      if (!captionToUse) {
+        captionToUse = item.topic || videoData.topic || ''
+      }
+
       const postResponse = await postVideo({
         videoUrl: videoData.video_url,
         platforms: platforms as string[],
-        caption: item.caption || item.topic || '',
+        caption: captionToUse,
         scheduledTime: skipScheduling ? undefined : scheduledTime,
         userId: uploadPostUserId,
         asyncUpload: true,
@@ -2443,17 +2421,34 @@ export class AutomationService {
           .select('caption, topic')
           .eq('video_id', firstPost.video_id)
           .single()
-        if (planItem) {
-          caption = planItem.caption || planItem.topic || ''
+        const { data: videoData } = await supabase
+          .from('videos')
+          .select('topic, script')
+          .eq('id', firstPost.video_id)
+          .single()
+
+        if (planItem?.caption) {
+          caption = planItem.caption
         } else {
-          const { data: videoData } = await supabase
-            .from('videos')
-            .select('topic')
-            .eq('id', firstPost.video_id)
-            .single()
-          if (videoData) {
-            caption = videoData.topic || ''
+          try {
+            caption = await generateVideoCaption({
+              topic: planItem?.topic || videoData?.topic || '',
+              script: videoData?.script || null,
+            })
+          } catch (captionError) {
+            console.warn(`[Scheduled Posts] Failed to auto-generate caption for video ${firstPost.video_id}:`, captionError)
           }
+
+          if (caption && planItem) {
+            await supabase
+              .from('video_plan_items')
+              .update({ caption })
+              .eq('video_id', firstPost.video_id)
+          }
+        }
+
+        if (!caption) {
+          caption = planItem?.topic || videoData?.topic || ''
         }
 
         console.log(`[Scheduled Posts] Sending ${platforms.length} posts for video ${firstPost.video_id} to Upload-Post`)
