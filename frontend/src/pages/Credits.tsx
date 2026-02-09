@@ -532,6 +532,28 @@ export function Credits() {
                         <span className="text-2xl font-bold text-brand-600">${plan.price_usd.toFixed(2)}</span>
                         <span className="text-sm text-slate-500">USD</span>
                       </div>
+                      <ul className="mb-6 space-y-2">
+                        {[
+                          t('credits.feature_manual_mode'),
+                          t('credits.feature_automation'),
+                          t('credits.feature_ai_scriptwriter'),
+                          t('credits.feature_content_plan'),
+                          t('credits.feature_auto_posting'),
+                          t('credits.feature_social_networks', { count: 8 }),
+                          t('credits.feature_videos', { count: plan.credits }),
+                          t('credits.feature_top_up'),
+                        ].map((feature) => (
+                          <li
+                            key={`${plan.id}-${feature}`}
+                            className="flex items-center gap-3 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 shadow-sm"
+                          >
+                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-brand-600">
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                            </span>
+                            <span className="font-medium text-slate-700">{feature}</span>
+                          </li>
+                        ))}
+                      </ul>
                       <Button
                         onClick={() => handlePurchase(plan.id)}
                         disabled={purchasing === plan.id || isCurrentPlan}
