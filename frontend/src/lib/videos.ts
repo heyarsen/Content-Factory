@@ -9,10 +9,10 @@ export interface VideoRecord {
   style: 'casual' | 'professional' | 'energetic' | 'educational'
   duration: number
   status: VideoStatus
-  provider?: 'heygen' | 'sora'
+  provider?: 'sora'
+  caption: string | null
   video_url: string | null
   error_message: string | null
-  heygen_video_id: string | null
   sora_task_id?: string | null
   created_at: string
   updated_at: string
@@ -24,7 +24,7 @@ export interface CreateVideoPayload {
   script?: string
   style: VideoRecord['style']
   duration: number
-  provider?: 'heygen' | 'sora'
+  provider?: 'sora'
   aspect_ratio?: string
   dimension?: {
     width: number
@@ -91,4 +91,3 @@ export async function generateDescription(id: string, topic?: string, script?: s
   const { data } = await api.post(`/api/videos/${id}/generate-description`, { topic, script })
   return data
 }
-

@@ -9,6 +9,7 @@ export interface Video {
   provider?: 'heygen' | 'sora'
   heygen_video_id: string | null
   sora_task_id?: string | null
+  caption: string | null
   video_url: string | null
   avatar_id: string | null
   error_message: string | null
@@ -123,4 +124,3 @@ export interface ContentResearch {
   research_data: Record<string, any>
   created_at: string
 }
-
