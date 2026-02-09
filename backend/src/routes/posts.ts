@@ -2,6 +2,7 @@ import { Router, Response } from 'express'
 import { supabase } from '../lib/supabase.js'
 import { authenticate, AuthRequest, requireSubscription } from '../middleware/auth.js'
 import { postVideo, getUploadStatus } from '../lib/uploadpost.js'
+import { generateVideoCaption } from '../services/captionService.js'
 
 const router = Router()
 
@@ -54,21 +55,21 @@ router.post('/schedule', authenticate, requireSubscription, async (req: AuthRequ
 
     // Call upload-post.com API once for all platforms
     try {
-      // Use sharable URL if available, otherwise use direct video URL
-      let videoUrlToUse = video.video_url
+      const videoUrlToUse = video.video_url
 
-      // Try to get sharable URL from HeyGen if we have a heygen_video_id
-      if (video.heygen_video_id && !video.video_url?.includes('share')) {
+      let captionToUse = typeof caption === 'string' ? caption.trim() : ''
+      if (!captionToUse) {
         try {
-          const { getSharableVideoUrl } = await import('../lib/heygen.js')
-          const shareResult = await getSharableVideoUrl(video.heygen_video_id)
-          if (shareResult.share_url) {
-            videoUrlToUse = shareResult.share_url
-            console.log('Using HeyGen sharable URL:', videoUrlToUse)
-          }
-        } catch (shareError) {
-          console.warn('Failed to get sharable URL, using direct URL:', shareError)
+          captionToUse = await generateVideoCaption({
+            topic: video.topic,
+            script: video.script || null,
+          })
+        } catch (captionError) {
+          console.warn('Failed to auto-generate caption, using topic fallback:', captionError)
         }
+      }
+      if (!captionToUse) {
+        captionToUse = video.topic || ''
       }
 
       console.log('Posting video to Upload-Post:', {
@@ -76,14 +77,13 @@ router.post('/schedule', authenticate, requireSubscription, async (req: AuthRequ
         originalUrl: video.video_url,
         platforms,
         userId: uploadPostUserId,
-        caption: caption || video.topic,
-        hasHeygenId: !!video.heygen_video_id,
+        caption: captionToUse,
       })
 
       const postResponse = await postVideo({
         videoUrl: videoUrlToUse,
         platforms: platforms, // Array of platform names
-        caption: caption || video.topic,
+        caption: captionToUse,
         scheduledTime: scheduled_time || undefined,
         userId: uploadPostUserId,
         asyncUpload: true, // Use async upload to handle multiple platforms
@@ -386,4 +386,3 @@ async function pollUploadStatus(
 }
 
 export default router
-
