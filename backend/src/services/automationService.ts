@@ -8,6 +8,26 @@ import { generateVideoCaption } from './captionService.js'
 import { DateTime } from 'luxon'
 
 export class AutomationService {
+  private static hasScheduledTimePassed(
+    scheduledTime: string | null | undefined,
+    nowInPlanTz: DateTime
+  ): boolean {
+    if (!scheduledTime) return true
+
+    const normalizedTime = scheduledTime.split(':').length === 3
+      ? scheduledTime
+      : `${scheduledTime}:00`
+
+    const scheduledDateTime = DateTime.fromFormat(
+      `${nowInPlanTz.toFormat('yyyy-MM-dd')} ${normalizedTime}`,
+      'yyyy-MM-dd HH:mm:ss',
+      { zone: nowInPlanTz.zoneName || 'UTC' }
+    )
+
+    if (!scheduledDateTime.isValid) return false
+    return scheduledDateTime <= nowInPlanTz
+  }
+
   private static buildScriptPrompt({
     topic,
     description,
@@ -61,9 +81,9 @@ export class AutomationService {
           const triggerMinutes = triggerHour * 60 + triggerMinute
           const currentMinutes = nowInPlanTz.hour * 60 + nowInPlanTz.minute
 
-          // Process if we're at or past the trigger time (within 5 minutes window)
-          // This ensures we catch the trigger time exactly when cron runs
-          shouldProcessPlan = currentMinutes >= triggerMinutes && (currentMinutes - triggerMinutes) <= 5
+          // Process if we're at or past the trigger time.
+          // This avoids missing runs when a cron tick is delayed beyond a narrow time window.
+          shouldProcessPlan = currentMinutes >= triggerMinutes
         }
 
         if (!shouldProcessPlan) {
@@ -83,17 +103,16 @@ export class AutomationService {
           .eq('status', 'pending')
           .eq('scheduled_date', today)
 
-        // Only filter by scheduled_time for time-based triggers
-        if (plan.auto_schedule_trigger === 'time_based' && plan.trigger_time) {
-          query.eq('scheduled_time', plan.trigger_time)
-        }
+        const { data: pendingItems } = await query.limit(100)
 
-        const { data: pendingItems } = await query.limit(plan.videos_per_day)
+        const duePendingItems = (pendingItems || [])
+          .filter(item => plan.auto_schedule_trigger !== 'time_based' || this.hasScheduledTimePassed(item.scheduled_time, nowInPlanTz))
+          .slice(0, plan.videos_per_day)
 
-        if (pendingItems && pendingItems.length > 0) {
+        if (duePendingItems.length > 0) {
           const researchPromises: Promise<void>[] = []
 
-          for (const item of pendingItems) {
+          for (const item of duePendingItems) {
             // If item has a topic but status is pending, check if we need to research it
             if (plan.auto_research) {
               if (item.topic) {
@@ -138,16 +157,15 @@ export class AutomationService {
           .eq('status', 'ready')
           .is('script', null)
 
-        // If trigger_time is set, prioritize items matching that time
-        if (plan.auto_schedule_trigger === 'time_based' && plan.trigger_time) {
-          readyQuery.eq('scheduled_time', plan.trigger_time)
-        }
+        const { data: readyItems } = await readyQuery.limit(100)
 
-        const { data: readyItems } = await readyQuery.limit(plan.videos_per_day)
+        const dueReadyItems = (readyItems || [])
+          .filter(item => plan.auto_schedule_trigger !== 'time_based' || this.hasScheduledTimePassed(item.scheduled_time, nowInPlanTz))
+          .slice(0, plan.videos_per_day)
 
         // Generate scripts for today's items (including items that are already ready from previous runs)
-        if (readyItems && readyItems.length > 0) {
-          console.log(`[Automation] Found ${readyItems.length} ready items for script generation at trigger time`)
+        if (dueReadyItems.length > 0) {
+          console.log(`[Automation] Found ${dueReadyItems.length} ready items for script generation at trigger time`)
           await this.generateScriptsForTodayItems(plan.id, today, plan.auto_approve || false)
           // Small delay to ensure script generation updates are reflected
           await new Promise(resolve => setTimeout(resolve, 2000))
@@ -164,7 +182,7 @@ export class AutomationService {
           today,
           plan.user_id,
           plan.auto_create || false,
-          plan.auto_schedule_trigger === 'time_based' ? plan.trigger_time || undefined : undefined
+          plan.auto_schedule_trigger === 'time_based' ? nowInPlanTz.toFormat('HH:mm:ss') : undefined
         )
       } catch (error) {
         console.error(`Error processing plan ${plan.id}:`, error)
@@ -391,7 +409,7 @@ export class AutomationService {
   /**
    * Generate videos for today's approved items in a specific plan
    */
-  static async generateVideosForTodayItems(planId: string, today: string, userId: string, autoCreate: boolean, triggerTime?: string): Promise<void> {
+  static async generateVideosForTodayItems(planId: string, today: string, userId: string, autoCreate: boolean, dueTime?: string): Promise<void> {
     // Only auto-create if auto_create is enabled
     if (!autoCreate) return
 
@@ -412,9 +430,9 @@ export class AutomationService {
       .is('video_id', null)
       .not('script', 'is', null)
 
-    // If trigger_time is provided, prioritize items matching that time
-    if (triggerTime) {
-      query.eq('scheduled_time', triggerTime)
+    // If dueTime is provided, only process videos that are due now or overdue
+    if (dueTime) {
+      query.lte('scheduled_time', dueTime)
     }
 
     const { data: items } = await query.limit(10)
@@ -576,15 +594,15 @@ export class AutomationService {
           .not('topic', 'is', null)
           .is('research_data', null)
 
-        if (plan.auto_schedule_trigger === 'time_based' && plan.trigger_time) {
-          query.eq('scheduled_time', plan.trigger_time)
-        }
+        const { data: items } = await query.limit(100)
 
-        const { data: items } = await query.limit(10)
+        const dueItems = (items || []).filter(item =>
+          plan.auto_schedule_trigger !== 'time_based' || this.hasScheduledTimePassed(item.scheduled_time, nowInPlanTz)
+        )
 
-        if (!items || items.length === 0) continue
+        if (dueItems.length === 0) continue
 
-        for (const item of items) {
+        for (const item of dueItems) {
           try {
             if (!item.topic) continue
 
@@ -654,11 +672,7 @@ export class AutomationService {
           .is('script', null)
           .not('research_data', 'is', null)
 
-        if (plan.auto_schedule_trigger === 'time_based' && plan.trigger_time) {
-          researchQuery.eq('scheduled_time', plan.trigger_time)
-        }
-
-        const { data: itemsWithResearch } = await researchQuery.limit(10)
+        const { data: itemsWithResearch } = await researchQuery.limit(100)
 
         // Get items with topics but no research for today
         const topicQuery = supabase
@@ -671,13 +685,10 @@ export class AutomationService {
           .is('research_data', null)
           .not('topic', 'is', null)
 
-        if (plan.auto_schedule_trigger === 'time_based' && plan.trigger_time) {
-          topicQuery.eq('scheduled_time', plan.trigger_time)
-        }
-
-        const { data: itemsWithTopic } = await topicQuery.limit(10)
+        const { data: itemsWithTopic } = await topicQuery.limit(100)
 
         const allItems = [...(itemsWithResearch || []), ...(itemsWithTopic || [])]
+          .filter(item => plan.auto_schedule_trigger !== 'time_based' || this.hasScheduledTimePassed(item.scheduled_time, nowInPlanTz))
 
         if (allItems.length === 0) continue
 
@@ -791,15 +802,15 @@ export class AutomationService {
           .is('video_id', null)
           .not('script', 'is', null)
 
-        if (plan.auto_schedule_trigger === 'time_based' && plan.trigger_time) {
-          query.eq('scheduled_time', plan.trigger_time)
-        }
+        const { data: items } = await query.limit(20)
 
-        const { data: items } = await query.limit(5)
+        const dueItems = (items || []).filter(item =>
+          plan.auto_schedule_trigger !== 'time_based' || this.hasScheduledTimePassed(item.scheduled_time, nowInPlanTz)
+        )
 
-        if (!items || items.length === 0) continue
+        if (dueItems.length === 0) continue
 
-        for (const item of items) {
+        for (const item of dueItems) {
           try {
             // Double-check: Verify no video already exists for this plan_item_id
             // This prevents creating duplicate videos if the video_id wasn't set in the plan_item yet
@@ -2308,9 +2319,9 @@ export class AutomationService {
     const nowWithBuffer = new Date(now.getTime() + bufferMs)
     const nowWithBufferISO = nowWithBuffer.toISOString()
 
-    // Rate limiting: Process fewer posts per run to avoid hitting API limits
-    // Process max 3 posts per minute to stay under rate limits
-    const maxPostsPerRun = parseInt(process.env.UPLOADPOST_MAX_POSTS_PER_RUN || '3', 10)
+    // Rate limiting: Process a bounded number of posts per run to avoid hitting API limits
+    // Default increased to 20 to reduce delayed publishes when many posts are due together
+    const maxPostsPerRun = parseInt(process.env.UPLOADPOST_MAX_POSTS_PER_RUN || '20', 10)
 
     // Find scheduled posts that are due (scheduled_time <= now + buffer) and still pending
     // Order by scheduled_time to process oldest first
