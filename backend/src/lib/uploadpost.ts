@@ -1,6 +1,21 @@
 import axios from 'axios'
 
 const UPLOADPOST_API_URL = 'https://api.upload-post.com/api'
+const MAX_UPLOADPOST_TITLE_LENGTH = 100
+
+export function buildUploadPostTitle(caption?: string): string {
+  const fallbackTitle = 'Video Post'
+  const rawTitle = caption?.trim() || fallbackTitle
+
+  if (rawTitle.length <= MAX_UPLOADPOST_TITLE_LENGTH) {
+    return rawTitle
+  }
+
+  const ellipsis = '...'
+  const truncatedTitle = rawTitle.slice(0, MAX_UPLOADPOST_TITLE_LENGTH - ellipsis.length).trimEnd()
+
+  return `${truncatedTitle}${ellipsis}`
+}
 
 function getUploadPostKey(): string {
   const key = process.env.UPLOADPOST_KEY
@@ -267,7 +282,13 @@ export async function postVideo(
     // Required fields
     formData.append('user', request.userId)
     formData.append('video', request.videoUrl) // Can be URL or file
-    formData.append('title', request.caption || 'Video Post')
+    const postTitle = buildUploadPostTitle(request.caption)
+    if (request.caption && request.caption.trim().length > postTitle.length) {
+      console.warn(
+        `[Upload-Post] Truncated title from ${request.caption.trim().length} to ${postTitle.length} characters to satisfy platform limits.`
+      )
+    }
+    formData.append('title', postTitle)
     
     // Platform array - must be sent as platform[] for each platform
     request.platforms.forEach(platform => {
@@ -666,4 +687,3 @@ export async function getUploadStatus(uploadId: string): Promise<UploadPostRespo
     )
   }
 }
-
