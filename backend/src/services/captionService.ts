@@ -13,8 +13,7 @@ function enforceCaptionLimit(caption: string): string {
     return trimmedCaption
   }
 
-  const ellipsis = '...'
-  return `${trimmedCaption.slice(0, MAX_CAPTION_LENGTH - ellipsis.length).trimEnd()}${ellipsis}`
+  return trimmedCaption.slice(0, MAX_CAPTION_LENGTH).trimEnd()
 }
 
 export async function generateVideoCaption({ topic, script }: CaptionInput): Promise<string> {
@@ -32,6 +31,7 @@ Requirements:
 - Include relevant hashtags (3-5)
 - Platform-optimized (works for Instagram, TikTok, YouTube Shorts, etc.)
 - No more than 100 characters total (including hashtags and CTA)
+- Do not add ellipsis (...) or any trailing truncation marker
 - Include a call-to-action
 - Professional but approachable tone
 

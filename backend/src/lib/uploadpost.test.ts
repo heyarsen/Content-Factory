@@ -14,13 +14,12 @@ describe('buildUploadPostTitle', () => {
     assert.equal(buildUploadPostTitle(caption), caption)
   })
 
-  it('truncates long captions to 100 characters with ellipsis', () => {
+  it('truncates long captions to exactly 100 characters without ellipsis', () => {
     const longCaption = 'A'.repeat(199)
     const result = buildUploadPostTitle(longCaption)
 
     assert.equal(result.length, 100)
-    assert.ok(result.endsWith('...'))
-    assert.equal(result, `${'A'.repeat(97)}...`)
+    assert.equal(result, 'A'.repeat(100))
   })
 })
 
@@ -30,7 +29,6 @@ describe('buildUploadPostDescription', () => {
     const result = buildUploadPostDescription(longCaption)
 
     assert.equal(result.length, 100)
-    assert.ok(result.endsWith('...'))
-    assert.equal(result, `${'B'.repeat(97)}...`)
+    assert.equal(result, 'B'.repeat(100))
   })
 })

@@ -11,10 +11,7 @@ export function buildUploadPostTitle(caption?: string): string {
     return rawTitle
   }
 
-  const ellipsis = '...'
-  const truncatedTitle = rawTitle.slice(0, MAX_UPLOADPOST_TITLE_LENGTH - ellipsis.length).trimEnd()
-
-  return `${truncatedTitle}${ellipsis}`
+  return rawTitle.slice(0, MAX_UPLOADPOST_TITLE_LENGTH).trimEnd()
 }
 
 export function buildUploadPostDescription(caption?: string): string {
