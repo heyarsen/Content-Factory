@@ -17,6 +17,10 @@ export function buildUploadPostTitle(caption?: string): string {
   return `${truncatedTitle}${ellipsis}`
 }
 
+export function buildUploadPostDescription(caption?: string): string {
+  return buildUploadPostTitle(caption)
+}
+
 function getUploadPostKey(): string {
   const key = process.env.UPLOADPOST_KEY
   if (!key) {
@@ -303,8 +307,9 @@ export async function postVideo(
     }
 
     // Optional fields
-    if (request.caption) {
-      formData.append('description', request.caption)
+    const postDescription = buildUploadPostDescription(request.caption)
+    if (postDescription) {
+      formData.append('description', postDescription)
     }
 
     // Option to skip scheduling in Upload-Post and send at the right time instead
