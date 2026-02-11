@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { buildUploadPostTitle } from './uploadpost'
+import { buildUploadPostDescription, buildUploadPostTitle } from './uploadpost'
 
 describe('buildUploadPostTitle', () => {
   it('uses fallback title when caption is missing', () => {
@@ -21,5 +21,16 @@ describe('buildUploadPostTitle', () => {
     assert.equal(result.length, 100)
     assert.ok(result.endsWith('...'))
     assert.equal(result, `${'A'.repeat(97)}...`)
+  })
+})
+
+describe('buildUploadPostDescription', () => {
+  it('uses the same max-100 normalization as post title', () => {
+    const longCaption = 'B'.repeat(150)
+    const result = buildUploadPostDescription(longCaption)
+
+    assert.equal(result.length, 100)
+    assert.ok(result.endsWith('...'))
+    assert.equal(result, `${'B'.repeat(97)}...`)
   })
 })

@@ -5,6 +5,18 @@ interface CaptionInput {
   script?: string | null
 }
 
+const MAX_CAPTION_LENGTH = 100
+
+function enforceCaptionLimit(caption: string): string {
+  const trimmedCaption = caption.trim()
+  if (trimmedCaption.length <= MAX_CAPTION_LENGTH) {
+    return trimmedCaption
+  }
+
+  const ellipsis = '...'
+  return `${trimmedCaption.slice(0, MAX_CAPTION_LENGTH - ellipsis.length).trimEnd()}${ellipsis}`
+}
+
 export async function generateVideoCaption({ topic, script }: CaptionInput): Promise<string> {
   if (!topic && !script) {
     return ''
@@ -19,7 +31,7 @@ Requirements:
 - Engaging and click-worthy
 - Include relevant hashtags (3-5)
 - Platform-optimized (works for Instagram, TikTok, YouTube Shorts, etc.)
-- 100-200 characters for the main caption
+- No more than 100 characters total (including hashtags and CTA)
 - Include a call-to-action
 - Professional but approachable tone
 
@@ -41,5 +53,5 @@ Output ONLY the caption text, nothing else.`
     max_tokens: 300,
   })
 
-  return completion.choices[0]?.message?.content?.trim() || ''
+  return enforceCaptionLimit(completion.choices[0]?.message?.content?.trim() || '')
 }
