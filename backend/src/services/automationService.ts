@@ -4,9 +4,30 @@ import { ResearchService } from './researchService.js'
 import { VideoService } from './videoService.js'
 import { SubscriptionService } from './subscriptionService.js'
 import { postVideo } from '../lib/uploadpost.js'
+import { generateVideoCaption } from './captionService.js'
 import { DateTime } from 'luxon'
 
 export class AutomationService {
+  private static hasScheduledTimePassed(
+    scheduledTime: string | null | undefined,
+    nowInPlanTz: DateTime
+  ): boolean {
+    if (!scheduledTime) return true
+
+    const normalizedTime = scheduledTime.split(':').length === 3
+      ? scheduledTime
+      : `${scheduledTime}:00`
+
+    const scheduledDateTime = DateTime.fromFormat(
+      `${nowInPlanTz.toFormat('yyyy-MM-dd')} ${normalizedTime}`,
+      'yyyy-MM-dd HH:mm:ss',
+      { zone: nowInPlanTz.zoneName || 'UTC' }
+    )
+
+    if (!scheduledDateTime.isValid) return false
+    return scheduledDateTime <= nowInPlanTz
+  }
+
   private static buildScriptPrompt({
     topic,
     description,
@@ -60,9 +81,9 @@ export class AutomationService {
           const triggerMinutes = triggerHour * 60 + triggerMinute
           const currentMinutes = nowInPlanTz.hour * 60 + nowInPlanTz.minute
 
-          // Process if we're at or past the trigger time (within 5 minutes window)
-          // This ensures we catch the trigger time exactly when cron runs
-          shouldProcessPlan = currentMinutes >= triggerMinutes && (currentMinutes - triggerMinutes) <= 5
+          // Process if we're at or past the trigger time.
+          // This avoids missing runs when a cron tick is delayed beyond a narrow time window.
+          shouldProcessPlan = currentMinutes >= triggerMinutes
         }
 
         if (!shouldProcessPlan) {
@@ -82,17 +103,16 @@ export class AutomationService {
           .eq('status', 'pending')
           .eq('scheduled_date', today)
 
-        // Only filter by scheduled_time for time-based triggers
-        if (plan.auto_schedule_trigger === 'time_based' && plan.trigger_time) {
-          query.eq('scheduled_time', plan.trigger_time)
-        }
+        const { data: pendingItems } = await query.limit(100)
 
-        const { data: pendingItems } = await query.limit(plan.videos_per_day)
+        const duePendingItems = (pendingItems || [])
+          .filter(item => plan.auto_schedule_trigger !== 'time_based' || this.hasScheduledTimePassed(item.scheduled_time, nowInPlanTz))
+          .slice(0, plan.videos_per_day)
 
-        if (pendingItems && pendingItems.length > 0) {
+        if (duePendingItems.length > 0) {
           const researchPromises: Promise<void>[] = []
 
-          for (const item of pendingItems) {
+          for (const item of duePendingItems) {
             // If item has a topic but status is pending, check if we need to research it
             if (plan.auto_research) {
               if (item.topic) {
@@ -137,16 +157,15 @@ export class AutomationService {
           .eq('status', 'ready')
           .is('script', null)
 
-        // If trigger_time is set, prioritize items matching that time
-        if (plan.auto_schedule_trigger === 'time_based' && plan.trigger_time) {
-          readyQuery.eq('scheduled_time', plan.trigger_time)
-        }
+        const { data: readyItems } = await readyQuery.limit(100)
 
-        const { data: readyItems } = await readyQuery.limit(plan.videos_per_day)
+        const dueReadyItems = (readyItems || [])
+          .filter(item => plan.auto_schedule_trigger !== 'time_based' || this.hasScheduledTimePassed(item.scheduled_time, nowInPlanTz))
+          .slice(0, plan.videos_per_day)
 
         // Generate scripts for today's items (including items that are already ready from previous runs)
-        if (readyItems && readyItems.length > 0) {
-          console.log(`[Automation] Found ${readyItems.length} ready items for script generation at trigger time`)
+        if (dueReadyItems.length > 0) {
+          console.log(`[Automation] Found ${dueReadyItems.length} ready items for script generation at trigger time`)
           await this.generateScriptsForTodayItems(plan.id, today, plan.auto_approve || false)
           // Small delay to ensure script generation updates are reflected
           await new Promise(resolve => setTimeout(resolve, 2000))
@@ -163,7 +182,7 @@ export class AutomationService {
           today,
           plan.user_id,
           plan.auto_create || false,
-          plan.auto_schedule_trigger === 'time_based' ? plan.trigger_time || undefined : undefined
+          plan.auto_schedule_trigger === 'time_based' ? nowInPlanTz.toFormat('HH:mm:ss') : undefined
         )
       } catch (error) {
         console.error(`Error processing plan ${plan.id}:`, error)
@@ -390,7 +409,7 @@ export class AutomationService {
   /**
    * Generate videos for today's approved items in a specific plan
    */
-  static async generateVideosForTodayItems(planId: string, today: string, userId: string, autoCreate: boolean, triggerTime?: string): Promise<void> {
+  static async generateVideosForTodayItems(planId: string, today: string, userId: string, autoCreate: boolean, dueTime?: string): Promise<void> {
     // Only auto-create if auto_create is enabled
     if (!autoCreate) return
 
@@ -411,9 +430,9 @@ export class AutomationService {
       .is('video_id', null)
       .not('script', 'is', null)
 
-    // If trigger_time is provided, prioritize items matching that time
-    if (triggerTime) {
-      query.eq('scheduled_time', triggerTime)
+    // If dueTime is provided, only process videos that are due now or overdue
+    if (dueTime) {
+      query.lte('scheduled_time', dueTime)
     }
 
     const { data: items } = await query.limit(10)
@@ -575,15 +594,15 @@ export class AutomationService {
           .not('topic', 'is', null)
           .is('research_data', null)
 
-        if (plan.auto_schedule_trigger === 'time_based' && plan.trigger_time) {
-          query.eq('scheduled_time', plan.trigger_time)
-        }
+        const { data: items } = await query.limit(100)
 
-        const { data: items } = await query.limit(10)
+        const dueItems = (items || []).filter(item =>
+          plan.auto_schedule_trigger !== 'time_based' || this.hasScheduledTimePassed(item.scheduled_time, nowInPlanTz)
+        )
 
-        if (!items || items.length === 0) continue
+        if (dueItems.length === 0) continue
 
-        for (const item of items) {
+        for (const item of dueItems) {
           try {
             if (!item.topic) continue
 
@@ -653,11 +672,7 @@ export class AutomationService {
           .is('script', null)
           .not('research_data', 'is', null)
 
-        if (plan.auto_schedule_trigger === 'time_based' && plan.trigger_time) {
-          researchQuery.eq('scheduled_time', plan.trigger_time)
-        }
-
-        const { data: itemsWithResearch } = await researchQuery.limit(10)
+        const { data: itemsWithResearch } = await researchQuery.limit(100)
 
         // Get items with topics but no research for today
         const topicQuery = supabase
@@ -670,13 +685,10 @@ export class AutomationService {
           .is('research_data', null)
           .not('topic', 'is', null)
 
-        if (plan.auto_schedule_trigger === 'time_based' && plan.trigger_time) {
-          topicQuery.eq('scheduled_time', plan.trigger_time)
-        }
-
-        const { data: itemsWithTopic } = await topicQuery.limit(10)
+        const { data: itemsWithTopic } = await topicQuery.limit(100)
 
         const allItems = [...(itemsWithResearch || []), ...(itemsWithTopic || [])]
+          .filter(item => plan.auto_schedule_trigger !== 'time_based' || this.hasScheduledTimePassed(item.scheduled_time, nowInPlanTz))
 
         if (allItems.length === 0) continue
 
@@ -790,15 +802,15 @@ export class AutomationService {
           .is('video_id', null)
           .not('script', 'is', null)
 
-        if (plan.auto_schedule_trigger === 'time_based' && plan.trigger_time) {
-          query.eq('scheduled_time', plan.trigger_time)
-        }
+        const { data: items } = await query.limit(20)
 
-        const { data: items } = await query.limit(5)
+        const dueItems = (items || []).filter(item =>
+          plan.auto_schedule_trigger !== 'time_based' || this.hasScheduledTimePassed(item.scheduled_time, nowInPlanTz)
+        )
 
-        if (!items || items.length === 0) continue
+        if (dueItems.length === 0) continue
 
-        for (const item of items) {
+        for (const item of dueItems) {
           try {
             // Double-check: Verify no video already exists for this plan_item_id
             // This prevents creating duplicate videos if the video_id wasn't set in the plan_item yet
@@ -1148,43 +1160,16 @@ export class AutomationService {
 
     // Refresh video statuses
     if (itemsWithVideos && itemsWithVideos.length > 0) {
-      const { getVideoStatus } = await import('../lib/heygen.js')
       for (const item of itemsWithVideos) {
         const video = item.videos as any
 
-        // [FIX] Check if video is already completed (e.g. by Sora service or other background job)
+        // Check if video is already completed (e.g. by Sora service or other background job)
         if (video?.status === 'completed' && video?.video_url) {
           console.log(`[Distribution] Video ${video.id} is already completed, updating plan item ${item.id} status`)
           await supabase
             .from('video_plan_items')
             .update({ status: 'completed' })
             .eq('id', item.id)
-          continue
-        }
-
-        if (video?.heygen_video_id) {
-          try {
-            const status = await getVideoStatus(video.heygen_video_id)
-            await supabase
-              .from('videos')
-              .update({
-                status: status.status === 'completed' ? 'completed' : (status.status === 'failed' ? 'failed' : 'generating'),
-                video_url: status.video_url || video.video_url,
-                error_message: status.error || null,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', video.id)
-
-            // If video completed, update plan item status
-            if (status.status === 'completed' && status.video_url) {
-              await supabase
-                .from('video_plan_items')
-                .update({ status: 'completed' })
-                .eq('id', item.id)
-            }
-          } catch (error: any) {
-            console.error(`[Distribution] Error refreshing video status for ${video.id}:`, error)
-          }
         }
       }
     }
@@ -1483,7 +1468,7 @@ export class AutomationService {
         // Fetch video to check status and URL
         const { data: videoData } = await supabase
           .from('videos')
-          .select('video_url, status, topic, heygen_video_id')
+          .select('video_url, status, topic, script')
           .eq('id', item.video_id)
           .single()
 
@@ -1492,51 +1477,9 @@ export class AutomationService {
           continue
         }
 
-        // If video is still generating, check HeyGen status
         if (videoData.status === 'generating' || videoData.status === 'pending') {
-          if (videoData.heygen_video_id) {
-            try {
-              const { getVideoStatus } = await import('../lib/heygen.js')
-              const heygenStatus = await getVideoStatus(videoData.heygen_video_id)
-
-              if (heygenStatus.status === 'completed' && heygenStatus.video_url) {
-                // Update video status
-                await supabase
-                  .from('videos')
-                  .update({
-                    status: 'completed',
-                    video_url: heygenStatus.video_url,
-                    updated_at: new Date().toISOString(),
-                  })
-                  .eq('id', item.video_id)
-
-                // Update videoData for use below
-                videoData.status = 'completed'
-                videoData.video_url = heygenStatus.video_url
-
-                console.log(`[Distribution] Video ${item.video_id} completed, updated status`)
-              } else if (heygenStatus.status === 'failed') {
-                console.log(`[Distribution] Video ${item.video_id} failed, skipping posting`)
-                await supabase
-                  .from('video_plan_items')
-                  .update({
-                    status: 'failed',
-                    error_message: heygenStatus.error || 'Video generation failed',
-                  })
-                  .eq('id', item.id)
-                continue
-              } else {
-                console.log(`[Distribution] Video ${item.video_id} still generating (status: ${heygenStatus.status}), skipping`)
-                continue
-              }
-            } catch (statusError: any) {
-              console.error(`[Distribution] Error checking video status for ${item.video_id}:`, statusError.message)
-              continue
-            }
-          } else {
-            console.log(`[Distribution] Video ${item.video_id} still generating, skipping`)
-            continue
-          }
+          console.log(`[Distribution] Video ${item.video_id} still generating, skipping`)
+          continue
         }
 
         if (videoData.status !== 'completed' || !videoData.video_url) {
@@ -1662,13 +1605,36 @@ export class AutomationService {
         }
 
         // Call upload-post.com API
+        let captionToUse = item.caption?.trim()
+        if (!captionToUse) {
+          try {
+            captionToUse = await generateVideoCaption({
+              topic: videoData.topic || item.topic || '',
+              script: videoData.script || null,
+            })
+          } catch (captionError) {
+            console.warn(`[Distribution] Failed to auto-generate caption for item ${item.id}:`, captionError)
+          }
+
+          if (captionToUse) {
+            await supabase
+              .from('video_plan_items')
+              .update({ caption: captionToUse })
+              .eq('id', item.id)
+          }
+        }
+
+        if (!captionToUse) {
+          captionToUse = item.topic || videoData.topic || ''
+        }
+
         console.log(`[Distribution] Posting video ${item.video_id} to platforms: ${platforms.join(', ')}`)
         let postResponse
         try {
           postResponse = await postVideo({
             videoUrl: videoData.video_url,
             platforms: platforms as string[],
-            caption: item.caption || item.topic || videoData.topic || '',
+            caption: captionToUse,
             scheduledTime,
             userId: uploadPostUserId,
             asyncUpload: true,
@@ -2175,7 +2141,7 @@ export class AutomationService {
     // Fetch video to verify status and URL
     const { data: videoData } = await supabase
       .from('videos')
-      .select('video_url, status, topic')
+      .select('video_url, status, topic, script')
       .eq('id', item.video_id)
       .single()
 
@@ -2275,10 +2241,33 @@ export class AutomationService {
       }
     } else {
       // Send to Upload-Post immediately (with or without scheduled_date)
+      let captionToUse = item.caption?.trim()
+      if (!captionToUse) {
+        try {
+          captionToUse = await generateVideoCaption({
+            topic: item.topic || videoData.topic || '',
+            script: videoData.script || null,
+          })
+        } catch (captionError) {
+          console.warn(`[Distribution] Failed to auto-generate caption for item ${item.id}:`, captionError)
+        }
+
+        if (captionToUse) {
+          await supabase
+            .from('video_plan_items')
+            .update({ caption: captionToUse })
+            .eq('id', item.id)
+        }
+      }
+
+      if (!captionToUse) {
+        captionToUse = item.topic || videoData.topic || ''
+      }
+
       const postResponse = await postVideo({
         videoUrl: videoData.video_url,
         platforms: platforms as string[],
-        caption: item.caption || item.topic || '',
+        caption: captionToUse,
         scheduledTime: skipScheduling ? undefined : scheduledTime,
         userId: uploadPostUserId,
         asyncUpload: true,
@@ -2330,9 +2319,9 @@ export class AutomationService {
     const nowWithBuffer = new Date(now.getTime() + bufferMs)
     const nowWithBufferISO = nowWithBuffer.toISOString()
 
-    // Rate limiting: Process fewer posts per run to avoid hitting API limits
-    // Process max 3 posts per minute to stay under rate limits
-    const maxPostsPerRun = parseInt(process.env.UPLOADPOST_MAX_POSTS_PER_RUN || '3', 10)
+    // Rate limiting: Process a bounded number of posts per run to avoid hitting API limits
+    // Default increased to 20 to reduce delayed publishes when many posts are due together
+    const maxPostsPerRun = parseInt(process.env.UPLOADPOST_MAX_POSTS_PER_RUN || '20', 10)
 
     // Find scheduled posts that are due (scheduled_time <= now + buffer) and still pending
     // Order by scheduled_time to process oldest first
@@ -2443,17 +2432,34 @@ export class AutomationService {
           .select('caption, topic')
           .eq('video_id', firstPost.video_id)
           .single()
-        if (planItem) {
-          caption = planItem.caption || planItem.topic || ''
+        const { data: videoData } = await supabase
+          .from('videos')
+          .select('topic, script')
+          .eq('id', firstPost.video_id)
+          .single()
+
+        if (planItem?.caption) {
+          caption = planItem.caption
         } else {
-          const { data: videoData } = await supabase
-            .from('videos')
-            .select('topic')
-            .eq('id', firstPost.video_id)
-            .single()
-          if (videoData) {
-            caption = videoData.topic || ''
+          try {
+            caption = await generateVideoCaption({
+              topic: planItem?.topic || videoData?.topic || '',
+              script: videoData?.script || null,
+            })
+          } catch (captionError) {
+            console.warn(`[Scheduled Posts] Failed to auto-generate caption for video ${firstPost.video_id}:`, captionError)
           }
+
+          if (caption && planItem) {
+            await supabase
+              .from('video_plan_items')
+              .update({ caption })
+              .eq('video_id', firstPost.video_id)
+          }
+        }
+
+        if (!caption) {
+          caption = planItem?.topic || videoData?.topic || ''
         }
 
         console.log(`[Scheduled Posts] Sending ${platforms.length} posts for video ${firstPost.video_id} to Upload-Post`)

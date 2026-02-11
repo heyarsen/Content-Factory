@@ -247,6 +247,29 @@ export async function getTaskDetails(taskId: string): Promise<SoraTaskDetail> {
         })
 
         if (response.data.code !== 200) {
+            if (response.data.msg?.includes('recordInfo is null')) {
+                console.warn(
+                    `[KIE Sora] Task ${taskId} is not indexed yet (recordInfo is null); treating as waiting`
+                )
+
+                return {
+                    code: 200,
+                    msg: 'Task is still being indexed',
+                    data: {
+                        taskId,
+                        model: 'sora-2-text-to-video-stable',
+                        state: 'waiting',
+                        param: '',
+                        resultJson: null,
+                        failCode: null,
+                        failMsg: null,
+                        costTime: null,
+                        completeTime: null,
+                        createTime: Date.now(),
+                    },
+                }
+            }
+
             throw new Error(`KIE API error: ${response.data.msg}`)
         }
 

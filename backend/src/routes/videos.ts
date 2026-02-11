@@ -1,6 +1,7 @@
 import { Router, Response } from 'express'
 import { authenticate, AuthRequest, requireSubscription } from '../middleware/auth.js'
 import { VideoService } from '../services/videoService.js'
+import { generateVideoCaption } from '../services/captionService.js'
 import { detectLanguage, enhancePromptWithLanguage } from '../lib/languageDetection.js'
 import { enforceScriptWordLimit, getMaxWordsForDuration } from '../lib/scriptLimits.js'
 import OpenAI from 'openai'
@@ -257,38 +258,7 @@ router.post('/:id/generate-description', authenticate, async (req: AuthRequest, 
       return res.status(400).json({ error: 'Topic or script is required' })
     }
 
-    const prompt = `Generate a compelling social media caption/description for a short video post. 
-
-${topic ? `Topic: ${topic}` : ''}
-${script ? `Script: ${script.substring(0, 500)}` : ''}
-
-Requirements:
-- Engaging and click-worthy
-- Include relevant hashtags (3-5)
-- Platform-optimized (works for Instagram, TikTok, YouTube Shorts, etc.)
-- 100-200 characters for the main caption
-- Include a call-to-action
-- Professional but approachable tone
-
-Output ONLY the caption text, nothing else.`
-
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a social media content writer specializing in video captions for short-form content platforms.',
-        },
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-      temperature: 0.8,
-      max_tokens: 300,
-    })
-
-    const description = completion.choices[0]?.message?.content?.trim() || ''
+    const description = await generateVideoCaption({ topic, script })
 
     res.json({ description })
   } catch (error: any) {
@@ -335,14 +305,11 @@ router.post('/:id/share', authenticate, async (req: AuthRequest, res: Response) 
       return res.status(404).json({ error: 'Video not found' })
     }
 
-    if (!video.heygen_video_id) {
-      return res.status(400).json({ error: 'Video does not have a HeyGen video ID' })
+    if (!video.video_url) {
+      return res.status(400).json({ error: 'Video does not have a URL' })
     }
 
-    const { getSharableVideoUrl } = await import('../lib/heygen.js')
-    const { share_url } = await getSharableVideoUrl(video.heygen_video_id)
-
-    res.json({ share_url })
+    res.json({ share_url: video.video_url })
   } catch (error: any) {
     handleServiceError(res, error, 'Get sharable URL error:')
   }
