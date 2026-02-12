@@ -67,7 +67,7 @@ router.post('/schedule', authenticate, requireSubscription, async (req: AuthRequ
       .select('*')
       .eq('user_id', userId)
       .in('platform', accountLookupPlatforms)
-      .eq('status', 'connected')
+      .in('status', ['connected', 'pending'])
 
     const availablePlatforms = new Set((accounts || []).map((account: any) => normalizePlatform(account.platform)))
     const missingPlatforms = normalizedPlatforms.filter((platform: string) => !availablePlatforms.has(platform))
@@ -92,7 +92,34 @@ router.post('/schedule', authenticate, requireSubscription, async (req: AuthRequ
       return !isPlatformConnectedOnUploadPost(uploadPostProfile, platform)
     })
 
-    if (unavailablePlatforms.length > 0) {
+    const availablePlatformsOnUploadPost = normalizedPlatforms.filter((platform: string) => {
+      return isPlatformConnectedOnUploadPost(uploadPostProfile, platform)
+    })
+
+    const platformsToMarkConnected = [...new Set(
+      (accounts || [])
+        .filter((account: any) => availablePlatformsOnUploadPost.includes(normalizePlatform(account.platform)))
+        .map((account: any) => account.platform)
+    )]
+
+    const platformsToMarkPending = [...new Set(
+      (accounts || [])
+        .filter((account: any) => unavailablePlatforms.includes(normalizePlatform(account.platform)))
+        .map((account: any) => account.platform)
+    )]
+
+    if (platformsToMarkConnected.length > 0) {
+      await supabase
+        .from('social_accounts')
+        .update({
+          status: 'connected',
+          connected_at: new Date().toISOString(),
+        })
+        .eq('user_id', userId)
+        .in('platform', platformsToMarkConnected)
+    }
+
+    if (platformsToMarkPending.length > 0) {
       await supabase
         .from('social_accounts')
         .update({
@@ -100,7 +127,7 @@ router.post('/schedule', authenticate, requireSubscription, async (req: AuthRequ
           connected_at: null,
         })
         .eq('user_id', userId)
-        .in('platform', unavailablePlatforms)
+        .in('platform', platformsToMarkPending)
 
       return res.status(400).json({
         error: `The following account(s) are not connected in Upload-Post: ${unavailablePlatforms.join(', ')}. Please reconnect them and try again.`,
