@@ -163,9 +163,9 @@ router.post('/connect', authenticate, requireSubscription, async (req: AuthReque
     const userId = req.userId!
     const user = req.user!
 
-    // Supported platforms according to Upload-Post API: instagram, tiktok, youtube, facebook, x (Twitter), linkedin, pinterest, threads
+    // Supported platforms according to Upload-Post API: instagram, tiktok, youtube, facebook, x (Twitter), linkedin, threads
     // Note: snapchat is NOT supported by Upload-Post
-    const supportedPlatforms = ['instagram', 'tiktok', 'youtube', 'facebook', 'x', 'linkedin', 'pinterest', 'threads']
+    const supportedPlatforms = ['instagram', 'tiktok', 'youtube', 'facebook', 'x', 'linkedin', 'threads']
     if (!platform || !supportedPlatforms.includes(platform)) {
       return res.status(400).json({ error: 'Valid platform is required' })
     }

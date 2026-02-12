@@ -5,7 +5,7 @@ import { Button } from '../components/ui/Button'
 import { Select } from '../components/ui/Select'
 import { Badge } from '../components/ui/Badge'
 import { useToast } from '../hooks/useToast'
-import { Settings, Globe, Bell, Share2, Instagram, Youtube, Facebook, Users } from 'lucide-react'
+import { Settings, Globe, Bell, Share2, Instagram, Youtube, Facebook, Users, Linkedin } from 'lucide-react'
 import api from '../lib/api'
 import { normalizeTimezone, timezones } from '../lib/timezones'
 import { useLanguage } from '../contexts/LanguageContext'
@@ -30,15 +30,14 @@ interface SocialAccount {
 }
 
 
-const availablePlatforms = ['instagram', 'youtube', 'tiktok', 'x', 'linkedin', 'pinterest', 'threads', 'facebook']
+const availablePlatforms = ['instagram', 'youtube', 'tiktok', 'x', 'linkedin', 'threads', 'facebook']
 const platformIcons: Record<string, any> = {
   instagram: Instagram,
   youtube: Youtube,
   tiktok: Users,
   facebook: Facebook,
   x: Share2,
-  linkedin: Share2,
-  pinterest: Share2,
+  linkedin: Linkedin,
   threads: Share2,
 }
 
@@ -72,7 +71,6 @@ export function Preferences() {
     facebook: t('platforms.facebook'),
     x: t('platforms.x'),
     linkedin: t('platforms.linkedin'),
-    pinterest: t('platforms.pinterest'),
     threads: t('platforms.threads'),
   }
 

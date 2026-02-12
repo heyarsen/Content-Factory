@@ -614,7 +614,6 @@ export const uk = {
         facebook: "Facebook",
         x: "X (Twitter)",
         linkedin: "LinkedIn",
-        pinterest: "Pinterest",
         threads: "Threads",
     },
     avatars: {

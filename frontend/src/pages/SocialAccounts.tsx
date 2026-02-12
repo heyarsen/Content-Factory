@@ -7,7 +7,7 @@ import { Badge } from '../components/ui/Badge'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Modal } from '../components/ui/Modal'
-import { Users, Link2, X, Instagram, Youtube, Facebook, Share2 } from 'lucide-react'
+import { Users, Link2, X, Instagram, Youtube, Facebook, Share2, Linkedin } from 'lucide-react'
 import api from '../lib/api'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -17,7 +17,7 @@ import { useToast } from '../hooks/useToast'
 
 interface SocialAccount {
   id: string
-  platform: 'instagram' | 'tiktok' | 'youtube' | 'facebook' | 'x' | 'linkedin' | 'pinterest' | 'threads'
+  platform: 'instagram' | 'tiktok' | 'youtube' | 'facebook' | 'x' | 'linkedin' | 'threads'
   status: 'connected' | 'disconnected' | 'error' | 'pending'
   connected_at: string
   account_info?: {
@@ -33,8 +33,7 @@ const platformIcons = {
   youtube: Youtube,
   facebook: Facebook,
   x: Share2,
-  linkedin: Users,
-  pinterest: Share2,
+  linkedin: Linkedin,
   threads: Share2,
 }
 
@@ -55,7 +54,6 @@ export function SocialAccounts() {
     facebook: t('platforms.facebook') !== 'platforms.facebook' ? t('platforms.facebook') : 'Facebook',
     x: t('platforms.x') !== 'platforms.x' ? t('platforms.x') : 'X (Twitter)',
     linkedin: t('platforms.linkedin') !== 'platforms.linkedin' ? t('platforms.linkedin') : 'LinkedIn',
-    pinterest: t('platforms.pinterest') !== 'platforms.pinterest' ? t('platforms.pinterest') : 'Pinterest',
     threads: t('platforms.threads') !== 'platforms.threads' ? t('platforms.threads') : 'Threads',
   }
   const [disconnectModal, setDisconnectModal] = useState<string | null>(null)
@@ -230,7 +228,7 @@ export function SocialAccounts() {
     return <Badge variant={variants[status] || 'default'}>{t(`social_accounts.status_${status}`)}</Badge>
   }
 
-  const allPlatforms = ['instagram', 'tiktok', 'youtube', 'facebook', 'x', 'linkedin', 'pinterest', 'threads'] as const
+  const allPlatforms = ['instagram', 'tiktok', 'youtube', 'facebook', 'x', 'linkedin', 'threads'] as const
   const connectedPlatforms = accounts
     .filter((a: SocialAccount) => a.status === 'connected')
     .map((a: SocialAccount) => a.platform)
