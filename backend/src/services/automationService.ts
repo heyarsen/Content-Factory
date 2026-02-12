@@ -2284,7 +2284,7 @@ export class AutomationService {
             user_id: userId,
             platform: platform,
             scheduled_time: scheduledTime ? new Date(scheduledTime).toISOString() : null,
-            status: platformResult?.status === 'success' ? 'posted' : 'pending',
+            status: platformResult?.status === 'success' ? 'posted' : platformResult?.status === 'failed' ? 'failed' : 'pending',
             upload_post_id: postResponse.upload_id || platformResult?.post_id,
             posted_at: platformResult?.status === 'success' ? new Date().toISOString() : null,
             error_message: platformResult?.error || null,
@@ -2495,7 +2495,7 @@ export class AutomationService {
           await supabase
             .from('scheduled_posts')
             .update({
-              status: platformResult?.status === 'success' ? 'posted' : 'pending',
+              status: platformResult?.status === 'success' ? 'posted' : platformResult?.status === 'failed' ? 'failed' : 'pending',
               upload_post_id: postResponse.upload_id || platformResult?.post_id,
               posted_at: platformResult?.status === 'success' ? new Date().toISOString() : null,
               error_message: platformResult?.error || null,
