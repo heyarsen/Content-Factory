@@ -1,10 +1,36 @@
 import { Router, Response } from 'express'
 import { supabase } from '../lib/supabase.js'
 import { authenticate, AuthRequest, requireSubscription } from '../middleware/auth.js'
-import { postVideo, getUploadStatus } from '../lib/uploadpost.js'
+import { postVideo, getUploadStatus, getUserProfile } from '../lib/uploadpost.js'
 import { generateVideoCaption } from '../services/captionService.js'
 
 const router = Router()
+
+const PLATFORM_ALIASES: Record<string, string> = {
+  twitter: 'x',
+}
+
+function normalizePlatform(platform: string): string {
+  const normalized = platform.toLowerCase().trim()
+  return PLATFORM_ALIASES[normalized] || normalized
+}
+
+function isPlatformConnectedOnUploadPost(profile: any, platform: string): boolean {
+  const normalizedPlatform = normalizePlatform(platform)
+  const actualProfile = profile?.profile || profile
+  const socialAccounts = actualProfile?.social_accounts
+
+  if (!socialAccounts || typeof socialAccounts !== 'object') {
+    return false
+  }
+
+  const platformAccount = socialAccounts[normalizedPlatform] || socialAccounts[platform]
+  if (!platformAccount || typeof platformAccount !== 'object') {
+    return false
+  }
+
+  return Boolean(platformAccount.display_name || platformAccount.username || Object.keys(platformAccount).length > 0)
+}
 
 // Schedule/Queue video for posting
 router.post('/schedule', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
@@ -32,25 +58,81 @@ router.post('/schedule', authenticate, requireSubscription, async (req: AuthRequ
       return res.status(400).json({ error: 'Video must be completed before posting' })
     }
 
+    const normalizedPlatforms = [...new Set(platforms.map((platform: string) => normalizePlatform(platform)))]
+    const accountLookupPlatforms = [...new Set([...normalizedPlatforms, 'twitter'])]
+
     // Get user's connected social accounts for requested platforms
     const { data: accounts } = await supabase
       .from('social_accounts')
       .select('*')
       .eq('user_id', userId)
-      .in('platform', platforms)
-      .eq('status', 'connected')
+      .in('platform', accountLookupPlatforms)
+      .in('status', ['connected', 'pending'])
 
-    if (!accounts || accounts.length === 0) {
+    const availablePlatforms = new Set((accounts || []).map((account: any) => normalizePlatform(account.platform)))
+    const missingPlatforms = normalizedPlatforms.filter((platform: string) => !availablePlatforms.has(platform))
+
+    if (!accounts || accounts.length === 0 || missingPlatforms.length > 0) {
       return res.status(400).json({ error: 'No connected accounts found for selected platforms' })
     }
 
     const scheduledPosts = []
 
     // Group accounts by Upload-Post user ID (platform_account_id stores the Upload-Post user ID)
-    const uploadPostUserId = accounts[0]?.platform_account_id
+    const uploadPostUserId = accounts.find((account: any) => account.platform_account_id)?.platform_account_id
 
     if (!uploadPostUserId) {
       return res.status(400).json({ error: 'No Upload-Post user ID found. Please connect your social accounts first.' })
+    }
+
+    // Validate that requested platforms are still connected in Upload-Post itself.
+    // This keeps local DB state in sync when a user disconnects externally.
+    const uploadPostProfile = await getUserProfile(uploadPostUserId)
+    const unavailablePlatforms = normalizedPlatforms.filter((platform: string) => {
+      return !isPlatformConnectedOnUploadPost(uploadPostProfile, platform)
+    })
+
+    const availablePlatformsOnUploadPost = normalizedPlatforms.filter((platform: string) => {
+      return isPlatformConnectedOnUploadPost(uploadPostProfile, platform)
+    })
+
+    const platformsToMarkConnected = [...new Set(
+      (accounts || [])
+        .filter((account: any) => availablePlatformsOnUploadPost.includes(normalizePlatform(account.platform)))
+        .map((account: any) => account.platform)
+    )]
+
+    const platformsToMarkPending = [...new Set(
+      (accounts || [])
+        .filter((account: any) => unavailablePlatforms.includes(normalizePlatform(account.platform)))
+        .map((account: any) => account.platform)
+    )]
+
+    if (platformsToMarkConnected.length > 0) {
+      await supabase
+        .from('social_accounts')
+        .update({
+          status: 'connected',
+          connected_at: new Date().toISOString(),
+        })
+        .eq('user_id', userId)
+        .in('platform', platformsToMarkConnected)
+    }
+
+    if (platformsToMarkPending.length > 0) {
+      await supabase
+        .from('social_accounts')
+        .update({
+          status: 'pending',
+          connected_at: null,
+        })
+        .eq('user_id', userId)
+        .in('platform', platformsToMarkPending)
+
+      return res.status(400).json({
+        error: `The following account(s) are not connected in Upload-Post: ${unavailablePlatforms.join(', ')}. Please reconnect them and try again.`,
+        missingPlatforms: unavailablePlatforms,
+      })
     }
 
     // Call upload-post.com API once for all platforms
@@ -75,14 +157,14 @@ router.post('/schedule', authenticate, requireSubscription, async (req: AuthRequ
       console.log('Posting video to Upload-Post:', {
         videoUrl: videoUrlToUse,
         originalUrl: video.video_url,
-        platforms,
+        platforms: normalizedPlatforms,
         userId: uploadPostUserId,
         caption: captionToUse,
       })
 
       const postResponse = await postVideo({
         videoUrl: videoUrlToUse,
-        platforms: platforms, // Array of platform names
+        platforms: normalizedPlatforms, // Array of platform names
         caption: captionToUse,
         scheduledTime: scheduled_time || undefined,
         userId: uploadPostUserId,
@@ -95,7 +177,7 @@ router.post('/schedule', authenticate, requireSubscription, async (req: AuthRequ
       const isAsync = postResponse.status === 'pending' && postResponse.upload_id
 
       // Create scheduled_post record for each platform
-      for (const platform of platforms) {
+      for (const platform of normalizedPlatforms) {
         const platformResult = postResponse.results?.find((r: any) => r.platform === platform)
 
         // For async uploads, always start as pending
@@ -129,7 +211,7 @@ router.post('/schedule', authenticate, requireSubscription, async (req: AuthRequ
       // If async upload, start background polling
       if (isAsync && postResponse.upload_id) {
         // Poll for status updates in the background (don't await)
-        pollUploadStatus(postResponse.upload_id, platforms, scheduledPosts.map((p: any) => p.id))
+        pollUploadStatus(postResponse.upload_id, normalizedPlatforms, scheduledPosts.map((p: any) => p.id))
           .catch(err => console.error('Background status polling error:', err))
       }
 
@@ -157,7 +239,7 @@ router.post('/schedule', authenticate, requireSubscription, async (req: AuthRequ
         'Failed to post video'
 
       // Create failed records for all platforms
-      for (const platform of platforms) {
+      for (const platform of normalizedPlatforms) {
         const { data: postData } = await supabase
           .from('scheduled_posts')
           .insert({
