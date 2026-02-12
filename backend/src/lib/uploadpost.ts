@@ -76,6 +76,11 @@ export interface UploadPostResponse {
   error?: string
 }
 
+function isPinterestBoardRequiredError(error: any): boolean {
+  const message = String(error?.response?.data?.message || error?.message || '').toLowerCase()
+  return message.includes('pinterest board id is required')
+}
+
 // Create user profile in Upload-Post
 export async function createUserProfile(
   request: CreateUserProfileRequest
@@ -292,7 +297,10 @@ export async function postVideo(
     formData.append('title', postTitle)
     
     // Platform array - must be sent as platform[] for each platform
-    request.platforms.forEach(platform => {
+    const requestedPlatforms = [...request.platforms]
+    let platformsToUpload = [...request.platforms]
+
+    platformsToUpload.forEach(platform => {
       formData.append('platform[]', platform)
     })
 
@@ -409,6 +417,44 @@ export async function postVideo(
           hasApiKey: !!getUploadPostKey(),
         })
         
+        // Retry once without Pinterest when board id is missing
+        if (
+          isPinterestBoardRequiredError(error) &&
+          platformsToUpload.includes('pinterest') &&
+          platformsToUpload.length > 1
+        ) {
+          console.warn('[Upload-Post] Pinterest board id is missing. Retrying without Pinterest platform.')
+          const retryPlatforms = platformsToUpload.filter((platform) => platform !== 'pinterest')
+          const { default: RetryFormData } = await import('form-data')
+          const retryFormData = new RetryFormData()
+          retryFormData.append('user', request.userId)
+          retryFormData.append('video', request.videoUrl)
+          retryFormData.append('title', postTitle)
+          retryPlatforms.forEach((platform) => retryFormData.append('platform[]', platform))
+          if (retryPlatforms.includes('instagram')) {
+            retryFormData.append('media_type', 'REELS')
+            retryFormData.append('share_to_feed', 'true')
+          }
+          if (postDescription) {
+            retryFormData.append('description', postDescription)
+          }
+          if (request.scheduledTime && !skipScheduling) {
+            retryFormData.append('scheduled_date', new Date(request.scheduledTime).toISOString())
+          }
+          retryFormData.append('async_upload', String(request.asyncUpload ?? true))
+
+          response = await axios.post(endpoint, retryFormData, {
+            headers: {
+              'Authorization': getAuthHeader(),
+              ...retryFormData.getHeaders(),
+            },
+            timeout: 30000,
+          })
+
+          platformsToUpload = retryPlatforms
+          break
+        }
+
         // Handle non-retryable errors immediately
         if (status === 404) {
           throw new Error(
@@ -470,6 +516,13 @@ export async function postVideo(
       throw new Error('Upload-Post API request failed: no response received')
     }
 
+    const skippedPlatforms = requestedPlatforms.filter(platform => !platformsToUpload.includes(platform))
+    const skippedPlatformResults = skippedPlatforms.map((platform) => ({
+      platform,
+      status: 'failed',
+      error: 'Pinterest Board ID is required when uploading to Pinterest.',
+    }))
+
     console.log('Upload-Post API response:', {
       status: response.status,
       statusText: response.statusText,
@@ -490,7 +543,7 @@ export async function postVideo(
       return {
         upload_id: uploadId,
         status: 'scheduled',
-        results: [],
+        results: skippedPlatformResults,
       }
     }
     
@@ -516,8 +569,8 @@ export async function postVideo(
       
       return {
         upload_id: uploadId,
-        status: results.length > 0 && results.every((r: any) => r.status === 'success') ? 'success' : 'pending',
-        results,
+        status: results.length > 0 && results.every((r: any) => r.status === 'success') && skippedPlatformResults.length === 0 ? 'success' : 'pending',
+        results: [...results, ...skippedPlatformResults],
       }
     }
     
@@ -535,8 +588,8 @@ export async function postVideo(
       console.log('[Upload-Post] Synchronous response with results:', results)
       return {
         upload_id: response.data.request_id || response.data.upload_id || undefined,
-        status: response.data.success ? 'success' : (response.data.status || 'pending'),
-        results,
+        status: response.data.success && skippedPlatformResults.length === 0 ? 'success' : (response.data.status || 'pending'),
+        results: [...results, ...skippedPlatformResults],
         error: response.data.error || null,
       }
     }
@@ -546,7 +599,7 @@ export async function postVideo(
     return {
       upload_id: response.data.request_id || response.data.job_id || response.data.upload_id || undefined,
       status: 'pending',
-      results: [],
+      results: skippedPlatformResults,
       error: 'Unexpected response format from upload-post API',
     }
   } catch (error: any) {
