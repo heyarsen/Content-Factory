@@ -1,7 +1,7 @@
 import { Router, Response } from 'express'
 import { supabase } from '../lib/supabase.js'
 import { authenticate, AuthRequest, requireSubscription } from '../middleware/auth.js'
-import { postVideo, getUploadStatus } from '../lib/uploadpost.js'
+import { postVideo, getUploadStatus, getUserProfile } from '../lib/uploadpost.js'
 import { generateVideoCaption } from '../services/captionService.js'
 
 const router = Router()
@@ -13,6 +13,23 @@ const PLATFORM_ALIASES: Record<string, string> = {
 function normalizePlatform(platform: string): string {
   const normalized = platform.toLowerCase().trim()
   return PLATFORM_ALIASES[normalized] || normalized
+}
+
+function isPlatformConnectedOnUploadPost(profile: any, platform: string): boolean {
+  const normalizedPlatform = normalizePlatform(platform)
+  const actualProfile = profile?.profile || profile
+  const socialAccounts = actualProfile?.social_accounts
+
+  if (!socialAccounts || typeof socialAccounts !== 'object') {
+    return false
+  }
+
+  const platformAccount = socialAccounts[normalizedPlatform] || socialAccounts[platform]
+  if (!platformAccount || typeof platformAccount !== 'object') {
+    return false
+  }
+
+  return Boolean(platformAccount.display_name || platformAccount.username || Object.keys(platformAccount).length > 0)
 }
 
 // Schedule/Queue video for posting
@@ -66,6 +83,29 @@ router.post('/schedule', authenticate, requireSubscription, async (req: AuthRequ
 
     if (!uploadPostUserId) {
       return res.status(400).json({ error: 'No Upload-Post user ID found. Please connect your social accounts first.' })
+    }
+
+    // Validate that requested platforms are still connected in Upload-Post itself.
+    // This keeps local DB state in sync when a user disconnects externally.
+    const uploadPostProfile = await getUserProfile(uploadPostUserId)
+    const unavailablePlatforms = normalizedPlatforms.filter((platform: string) => {
+      return !isPlatformConnectedOnUploadPost(uploadPostProfile, platform)
+    })
+
+    if (unavailablePlatforms.length > 0) {
+      await supabase
+        .from('social_accounts')
+        .update({
+          status: 'pending',
+          connected_at: null,
+        })
+        .eq('user_id', userId)
+        .in('platform', unavailablePlatforms)
+
+      return res.status(400).json({
+        error: `The following account(s) are not connected in Upload-Post: ${unavailablePlatforms.join(', ')}. Please reconnect them and try again.`,
+        missingPlatforms: unavailablePlatforms,
+      })
     }
 
     // Call upload-post.com API once for all platforms
