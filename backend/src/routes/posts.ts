@@ -25,8 +25,14 @@ function isPlatformConnectedOnUploadPost(profile: any, platform: string): boolea
   }
 
   const platformAccount = socialAccounts[normalizedPlatform] || socialAccounts[platform]
-  if (!platformAccount || typeof platformAccount !== 'object') {
+  if (!platformAccount) {
     return false
+  }
+
+  // Upload-Post can return either an object with account fields,
+  // or a non-empty string/primitive for connected platforms.
+  if (typeof platformAccount !== 'object') {
+    return String(platformAccount).trim().length > 0
   }
 
   return Boolean(platformAccount.display_name || platformAccount.username || Object.keys(platformAccount).length > 0)

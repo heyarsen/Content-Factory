@@ -2404,14 +2404,29 @@ export class AutomationService {
 
         const platforms = videoPosts.map(p => p.platform)
 
-        // Get upload_post_user_id from social_accounts
-        const { data: account } = await supabase
+        // Get upload_post_user_id from social_accounts.
+        // Prefer accounts for target platforms, but fall back to any connected account
+        // because platform_account_id is Upload-Post user ID shared across platforms.
+        let { data: account } = await supabase
           .from('social_accounts')
           .select('platform_account_id')
           .eq('user_id', firstPost.user_id)
-          .eq('platform', platforms[0])
+          .in('platform', platforms)
           .eq('status', 'connected')
           .single()
+
+        if (!account?.platform_account_id) {
+          const { data: fallbackAccount } = await supabase
+            .from('social_accounts')
+            .select('platform_account_id')
+            .eq('user_id', firstPost.user_id)
+            .eq('status', 'connected')
+            .not('platform_account_id', 'is', null)
+            .limit(1)
+            .maybeSingle()
+
+          account = fallbackAccount || null
+        }
 
         if (!account || !account.platform_account_id) {
           console.error(`[Scheduled Posts] No upload_post_user_id for post ${firstPost.id}`)
