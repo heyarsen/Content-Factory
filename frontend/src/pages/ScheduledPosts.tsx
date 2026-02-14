@@ -83,16 +83,6 @@ export function ScheduledPosts() {
   useEffect(() => {
     loadPosts()
     loadVideos()
-
-    // Safety timeout
-    const timeout = setTimeout(() => {
-      if (loading && mountedRef.current) {
-        console.warn('Scheduled posts loading timed out')
-        setLoading(false)
-      }
-    }, 10000)
-
-    return () => clearTimeout(timeout)
   }, [statusFilter])
 
   useEffect(() => {
