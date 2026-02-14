@@ -12,7 +12,7 @@ import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useCreditsContext } from '../contexts/CreditContext'
 import { CreditBanner } from '../components/ui/CreditBanner'
-
+import { OnboardingChecklist, OnboardingChecklistStep } from '../components/onboarding/OnboardingChecklist'
 
 
 interface VideoStats {
@@ -51,6 +51,17 @@ interface PlanHealth {
   inFlightItems: number
 }
 
+interface OnboardingStats {
+  isNewUser: boolean
+  accountCreatedAt: string | null
+  accountAgeDays: number | null
+  hidden: boolean
+  completedSteps: string[]
+  completedAt: string | null
+  totalSteps: number
+  allCompleted: boolean
+}
+
 export function Dashboard() {
   const { t } = useLanguage()
   useAuth()
@@ -60,6 +71,7 @@ export function Dashboard() {
   const [activity, setActivity] = useState<ActivityItem[]>([])
   const [nextScheduled, setNextScheduled] = useState<NextScheduled | null>(null)
   const [planHealth, setPlanHealth] = useState<PlanHealth | null>(null)
+  const [onboarding, setOnboarding] = useState<OnboardingStats | null>(null)
   const [loading, setLoading] = useState(true)
 
   const formatStatus = (status?: string) => {
@@ -94,11 +106,48 @@ export function Dashboard() {
       setActivity(activityRes.data.activity || [])
       setNextScheduled(activityRes.data.nextScheduled)
       setPlanHealth(activityRes.data.planHealth)
+      setOnboarding(statsRes.data.onboarding || null)
     } catch (error) {
       console.error('Failed to load stats:', error)
     } finally {
       setLoading(false)
     }
+  }
+
+
+  const onboardingSteps: OnboardingChecklistStep[] = [
+    {
+      id: 'connect_social_account',
+      title: 'Connect at least one social account',
+      path: '/social',
+      completed: Boolean(onboarding?.completedSteps?.includes('connect_social_account')),
+    },
+    {
+      id: 'generate_first_video',
+      title: 'Generate first video',
+      path: '/quick-create',
+      completed: Boolean(onboarding?.completedSteps?.includes('generate_first_video')),
+    },
+    {
+      id: 'set_default_platforms_timezone',
+      title: 'Set default platforms/timezone',
+      path: '/preferences',
+      completed: Boolean(onboarding?.completedSteps?.includes('set_default_platforms_timezone')),
+    },
+    {
+      id: 'schedule_first_post',
+      title: 'Schedule first post',
+      path: '/distribution',
+      completed: Boolean(onboarding?.completedSteps?.includes('schedule_first_post')),
+    },
+  ]
+
+  const hideOnboarding = async () => {
+    await api.put('/api/preferences', {
+      onboarding_checklist_hidden: true,
+      onboarding_completed_at: onboarding?.allCompleted ? new Date().toISOString() : null,
+    })
+    setOnboarding((prev) => (prev ? { ...prev, hidden: true } : prev))
   }
 
   if (loading) {
@@ -125,6 +174,14 @@ export function Dashboard() {
     <Layout>
       <div className="space-y-10">
         <CreditBanner />
+        <OnboardingChecklist
+          steps={onboardingSteps}
+          isNewUser={Boolean(onboarding?.isNewUser)}
+          accountAgeDays={onboarding?.accountAgeDays ?? null}
+          allCompleted={Boolean(onboarding?.allCompleted)}
+          hidden={Boolean(onboarding?.hidden)}
+          onHide={hideOnboarding}
+        />
         <section className="relative overflow-hidden rounded-[32px] border border-white/30 bg-gradient-to-br from-brand-600 via-brand-500 to-indigo-500 p-6 sm:p-8 text-white shadow-[0_60px_120px_-70px_rgba(79,70,229,0.9)]">
           <div className="absolute -left-16 top-1/2 h-56 w-56 -translate-y-1/2 rounded-full bg-white/10 blur-3xl" />
           <div className="absolute -right-16 top-8 h-44 w-44 rounded-full bg-cyan-400/30 blur-3xl" />
