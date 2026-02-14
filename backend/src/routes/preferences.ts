@@ -53,6 +53,9 @@ router.put('/', authenticate, requireSubscription, async (req: AuthRequest, res:
       heygen_vertical_template_script_key,
       heygen_vertical_template_variables,
       heygen_vertical_template_overrides,
+      onboarding_checklist_completed_steps,
+      onboarding_checklist_hidden,
+      onboarding_completed_at,
     } = req.body
 
     // Check if preferences exist
@@ -108,6 +111,19 @@ router.put('/', authenticate, requireSubscription, async (req: AuthRequest, res:
       } else {
         return res.status(400).json({ error: 'Template overrides must be a JSON object' })
       }
+    }
+    if (onboarding_checklist_completed_steps !== undefined) {
+      if (Array.isArray(onboarding_checklist_completed_steps)) {
+        updates.onboarding_checklist_completed_steps = onboarding_checklist_completed_steps
+      } else {
+        return res.status(400).json({ error: 'Onboarding completed steps must be an array' })
+      }
+    }
+    if (onboarding_checklist_hidden !== undefined) {
+      updates.onboarding_checklist_hidden = Boolean(onboarding_checklist_hidden)
+    }
+    if (onboarding_completed_at !== undefined) {
+      updates.onboarding_completed_at = onboarding_completed_at
     }
 
     let data
