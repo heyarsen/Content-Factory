@@ -7,6 +7,8 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { Badge } from '../components/ui/Badge'
 import { Video, Calendar, Users, Zap, ArrowRight, Sparkles, ClipboardList } from 'lucide-react'
 import api from '../lib/api'
+import { useRequestState } from '../hooks/useRequestState'
+import { RequestStatePanel } from '../components/ui/RequestStatePanel'
 
 import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -60,7 +62,7 @@ export function Dashboard() {
   const [activity, setActivity] = useState<ActivityItem[]>([])
   const [nextScheduled, setNextScheduled] = useState<NextScheduled | null>(null)
   const [planHealth, setPlanHealth] = useState<PlanHealth | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { isInitialLoading, isRefreshing, status, lastAttemptedAt, runRequest } = useRequestState(8000)
 
   const formatStatus = (status?: string) => {
     if (!status) return t('dashboard.status_unknown') || 'Unknown'
@@ -70,38 +72,36 @@ export function Dashboard() {
 
   useEffect(() => {
     loadStats()
-
-    // Safety timeout to forcefully clear loading state if API hangs
-    const timeout = setTimeout(() => {
-      if (loading) {
-        console.warn('Dashboard stats loading timed out')
-        setLoading(false)
-      }
-    }, 5000)
-
-    return () => clearTimeout(timeout)
   }, [])
 
   const loadStats = async () => {
-    try {
+    const result = await runRequest(async () => {
       const [statsRes, activityRes] = await Promise.all([
         api.get('/api/dashboard/stats'),
         api.get('/api/dashboard/activity'),
       ])
 
-      setVideoStats(statsRes.data.videos)
-      setPostStats(statsRes.data.posts)
-      setActivity(activityRes.data.activity || [])
-      setNextScheduled(activityRes.data.nextScheduled)
-      setPlanHealth(activityRes.data.planHealth)
-    } catch (error) {
-      console.error('Failed to load stats:', error)
-    } finally {
-      setLoading(false)
+      return {
+        videos: statsRes.data.videos,
+        posts: statsRes.data.posts,
+        activity: activityRes.data.activity || [],
+        nextScheduled: activityRes.data.nextScheduled,
+        planHealth: activityRes.data.planHealth,
+      }
+    })
+
+    if (!result) {
+      return
     }
+
+    setVideoStats(result.videos)
+    setPostStats(result.posts)
+    setActivity(result.activity)
+    setNextScheduled(result.nextScheduled)
+    setPlanHealth(result.planHealth)
   }
 
-  if (loading) {
+  if (isInitialLoading) {
     return (
       <Layout>
         <div className="space-y-8">
@@ -124,6 +124,20 @@ export function Dashboard() {
   return (
     <Layout>
       <div className="space-y-10">
+        <div className="flex items-center justify-between gap-3">
+          <RequestStatePanel
+            status={status}
+            onRetry={loadStats}
+            lastAttemptedAt={lastAttemptedAt}
+            statusLink="https://status.openai.com/"
+          />
+          {isRefreshing && (
+            <div className="ml-auto inline-flex items-center gap-2 text-xs text-slate-500">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-brand-400" />
+              Refreshing dashboard…
+            </div>
+          )}
+        </div>
         <CreditBanner />
         <section className="relative overflow-hidden rounded-[32px] border border-white/30 bg-gradient-to-br from-brand-600 via-brand-500 to-indigo-500 p-6 sm:p-8 text-white shadow-[0_60px_120px_-70px_rgba(79,70,229,0.9)]">
           <div className="absolute -left-16 top-1/2 h-56 w-56 -translate-y-1/2 rounded-full bg-white/10 blur-3xl" />

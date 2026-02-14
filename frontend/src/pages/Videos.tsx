@@ -16,6 +16,8 @@ import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useCreditsContext } from '../contexts/CreditContext'
 import { CreditBanner } from '../components/ui/CreditBanner'
+import { RequestStatePanel } from '../components/ui/RequestStatePanel'
+import { useRequestState } from '../hooks/useRequestState'
 import api from '../lib/api'
 import { supabase } from '../lib/supabase'
 import {
@@ -48,7 +50,7 @@ export function Videos() {
   console.log('[Videos] Debug:', { hasSubscription, credits, unlimited, safeCanCreate, creditsLoading })
   const [searchParams, setSearchParams] = useSearchParams()
   const [videos, setVideos] = useState<VideoRecord[]>([])
-  const [loading, setLoading] = useState(true)
+  const { status, lastAttemptedAt, isInitialLoading, isRefreshing, runRequest } = useRequestState(12000)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<ListVideosParams['status']>('all')
   const [deleteModal, setDeleteModal] = useState<string | null>(null)
@@ -80,36 +82,19 @@ export function Videos() {
   }, [])
 
   const loadVideos = useCallback(async () => {
-    try {
-      const videos = await listVideos({
-        search: search || undefined,
-        status: statusFilter,
-      })
-      if (mountedRef.current) {
-        setVideos(videos)
-      }
-    } catch (error) {
-      console.error('Failed to load videos:', error)
-    } finally {
-      if (mountedRef.current) {
-        setLoading(false)
-      }
+    const loadedVideos = await runRequest(() => listVideos({
+      search: search || undefined,
+      status: statusFilter,
+    }))
+
+    if (loadedVideos && mountedRef.current) {
+      setVideos(loadedVideos)
     }
-  }, [search, statusFilter])
+  }, [runRequest, search, statusFilter])
 
   useEffect(() => {
     loadVideos()
-
-    // Safety timeout for loading state
-    const timeout = setTimeout(() => {
-      if (loading && mountedRef.current) {
-        console.warn('Videos loading timed out')
-        setLoading(false)
-      }
-    }, 10000)
-
-    return () => clearTimeout(timeout)
-  }, [loadVideos]) // Removed loading from dependency to avoid loop, but it's safe
+  }, [loadVideos])
 
   const loadSocialAccounts = useCallback(async () => {
     try {
@@ -136,7 +121,7 @@ export function Videos() {
   // Handle videoId query parameter - open video modal if videoId is in URL
   useEffect(() => {
     const videoId = searchParams.get('videoId')
-    if (videoId && !loading && !loadingVideo) {
+    if (videoId && !isInitialLoading && !loadingVideo) {
       // Check if video is already selected with this ID
       if (selectedVideo?.id === videoId) {
         // Already showing this video, just clean up URL
@@ -179,7 +164,7 @@ export function Videos() {
 
       fetchVideo()
     }
-  }, [searchParams, videos, selectedVideo, loading, loadingVideo, setSearchParams, addNotification])
+  }, [searchParams, videos, selectedVideo, isInitialLoading, loadingVideo, setSearchParams, addNotification])
 
   // Subscribe to Real-time updates for videos
   useEffect(() => {
@@ -493,7 +478,7 @@ export function Videos() {
     return <Badge variant={variants[status] || 'default'} className="shrink-0 transition-all hover:scale-105">{status}</Badge>
   }
 
-  if (loading) {
+  if (isInitialLoading) {
     return (
       <Layout>
         <div className="space-y-8">
@@ -512,6 +497,20 @@ export function Videos() {
   return (
     <Layout>
       <div className="space-y-10">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <RequestStatePanel
+            status={status}
+            onRetry={loadVideos}
+            lastAttemptedAt={lastAttemptedAt}
+            statusLink="https://status.openai.com/"
+          />
+          {isRefreshing && (
+            <div className="inline-flex items-center gap-2 text-xs text-slate-500">
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+              Refreshing videos…
+            </div>
+          )}
+        </div>
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('videos.my_videos') || 'My Videos'}</p>
@@ -558,10 +557,10 @@ export function Videos() {
               <Button
                 variant="secondary"
                 onClick={loadVideos}
-                loading={loading}
+                loading={isRefreshing}
                 className="h-12 w-12 sm:h-11 sm:w-11 p-0 rounded-2xl sm:rounded-xl active:scale-95"
               >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
               </Button>
             </div>
           </div>
