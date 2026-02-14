@@ -2,6 +2,8 @@ import axios from 'axios'
 
 const UPLOADPOST_API_URL = 'https://api.upload-post.com/api'
 const MAX_UPLOADPOST_TITLE_LENGTH = 100
+const DEFAULT_UPLOADPOST_RETRY_DELAY_MS = 2000
+const MAX_UPLOADPOST_RETRIES = 3
 
 export function buildUploadPostTitle(caption?: string): string {
   const fallbackTitle = 'Video Post'
@@ -75,6 +77,86 @@ export interface UploadPostResponse {
   }>
   error?: string
 }
+
+function parseRetryAfterMs(retryAfterHeader: string | number | undefined): number | null {
+  if (retryAfterHeader === undefined || retryAfterHeader === null) {
+    return null
+  }
+
+  if (typeof retryAfterHeader === 'number' && Number.isFinite(retryAfterHeader) && retryAfterHeader >= 0) {
+    return retryAfterHeader * 1000
+  }
+
+  if (typeof retryAfterHeader !== 'string' || retryAfterHeader.trim() === '') {
+    return null
+  }
+
+  const numericSeconds = Number(retryAfterHeader)
+  if (Number.isFinite(numericSeconds) && numericSeconds >= 0) {
+    return numericSeconds * 1000
+  }
+
+  const retryDateMs = Date.parse(retryAfterHeader)
+  if (!Number.isNaN(retryDateMs)) {
+    return Math.max(0, retryDateMs - Date.now())
+  }
+
+  return null
+}
+
+async function buildUploadVideoFormData(request: PostVideoRequest): Promise<any> {
+  const { default: FormData } = await import('form-data')
+  const formData = new FormData()
+
+  formData.append('user', request.userId)
+  formData.append('video', request.videoUrl)
+
+  const postTitle = buildUploadPostTitle(request.caption)
+  if (request.caption && request.caption.trim().length > postTitle.length) {
+    console.warn(
+      `[Upload-Post] Truncated title from ${request.caption.trim().length} to ${postTitle.length} characters to satisfy platform limits.`
+    )
+  }
+  formData.append('title', postTitle)
+
+  request.platforms.forEach(platform => {
+    formData.append('platform[]', platform)
+  })
+
+  if (request.platforms.includes('instagram')) {
+    formData.append('media_type', 'REELS')
+    formData.append('share_to_feed', 'true')
+  }
+
+  const postDescription = buildUploadPostDescription(request.caption)
+  if (postDescription) {
+    formData.append('description', postDescription)
+  }
+
+  const skipScheduling = process.env.UPLOADPOST_SKIP_SCHEDULING !== 'false'
+
+  if (request.scheduledTime && !skipScheduling) {
+    let scheduledDate: string
+    if (typeof request.scheduledTime === 'string' && request.scheduledTime.includes('T') && request.scheduledTime.endsWith('Z')) {
+      scheduledDate = request.scheduledTime
+    } else {
+      const dateObj = new Date(request.scheduledTime)
+      if (isNaN(dateObj.getTime())) {
+        throw new Error(`Invalid scheduled time format: ${request.scheduledTime}`)
+      }
+      scheduledDate = dateObj.toISOString()
+    }
+    formData.append('scheduled_date', scheduledDate)
+    console.log('[Upload-Post] Scheduling post for:', scheduledDate)
+  } else if (request.scheduledTime && skipScheduling) {
+    console.log('[Upload-Post] Skipping scheduled_date parameter - will send at scheduled time via local scheduler')
+  }
+
+  formData.append('async_upload', String(request.asyncUpload ?? true))
+
+  return formData
+}
+
 
 // Create user profile in Upload-Post
 export async function createUserProfile(
@@ -158,7 +240,7 @@ export interface GenerateUserAccessLinkOptions {
   redirectButtonText?: string
   connectTitle?: string
   connectDescription?: string
-  platforms?: Array<'tiktok' | 'instagram' | 'linkedin' | 'youtube' | 'facebook' | 'x' | 'threads' | 'pinterest'>
+  platforms?: Array<'tiktok' | 'instagram' | 'linkedin' | 'youtube' | 'facebook' | 'x' | 'threads'>
 }
 
 export interface UploadPostAccessLink {
@@ -275,75 +357,6 @@ export async function postVideo(
       throw new Error('User ID is required for posting videos')
     }
 
-    // Build form data according to Upload-Post API documentation
-    // https://docs.upload-post.com/api/upload-video
-    const { default: FormData } = await import('form-data')
-    const formData = new FormData()
-    
-    // Required fields
-    formData.append('user', request.userId)
-    formData.append('video', request.videoUrl) // Can be URL or file
-    const postTitle = buildUploadPostTitle(request.caption)
-    if (request.caption && request.caption.trim().length > postTitle.length) {
-      console.warn(
-        `[Upload-Post] Truncated title from ${request.caption.trim().length} to ${postTitle.length} characters to satisfy platform limits.`
-      )
-    }
-    formData.append('title', postTitle)
-    
-    // Platform array - must be sent as platform[] for each platform
-    request.platforms.forEach(platform => {
-      formData.append('platform[]', platform)
-    })
-
-    // Platform-specific parameters
-    // Instagram: Set media_type to REELS for vertical format
-    if (request.platforms.includes('instagram')) {
-      formData.append('media_type', 'REELS')
-      formData.append('share_to_feed', 'true')
-    }
-
-    // Optional fields
-    const postDescription = buildUploadPostDescription(request.caption)
-    if (postDescription) {
-      formData.append('description', postDescription)
-    }
-
-    // Option to skip scheduling in Upload-Post and send at the right time instead
-    // Default to true to avoid timezone issues - local scheduler will send at correct time
-    // Set UPLOADPOST_SKIP_SCHEDULING=false to use Upload-Post scheduling (may have timezone issues)
-    const skipScheduling = process.env.UPLOADPOST_SKIP_SCHEDULING !== 'false'
-    
-    if (request.scheduledTime && !skipScheduling) {
-      // Convert to ISO-8601 format if needed
-      try {
-        // Check if already in ISO format
-        let scheduledDate: string
-        if (typeof request.scheduledTime === 'string' && request.scheduledTime.includes('T') && request.scheduledTime.endsWith('Z')) {
-          // Already in ISO format with Z
-          scheduledDate = request.scheduledTime
-        } else {
-          // Try to parse and convert
-          const dateObj = new Date(request.scheduledTime)
-          if (isNaN(dateObj.getTime())) {
-            throw new Error(`Invalid scheduled time format: ${request.scheduledTime}`)
-          }
-          scheduledDate = dateObj.toISOString()
-        }
-        formData.append('scheduled_date', scheduledDate)
-        console.log('[Upload-Post] Scheduling post for:', scheduledDate)
-      } catch (error: any) {
-        console.error('[Upload-Post] Invalid scheduled time:', request.scheduledTime, error.message)
-        throw new Error(`Invalid scheduled time format: ${request.scheduledTime}. ${error.message}`)
-      }
-    } else if (request.scheduledTime && skipScheduling) {
-      console.log('[Upload-Post] Skipping scheduled_date parameter - will send at scheduled time via local scheduler')
-      // Don't append scheduled_date - the request will be sent at the right time by our scheduler
-    }
-
-    // Always use async upload to avoid timeouts
-    formData.append('async_upload', String(request.asyncUpload ?? true))
-
     // According to Upload-Post API docs: https://docs.upload-post.com/api/upload-video
     // The correct endpoint is: POST /api/upload
     const endpoint = `${UPLOADPOST_API_URL}/upload`
@@ -374,13 +387,12 @@ export async function postVideo(
     }
 
     // Retry logic with exponential backoff for rate limits and server errors
-    const maxRetries = 3
-    const initialDelay = 2000 // Start with 2 seconds
     let response
     let lastError: any
 
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
+    for (let attempt = 0; attempt < MAX_UPLOADPOST_RETRIES; attempt++) {
       try {
+        const formData = await buildUploadVideoFormData(request)
         response = await axios.post(
           endpoint,
           formData,
@@ -400,7 +412,7 @@ export async function postVideo(
         const statusText = error.response?.statusText
         const errorData = error.response?.data
         
-        console.error(`[Upload-Post] API request failed (attempt ${attempt + 1}/${maxRetries}):`, {
+        console.error(`[Upload-Post] API request failed (attempt ${attempt + 1}/${MAX_UPLOADPOST_RETRIES}):`, {
           endpoint,
           status,
           statusText,
@@ -423,16 +435,17 @@ export async function postVideo(
         
         // Retry on rate limit (429) or server errors (5xx)
         if (status === 429 || (status >= 500 && status < 600)) {
-          if (attempt < maxRetries - 1) {
+          if (attempt < MAX_UPLOADPOST_RETRIES - 1) {
             // Calculate delay with exponential backoff
-            const delay = initialDelay * Math.pow(2, attempt)
+            const delay = DEFAULT_UPLOADPOST_RETRY_DELAY_MS * Math.pow(2, attempt)
             
             // If 429, try to use retry-after header if available
             const retryAfter = error.response?.headers?.['retry-after'] || 
                              error.response?.headers?.['x-ratelimit-reset']
-            const waitTime = retryAfter ? parseInt(retryAfter, 10) * 1000 : delay
+            const retryAfterMs = parseRetryAfterMs(retryAfter)
+            const waitTime = retryAfterMs ?? delay
             
-            console.log(`[Upload-Post] Rate limit or server error (${status}), retrying in ${waitTime}ms (attempt ${attempt + 1}/${maxRetries})`)
+            console.log(`[Upload-Post] Rate limit or server error (${status}), retrying in ${waitTime}ms (attempt ${attempt + 1}/${MAX_UPLOADPOST_RETRIES})`)
             await new Promise(resolve => setTimeout(resolve, waitTime))
             continue
           } else {

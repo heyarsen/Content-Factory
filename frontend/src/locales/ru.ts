@@ -636,7 +636,6 @@ export const ru = {
         facebook: "Facebook",
         x: "X (Twitter)",
         linkedin: "LinkedIn",
-        pinterest: "Pinterest",
         threads: "Threads",
     },
     avatars: {

@@ -25,8 +25,14 @@ function isPlatformConnectedOnUploadPost(profile: any, platform: string): boolea
   }
 
   const platformAccount = socialAccounts[normalizedPlatform] || socialAccounts[platform]
-  if (!platformAccount || typeof platformAccount !== 'object') {
+  if (!platformAccount) {
     return false
+  }
+
+  // Upload-Post can return either an object with account fields,
+  // or a non-empty string/primitive for connected platforms.
+  if (typeof platformAccount !== 'object') {
+    return String(platformAccount).trim().length > 0
   }
 
   return Boolean(platformAccount.display_name || platformAccount.username || Object.keys(platformAccount).length > 0)
@@ -181,9 +187,9 @@ router.post('/schedule', authenticate, requireSubscription, async (req: AuthRequ
         const platformResult = postResponse.results?.find((r: any) => r.platform === platform)
 
         // For async uploads, always start as pending
-        const status = isAsync ? 'pending' :
-          platformResult?.status === 'success' || postResponse.status === 'success' ? 'posted' :
-            platformResult?.status === 'failed' ? 'failed' : 'pending'
+        const status = platformResult?.status === 'failed' ? 'failed' :
+          isAsync ? 'pending' :
+            platformResult?.status === 'success' || postResponse.status === 'success' ? 'posted' : 'pending'
 
         const { data: postData, error: postError } = await supabase
           .from('scheduled_posts')
