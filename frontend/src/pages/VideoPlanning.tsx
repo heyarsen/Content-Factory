@@ -89,6 +89,7 @@ interface VideoPlanItem {
   error_message: string | null
   created_at?: string
   updated_at?: string
+  plan_name?: string
 }
 
 interface SocialAccount {
@@ -258,9 +259,13 @@ export function VideoPlanning() {
         const day = String(planStartDate.getDate()).padStart(2, '0')
         setSelectedDate(`${year}-${month}-${day}`)
       }
+    } else if (plans.length > 0) {
+      loadAllPlanItems(plans)
+    } else {
+      setPlanItems([])
     }
     loadScheduledPosts()
-  }, [selectedPlan])
+  }, [selectedPlan, plans])
 
   useEffect(() => {
     setSelectedItem(null)
@@ -398,7 +403,13 @@ export function VideoPlanning() {
   const loadPlans = async () => {
     try {
       const response = await api.get('/api/plans')
-      setPlans(response.data.plans || [])
+      const loadedPlans = response.data.plans || []
+      setPlans(loadedPlans)
+
+      if (loadedPlans.length === 0) {
+        setSelectedPlan(null)
+        setPlanItems([])
+      }
 
       // Load variety metrics if we have plans
       if (response.data.plans && response.data.plans.length > 0) {
@@ -409,6 +420,33 @@ export function VideoPlanning() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const normalizePlanItems = (items: VideoPlanItem[]): VideoPlanItem[] => {
+    return items.map((item: VideoPlanItem) => {
+      const normalizedItemStatus = normalizeStatusValue(item.status) as VideoPlanItem['status']
+      const normalizedScriptStatus = normalizeStatusValue(item.script_status) as VideoPlanItem['script_status']
+      const normalizedVideoStatus = normalizeStatusValue(item.videos?.status)
+      const hasVideoFailure = ['failed', 'error'].includes(normalizedVideoStatus || '')
+      const hasItemFailure = Boolean(item.error_message)
+      const status = ((hasVideoFailure || hasItemFailure)
+        ? 'failed'
+        : (item.video_id && normalizedVideoStatus
+          ? normalizedVideoStatus
+          : normalizedItemStatus)) as VideoPlanItem['status']
+
+      return {
+        ...item,
+        status,
+        script_status: normalizedScriptStatus,
+        videos: item.videos
+          ? {
+            ...item.videos,
+            status: normalizedVideoStatus,
+          }
+          : item.videos,
+      }
+    })
   }
 
   const loadVarietyMetrics = async () => {
@@ -430,30 +468,7 @@ export function VideoPlanning() {
         itemsCount: items.length,
         responseData: response.data
       })
-      const normalizedItems = items.map((item: VideoPlanItem) => {
-        const normalizedItemStatus = normalizeStatusValue(item.status) as VideoPlanItem['status']
-        const normalizedScriptStatus = normalizeStatusValue(item.script_status) as VideoPlanItem['script_status']
-        const normalizedVideoStatus = normalizeStatusValue(item.videos?.status)
-        const hasVideoFailure = ['failed', 'error'].includes(normalizedVideoStatus || '')
-        const hasItemFailure = Boolean(item.error_message)
-        const status = (hasVideoFailure || hasItemFailure)
-          ? 'failed'
-          : (item.video_id && normalizedVideoStatus
-            ? normalizedVideoStatus
-            : normalizedItemStatus)
-
-        return {
-          ...item,
-          status,
-          script_status: normalizedScriptStatus,
-          videos: item.videos
-            ? {
-              ...item.videos,
-              status: normalizedVideoStatus,
-            }
-            : item.videos,
-        }
-      })
+      const normalizedItems = normalizePlanItems(items)
       setPlanItems(normalizedItems)
       console.log(`[VideoPlanning] ✓ Loaded ${items.length} plan items for plan ${planId}`)
       if (items.length > 0) {
@@ -483,6 +498,41 @@ export function VideoPlanning() {
         status: error.response?.status
       })
     }
+  }
+
+  const loadAllPlanItems = async (availablePlans: VideoPlan[]) => {
+    if (availablePlans.length === 0) {
+      setPlanItems([])
+      return
+    }
+
+    try {
+      const planResponses = await Promise.all(
+        availablePlans.map((plan) => api.get(`/api/plans/${plan.id}`)),
+      )
+
+      const allItems = planResponses.flatMap((response, index) => {
+        const plan = availablePlans[index]
+        const items = response.data.items || []
+        return items.map((item: VideoPlanItem) => ({
+          ...item,
+          plan_name: plan.name,
+        }))
+      })
+
+      setPlanItems(normalizePlanItems(allItems))
+    } catch (error: any) {
+      console.error('Failed to load all plan items:', error)
+    }
+  }
+
+  const refreshVisiblePlanItems = async () => {
+    if (selectedPlan) {
+      await loadPlanItems(selectedPlan.id)
+      return
+    }
+
+    await loadAllPlanItems(plans)
   }
 
   const loadScheduledPosts = async () => {
@@ -603,8 +653,8 @@ export function VideoPlanning() {
         // You could show a toast notification here if you have a toast system
       }
 
-    setPlans([response.data.plan, ...plans])
-    setSelectedPlan(response.data.plan)
+      setPlans([response.data.plan, ...plans])
+      setSelectedPlan(response.data.plan)
 
       // Navigate to plan start date
       if (response.data.plan.start_date) {
@@ -654,9 +704,7 @@ export function VideoPlanning() {
   const handleApproveScript = async (itemId: string) => {
     try {
       await api.post(`/api/plans/items/${itemId}/approve-script`)
-      if (selectedPlan) {
-        loadPlanItems(selectedPlan.id)
-      }
+      await refreshVisiblePlanItems()
       setScriptPreviewItem(null)
     } catch (error: any) {
       alert(error.response?.data?.error || t('video_planning.approve_script_failed'))
@@ -666,9 +714,7 @@ export function VideoPlanning() {
   const handleRejectScript = async (itemId: string) => {
     try {
       await api.post(`/api/plans/items/${itemId}/reject-script`)
-      if (selectedPlan) {
-        loadPlanItems(selectedPlan.id)
-      }
+      await refreshVisiblePlanItems()
       setScriptPreviewItem(null)
     } catch (error: any) {
       alert(error.response?.data?.error || t('video_planning.reject_script_failed'))
@@ -678,9 +724,7 @@ export function VideoPlanning() {
   const handleGenerateTopic = async (itemId: string) => {
     try {
       await api.post(`/api/plans/items/${itemId}/generate-topic`)
-      if (selectedPlan) {
-        loadPlanItems(selectedPlan.id)
-      }
+      await refreshVisiblePlanItems()
     } catch (error: any) {
       alert(error.response?.data?.error || t('video_planning.generate_topic_failed'))
     }
@@ -692,9 +736,7 @@ export function VideoPlanning() {
         style: 'Realistic',
         duration: 30,
       })
-      if (selectedPlan) {
-        loadPlanItems(selectedPlan.id)
-      }
+      await refreshVisiblePlanItems()
     } catch (error: any) {
       alert(error.response?.data?.error || t('video_planning.create_video_failed'))
     }
@@ -769,16 +811,39 @@ export function VideoPlanning() {
     setDeleting(true)
     try {
       await api.delete(`/api/plans/${deleteModal}`)
-      setPlans(plans.filter((p: VideoPlan) => p.id !== deleteModal))
+      const remainingPlans = plans.filter((p: VideoPlan) => p.id !== deleteModal)
+      setPlans(remainingPlans)
       if (selectedPlan?.id === deleteModal) {
-        const remainingPlans = plans.filter((p: VideoPlan) => p.id !== deleteModal)
-        setSelectedPlan(remainingPlans.length > 0 ? remainingPlans[0] : null)
+        setSelectedPlan(null)
+      }
+      if (!selectedPlan || selectedPlan?.id === deleteModal) {
+        await loadAllPlanItems(remainingPlans)
       }
       setDeleteModal(null)
     } catch (error: any) {
       alert(error.response?.data?.error || t('video_planning.delete_plan_failed'))
     } finally {
       setDeleting(false)
+    }
+  }
+
+  const handleTogglePlanPause = async (plan: VideoPlan) => {
+    try {
+      const response = await api.patch(`/api/plans/${plan.id}`, {
+        enabled: !plan.enabled,
+      })
+
+      const updatedPlan = response.data.plan
+      setPlans((prevPlans) =>
+        prevPlans.map((prevPlan) =>
+          prevPlan.id === plan.id ? { ...prevPlan, ...updatedPlan } : prevPlan,
+        ),
+      )
+      if (selectedPlan?.id === plan.id) {
+        setSelectedPlan((prev) => (prev ? { ...prev, ...updatedPlan } : prev))
+      }
+    } catch (error: any) {
+      alert(error.response?.data?.error || t('video_planning.pause_resume_failed'))
     }
   }
 
@@ -803,7 +868,7 @@ export function VideoPlanning() {
 
   const handleSaveItem = async () => {
     const targetItem = editingItem || selectedItem
-    if (!targetItem || !selectedPlan) return
+    if (!targetItem) return
 
     try {
       await api.patch(`/api/plans/items/${targetItem.id}`, {
@@ -822,7 +887,7 @@ export function VideoPlanning() {
       }
 
       setEditingItem(null)
-      loadPlanItems(selectedPlan.id)
+      await refreshVisiblePlanItems()
     } catch (error: any) {
       alert(error.response?.data?.error || t('video_planning.update_item_failed'))
     }
@@ -1299,6 +1364,15 @@ export function VideoPlanning() {
         {plans.length > 0 && (
           <Card className="p-4">
             <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setSelectedPlan(null)}
+                className={`rounded-xl px-4 py-2 text-sm font-medium transition ${!selectedPlan
+                  ? 'bg-brand-500 text-white'
+                  : 'bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+              >
+                {t('video_planning.all_plans')}
+              </button>
               {plans.map((plan: VideoPlan) => (
                 <div key={plan.id} className="flex items-center gap-2">
                   <button
@@ -1309,6 +1383,17 @@ export function VideoPlanning() {
                       }`}
                   >
                     {plan.name} ({plan.videos_per_day}/day)
+                    {!plan.enabled && ` • ${t('video_planning.paused')}`}
+                  </button>
+                  <button
+                    onClick={() => handleTogglePlanPause(plan)}
+                    className={`rounded-xl px-2 py-1 text-xs font-medium transition ${plan.enabled
+                      ? 'text-amber-700 bg-amber-50 hover:bg-amber-100'
+                      : 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
+                      }`}
+                    title={plan.enabled ? t('video_planning.pause_plan') : t('video_planning.resume_plan')}
+                  >
+                    {plan.enabled ? t('video_planning.pause_plan') : t('video_planning.resume_plan')}
                   </button>
                   <button
                     onClick={() => handleEditPlan(plan)}
@@ -1333,7 +1418,7 @@ export function VideoPlanning() {
         <CreditBanner />
 
         {/* Plan Items Calendar View */}
-        {selectedPlan ? (
+        {plans.length > 0 ? (
           <div className="space-y-6">
             {/* Status Summary and Filters */}
             <Card className="p-4">
@@ -1771,6 +1856,9 @@ export function VideoPlanning() {
                                     item.script_status,
                                     item,
                                   )}
+                                  {!selectedPlan && item.plan_name && (
+                                    <Badge variant="default">{item.plan_name}</Badge>
+                                  )}
                                 </div>
 
                                 {editingItem?.id === item.id ? (
@@ -1980,8 +2068,7 @@ export function VideoPlanning() {
                                         await api.post(
                                           `/api/plans/items/${item.id}/generate-script`,
                                         )
-                                        if (selectedPlan)
-                                          loadPlanItems(selectedPlan.id)
+                                        await refreshVisiblePlanItems()
                                       } catch (error: any) {
                                         alert(
                                           error.response?.data?.error ||
@@ -2104,11 +2191,10 @@ export function VideoPlanning() {
                     <Button
                       size="sm"
                       variant="secondary"
-                      onClick={() =>
-                        api
-                          .post(`/api/plans/items/${selectedItem.id}/generate-script`)
-                          .then(() => selectedPlan && loadPlanItems(selectedPlan.id))
-                      }
+                      onClick={async () => {
+                        await api.post(`/api/plans/items/${selectedItem.id}/generate-script`)
+                        await refreshVisiblePlanItems()
+                      }}
                       leftIcon={<PenSquare className="h-4 w-4" />}
                     >
                       {t('video_planning.regenerate_script')}
