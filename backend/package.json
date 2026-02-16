@@ -7,7 +7,8 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "type-check": "tsc --noEmit",
-    "test": "tsx --test"
+    "test": "tsx --test",
+    "migrate:admin-plans": "tsx src/scripts/run-admin-plan-migration.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.38.4",

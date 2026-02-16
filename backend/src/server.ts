@@ -22,7 +22,6 @@ import promptsRoutes from './routes/prompts.js'
 import { initializeScheduler } from './jobs/scheduler.js'
 import adminRoutes from './routes/admin.js'
 import supportRoutes from './routes/support.js'
-import adminMigrationRoutes from './routes/admin-migration.js'
 import dashboardRoutes from './routes/dashboard.js'
 import privacyRoutes from './routes/privacy.js'
 
@@ -304,7 +303,6 @@ app.use('/api/credits', creditsRoutes)
 app.use('/api/prompts', promptsRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/support', supportRoutes)
-app.use('/api/admin-migration', adminMigrationRoutes)
 app.use('/api/dashboard', dashboardRoutes)
 app.use('/api/privacy', privacyRoutes)
 
