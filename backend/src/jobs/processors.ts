@@ -40,7 +40,12 @@ export async function processJob(job: BackgroundJob): Promise<void> {
 
     await JobService.markJobCompleted(job.id)
   } catch (error: any) {
-    console.error(`Error processing job ${job.id}:`, error)
+    const isExpectedCreditFailure = error?.name === 'InsufficientCreditsError'
+    if (isExpectedCreditFailure) {
+      console.warn(`Job ${job.id} failed: ${error.message}`)
+    } else {
+      console.error(`Error processing job ${job.id}:`, error)
+    }
     await JobService.markJobFailed(job.id, error.message, true)
   }
 }
@@ -158,7 +163,7 @@ async function processVideoGeneration(job: BackgroundJob): Promise<void> {
   try {
     await CreditsService.checkAndDeduct(reel.user_id, CreditsService.COSTS.VIDEO_GENERATION, 'reel video generation')
   } catch (creditError: any) {
-    console.error(`[Background Job] Insufficient credits for user ${reel.user_id} to generate video for reel ${reel_id}:`, creditError.message)
+    console.warn(`[Background Job] Skipping reel ${reel_id}: ${creditError.message}`)
     // Update reel with error
     const { ReelService } = await import('../services/reelService.js')
     await ReelService.updateReelVideo(reel_id, {
@@ -166,7 +171,9 @@ async function processVideoGeneration(job: BackgroundJob): Promise<void> {
       heygen_video_id: null,
       template: null,
     })
-    throw new Error(`Insufficient credits: ${creditError.message}`)
+    const insufficientCreditsError = new Error(`Insufficient credits: ${creditError.message}`)
+    insufficientCreditsError.name = 'InsufficientCreditsError'
+    throw insufficientCreditsError
   }
 
   const videoData = await VideoService.generateVideoForReel(reel)

@@ -1634,8 +1634,6 @@ export class VideoService {
    * if the user is not actively polling.
    */
   static async refreshAllGeneratingVideos(): Promise<{ processed: number; updated: number }> {
-    console.log('[VideoStatusWorker] Starting background status refresh for all generating videos...')
-
     // Fetch all videos with generating/pending status that have an external task ID (HeyGen or Sora)
     const { data: generatingVideos, error } = await supabase
       .from('videos')
@@ -1652,8 +1650,6 @@ export class VideoService {
     if (!generatingVideos || generatingVideos.length === 0) {
       return { processed: 0, updated: 0 }
     }
-
-    console.log(`[VideoStatusWorker] Found ${generatingVideos.length} videos to check status...`)
 
     let updatedCount = 0
 
@@ -1691,7 +1687,6 @@ export class VideoService {
             if (updateError) {
               console.error(`[VideoStatusWorker] Error updating status for HeyGen video ${video.id}:`, updateError)
             } else {
-              console.log(`[VideoStatusWorker] Updated HeyGen video ${video.id} status to ${mappedStatus}`)
               wasUpdated = true
             }
           }
