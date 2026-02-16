@@ -120,14 +120,29 @@ async function processVideoGeneration(job: BackgroundJob): Promise<void> {
     throw new Error('Reel not found')
   }
 
-  // Idempotency: if the reel already has a video assigned, skip generation
-  if (reel.heygen_video_id || reel.video_url) {
+  // Idempotency: only skip when a playable video URL already exists.
+  // Some reels can be left with a stale heygen_video_id but no video_url
+  // (e.g. provider task never finished). In that case we retry generation.
+  if (reel.video_url) {
     console.log('[Reel Generation] Skipping: reel already has video', {
       reelId: reel_id,
       heygen_video_id: reel.heygen_video_id,
       hasVideoUrl: !!reel.video_url,
     })
     return
+  }
+
+  if (reel.heygen_video_id && !reel.video_url) {
+    console.warn('[Reel Generation] Found stale provider video id without video URL, retrying generation', {
+      reelId: reel_id,
+      heygen_video_id: reel.heygen_video_id,
+    })
+
+    await ReelService.updateReelVideo(reel_id, {
+      heygen_video_id: null,
+      video_url: null,
+      template: null,
+    })
   }
 
   if (reel.status !== 'approved') {
@@ -227,4 +242,3 @@ export async function processJobQueue(limit = 10): Promise<number> {
 
   return processed
 }
-

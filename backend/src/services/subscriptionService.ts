@@ -129,8 +129,6 @@ export class SubscriptionService {
    * Check if user has active subscription
    */
   static async hasActiveSubscription(userId: string): Promise<boolean> {
-    console.log('[Subscription] Checking active subscription for user:', userId)
-
     // First check user_profiles table for cached subscription status
     const { data: profile, error: profileError } = await supabase
       .from('user_profiles')
@@ -142,11 +140,9 @@ export class SubscriptionService {
     // OR if user is an admin
     if (!profileError) {
       if (profile?.has_active_subscription) {
-        console.log('[Subscription] Found active subscription in user_profiles flag:', userId)
         return true
       }
       if (profile?.role === 'admin') {
-        console.log('[Subscription] Admin bypass in hasActiveSubscription:', userId)
         return true
       }
     }
@@ -163,14 +159,13 @@ export class SubscriptionService {
     // If latest is active or pending, it's considered active
     const hasActiveSub = !!latestSub && ['active', 'pending'].includes(latestSub.status)
 
-    console.log('[Subscription] FINAL check result for', userId, ':', {
-      hasActiveSub,
-      profileHasActive: profile?.has_active_subscription,
-      latestSubId: latestSub?.id,
-      latestSubStatus: latestSub?.status,
-      profileError: profileError?.message,
-      subError: subError?.message
-    })
+    if (profileError || subError) {
+      console.warn('[Subscription] Subscription lookup fallback encountered an error', {
+        userId,
+        profileError: profileError?.message,
+        subError: subError?.message,
+      })
+    }
 
     return hasActiveSub
   }
