@@ -43,6 +43,49 @@ const countRows = async (
   return count ?? 0
 }
 
+
+const loadUserPreferences = async (userId: string) => {
+  const primaryQuery = await supabase
+    .from('user_preferences')
+    .select('timezone, default_platforms, onboarding_checklist_hidden, onboarding_checklist_completed_steps, onboarding_completed_at')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (!primaryQuery.error) {
+    return primaryQuery
+  }
+
+  const isMissingColumn =
+    primaryQuery.error.code === '42703' ||
+    primaryQuery.error.message?.includes('onboarding_checklist_hidden') ||
+    primaryQuery.error.message?.includes('onboarding_checklist_completed_steps') ||
+    primaryQuery.error.message?.includes('onboarding_completed_at')
+
+  if (!isMissingColumn) {
+    return primaryQuery
+  }
+
+  const fallbackQuery = await supabase
+    .from('user_preferences')
+    .select('timezone, default_platforms')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (fallbackQuery.error) {
+    return fallbackQuery
+  }
+
+  return {
+    data: {
+      ...fallbackQuery.data,
+      onboarding_checklist_hidden: false,
+      onboarding_checklist_completed_steps: [],
+      onboarding_completed_at: null,
+    },
+    error: null,
+  }
+}
+
 const countPlanItems = async (userId: string, filter?: CountFilter) => {
   let query = supabase
     .from('video_plan_items')
@@ -87,11 +130,7 @@ router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
       countRows('scheduled_posts', userId, { column: 'status', value: 'pending' }),
       countRows('scheduled_posts', userId, { column: 'status', value: 'posted' }),
       countRows('social_accounts', userId, { column: 'status', value: 'connected' }),
-      supabase
-        .from('user_preferences')
-        .select('timezone, default_platforms, onboarding_checklist_hidden, onboarding_checklist_completed_steps, onboarding_completed_at')
-        .eq('user_id', userId)
-        .maybeSingle(),
+      loadUserPreferences(userId),
       supabase
         .from('user_profiles')
         .select('created_at')

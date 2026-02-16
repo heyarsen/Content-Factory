@@ -3,7 +3,7 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { existsSync, readdirSync } from 'fs'
+import { existsSync } from 'fs'
 import helmet from 'helmet'
 import { randomUUID } from 'crypto'
 import { errorHandler } from './middleware/errorHandler.js'
@@ -35,7 +35,7 @@ const app = express()
 const PORT = process.env.PORT || 3001
 
 // Trust proxy - required for Railway and other reverse proxies
-app.set('trust proxy', true)
+app.set('trust proxy', 1)
 
 const corsOriginEnv = process.env.CORS_ORIGIN || process.env.FRONTEND_URL || ''
 const normalizeOrigin = (origin: string) => origin.replace(/\/+$/, '')
@@ -311,18 +311,12 @@ app.use('/api/privacy', privacyRoutes)
 const frontendDist = path.join(__dirname, '../public')
 const indexHtml = path.join(frontendDist, 'index.html')
 
-console.log('🔍 Frontend Detection:')
-console.log('  __dirname:', __dirname)
-console.log('  Looking for frontend at:', frontendDist)
-console.log('  Frontend directory exists:', existsSync(frontendDist))
-console.log('  Index.html exists:', existsSync(indexHtml))
-if (existsSync(frontendDist)) {
-  try {
-    const files = readdirSync(frontendDist)
-    console.log('  Files in public directory:', files.slice(0, 10).join(', '), files.length > 10 ? `... (${files.length} total)` : `(${files.length} total)`)
-  } catch (error) {
-    console.log('  Error reading public directory:', error)
-  }
+if (process.env.NODE_ENV === 'development') {
+  console.log('[Frontend] Build lookup:', {
+    frontendDist,
+    hasDirectory: existsSync(frontendDist),
+    hasIndex: existsSync(indexHtml),
+  })
 }
 
 if (existsSync(frontendDist) && existsSync(indexHtml)) {
@@ -335,7 +329,7 @@ if (existsSync(frontendDist) && existsSync(indexHtml)) {
     }
     res.sendFile(indexHtml)
   })
-  console.log('✅ Serving frontend from', frontendDist)
+  console.log('[Frontend] Serving static build')
 } else {
   // Fallback if frontend not built - show API info
   app.get('/', (req, res) => {
@@ -359,8 +353,7 @@ if (existsSync(frontendDist) && existsSync(indexHtml)) {
       timestamp: new Date().toISOString(),
     })
   })
-  console.log('❌ Frontend build not found, serving API only')
-  console.log('Expected path:', frontendDist)
+  console.warn('[Frontend] Build not found, serving API only')
 }
 
 // Debug: Log all API requests (in development)

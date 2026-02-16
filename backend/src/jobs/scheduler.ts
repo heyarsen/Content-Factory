@@ -25,7 +25,6 @@ export function initializeScheduler(): void {
   // Auto-approval job: Runs every 5 minutes
   // Checks for reels with status='pending' and scheduled_time <= now
   cron.schedule('*/5 * * * *', async () => {
-    console.log('[Cron] Running auto-approval job...')
     try {
       const reels = await ReelService.getReelsReadyForAutoApproval()
 
@@ -83,7 +82,6 @@ export function initializeScheduler(): void {
   // Video generation job: Runs every 5 minutes
   // Processes approved reels without video
   cron.schedule('*/5 * * * *', async () => {
-    console.log('[Cron] Running video generation job...')
     try {
       const approvedReels = await ReelService.getApprovedReelsWithoutVideo(undefined)
 
@@ -150,10 +148,8 @@ export function initializeScheduler(): void {
   // Automation: Process scheduled plans - generate topics (Step 1)
   // Runs every minute to catch trigger times exactly
   cron.schedule('* * * * *', async () => {
-    console.log('[Cron] Running automation: process scheduled plans...')
     try {
       await AutomationService.processScheduledPlans()
-      console.log('[Automation] Processed scheduled plans')
     } catch (error: any) {
       console.error('[Automation] Error processing scheduled plans:', error)
     }
@@ -162,10 +158,8 @@ export function initializeScheduler(): void {
   // Automation: Generate research for ready items with topics but no research (Step 1.5)
   // Runs every 5 minutes for faster processing
   cron.schedule('*/5 * * * *', async () => {
-    console.log('[Cron] Running automation: generate research for ready items...')
     try {
       await AutomationService.generateResearchForReadyItems()
-      console.log('[Automation] Generated research for ready items')
     } catch (error: any) {
       console.error('[Automation] Error generating research:', error)
     }
@@ -174,10 +168,8 @@ export function initializeScheduler(): void {
   // Automation: Generate scripts for ready items (Step 2)
   // Runs every 2 minutes for faster processing
   cron.schedule('*/2 * * * *', async () => {
-    console.log('[Cron] Running automation: generate scripts...')
     try {
       await AutomationService.generateScriptsForReadyItems()
-      console.log('[Automation] Generated scripts for ready items')
     } catch (error: any) {
       console.error('[Automation] Error generating scripts:', error)
     }
@@ -186,10 +178,8 @@ export function initializeScheduler(): void {
   // Automation: Generate videos for approved scripts (Step 4)
   // Runs every 2 minutes for faster processing
   cron.schedule('*/2 * * * *', async () => {
-    console.log('[Cron] Running automation: generate videos...')
     try {
       await AutomationService.generateVideosForApprovedItems()
-      console.log('[Automation] Generated videos for approved items')
     } catch (error: any) {
       console.error('[Automation] Error generating videos:', error)
     }
@@ -198,10 +188,8 @@ export function initializeScheduler(): void {
   // Automation: Check video status and schedule distribution for completed videos (Step 5)
   // Runs every minute to check video status more frequently
   cron.schedule('* * * * *', async () => {
-    console.log('[Cron] Running automation: check video status and schedule distribution...')
     try {
       await AutomationService.checkVideoStatusAndScheduleDistribution()
-      console.log('[Automation] Checked video status and scheduled distribution')
     } catch (error: any) {
       console.error('[Automation] Error checking video status and scheduling distribution:', error)
     }
@@ -212,10 +200,8 @@ export function initializeScheduler(): void {
   // Set UPLOADPOST_SEND_INTERVAL_MINUTES to change interval (default: 1 for accurate posting times)
   const sendInterval = parseInt(process.env.UPLOADPOST_SEND_INTERVAL_MINUTES || '1', 10)
   cron.schedule(`*/${sendInterval} * * * *`, async () => {
-    console.log(`[Cron] Running automation: send scheduled posts (every ${sendInterval} minute(s))...`)
     try {
       await AutomationService.sendScheduledPosts()
-      console.log('[Automation] Sent scheduled posts')
     } catch (error: any) {
       console.error('[Automation] Error sending scheduled posts:', error)
       // Don't throw - let it retry on next run
@@ -238,4 +224,3 @@ export function initializeScheduler(): void {
 
   console.log('Job scheduler initialized successfully')
 }
-

@@ -74,8 +74,6 @@ export class SubscriptionService {
    * Get user's active subscription
    */
   static async getUserSubscription(userId: string): Promise<UserSubscription | null> {
-    console.log('[Subscription] Fetching active subscription for user:', userId)
-
     // First, try to get active subscription with completed payment
     const { data, error } = await supabase
       .from('user_subscriptions')
@@ -121,7 +119,6 @@ export class SubscriptionService {
       return failedPaymentSub as any as UserSubscription
     }
 
-    console.log('[Subscription] No active subscription records found for user:', userId)
     return null
   }
 
