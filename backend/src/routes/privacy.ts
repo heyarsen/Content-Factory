@@ -62,7 +62,6 @@ router.post('/consent', authenticate, consentLimiter, async (req: AuthRequest, r
 
     if (error) {
       if (error.code === 'PGRST205') {
-        console.warn('privacy_consents table is missing; skipping consent persistence')
         return res.json({ success: true, skipped: true })
       }
       console.error('Consent insert error:', error)

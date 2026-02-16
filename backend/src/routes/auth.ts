@@ -118,23 +118,9 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body
 
-    console.log(`[Auth] Login request received:`, {
-      hasEmail: !!email,
-      hasPassword: !!password,
-      email: email ? `${email.substring(0, 3)}***` : 'missing',
-      ip: req.ip,
-      userAgent: req.get('user-agent'),
-    })
-
     if (!email || !password) {
-      console.log('[Auth] Login failed: Missing email or password')
       return res.status(400).json({ error: 'Email and password are required' })
     }
-
-    console.log(`[Auth] Login attempt for email: ${email}`)
-    console.log(`[Auth] Supabase URL: ${process.env.SUPABASE_URL ? 'Set' : 'Missing'}`)
-    console.log(`[Auth] Service role key: ${process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Set (length: ' + process.env.SUPABASE_SERVICE_ROLE_KEY.length + ')' : 'Missing'}`)
-    console.log(`[Auth] Anon key: ${process.env.SUPABASE_ANON_KEY ? 'Set (length: ' + process.env.SUPABASE_ANON_KEY.length + ')' : 'Missing'}`)
 
     // Try with service role key first, then fallback to anon key if needed
     let data: any = null
@@ -142,7 +128,7 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
     let authClient = supabase
 
     // Check Supabase health before attempting authentication
-    const { checkSupabaseHealth, getSupabaseClientWithHealthCheck } = await import('../lib/supabaseConnection.js')
+    const { getSupabaseClientWithHealthCheck } = await import('../lib/supabaseConnection.js')
     const { circuitBreaker } = await import('../lib/circuitBreaker.js')
 
     // Check circuit breaker first
@@ -194,19 +180,14 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
     }
 
     authClient = healthCheckedClient
-    console.log(`[Auth] Using anon key for authentication with health check and circuit breaker`)
 
     // Single attempt with the health-checked client
     // If health check passed, the connection should work
-    const authStart = Date.now()
     try {
       const result = await authClient.auth.signInWithPassword({
         email,
         password,
       })
-      const authDuration = Date.now() - authStart
-      console.log(`[Auth] signInWithPassword for ${email} took ${authDuration}ms`)
-
       data = result.data
       error = result.error
 

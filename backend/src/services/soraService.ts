@@ -214,7 +214,11 @@ export async function checkSoraTaskStatus(
 
         const status = mapSoraStatusToVideoStatus(taskDetail.data.state) // API uses 'state', not 'status'
 
-        const shouldLogStatus = taskDetail.data.state !== 'waiting' || process.env.DEBUG_VIDEO_STATUS === 'true'
+        const shouldLogStatus =
+            process.env.DEBUG_VIDEO_STATUS === 'true' ||
+            taskDetail.data.state === 'success' ||
+            taskDetail.data.state === 'fail'
+
         if (shouldLogStatus) {
             console.log('[Sora Service] Task status check:', {
                 videoId,
