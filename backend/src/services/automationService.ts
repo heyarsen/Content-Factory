@@ -176,7 +176,6 @@ export class AutomationService {
         }
 
         // Generate videos for today's approved items
-        console.log(`[Automation] Checking for approved items to generate videos for plan ${plan.id}`)
         await this.generateVideosForTodayItems(
           plan.id,
           today,
@@ -1489,7 +1488,7 @@ export class AutomationService {
 
         const platforms = item.platforms || plan.default_platforms || []
         if (platforms.length === 0) {
-          console.log(`[Distribution] Skipping item ${item.id} - no platforms configured`)
+          // No social platforms linked for this item; keep as completed and skip posting.
           continue
         }
 
