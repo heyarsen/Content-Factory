@@ -8,6 +8,26 @@ import { generateVideoCaption } from './captionService.js'
 import { DateTime } from 'luxon'
 
 export class AutomationService {
+  private static isRetryableUploadError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message.toLowerCase() : String(error || '').toLowerCase()
+
+    return [
+      'rate limit',
+      'server error',
+      'timed out',
+      'timeout',
+      'network',
+      'socket hang up',
+      'econnreset',
+      'etimedout',
+      'eai_again',
+      'temporarily unavailable',
+      '502',
+      '503',
+      '504',
+    ].some(fragment => message.includes(fragment))
+  }
+
   private static hasScheduledTimePassed(
     scheduledTime: string | null | undefined,
     nowInPlanTz: DateTime
@@ -2491,9 +2511,17 @@ export class AutomationService {
             asyncUpload: true,
           })
         } catch (error: any) {
-          // Handle rate limit errors specifically
-          if (error.message && error.message.includes('rate limit')) {
-            console.warn(`[Scheduled Posts] Rate limit hit, will retry on next run. Error: ${error.message}`)
+          if (this.isRetryableUploadError(error)) {
+            console.warn(`[Scheduled Posts] Transient Upload-Post error, will retry on next run. Error: ${error?.message || error}`)
+
+            await supabase
+              .from('scheduled_posts')
+              .update({
+                status: 'pending',
+                error_message: error?.message || 'Transient Upload-Post error, retry scheduled',
+              })
+              .in('id', videoPosts.map(p => p.id))
+
             // Don't mark as failed - leave as pending so it retries
             // Add a small delay before continuing to other posts
             await new Promise(resolve => setTimeout(resolve, 5000)) // Wait 5 seconds
@@ -2519,6 +2547,18 @@ export class AutomationService {
 
         console.log(`[Scheduled Posts] Successfully sent posts for video ${firstPost.video_id}`)
       } catch (error: any) {
+        if (this.isRetryableUploadError(error)) {
+          console.warn(`[Scheduled Posts] Transient error while sending posts, will retry next run:`, error)
+          await supabase
+            .from('scheduled_posts')
+            .update({
+              status: 'pending',
+              error_message: error.message || 'Transient error, retry scheduled',
+            })
+            .in('id', videoPosts.map(p => p.id))
+          continue
+        }
+
         console.error(`[Scheduled Posts] Error sending posts:`, error)
         await supabase
           .from('scheduled_posts')
