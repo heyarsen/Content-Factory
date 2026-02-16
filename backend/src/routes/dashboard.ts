@@ -4,6 +4,13 @@ import { supabase } from '../lib/supabase.js'
 
 const router = Router()
 
+const ONBOARDING_STEP_IDS = {
+  CONNECT_SOCIAL: 'connect_social_account',
+  GENERATE_VIDEO: 'generate_first_video',
+  SET_DEFAULTS: 'set_default_platforms_timezone',
+  SCHEDULE_POST: 'schedule_first_post',
+} as const
+
 type CountFilter =
   | { column: string; value: any }
   | { column: string; values: any[]; op: 'in' }
@@ -62,14 +69,68 @@ router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!
 
-    const [totalVideos, completedVideos, generatingVideos, failedVideos, pendingPosts, postedPosts] = await Promise.all([
+    const [
+      totalVideos,
+      completedVideos,
+      generatingVideos,
+      failedVideos,
+      pendingPosts,
+      postedPosts,
+      connectedSocialAccounts,
+      preferencesResponse,
+      profileResponse,
+    ] = await Promise.all([
       countRows('videos', userId),
       countRows('videos', userId, { column: 'status', value: 'completed' }),
       countRows('videos', userId, { column: 'status', value: 'generating' }),
       countRows('videos', userId, { column: 'status', value: 'failed' }),
       countRows('scheduled_posts', userId, { column: 'status', value: 'pending' }),
       countRows('scheduled_posts', userId, { column: 'status', value: 'posted' }),
+      countRows('social_accounts', userId, { column: 'status', value: 'connected' }),
+      supabase
+        .from('user_preferences')
+        .select('timezone, default_platforms, onboarding_checklist_hidden, onboarding_checklist_completed_steps, onboarding_completed_at')
+        .eq('user_id', userId)
+        .maybeSingle(),
+      supabase
+        .from('user_profiles')
+        .select('created_at')
+        .eq('id', userId)
+        .maybeSingle(),
     ])
+
+    if (preferencesResponse.error) {
+      throw preferencesResponse.error
+    }
+
+    if (profileResponse.error) {
+      throw profileResponse.error
+    }
+
+    const preferences = preferencesResponse.data
+    const accountCreatedAt = profileResponse.data?.created_at || null
+    const accountAgeDays = accountCreatedAt
+      ? Math.max(0, Math.floor((Date.now() - new Date(accountCreatedAt).getTime()) / (1000 * 60 * 60 * 24)))
+      : null
+
+    const hasDefaultPlatforms = Array.isArray(preferences?.default_platforms) && preferences.default_platforms.length > 0
+    const hasTimezone = typeof preferences?.timezone === 'string' && preferences.timezone.trim().length > 0
+
+    const autoCompletedStepIds = [
+      connectedSocialAccounts > 0 ? ONBOARDING_STEP_IDS.CONNECT_SOCIAL : null,
+      totalVideos > 0 ? ONBOARDING_STEP_IDS.GENERATE_VIDEO : null,
+      hasDefaultPlatforms && hasTimezone ? ONBOARDING_STEP_IDS.SET_DEFAULTS : null,
+      pendingPosts + postedPosts > 0 ? ONBOARDING_STEP_IDS.SCHEDULE_POST : null,
+    ].filter(Boolean) as string[]
+
+    const storedCompletedStepIds = Array.isArray(preferences?.onboarding_checklist_completed_steps)
+      ? preferences.onboarding_checklist_completed_steps
+      : []
+
+    const completedSteps = Array.from(new Set([...storedCompletedStepIds, ...autoCompletedStepIds]))
+    const allSteps = Object.values(ONBOARDING_STEP_IDS)
+    const allCompleted = allSteps.every((stepId) => completedSteps.includes(stepId))
+    const isNewUser = accountAgeDays === null ? true : accountAgeDays <= 14
 
     res.json({
       videos: {
@@ -81,6 +142,16 @@ router.get('/stats', authenticate, async (req: AuthRequest, res: Response) => {
       posts: {
         pending: pendingPosts,
         posted: postedPosts,
+      },
+      onboarding: {
+        isNewUser,
+        accountCreatedAt,
+        accountAgeDays,
+        hidden: Boolean(preferences?.onboarding_checklist_hidden),
+        completedSteps,
+        completedAt: preferences?.onboarding_completed_at || null,
+        totalSteps: allSteps.length,
+        allCompleted,
       },
     })
   } catch (error: any) {

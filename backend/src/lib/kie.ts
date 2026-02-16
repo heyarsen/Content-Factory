@@ -248,10 +248,6 @@ export async function getTaskDetails(taskId: string): Promise<SoraTaskDetail> {
 
         if (response.data.code !== 200) {
             if (response.data.msg?.includes('recordInfo is null')) {
-                console.warn(
-                    `[KIE Sora] Task ${taskId} is not indexed yet (recordInfo is null); treating as waiting`
-                )
-
                 return {
                     code: 200,
                     msg: 'Task is still being indexed',
