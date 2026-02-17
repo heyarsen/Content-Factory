@@ -9,6 +9,8 @@ export interface Video {
   provider?: 'heygen' | 'sora'
   heygen_video_id: string | null
   sora_task_id?: string | null
+  sora_provider?: 'kie' | 'poyo' | null
+  sora_model?: 'sora-2' | 'sora-2-private' | 'sora-2-stable' | null
   video_url: string | null
   avatar_id: string | null
   error_message: string | null
