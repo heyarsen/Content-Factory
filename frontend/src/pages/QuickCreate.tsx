@@ -6,11 +6,13 @@ import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { Textarea } from '../components/ui/Textarea'
 import { Select } from '../components/ui/Select'
-import { Sparkles, Video, Share2, Instagram, Youtube, Users, Facebook } from 'lucide-react'
+import { Sparkles, Video, Share2, Instagram, Youtube, Users, Facebook, AlertTriangle } from 'lucide-react'
 import api from '../lib/api'
 import { DEFAULT_VERTICAL_ASPECT_RATIO, DEFAULT_VERTICAL_DIMENSION } from '../lib/videos'
 import { useNotifications } from '../contexts/NotificationContext'
 import { useLanguage } from '../contexts/LanguageContext'
+import { useCreditsContext } from '../contexts/CreditContext'
+import { useAuth } from '../contexts/AuthContext'
 
 interface SocialAccount {
   id: string
@@ -38,6 +40,8 @@ export function QuickCreate() {
   const navigate = useNavigate()
   const { addNotification } = useNotifications()
   const { t } = useLanguage()
+  const { user } = useAuth()
+  const { credits, unlimited, subscription } = useCreditsContext()
   const [topic, setTopic] = useState('')
   const [description, setDescription] = useState('')
   const [style, setStyle] = useState('Cinematic')
@@ -46,6 +50,9 @@ export function QuickCreate() {
   const [generatingVideo, setGeneratingVideo] = useState(false)
   const [formError, setFormError] = useState('')
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([])
+
+  const hasSubscription = !!(user?.role === 'admin' || (subscription && ['active', 'pending'].includes(subscription.status)))
+  const canGenerateVideo = hasSubscription || unlimited || (credits !== null && credits > 0)
 
   useEffect(() => {
     loadSocialAccounts()
@@ -62,6 +69,11 @@ export function QuickCreate() {
   }
 
   const handleGenerateVideo = async () => {
+    if (!canGenerateVideo) {
+      setFormError(t('common.trial_credits_ended_message'))
+      return
+    }
+
     if (!topic.trim()) {
       setFormError(t('validation.required_field'))
       return
@@ -113,6 +125,13 @@ export function QuickCreate() {
             {t('quick_create.desc')}
           </p>
         </div>
+
+        {!canGenerateVideo && (
+          <div className="flex items-start gap-3 rounded-2xl border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm text-amber-700">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{t('common.trial_credits_ended_message')}</span>
+          </div>
+        )}
 
         {formError && (
           <div className="rounded-2xl border border-rose-200/80 bg-rose-50/80 px-4 py-3 text-sm text-rose-600">
@@ -220,7 +239,7 @@ export function QuickCreate() {
               </Button>
               <Button
                 onClick={handleGenerateVideo}
-                disabled={generatingVideo}
+                disabled={generatingVideo || !canGenerateVideo}
                 loading={generatingVideo}
                 leftIcon={!generatingVideo ? <Video className="h-4 w-4" /> : undefined}
                 className="w-full sm:w-auto shadow-lg shadow-brand-500/20"

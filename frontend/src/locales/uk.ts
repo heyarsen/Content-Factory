@@ -31,6 +31,11 @@ export const uk = {
         credits_available: '{count} кредитів доступно',
         credits_message: 'У вас є {count} кредит{plural} для створення відео. Для автоматизації, підключення соціальних мереж та планування публікацій потрібна підписка.',
         subscription_inactive_message: 'Ваша підписка неактивна. Будь ласка, оновіть або використовуйте кредити для продовження створення відео та планування публікацій.',
+
+        buy_subscription: "Buy subscription",
+        generate_video: "Generate a video",
+        trial_credits_ended_title: "You ran out of trial credits",
+        trial_credits_ended_message: "You ran out of free trial credits. Buy a subscription to continue generating videos, automation, and connecting social accounts.",
     },
     dashboard: {
         title: "Творець відео",

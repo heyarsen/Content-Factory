@@ -5,7 +5,7 @@ import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Badge } from '../components/ui/Badge'
-import { Video, Calendar, Users, Zap, ArrowRight, Sparkles, ClipboardList } from 'lucide-react'
+import { Video, Calendar, Users, Zap, ArrowRight, Sparkles, ClipboardList, Lock } from 'lucide-react'
 import api from '../lib/api'
 
 import { useLanguage } from '../contexts/LanguageContext'
@@ -64,8 +64,8 @@ interface OnboardingStats {
 
 export function Dashboard() {
   const { t } = useLanguage()
-  useAuth()
-  useCreditsContext()
+  const { user } = useAuth()
+  const { unlimited, subscription } = useCreditsContext()
   const [videoStats, setVideoStats] = useState<VideoStats | null>(null)
   const [postStats, setPostStats] = useState<PostStats | null>(null)
   const [activity, setActivity] = useState<ActivityItem[]>([])
@@ -73,6 +73,9 @@ export function Dashboard() {
   const [planHealth, setPlanHealth] = useState<PlanHealth | null>(null)
   const [onboarding, setOnboarding] = useState<OnboardingStats | null>(null)
   const [loading, setLoading] = useState(true)
+
+  const hasSubscription = !!(user?.role === 'admin' || (subscription && ['active', 'pending'].includes(subscription.status)))
+  const canConnectSocial = hasSubscription || unlimited
 
   const formatStatus = (status?: string) => {
     if (!status) return t('dashboard.status_unknown') || 'Unknown'
@@ -335,8 +338,16 @@ export function Dashboard() {
                 </Link>
 
                 <Link
-                  to="/social"
-                  className="group flex items-center justify-between rounded-2xl border border-white/60 bg-white/70 px-4 py-3 sm:px-5 sm:py-4 transition-all hover:border-brand-200 hover:shadow-[0_18px_45px_-30px_rgba(99,102,241,0.45)] touch-manipulation active:scale-[0.98]"
+                  to={canConnectSocial ? '/social' : '#'}
+                  onClick={(event) => {
+                    if (!canConnectSocial) {
+                      event.preventDefault()
+                    }
+                  }}
+                  className={`group flex items-center justify-between rounded-2xl px-4 py-3 sm:px-5 sm:py-4 touch-manipulation ${canConnectSocial
+                    ? 'border border-white/60 bg-white/70 transition-all hover:border-brand-200 hover:shadow-[0_18px_45px_-30px_rgba(99,102,241,0.45)] active:scale-[0.98]'
+                    : 'cursor-not-allowed border border-amber-200 bg-amber-50/60 opacity-70'}`}
+                  aria-disabled={!canConnectSocial}
                 >
                   <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                     <div className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-[18px] bg-sky-50 text-sky-500">
@@ -345,9 +356,16 @@ export function Dashboard() {
                     <div className="min-w-0">
                       <p className="text-sm font-bold text-slate-900 leading-tight truncate">{t('dashboard.connect_social')}</p>
                       <p className="mt-0.5 text-[10px] sm:text-xs text-slate-500 leading-none truncate">{t('dashboard.connect_social_desc')}</p>
+                      {!canConnectSocial && (
+                        <p className="mt-1 text-[10px] sm:text-xs text-amber-700">{t('common.buy_subscription')}</p>
+                      )}
                     </div>
                   </div>
-                  <ArrowRight className="h-4 w-4 text-brand-600 transition group-hover:translate-x-0.5 shrink-0" />
+                  {canConnectSocial ? (
+                    <ArrowRight className="h-4 w-4 text-brand-600 transition group-hover:translate-x-0.5 shrink-0" />
+                  ) : (
+                    <Lock className="h-4 w-4 text-amber-600 shrink-0" />
+                  )}
                 </Link>
               </div>
             </div>
