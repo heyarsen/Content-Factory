@@ -31,6 +31,11 @@ export const es = {
         credits_available: '{count} créditos disponibles',
         credits_message: 'Tienes {count} crédito{plural} para la generación de videos. Para la automatización, conectar redes sociales y programar publicaciones, necesitas una suscripción.',
         subscription_inactive_message: 'Tu suscripción está inactiva. Por favor, actualiza o usa créditos para continuar creando videos y programando publicaciones.',
+
+        buy_subscription: "Buy subscription",
+        generate_video: "Generate a video",
+        trial_credits_ended_title: "You ran out of trial credits",
+        trial_credits_ended_message: "You ran out of free trial credits. Buy a subscription to continue generating videos, automation, and connecting social accounts.",
     },
     dashboard: {
         title: "Creador de Video",
