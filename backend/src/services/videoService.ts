@@ -1185,7 +1185,8 @@ export class VideoService {
 
         // Import and use Sora service
         const { generateVideoWithSora } = await import('./soraService.js')
-        void generateVideoWithSora(video, { aspectRatio }).catch((error: any) => {
+        const generationMode = input.plan_item_id ? 'automation' : 'manual'
+        void generateVideoWithSora(video, { aspectRatio, generationMode }).catch((error: any) => {
           console.error('[Video Generation] Sora generation failed:', {
             error: error?.message || error,
             videoId: video.id,
@@ -1660,7 +1661,7 @@ export class VideoService {
         if (video.sora_task_id) {
           // Handle Sora videos
           const { SoraService } = await import('./soraService.js')
-          await SoraService.checkSoraTaskStatus(video.id, video.sora_task_id)
+          await SoraService.checkSoraTaskStatus(video.id, video.sora_task_id, video.sora_provider || 'kie')
           wasUpdated = true // SoraService handles its own DB updates and logging
         } else if (video.heygen_video_id) {
           // Handle HeyGen videos

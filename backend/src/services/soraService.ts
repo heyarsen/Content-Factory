@@ -6,10 +6,13 @@ import {
     calculateFramesFromDuration,
     type SoraAspectRatio,
     type SoraTaskDetail,
+    type SoraProvider,
+    type SoraModel,
 } from '../lib/kie.js'
 import type { Video } from '../types/database.js'
 import { getMaxCharactersForDuration, getMaxWordsForDuration } from '../lib/scriptLimits.js'
 import { VideoService } from './videoService.js'
+import { SoraGenerationSettingsService, type GenerationMode } from './soraGenerationSettingsService.js'
 
 /**
  * Map Sora task status to internal video status
@@ -96,6 +99,7 @@ export async function generateVideoWithSora(
     options: {
         aspectRatio?: string | null
         callBackUrl?: string
+        generationMode?: GenerationMode
     } = {}
 ): Promise<void> {
     try {
@@ -137,50 +141,83 @@ export async function generateVideoWithSora(
         // Calculate frames from duration
         const nFrames = calculateFramesFromDuration(video.duration || 30)
 
-        // Create Sora task
-        const createResponse = await createSoraTask(prompt, soraAspectRatio, {
-            nFrames,
-            removeWatermark: true,
-            callBackUrl: options.callBackUrl,
-        })
+        const generationMode = options.generationMode || 'manual'
+        const selected = await SoraGenerationSettingsService.resolveProviderConfig(generationMode)
 
-        const taskId = createResponse.data.taskId
+        const attemptedModels: SoraModel[] =
+            selected.model === 'sora-2' || selected.model === 'sora-2-private'
+                ? [selected.model, selected.model, 'sora-2-stable']
+                : [selected.model]
 
-        // Update video record with task ID
-        const { error: updateError } = await supabase
-            .from('videos')
-            .update({
-                sora_task_id: taskId,
-                status: 'generating',
-                updated_at: new Date().toISOString(),
-            })
-            .eq('id', video.id)
+        let lastError: Error | null = null
+        let successfulTaskDetail: SoraTaskDetail | null = null
+        let successfulTaskId = ''
 
-        if (updateError) {
-            console.error('[Sora Service] Failed to update video with task ID:', updateError)
-            throw new Error(`Failed to update video record: ${updateError.message}`)
+        for (let idx = 0; idx < attemptedModels.length; idx++) {
+            const model = attemptedModels[idx]
+            try {
+                const createResponse = await createSoraTask(prompt, soraAspectRatio, {
+                    nFrames,
+                    removeWatermark: true,
+                    callBackUrl: options.callBackUrl,
+                    provider: selected.provider,
+                    model,
+                })
+
+                const taskId = createResponse.data.taskId
+
+                const { error: updateError } = await supabase
+                    .from('videos')
+                    .update({
+                        sora_task_id: taskId,
+                        sora_provider: selected.provider,
+                        sora_model: model,
+                        status: 'generating',
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq('id', video.id)
+
+                if (updateError) {
+                    console.error('[Sora Service] Failed to update video with task ID:', updateError)
+                    throw new Error(`Failed to update video record: ${updateError.message}`)
+                }
+
+                const taskDetail = await pollTaskUntilComplete(taskId, {
+                    maxAttempts: 120,
+                    pollInterval: 10000,
+                    provider: selected.provider,
+                    onProgress: (progress, status) => {
+                        console.log(`[Sora Service] Video ${video.id} - Progress: ${progress}%, Status: ${status}`)
+                    },
+                })
+
+                successfulTaskDetail = taskDetail
+                successfulTaskId = taskId
+                break
+            } catch (attemptError: any) {
+                lastError = attemptError instanceof Error ? attemptError : new Error(String(attemptError))
+                console.error('[Sora Service] Attempt failed:', {
+                    videoId: video.id,
+                    attempt: idx + 1,
+                    totalAttempts: attemptedModels.length,
+                    provider: selected.provider,
+                    model,
+                    error: lastError.message,
+                })
+            }
         }
 
-        console.log('[Sora Service] Task created, starting polling:', taskId)
+        if (!successfulTaskDetail) {
+            throw lastError || new Error('All Sora generation attempts failed')
+        }
 
-        // Poll for completion
-        // Increased timeout: 120 attempts * 10s = 20 minutes (video generation can take longer)
-        const taskDetail = await pollTaskUntilComplete(taskId, {
-            maxAttempts: 120, // 20 minutes with 10s interval
-            pollInterval: 10000, // 10 seconds between polls
-            onProgress: (progress, status) => {
-                console.log(`[Sora Service] Video ${video.id} - Progress: ${progress}%, Status: ${status}`)
-            },
-        })
-
-        // Update video record with success
-        await updateVideoWithSoraSuccess(video.id, taskDetail)
+        await updateVideoWithSoraSuccess(video.id, successfulTaskDetail)
 
         // Extract video URL from resultJson for logging
         let videoUrl: string | null = null
-        if (taskDetail.data.resultJson) {
+        if (successfulTaskDetail.data.resultJson) {
             try {
-                const result = JSON.parse(taskDetail.data.resultJson)
+                const result = JSON.parse(successfulTaskDetail.data.resultJson)
                 if (result.resultUrls && Array.isArray(result.resultUrls) && result.resultUrls.length > 0) {
                     videoUrl = result.resultUrls[0]
                 }
@@ -191,7 +228,7 @@ export async function generateVideoWithSora(
 
         console.log('[Sora Service] Video generation completed successfully:', {
             videoId: video.id,
-            taskId,
+            taskId: successfulTaskId,
             videoUrl,
         })
     } catch (error: any) {
@@ -206,11 +243,12 @@ export async function generateVideoWithSora(
  */
 export async function checkSoraTaskStatus(
     videoId: string,
-    taskId: string
+    taskId: string,
+    provider: SoraProvider = 'kie'
 ): Promise<void> {
     try {
         const { getTaskDetails } = await import('../lib/kie.js')
-        const taskDetail = await getTaskDetails(taskId)
+        const taskDetail = await getTaskDetails(taskId, provider)
 
         const status = mapSoraStatusToVideoStatus(taskDetail.data.state) // API uses 'state', not 'status'
 
