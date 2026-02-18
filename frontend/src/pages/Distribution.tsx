@@ -134,6 +134,16 @@ export function Distribution() {
     loadVideos()
   }, [loadAccounts, statusFilter])
 
+  useEffect(() => {
+    const refreshOnPostCreated = () => {
+      loadPosts()
+      loadVideos()
+    }
+
+    window.addEventListener('content-factory:post-created', refreshOnPostCreated)
+    return () => window.removeEventListener('content-factory:post-created', refreshOnPostCreated)
+  }, [statusFilter])
+
   // Poll for pending posts to update their status
   useEffect(() => {
     const pendingPosts = posts.filter(p => p.status === 'pending' && p.upload_post_id)

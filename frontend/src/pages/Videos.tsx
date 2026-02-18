@@ -111,6 +111,15 @@ export function Videos() {
     return () => clearTimeout(timeout)
   }, [loadVideos]) // Removed loading from dependency to avoid loop, but it's safe
 
+  useEffect(() => {
+    const refreshOnPostCreated = () => {
+      loadVideos()
+    }
+
+    window.addEventListener('content-factory:post-created', refreshOnPostCreated)
+    return () => window.removeEventListener('content-factory:post-created', refreshOnPostCreated)
+  }, [loadVideos])
+
   const loadSocialAccounts = useCallback(async () => {
     try {
       const response = await api.get('/api/social/accounts')
