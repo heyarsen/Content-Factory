@@ -8,8 +8,10 @@ const UPLOADPOST_ENDPOINTS = {
   upload: '/upload',
   uploadStatus: '/uploadposts/status',
   dmsConversations: '/uploadposts/dms/conversations',
+  dmsSend: '/uploadposts/dms/send',
   instagramComments: '/uploadposts/instagram/comments',
   analytics: '/uploadposts/analytics',
+  instagramAnalytics: '/uploadposts/instagram/analytics',
 } as const
 const MAX_UPLOADPOST_TITLE_LENGTH = 100
 const DEFAULT_UPLOADPOST_RETRY_DELAY_MS = 2000
@@ -221,6 +223,30 @@ export interface AnalyticsRequest extends UploadPostDateRangeFilter, UploadPostP
   metrics?: string[]
   dimensions?: string[]
   platform?: string
+}
+
+export function getAnalyticsEndpointCandidates(platform?: AnalyticsRequest['platform']): string[] {
+  if (platform === 'instagram') {
+    return [UPLOADPOST_ENDPOINTS.instagramAnalytics, UPLOADPOST_ENDPOINTS.analytics]
+  }
+
+  return [UPLOADPOST_ENDPOINTS.analytics]
+}
+
+
+export interface SendDirectMessageRequest extends UploadPostRequestContext {
+  platform: 'instagram'
+  recipientId: string
+  message: string
+}
+
+export interface SendDirectMessageResponse {
+  success?: boolean
+  recipient_id?: string
+  message_id?: string
+  message?: string
+  error?: string
+  [key: string]: any
 }
 
 export interface InstagramDM {
@@ -645,28 +671,59 @@ export async function getInstagramComments(
 export async function getAnalytics(
   filters: AnalyticsRequest
 ): Promise<UploadPostListResponse<AnalyticsEntry>> {
-  try {
-    const response = await axios.get(
-      `${UPLOADPOST_API_URL}${UPLOADPOST_ENDPOINTS.analytics}`,
-      {
-        headers: {
-          'Authorization': getAuthHeader(),
-        },
-        params: {
-          ...buildLookupQueryParams(filters),
-          start_date: filters.startDate,
-          end_date: filters.endDate,
-          page: filters.page,
-          per_page: filters.perPage,
-          limit: filters.limit,
-          cursor: filters.cursor,
-          metrics: filters.metrics?.join(','),
-          dimensions: filters.dimensions?.join(','),
-          platform: filters.platform,
-        },
-        timeout: 15000,
+  const analyticsEndpoints = getAnalyticsEndpointCandidates(filters.platform)
+  let response: any = null
+  let lastError: any = null
+
+  for (const endpoint of analyticsEndpoints) {
+    try {
+      response = await axios.get(
+        `${UPLOADPOST_API_URL}${endpoint}`,
+        {
+          headers: {
+            'Authorization': getAuthHeader(),
+          },
+          params: {
+            ...buildLookupQueryParams(filters),
+            start_date: filters.startDate,
+            end_date: filters.endDate,
+            page: filters.page,
+            per_page: filters.perPage,
+            limit: filters.limit,
+            cursor: filters.cursor,
+            metrics: filters.metrics?.join(','),
+            dimensions: filters.dimensions?.join(','),
+            platform: filters.platform,
+          },
+          timeout: 15000,
+        }
+      )
+
+      break
+    } catch (error: any) {
+      lastError = error
+      const isLastEndpoint = endpoint === analyticsEndpoints[analyticsEndpoints.length - 1]
+      const shouldFallback = error.response?.status === 404 && !isLastEndpoint
+
+      if (shouldFallback) {
+        continue
       }
+
+      console.error('Upload-post analytics error:', error.response?.data || error.message)
+      throw normalizeUploadPostError(error, 'Failed to get Upload-Post analytics', endpoint)
+    }
+  }
+
+  if (!response) {
+    console.error('Upload-post analytics error:', lastError?.response?.data || lastError?.message)
+    throw normalizeUploadPostError(
+      lastError,
+      'Failed to get Upload-Post analytics',
+      analyticsEndpoints[analyticsEndpoints.length - 1]
     )
+  }
+
+  try {
 
     const normalized = normalizePaginatedResponse<any>(response.data, ['analytics', 'insights', 'data'])
 
@@ -681,8 +738,51 @@ export async function getAnalytics(
       })),
     }
   } catch (error: any) {
-    console.error('Upload-post analytics error:', error.response?.data || error.message)
-    throw normalizeUploadPostError(error, 'Failed to get Upload-Post analytics', UPLOADPOST_ENDPOINTS.analytics)
+    console.error('Upload-post analytics parsing error:', error.response?.data || error.message)
+    throw normalizeUploadPostError(
+      error,
+      'Failed to get Upload-Post analytics',
+      analyticsEndpoints[analyticsEndpoints.length - 1]
+    )
+  }
+}
+
+
+export async function sendDirectMessage(
+  request: SendDirectMessageRequest
+): Promise<SendDirectMessageResponse> {
+  try {
+    const params = buildLookupQueryParams(request)
+
+    if (!params.user) {
+      throw new Error('Upload-Post username is required to send DMs')
+    }
+
+    if (!request.recipientId || !request.message?.trim()) {
+      throw new Error('Recipient ID and message are required to send DMs')
+    }
+
+    const response = await axios.post(
+      `${UPLOADPOST_API_URL}${UPLOADPOST_ENDPOINTS.dmsSend}`,
+      {
+        platform: request.platform,
+        user: params.user,
+        recipient_id: request.recipientId,
+        message: request.message.trim(),
+      },
+      {
+        headers: {
+          'Authorization': getAuthHeader(),
+          'Content-Type': 'application/json',
+        },
+        timeout: 15000,
+      }
+    )
+
+    return response.data
+  } catch (error: any) {
+    console.error('Upload-post send DM error:', error.response?.data || error.message)
+    throw normalizeUploadPostError(error, 'Failed to send direct message', UPLOADPOST_ENDPOINTS.dmsSend)
   }
 }
 
