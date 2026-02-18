@@ -121,25 +121,25 @@ export function Dashboard() {
   const onboardingSteps: OnboardingChecklistStep[] = [
     {
       id: 'connect_social_account',
-      title: 'Connect at least one social account',
+      title: 'Connect accounts',
       path: '/social',
       completed: Boolean(onboarding?.completedSteps?.includes('connect_social_account')),
     },
     {
       id: 'generate_first_video',
-      title: 'Generate first video',
+      title: 'Launch first campaign',
       path: '/quick-create',
       completed: Boolean(onboarding?.completedSteps?.includes('generate_first_video')),
     },
     {
       id: 'set_default_platforms_timezone',
-      title: 'Set default platforms/timezone',
+      title: 'Define social goals, platforms, voice, and cadence',
       path: '/preferences',
       completed: Boolean(onboarding?.completedSteps?.includes('set_default_platforms_timezone')),
     },
     {
       id: 'schedule_first_post',
-      title: 'Schedule first post',
+      title: 'Review campaign calendar',
       path: '/distribution',
       completed: Boolean(onboarding?.completedSteps?.includes('schedule_first_post')),
     },
@@ -200,7 +200,7 @@ export function Dashboard() {
               <Link to="/quick-create" className="w-full sm:w-auto">
                 <Button className="w-full sm:w-auto border border-white/20 bg-white/20 text-white backdrop-blur hover:bg-white/30 hover:text-white shadow-lg active:scale-[0.98]">
                   <Sparkles className="mr-2 h-4 w-4" />
-                  {t('dashboard.create_video')}
+                  Launch first campaign
                 </Button>
               </Link>
               <Link to="/planning" className="w-full sm:w-auto">
@@ -314,8 +314,8 @@ export function Dashboard() {
                       <Zap className="h-5 w-5" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-bold text-slate-900 leading-tight truncate">{t('dashboard.create_video')}</p>
-                      <p className="mt-0.5 text-[10px] sm:text-xs text-slate-500 leading-none truncate">{t('dashboard.create_video_desc')}</p>
+                      <p className="text-sm font-bold text-slate-900 leading-tight truncate">Launch first campaign</p>
+                      <p className="mt-0.5 text-[10px] sm:text-xs text-slate-500 leading-none truncate">Build content, captions, and channel mix from one brief</p>
                     </div>
                   </div>
                   <ArrowRight className="h-4 w-4 text-brand-600 transition group-hover:translate-x-0.5 shrink-0" />
@@ -354,8 +354,8 @@ export function Dashboard() {
                       <Users className="h-5 w-5" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-bold text-slate-900 leading-tight truncate">{t('dashboard.connect_social')}</p>
-                      <p className="mt-0.5 text-[10px] sm:text-xs text-slate-500 leading-none truncate">{t('dashboard.connect_social_desc')}</p>
+                      <p className="text-sm font-bold text-slate-900 leading-tight truncate">Connect accounts</p>
+                      <p className="mt-0.5 text-[10px] sm:text-xs text-slate-500 leading-none truncate">Link destinations to unlock scheduling, inbox, and analytics</p>
                       {!canConnectSocial && (
                         <p className="mt-1 text-[10px] sm:text-xs text-amber-700">{t('common.buy_subscription')}</p>
                       )}
