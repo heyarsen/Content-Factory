@@ -34,6 +34,8 @@ import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useCreditsContext } from '../contexts/CreditContext'
 import { CreditBanner } from '../components/ui/CreditBanner'
+import { UploadAndPlanModal } from '../components/videos/UploadAndPlanModal'
+import { useNotifications } from '../contexts/NotificationContext'
 
 const STATUS_FILTER_KEY = 'video_planning_status_filter'
 
@@ -113,6 +115,7 @@ interface ScheduledPost {
 
 export function VideoPlanning() {
   const { t, language } = useLanguage()
+  const { addNotification } = useNotifications()
   const { user } = useAuth()
   const { credits, unlimited, loading: creditsLoading } = useCreditsContext()
   const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')
@@ -130,6 +133,7 @@ export function VideoPlanning() {
   const [loading, setLoading] = useState(true)
   const [varietyMetrics, setVarietyMetrics] = useState<any>(null)
   const [createModal, setCreateModal] = useState(false)
+  const [uploadPlanModal, setUploadPlanModal] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     // Initialize with today's date in YYYY-MM-DD format using local timezone
     const today = new Date()
@@ -205,6 +209,16 @@ export function VideoPlanning() {
 
 
   const [creating, setCreating] = useState(false)
+
+  const handleUploadPlanSuccess = async () => {
+    addNotification({
+      type: 'success',
+      title: t('video_planning.upload_plan.success_title'),
+      message: t('video_planning.upload_plan.success_message'),
+    })
+
+    await Promise.all([loadScheduledPosts(), selectedPlan ? loadPlanItems(selectedPlan.id) : Promise.resolve()])
+  }
   const loadSocialAccounts = async () => {
     try {
       const response = await api.get('/api/social/accounts')
@@ -1227,14 +1241,23 @@ export function VideoPlanning() {
               {t('video_planning.subtitle')}
             </p>
           </div>
-          <Button
-            onClick={() => setCreateModal(true)}
-            leftIcon={<Plus className="h-4 w-4" />}
-            className="w-full md:w-auto"
-            disabled={showUpgrade}
-          >
-            {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : t('video_planning.new_plan')}
-          </Button>
+          <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto">
+            <Button
+              variant="secondary"
+              onClick={() => setUploadPlanModal(true)}
+              className="w-full md:w-auto"
+            >
+              {t('video_planning.upload_plan.cta')}
+            </Button>
+            <Button
+              onClick={() => setCreateModal(true)}
+              leftIcon={<Plus className="h-4 w-4" />}
+              className="w-full md:w-auto"
+              disabled={showUpgrade}
+            >
+              {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : t('video_planning.new_plan')}
+            </Button>
+          </div>
         </div>
 
         {/* Content Variety Metrics */}
@@ -2043,15 +2066,29 @@ export function VideoPlanning() {
             title={t('video_planning.no_plans_yet')}
             description={t('video_planning.no_plans_desc')}
             action={
-              <Button
-                onClick={() => setCreateModal(true)}
-                leftIcon={<Plus className="h-4 w-4" />}
-              >
-                {t('video_planning.create_plan')}
-              </Button>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  variant="secondary"
+                  onClick={() => setUploadPlanModal(true)}
+                >
+                  {t('video_planning.upload_plan.cta')}
+                </Button>
+                <Button
+                  onClick={() => setCreateModal(true)}
+                  leftIcon={<Plus className="h-4 w-4" />}
+                >
+                  {t('video_planning.create_plan')}
+                </Button>
+              </div>
             }
           />
         )}
+
+        <UploadAndPlanModal
+          isOpen={uploadPlanModal}
+          onClose={() => setUploadPlanModal(false)}
+          onSuccess={handleUploadPlanSuccess}
+        />
 
         {/* Item Detail Modal */}
         <Modal
