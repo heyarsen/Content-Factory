@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
@@ -36,6 +36,36 @@ const platformNames: Record<string, string> = {
   x: 'X (Twitter)',
 }
 
+const campaignObjectiveOptions = [
+  { value: 'awareness', label: 'Awareness' },
+  { value: 'engagement', label: 'Engagement' },
+  { value: 'leads', label: 'Leads' },
+  { value: 'sales', label: 'Sales' },
+]
+
+const objectiveTemplateSuggestions: Record<string, string[]> = {
+  awareness: [
+    'Introduce the campaign story arc and core message.',
+    'Show a quick before/after transformation with a branded hook.',
+    'Publish an educational explainer designed for reach and shares.',
+  ],
+  engagement: [
+    'Ask a bold question to spark comments and replies.',
+    'Create a trend response with a clear community angle.',
+    'Share a behind-the-scenes clip that invites audience opinions.',
+  ],
+  leads: [
+    'Break down a common pain point and tease the full solution in bio.',
+    'Publish a checklist-style post with an offer to download a resource.',
+    'Create a social proof story that drives profile clicks and DMs.',
+  ],
+  sales: [
+    'Feature the product in action with a time-limited call to action.',
+    'Address top purchase objections and close with a direct offer.',
+    'Show customer outcomes and include a clear buying path.',
+  ],
+}
+
 export function QuickCreate() {
   const navigate = useNavigate()
   const { addNotification } = useNotifications()
@@ -45,6 +75,7 @@ export function QuickCreate() {
   const [topic, setTopic] = useState('')
   const [description, setDescription] = useState('')
   const [style, setStyle] = useState('Cinematic')
+  const [campaignObjective, setCampaignObjective] = useState('awareness')
   const [duration] = useState(15)
   const [generateCaption, setGenerateCaption] = useState(true)
   const [generatingVideo, setGeneratingVideo] = useState(false)
@@ -86,10 +117,11 @@ export function QuickCreate() {
       const verticalDimension = { ...DEFAULT_VERTICAL_DIMENSION }
       await api.post('/api/videos/generate', {
         topic,
-        description: description || undefined,
+        description: description ? `[Objective: ${campaignObjective}] ${description}` : `Objective: ${campaignObjective}`,
         style,
         duration,
         provider: 'sora',
+        campaign_objective: campaignObjective,
         generateScript: true,
         generate_caption: generateCaption,
         aspect_ratio: DEFAULT_VERTICAL_ASPECT_RATIO,
@@ -114,6 +146,12 @@ export function QuickCreate() {
   const connectedPlatforms = socialAccounts
     .filter((acc: SocialAccount) => acc.status === 'connected')
     .map((acc: SocialAccount) => acc.platform)
+
+  const suggestions = useMemo(() => objectiveTemplateSuggestions[campaignObjective] || [], [campaignObjective])
+
+  const applyTemplateSuggestion = (suggestion: string) => {
+    setDescription(suggestion)
+  }
 
   return (
     <Layout>
@@ -168,6 +206,35 @@ export function QuickCreate() {
           )}
 
           <div className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Select
+                label="Campaign objective"
+                value={campaignObjective}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setCampaignObjective(e.target.value)}
+                options={campaignObjectiveOptions}
+              />
+              <div className="rounded-2xl border border-white/60 bg-white/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">AI suggestions</p>
+                <p className="mt-1 text-xs text-slate-500">Template prompts adapt to your selected objective.</p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Suggested campaign angles</p>
+              <div className="flex flex-wrap gap-2">
+                {suggestions.map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    type="button"
+                    onClick={() => applyTemplateSuggestion(suggestion)}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 transition hover:border-brand-200 hover:text-brand-600"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div>
               <Input
                 label={t('quick_create.topic_label')}

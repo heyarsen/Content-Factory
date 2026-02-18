@@ -2,7 +2,6 @@ import { Fragment } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import {
   Clapperboard,
-  LayoutDashboard,
   Share2,
   Sparkles,
   Zap,
@@ -31,11 +30,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   console.log('[Sidebar] User check:', { user: user?.email, role: user?.role, isAdmin: user?.role === 'admin' })
 
   const navigation = [
-    { label: t('common.dashboard'), to: '/dashboard', icon: LayoutDashboard },
-    { label: t('sidebar.manual_creation'), to: '/create', icon: Zap },
-    { label: t('sidebar.automation'), to: '/planning', icon: Calendar },
-    { label: t('common.my_videos'), to: '/videos', icon: Clapperboard },
-    { label: t('common.social_accounts') || 'Social Accounts', to: '/social', icon: Share2 },
+    { label: 'Calendar', to: '/planning', icon: Calendar },
+    { label: 'Content Studio', to: '/create', icon: Clapperboard },
+    { label: 'Inbox / Engagement', to: '/social', icon: Share2 },
+    { label: 'Analytics', to: '/dashboard', icon: BarChart3 },
+    { label: 'Automations', to: '/workflows', icon: Zap },
+  ]
+
+  const secondaryNavigation = [
     { label: t('common.settings'), to: '/preferences', icon: Settings },
   ]
 
@@ -107,6 +109,33 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 </NavLink>
               )
             })}
+
+            <div className="mt-4 border-t border-slate-200 pt-4">
+              {secondaryNavigation.map(({ label, to, icon: Icon }) => {
+                const isActive = location.pathname === to || location.pathname.startsWith(to + '/')
+                return (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    onClick={onClose}
+                    className={`group relative flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold transition-all duration-200 touch-manipulation active:scale-[0.98] ${isActive
+                      ? 'bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-transparent text-brand-600'
+                      : 'text-slate-500 hover:bg-white hover:text-primary'
+                      }`}
+                  >
+                    <div
+                      className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-200 ${isActive
+                        ? 'border-brand-200 bg-white text-brand-600 shadow-sm'
+                        : 'border-transparent bg-slate-100 text-slate-500 group-hover:border-slate-200'
+                        }`}
+                    >
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <span>{label}</span>
+                  </NavLink>
+                )
+              })}
+            </div>
 
             {user?.role === 'admin' && (
               <div className="mt-6 flex flex-col gap-2">

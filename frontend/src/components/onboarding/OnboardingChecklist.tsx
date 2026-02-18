@@ -54,7 +54,7 @@ export function OnboardingChecklist({
           <h2 className="mt-1 text-lg font-semibold text-slate-900">Onboarding checklist</h2>
           <p className="mt-1 text-sm text-slate-500">
             {allCompleted
-              ? 'You completed your setup. You are ready to publish consistently.'
+              ? 'You completed your setup. You are ready to launch campaigns consistently.'
               : `${completedCount}/${steps.length} steps complete${accountAgeDays !== null ? ` · Day ${accountAgeDays + 1}` : ''}`}
           </p>
         </div>
@@ -75,7 +75,7 @@ export function OnboardingChecklist({
           {allCompleted && (
             <div className="mb-2 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
               <PartyPopper className="h-4 w-4" />
-              Nice work—every onboarding milestone is complete.
+              Nice work—every activation milestone is complete.
             </div>
           )}
 
