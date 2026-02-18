@@ -784,6 +784,15 @@ export function VideoPlanning() {
 
 
 
+  const getDefaultSelectedPlatforms = (item?: VideoPlanItem) => {
+    if (item?.platforms?.length) return item.platforms
+    if (selectedPlan?.default_platforms?.length) return selectedPlan.default_platforms
+
+    return socialAccounts
+      .filter((acc: SocialAccount) => acc.status === 'connected')
+      .map((acc: SocialAccount) => acc.platform)
+  }
+
   const handleEditItem = (item: VideoPlanItem) => {
     setEditingItem(item)
     setEditForm({
@@ -793,7 +802,7 @@ export function VideoPlanning() {
       why_important: item.why_important || '',
       useful_tips: item.useful_tips || '',
       caption: item.caption || '',
-      platforms: item.platforms || [],
+      platforms: getDefaultSelectedPlatforms(item),
     })
   }
 
@@ -1052,7 +1061,7 @@ export function VideoPlanning() {
       why_important: item.why_important || '',
       useful_tips: item.useful_tips || '',
       caption: item.caption || '',
-      platforms: item.platforms || [],
+      platforms: getDefaultSelectedPlatforms(item),
     })
     setIsDetailDrawerOpen(true)
   }
