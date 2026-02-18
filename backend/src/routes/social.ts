@@ -8,6 +8,7 @@ import {
   getUserProfile,
   getInstagramDMs,
   getAnalytics,
+  sendDirectMessage,
   buildUploadPostLookupFromProfile,
 } from '../lib/uploadpost.js'
 import { maybeEncryptToken } from '../lib/encryption.js'
@@ -696,6 +697,37 @@ router.get('/instagram/dms', authenticate, requireSubscription, async (req: Auth
   } catch (error: any) {
     console.error('Get Instagram DMs error:', error)
     res.status(500).json({ error: error.message || 'Failed to get Instagram DMs' })
+  }
+})
+
+
+router.post('/instagram/dms/send', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const lookup = await resolveInstagramLookupForUser(userId, req.userToken)
+
+    if (!lookup) {
+      return res.status(400).json({ error: 'Connect Instagram account first to send DMs.' })
+    }
+
+    const recipientId = typeof req.body?.recipient_id === 'string' ? req.body.recipient_id.trim() : ''
+    const message = typeof req.body?.message === 'string' ? req.body.message.trim() : ''
+
+    if (!recipientId || !message) {
+      return res.status(400).json({ error: 'Missing required fields: recipient_id, message' })
+    }
+
+    const result = await sendDirectMessage({
+      ...lookup,
+      platform: 'instagram',
+      recipientId,
+      message,
+    })
+
+    return res.json(result)
+  } catch (error: any) {
+    console.error('Send Instagram DM error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to send Instagram DM' })
   }
 })
 
