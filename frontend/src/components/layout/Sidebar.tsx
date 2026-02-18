@@ -32,6 +32,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { label: 'Calendar', to: '/planning', icon: Calendar },
     { label: 'Content Studio', to: '/create', icon: Clapperboard },
     { label: 'Inbox / Engagement', to: '/social', icon: Share2 },
+    { label: 'Instagram DMs', to: '/social/dms', icon: MessagesSquare },
     { label: 'Analytics', to: '/dashboard', icon: BarChart3 },
   ]
 
