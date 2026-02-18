@@ -2,10 +2,43 @@ import { Router, Response } from 'express'
 import { supabase } from '../lib/supabase.js'
 import { getSupabaseClientForUser } from '../lib/supabase.js'
 import { authenticate, AuthRequest, requireSubscription } from '../middleware/auth.js'
-import { createUserProfile, generateUserAccessLink, getUserProfile } from '../lib/uploadpost.js'
+import {
+  createUserProfile,
+  generateUserAccessLink,
+  getUserProfile,
+  getInstagramDMs,
+  getAnalytics,
+  buildUploadPostLookupFromProfile,
+} from '../lib/uploadpost.js'
 import { maybeEncryptToken } from '../lib/encryption.js'
 
 const router = Router()
+
+async function resolveInstagramLookupForUser(userId: string, userToken?: string) {
+  const userSupabase = userToken ? getSupabaseClientForUser(userToken) : supabase
+
+  const { data: account, error } = await userSupabase
+    .from('social_accounts')
+    .select('platform_account_id, status')
+    .eq('user_id', userId)
+    .eq('platform', 'instagram')
+    .eq('status', 'connected')
+    .not('platform_account_id', 'is', null)
+    .order('connected_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(`Failed to load Instagram account: ${error.message}`)
+  }
+
+  if (!account?.platform_account_id) {
+    return null
+  }
+
+  const profile = await getUserProfile(account.platform_account_id)
+  return buildUploadPostLookupFromProfile(profile)
+}
 
 // Map our platform names to Upload-Post API platform names
 // Note: We use 'x' internally to match Upload-Post API (no mapping needed)
@@ -636,6 +669,70 @@ router.get('/accounts/:id/status', authenticate, requireSubscription, async (req
   } catch (error: any) {
     console.error('Get account status error:', error)
     res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+router.get('/instagram/dms', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const lookup = await resolveInstagramLookupForUser(userId, req.userToken)
+
+    if (!lookup) {
+      return res.status(400).json({ error: 'Connect Instagram account first to load DMs.' })
+    }
+
+    const dms = await getInstagramDMs({
+      ...lookup,
+      startDate: req.query.start_date as string | undefined,
+      endDate: req.query.end_date as string | undefined,
+      page: req.query.page ? Number(req.query.page) : undefined,
+      perPage: req.query.per_page ? Number(req.query.per_page) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
+      cursor: req.query.cursor as string | undefined,
+      platform: 'instagram',
+    })
+
+    res.json(dms)
+  } catch (error: any) {
+    console.error('Get Instagram DMs error:', error)
+    res.status(500).json({ error: error.message || 'Failed to get Instagram DMs' })
+  }
+})
+
+router.get('/instagram/analytics', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const lookup = await resolveInstagramLookupForUser(userId, req.userToken)
+
+    if (!lookup) {
+      return res.status(400).json({ error: 'Connect Instagram account first to load analytics.' })
+    }
+
+    const metrics = typeof req.query.metrics === 'string'
+      ? req.query.metrics.split(',').map((metric) => metric.trim()).filter(Boolean)
+      : undefined
+
+    const dimensions = typeof req.query.dimensions === 'string'
+      ? req.query.dimensions.split(',').map((dimension) => dimension.trim()).filter(Boolean)
+      : undefined
+
+    const analytics = await getAnalytics({
+      ...lookup,
+      startDate: req.query.start_date as string | undefined,
+      endDate: req.query.end_date as string | undefined,
+      page: req.query.page ? Number(req.query.page) : undefined,
+      perPage: req.query.per_page ? Number(req.query.per_page) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
+      cursor: req.query.cursor as string | undefined,
+      metrics,
+      dimensions,
+      platform: 'instagram',
+    })
+
+    res.json(analytics)
+  } catch (error: any) {
+    console.error('Get Instagram analytics error:', error)
+    res.status(500).json({ error: error.message || 'Failed to get Instagram analytics' })
   }
 })
 

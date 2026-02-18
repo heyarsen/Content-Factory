@@ -40,6 +40,7 @@ import { TermsOfService } from './pages/TermsOfService'
 import { CookiePolicy } from './pages/CookiePolicy'
 import { AcceptableUsePolicy } from './pages/AcceptableUsePolicy'
 import { Dpa } from './pages/Dpa'
+import { InstagramDMs } from './pages/InstagramDMs'
 
 const isWorkflowRouteEnabled = import.meta.env.DEV
 
@@ -109,6 +110,14 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <SocialAccounts />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/social/dms"
+          element={
+            <ProtectedRoute>
+              <InstagramDMs />
             </ProtectedRoute>
           }
         />
