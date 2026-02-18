@@ -4,7 +4,6 @@ import {
   Clapperboard,
   Share2,
   Sparkles,
-  Zap,
   Calendar,
   Settings,
   BarChart3,
@@ -34,7 +33,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { label: 'Content Studio', to: '/create', icon: Clapperboard },
     { label: 'Inbox / Engagement', to: '/social', icon: Share2 },
     { label: 'Analytics', to: '/dashboard', icon: BarChart3 },
-    { label: 'Automations', to: '/workflows', icon: Zap },
   ]
 
   const secondaryNavigation = [
