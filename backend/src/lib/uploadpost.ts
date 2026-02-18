@@ -7,7 +7,7 @@ const UPLOADPOST_ENDPOINTS = {
   userProfile: '/uploadposts/users',
   upload: '/upload',
   uploadStatus: '/uploadposts/status',
-  instagramDMs: '/uploadposts/instagram/dms',
+  dmsConversations: '/uploadposts/dms/conversations',
   instagramComments: '/uploadposts/instagram/comments',
   analytics: '/uploadposts/analytics',
 } as const
@@ -122,6 +122,7 @@ export function getUploadPostProfileLookup(profile?: UserProfile | null): Upload
 export function buildUploadPostLookupFromProfile(profile?: UserProfile | null): UploadPostRequestContext {
   const lookup = getUploadPostProfileLookup(profile)
   return {
+    username: lookup.username,
     userId: lookup.userId,
     profileId: lookup.profileId,
     accountId: lookup.accountId,
@@ -130,6 +131,10 @@ export function buildUploadPostLookupFromProfile(profile?: UserProfile | null): 
 
 function buildLookupQueryParams(filters: UploadPostRequestContext): Record<string, string> {
   const params: Record<string, string> = {}
+
+  if (filters.username) {
+    params.user = filters.username
+  }
 
   if (filters.userId) {
     params.user_id = filters.userId
@@ -196,6 +201,7 @@ export interface UploadPostPaginationFilter {
 }
 
 export interface UploadPostRequestContext {
+  username?: string
   userId?: string
   profileId?: string
   accountId?: string
@@ -552,7 +558,7 @@ export async function getInstagramDMs(
 ): Promise<UploadPostListResponse<InstagramDM>> {
   try {
     const response = await axios.get(
-      `${UPLOADPOST_API_URL}${UPLOADPOST_ENDPOINTS.instagramDMs}`,
+      `${UPLOADPOST_API_URL}${UPLOADPOST_ENDPOINTS.dmsConversations}`,
       {
         headers: {
           'Authorization': getAuthHeader(),
@@ -571,23 +577,23 @@ export async function getInstagramDMs(
       }
     )
 
-    const normalized = normalizePaginatedResponse<any>(response.data, ['messages', 'dms', 'data'])
+    const normalized = normalizePaginatedResponse<any>(response.data, ['conversations', 'messages', 'dms', 'data'])
 
     return {
       ...normalized,
       data: normalized.data.map((dm: any): InstagramDM => ({
-        id: String(dm.id || dm.message_id || dm.dm_id || ''),
-        text: dm.text || dm.message,
-        timestamp: dm.timestamp || dm.created_at,
-        senderId: dm.sender_id || dm.sender?.id,
-        recipientId: dm.recipient_id || dm.recipient?.id,
-        threadId: dm.thread_id || dm.conversation_id,
+        id: String(dm.id || dm.message_id || dm.dm_id || dm.messages?.data?.[0]?.id || ''),
+        text: dm.text || dm.message || dm.messages?.data?.[0]?.message,
+        timestamp: dm.timestamp || dm.created_at || dm.messages?.data?.[0]?.created_time,
+        senderId: dm.sender_id || dm.sender?.id || dm.messages?.data?.[0]?.from?.id,
+        recipientId: dm.recipient_id || dm.recipient?.id || dm.messages?.data?.[0]?.to?.data?.[0]?.id,
+        threadId: dm.thread_id || dm.conversation_id || dm.id,
         raw: dm,
       })),
     }
   } catch (error: any) {
     console.error('Upload-post Instagram DMs error:', error.response?.data || error.message)
-    throw normalizeUploadPostError(error, 'Failed to get Instagram DMs', UPLOADPOST_ENDPOINTS.instagramDMs)
+    throw normalizeUploadPostError(error, 'Failed to get Instagram DMs', UPLOADPOST_ENDPOINTS.dmsConversations)
   }
 }
 
