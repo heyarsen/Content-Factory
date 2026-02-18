@@ -1,6 +1,16 @@
 import axios from 'axios'
 
 const UPLOADPOST_API_URL = 'https://api.upload-post.com/api'
+const UPLOADPOST_ENDPOINTS = {
+  createUserProfile: '/uploadposts/users',
+  generateUserAccessLink: '/uploadposts/users/generate-jwt',
+  userProfile: '/uploadposts/users',
+  upload: '/upload',
+  uploadStatus: '/uploadposts/status',
+  instagramDMs: '/uploadposts/instagram/dms',
+  instagramComments: '/uploadposts/instagram/comments',
+  analytics: '/uploadposts/analytics',
+} as const
 const MAX_UPLOADPOST_TITLE_LENGTH = 100
 const DEFAULT_UPLOADPOST_RETRY_DELAY_MS = 2000
 const MAX_UPLOADPOST_RETRIES = 3
@@ -32,6 +42,108 @@ function getAuthHeader(): string {
   return `Apikey ${getUploadPostKey()}`
 }
 
+
+function normalizeUploadPostError(error: any, fallbackMessage: string, endpoint?: string): Error {
+  const status = error.response?.status
+  const apiMessage = error.response?.data?.message || error.response?.data?.error
+
+  if (status === 401) {
+    return new Error('Upload-Post API authentication failed. Please check your UPLOADPOST_KEY environment variable.')
+  }
+  if (status === 403) {
+    return new Error(apiMessage || 'Upload-Post API access forbidden. Please check your plan limits.')
+  }
+  if (status === 404) {
+    const endpointText = endpoint ? `: ${endpoint}` : ''
+    return new Error(`Upload-Post API endpoint not found (404)${endpointText}.`)
+  }
+  if (status === 429) {
+    return new Error(apiMessage || 'Upload-Post API rate limit exceeded. Please try again later.')
+  }
+  if (typeof status === 'number' && status >= 500) {
+    return new Error('Upload-Post API server error. Please try again later.')
+  }
+
+  return new Error(apiMessage || error.message || fallbackMessage)
+}
+
+function normalizePaginatedResponse<T>(responseData: any, itemKeyCandidates: string[]): UploadPostListResponse<T> {
+  const items = itemKeyCandidates.reduce<any[]>((acc, key) => {
+    if (acc.length > 0) return acc
+    const value = responseData?.[key]
+    return Array.isArray(value) ? value : acc
+  }, [])
+
+  return {
+    status: responseData?.status || 'success',
+    data: items,
+    page: responseData?.page,
+    perPage: responseData?.per_page ?? responseData?.perPage,
+    total: responseData?.total,
+    hasMore: responseData?.has_more ?? responseData?.hasMore,
+    cursor: responseData?.cursor,
+    raw: responseData,
+  }
+}
+
+export function getUploadPostProfileLookup(profile?: UserProfile | null): UploadPostProfileLookup {
+  if (!profile) {
+    return {}
+  }
+
+  const userId =
+    profile.userId ||
+    profile.user_id ||
+    profile.uploadpost_user_id ||
+    profile.id ||
+    profile.user?.id ||
+    profile.data?.id
+
+  const profileId =
+    profile.profileId ||
+    profile.profile_id ||
+    profile.instagram_profile_id ||
+    profile.data?.profile_id
+
+  const accountId =
+    profile.accountId ||
+    profile.account_id ||
+    profile.instagram_account_id ||
+    profile.data?.account_id
+
+  return {
+    username: profile.username,
+    userId,
+    profileId,
+    accountId,
+  }
+}
+
+export function buildUploadPostLookupFromProfile(profile?: UserProfile | null): UploadPostRequestContext {
+  const lookup = getUploadPostProfileLookup(profile)
+  return {
+    userId: lookup.userId,
+    profileId: lookup.profileId,
+    accountId: lookup.accountId,
+  }
+}
+
+function buildLookupQueryParams(filters: UploadPostRequestContext): Record<string, string> {
+  const params: Record<string, string> = {}
+
+  if (filters.userId) {
+    params.user_id = filters.userId
+  }
+  if (filters.profileId) {
+    params.profile_id = filters.profileId
+  }
+  if (filters.accountId) {
+    params.account_id = filters.accountId
+  }
+
+  return params
+}
+
 export interface CreateUserProfileRequest {
   username: string
   email?: string
@@ -43,6 +155,13 @@ export interface UserProfile {
   id?: string
   user_id?: string
   userId?: string
+  uploadpost_user_id?: string
+  profile_id?: string
+  profileId?: string
+  instagram_profile_id?: string
+  instagram_account_id?: string
+  account_id?: string
+  accountId?: string
   email?: string
   name?: string
   jwt?: string
@@ -55,6 +174,85 @@ export interface UserProfile {
     [key: string]: any
   }
   [key: string]: any // Allow any additional properties
+}
+
+export interface UploadPostProfileLookup {
+  username?: string
+  userId?: string
+  profileId?: string
+  accountId?: string
+}
+
+export interface UploadPostDateRangeFilter {
+  startDate?: string
+  endDate?: string
+}
+
+export interface UploadPostPaginationFilter {
+  page?: number
+  perPage?: number
+  limit?: number
+  cursor?: string
+}
+
+export interface UploadPostRequestContext {
+  userId?: string
+  profileId?: string
+  accountId?: string
+}
+
+export interface InstagramDMsRequest extends UploadPostDateRangeFilter, UploadPostPaginationFilter, UploadPostRequestContext {
+  platform?: 'instagram'
+}
+
+export interface InstagramCommentsRequest extends UploadPostDateRangeFilter, UploadPostPaginationFilter, UploadPostRequestContext {
+  mediaId?: string
+  postId?: string
+  platform?: 'instagram'
+}
+
+export interface AnalyticsRequest extends UploadPostDateRangeFilter, UploadPostPaginationFilter, UploadPostRequestContext {
+  metrics?: string[]
+  dimensions?: string[]
+  platform?: string
+}
+
+export interface InstagramDM {
+  id: string
+  text?: string
+  timestamp?: string
+  senderId?: string
+  recipientId?: string
+  threadId?: string
+  raw?: any
+}
+
+export interface InstagramComment {
+  id: string
+  text?: string
+  timestamp?: string
+  authorId?: string
+  mediaId?: string
+  raw?: any
+}
+
+export interface AnalyticsEntry {
+  date?: string
+  metric?: string
+  value?: number
+  breakdown?: Record<string, any>
+  raw?: any
+}
+
+export interface UploadPostListResponse<T> {
+  status: string
+  data: T[]
+  page?: number
+  perPage?: number
+  total?: number
+  hasMore?: boolean
+  cursor?: string
+  raw?: any
 }
 
 export interface PostVideoRequest {
@@ -175,13 +373,13 @@ export async function createUserProfile(
     if (request.name) payload.name = request.name
 
     console.log('Creating Upload-Post user profile:', {
-      url: `${UPLOADPOST_API_URL}/uploadposts/users`,
+      url: `${UPLOADPOST_API_URL}${UPLOADPOST_ENDPOINTS.createUserProfile}`,
       payload,
       hasApiKey: !!getUploadPostKey(),
     })
 
     const response = await axios.post(
-      `${UPLOADPOST_API_URL}/uploadposts/users`,
+      `${UPLOADPOST_API_URL}${UPLOADPOST_ENDPOINTS.createUserProfile}`,
       payload,
       {
         headers: {
@@ -273,7 +471,7 @@ export async function generateUserAccessLink(
     console.log('Generating Upload-Post access link with payload:', payload)
 
     const response = await axios.post(
-      `${UPLOADPOST_API_URL}/uploadposts/users/generate-jwt`,
+      `${UPLOADPOST_API_URL}${UPLOADPOST_ENDPOINTS.generateUserAccessLink}`,
       payload,
       {
         headers: {
@@ -325,7 +523,7 @@ export async function getUserProfile(username: string): Promise<UserProfile> {
     }
 
     const response = await axios.get(
-      `${UPLOADPOST_API_URL}/uploadposts/users/${encodeURIComponent(username.trim())}`,
+      `${UPLOADPOST_API_URL}${UPLOADPOST_ENDPOINTS.userProfile}/${encodeURIComponent(username.trim())}`,
       {
         headers: {
           'Authorization': getAuthHeader(),
@@ -348,6 +546,140 @@ export async function getUserProfile(username: string): Promise<UserProfile> {
   }
 }
 
+
+export async function getInstagramDMs(
+  filters: InstagramDMsRequest
+): Promise<UploadPostListResponse<InstagramDM>> {
+  try {
+    const response = await axios.get(
+      `${UPLOADPOST_API_URL}${UPLOADPOST_ENDPOINTS.instagramDMs}`,
+      {
+        headers: {
+          'Authorization': getAuthHeader(),
+        },
+        params: {
+          ...buildLookupQueryParams(filters),
+          start_date: filters.startDate,
+          end_date: filters.endDate,
+          page: filters.page,
+          per_page: filters.perPage,
+          limit: filters.limit,
+          cursor: filters.cursor,
+          platform: filters.platform,
+        },
+        timeout: 15000,
+      }
+    )
+
+    const normalized = normalizePaginatedResponse<any>(response.data, ['messages', 'dms', 'data'])
+
+    return {
+      ...normalized,
+      data: normalized.data.map((dm: any): InstagramDM => ({
+        id: String(dm.id || dm.message_id || dm.dm_id || ''),
+        text: dm.text || dm.message,
+        timestamp: dm.timestamp || dm.created_at,
+        senderId: dm.sender_id || dm.sender?.id,
+        recipientId: dm.recipient_id || dm.recipient?.id,
+        threadId: dm.thread_id || dm.conversation_id,
+        raw: dm,
+      })),
+    }
+  } catch (error: any) {
+    console.error('Upload-post Instagram DMs error:', error.response?.data || error.message)
+    throw normalizeUploadPostError(error, 'Failed to get Instagram DMs', UPLOADPOST_ENDPOINTS.instagramDMs)
+  }
+}
+
+export async function getInstagramComments(
+  filters: InstagramCommentsRequest
+): Promise<UploadPostListResponse<InstagramComment>> {
+  try {
+    const response = await axios.get(
+      `${UPLOADPOST_API_URL}${UPLOADPOST_ENDPOINTS.instagramComments}`,
+      {
+        headers: {
+          'Authorization': getAuthHeader(),
+        },
+        params: {
+          ...buildLookupQueryParams(filters),
+          start_date: filters.startDate,
+          end_date: filters.endDate,
+          page: filters.page,
+          per_page: filters.perPage,
+          limit: filters.limit,
+          cursor: filters.cursor,
+          media_id: filters.mediaId,
+          post_id: filters.postId,
+          platform: filters.platform,
+        },
+        timeout: 15000,
+      }
+    )
+
+    const normalized = normalizePaginatedResponse<any>(response.data, ['comments', 'data'])
+
+    return {
+      ...normalized,
+      data: normalized.data.map((comment: any): InstagramComment => ({
+        id: String(comment.id || comment.comment_id || ''),
+        text: comment.text || comment.message,
+        timestamp: comment.timestamp || comment.created_at,
+        authorId: comment.author_id || comment.from?.id || comment.user_id,
+        mediaId: comment.media_id || comment.post_id,
+        raw: comment,
+      })),
+    }
+  } catch (error: any) {
+    console.error('Upload-post Instagram comments error:', error.response?.data || error.message)
+    throw normalizeUploadPostError(error, 'Failed to get Instagram comments', UPLOADPOST_ENDPOINTS.instagramComments)
+  }
+}
+
+export async function getAnalytics(
+  filters: AnalyticsRequest
+): Promise<UploadPostListResponse<AnalyticsEntry>> {
+  try {
+    const response = await axios.get(
+      `${UPLOADPOST_API_URL}${UPLOADPOST_ENDPOINTS.analytics}`,
+      {
+        headers: {
+          'Authorization': getAuthHeader(),
+        },
+        params: {
+          ...buildLookupQueryParams(filters),
+          start_date: filters.startDate,
+          end_date: filters.endDate,
+          page: filters.page,
+          per_page: filters.perPage,
+          limit: filters.limit,
+          cursor: filters.cursor,
+          metrics: filters.metrics?.join(','),
+          dimensions: filters.dimensions?.join(','),
+          platform: filters.platform,
+        },
+        timeout: 15000,
+      }
+    )
+
+    const normalized = normalizePaginatedResponse<any>(response.data, ['analytics', 'insights', 'data'])
+
+    return {
+      ...normalized,
+      data: normalized.data.map((entry: any): AnalyticsEntry => ({
+        date: entry.date || entry.day,
+        metric: entry.metric || entry.name,
+        value: Number(entry.value ?? entry.count ?? 0),
+        breakdown: entry.breakdown,
+        raw: entry,
+      })),
+    }
+  } catch (error: any) {
+    console.error('Upload-post analytics error:', error.response?.data || error.message)
+    throw normalizeUploadPostError(error, 'Failed to get Upload-Post analytics', UPLOADPOST_ENDPOINTS.analytics)
+  }
+}
+
 // Upload video to multiple platforms
 export async function postVideo(
   request: PostVideoRequest
@@ -359,7 +691,7 @@ export async function postVideo(
 
     // According to Upload-Post API docs: https://docs.upload-post.com/api/upload-video
     // The correct endpoint is: POST /api/upload
-    const endpoint = `${UPLOADPOST_API_URL}/upload`
+    const endpoint = `${UPLOADPOST_API_URL}${UPLOADPOST_ENDPOINTS.upload}`
 
     console.log('Upload-Post API request:', {
       endpoint,
@@ -605,7 +937,7 @@ export async function postVideo(
 export async function getUploadStatus(uploadId: string): Promise<UploadPostResponse> {
   try {
     const response = await axios.get(
-      `${UPLOADPOST_API_URL}/uploadposts/status`,
+      `${UPLOADPOST_API_URL}${UPLOADPOST_ENDPOINTS.uploadStatus}`,
       {
         headers: {
           'Authorization': getAuthHeader(),
