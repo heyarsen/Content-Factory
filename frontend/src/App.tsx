@@ -41,6 +41,8 @@ import { CookiePolicy } from './pages/CookiePolicy'
 import { AcceptableUsePolicy } from './pages/AcceptableUsePolicy'
 import { Dpa } from './pages/Dpa'
 
+const isWorkflowRouteEnabled = import.meta.env.DEV
+
 function AppContent() {
   const { toasts, removeToast } = useToast()
 
@@ -137,9 +139,15 @@ function AppContent() {
         <Route
           path="/workflows"
           element={
-            <ProtectedRoute>
-              <Workflows />
-            </ProtectedRoute>
+            isWorkflowRouteEnabled ? (
+              <ProtectedRoute>
+                <Workflows />
+              </ProtectedRoute>
+            ) : (
+              <AdminRoute>
+                <Workflows />
+              </AdminRoute>
+            )
           }
         />
         <Route
