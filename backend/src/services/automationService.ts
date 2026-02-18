@@ -8,6 +8,11 @@ import { generateVideoCaption } from './captionService.js'
 import { DateTime } from 'luxon'
 
 export class AutomationService {
+  private static isInsufficientCreditsError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message.toLowerCase() : String(error || '').toLowerCase()
+    return message.includes('insufficient credits')
+  }
+
   private static isRetryableUploadError(error: unknown): boolean {
     const message = error instanceof Error ? error.message.toLowerCase() : String(error || '').toLowerCase()
 
@@ -125,11 +130,25 @@ export class AutomationService {
 
         const { data: pendingItems } = await query.limit(100)
 
+        console.log(
+          `[Automation] Plan ${plan.id}: pending items for ${today} = ${(pendingItems || []).length}`,
+          (pendingItems || []).map(item => ({
+            id: item.id,
+            status: item.status,
+            scheduled_time: item.scheduled_time || 'N/A',
+            topic: item.topic || 'N/A',
+          }))
+        )
+
         const duePendingItems = (pendingItems || [])
           .filter(item => plan.auto_schedule_trigger !== 'time_based' || this.hasScheduledTimePassed(item.scheduled_time, nowInPlanTz))
           .slice(0, plan.videos_per_day)
 
         if (duePendingItems.length > 0) {
+          console.log(
+            `[Automation] Plan ${plan.id}: due pending items after time filter = ${duePendingItems.length}`,
+            duePendingItems.map(item => ({ id: item.id, scheduled_time: item.scheduled_time || 'N/A' }))
+          )
           const researchPromises: Promise<void>[] = []
 
           for (const item of duePendingItems) {
@@ -178,6 +197,16 @@ export class AutomationService {
           .is('script', null)
 
         const { data: readyItems } = await readyQuery.limit(100)
+
+        console.log(
+          `[Automation] Plan ${plan.id}: ready items without script for ${today} = ${(readyItems || []).length}`,
+          (readyItems || []).map(item => ({
+            id: item.id,
+            status: item.status,
+            scheduled_time: item.scheduled_time || 'N/A',
+            topic: item.topic || 'N/A',
+          }))
+        )
 
         const dueReadyItems = (readyItems || [])
           .filter(item => plan.auto_schedule_trigger !== 'time_based' || this.hasScheduledTimePassed(item.scheduled_time, nowInPlanTz))
@@ -357,26 +386,16 @@ export class AutomationService {
                     continue // Another process already claimed this item
                   }
 
-                  // Get avatar_id and talking_photo_id from plan item (optional - will fall back to default avatar if not provided)
-                  const avatarId = (updatedItem as any).avatar_id
-                  const talkingPhotoId = (updatedItem as any).talking_photo_id
-
                   console.log(`[Video Generation] ✓ Claimed item ${item.id} for immediate video generation`, {
                     topic: updatedItem.topic,
-                    hasAvatarId: !!avatarId,
-                    hasTalkingPhotoId: !!talkingPhotoId,
-                    avatarId: avatarId || 'will use default avatar',
-                    talkingPhotoId: talkingPhotoId || 'none'
+                    scriptLength: updatedItem.script?.length || 0,
                   })
 
-                  // VideoService.requestManualVideo will automatically use default avatar if avatar_id is not provided
                   const video = await VideoService.requestManualVideo(plan.user_id, {
                     topic: updatedItem.topic || 'Video Content',
                     script: updatedItem.script || '',
                     style: 'Cinematic',
                     duration: 30,
-                    avatar_id: avatarId, // Can be undefined - will fall back to default
-                    talking_photo_id: talkingPhotoId, // Look ID if provided
                     plan_item_id: item.id,
                   })
 
@@ -456,6 +475,11 @@ export class AutomationService {
 
     const { data: items } = await query.limit(10)
 
+    console.log(
+      `[Video Generation] Plan ${planId}: approved items queued for ${today}${dueTime ? ` up to ${dueTime}` : ''} = ${(items || []).length}`,
+      (items || []).map(item => ({ id: item.id, scheduled_time: item.scheduled_time || 'N/A', topic: item.topic || 'N/A' }))
+    )
+
     if (!items || items.length === 0) return
 
     for (const item of items) {
@@ -496,20 +520,11 @@ export class AutomationService {
           throw new Error('Missing topic or script for video generation')
         }
 
-        // Get avatar_id and talking_photo_id from plan item (optional - will fall back to default avatar if not provided)
-        const avatarId = (item as any).avatar_id
-        const talkingPhotoId = (item as any).talking_photo_id
-
         console.log(`[Video Generation] Creating video for item ${item.id}`, {
           topic: item.topic,
           scriptLength: item.script?.length || 0,
-          hasAvatarId: !!avatarId,
-          hasTalkingPhotoId: !!talkingPhotoId,
-          avatarId: avatarId || 'will use default avatar',
-          talkingPhotoId: talkingPhotoId || 'none'
         })
 
-        // VideoService.requestManualVideo will automatically use default avatar if avatar_id is not provided
         // Ensure we're using the correct topic - use item.topic as the primary topic
         // The script should already be based on this topic, but we pass both for clarity
         const video = await VideoService.requestManualVideo(userId, {
@@ -517,8 +532,6 @@ export class AutomationService {
           script: item.script, // Script should match the topic
           style: 'Cinematic',
           duration: 30,
-          avatar_id: avatarId, // Can be undefined - will fall back to default avatar
-          talking_photo_id: talkingPhotoId, // Look ID if provided
           plan_item_id: item.id,
           skipDeduction: true,
         })
@@ -893,15 +906,8 @@ export class AutomationService {
               throw new Error('Missing topic or script for video generation')
             }
 
-            // Check and deduct credits before generating video
-
-            // Get avatar_id and talking_photo_id from plan item
-            const avatarId = (item as any).avatar_id
-            const talkingPhotoId = (item as any).talking_photo_id
-
             console.log(`[Video Generation] Creating video for today's item ${item.id} with topic: ${item.topic}`, {
-              hasAvatarId: !!avatarId,
-              hasTalkingPhotoId: !!talkingPhotoId
+              scriptLength: item.script?.length || 0,
             })
 
             // Create video record - this happens synchronously
@@ -910,8 +916,6 @@ export class AutomationService {
               script: item.script,
               style: 'Cinematic',
               duration: 30,
-              avatar_id: avatarId, // Can be undefined - will fall back to default avatar
-              talking_photo_id: talkingPhotoId, // Look ID if provided
               plan_item_id: item.id,
             })
 
@@ -950,7 +954,8 @@ export class AutomationService {
             const errorMessage = error?.message || 'Failed to create video record'
 
             // Reset status back to 'approved' so it can be retried, or mark as 'failed' if it's a persistent error
-            const shouldRetry = !errorMessage.includes('avatar') && !errorMessage.includes('API key')
+            const shouldRetry = !errorMessage.includes('API key')
+              && !this.isInsufficientCreditsError(error)
             await supabase
               .from('video_plan_items')
               .update({
@@ -2104,18 +2109,11 @@ export class AutomationService {
 
     const plan = item.plan as any
 
-    // Check and deduct credits before generating video
-
-    const avatarId = (item as any).avatar_id
-    const talkingPhotoId = (item as any).talking_photo_id
-
     const video = await VideoService.requestManualVideo(plan.user_id, {
       topic: item.topic!,
       script: item.script,
       style: 'Cinematic',
       duration: 30,
-      avatar_id: avatarId, // Can be undefined - will fall back to default avatar
-      talking_photo_id: talkingPhotoId, // Look ID if provided
       plan_item_id: item.id,
     })
 
