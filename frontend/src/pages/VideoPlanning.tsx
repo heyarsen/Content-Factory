@@ -33,6 +33,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useCreditsContext } from '../contexts/CreditContext'
 import { CreditBanner } from '../components/ui/CreditBanner'
 import { UploadAndPlanModal } from '../components/videos/UploadAndPlanModal'
+import { GenerateVideoModal } from '../components/videos/GenerateVideoModal'
 import { useNotifications } from '../contexts/NotificationContext'
 
 const STATUS_FILTER_KEY = 'video_planning_status_filter'
@@ -131,6 +132,7 @@ export function VideoPlanning() {
   const [loading, setLoading] = useState(true)
   const [varietyMetrics, setVarietyMetrics] = useState<any>(null)
   const [createModal, setCreateModal] = useState(false)
+  const [generateVideoModalOpen, setGenerateVideoModalOpen] = useState(false)
   const [uploadPlanModal, setUploadPlanModal] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     // Initialize with today's date in YYYY-MM-DD format using local timezone
@@ -1248,7 +1250,7 @@ export function VideoPlanning() {
               Upload video
             </Button>
             <Button
-              onClick={() => setCreateModal(true)}
+              onClick={() => setGenerateVideoModalOpen(true)}
               leftIcon={<Plus className="h-4 w-4" />}
               className="w-full md:w-auto"
               disabled={showUpgrade}
@@ -1257,7 +1259,7 @@ export function VideoPlanning() {
             </Button>
             <Button
               variant="secondary"
-              onClick={() => navigate('/workflows')}
+              onClick={() => setCreateModal(true)}
               className="w-full md:w-auto border border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100"
             >
               Make an automatization
@@ -2072,6 +2074,17 @@ export function VideoPlanning() {
           isOpen={uploadPlanModal}
           onClose={() => setUploadPlanModal(false)}
           onSuccess={handleUploadPlanSuccess}
+        />
+
+        <GenerateVideoModal
+          isOpen={generateVideoModalOpen}
+          onClose={() => setGenerateVideoModalOpen(false)}
+          onSuccess={async () => {
+            await Promise.all([
+              loadScheduledPosts(),
+              selectedPlan ? loadPlanItems(selectedPlan.id) : Promise.resolve(),
+            ])
+          }}
         />
 
         {/* Item Detail Modal */}
