@@ -231,7 +231,7 @@ export function SocialAccounts() {
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Inbox / Engagement</p>
           <h1 className="text-3xl font-semibold text-primary">Unified social inbox</h1>
           <p className="text-sm text-slate-500">
-            Connect DMs and manage comments, mentions, and direct messages in one workspace with AI-assisted responses.
+            Connect your social channels and manage comments, mentions, and messages in one workspace with AI-assisted responses.
           </p>
         </div>
 
@@ -241,7 +241,7 @@ export function SocialAccounts() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-primary">Connected channels</h2>
-              <p className="text-sm text-slate-500">Link channels to ingest DMs, comments, and mentions.</p>
+              <p className="text-sm text-slate-500">Link channels to ingest messages, comments, and mentions.</p>
             </div>
             <Badge variant="default">{connectedPlatforms.length} connected</Badge>
           </div>
@@ -264,7 +264,7 @@ export function SocialAccounts() {
                         {account && getStatusBadge(account.status)}
                       </div>
                     </div>
-                    {isConnected && <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-500">DM sync on</span>}
+                    {isConnected && <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-500">Inbox sync on</span>}
                   </div>
 
                   {isConnected && account?.account_info?.username && (
@@ -280,7 +280,7 @@ export function SocialAccounts() {
                         className="w-full border border-rose-200 bg-rose-50/70 text-rose-600 hover:border-rose-300 hover:bg-rose-50"
                       >
                         <X className="mr-2 h-4 w-4" />
-                        Disconnect DM channel
+                        Disconnect channel
                       </Button>
                     ) : (
                       <Button
@@ -292,7 +292,7 @@ export function SocialAccounts() {
                         className="w-full"
                       >
                         <Link2 className="mr-2 h-4 w-4" />
-                        Connect DMs
+                        Connect channel
                       </Button>
                     )}
                   </div>
