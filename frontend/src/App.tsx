@@ -24,7 +24,6 @@ import { QuickCreate } from './pages/QuickCreate'
 import { SocialAccounts } from './pages/SocialAccounts'
 import { ScheduledPosts } from './pages/ScheduledPosts'
 import { SocialCallback } from './pages/SocialCallback'
-import { ContentFactory } from './pages/ContentFactory'
 import { Workflows } from './pages/Workflows'
 import { AdminPanel } from './pages/AdminPanel'
 import { VideoPlanning } from './pages/VideoPlanning'
@@ -150,7 +149,7 @@ function AppContent() {
           path="/content"
           element={
             <ProtectedRoute>
-              <ContentFactory />
+              <Navigate to="/planning" replace />
             </ProtectedRoute>
           }
         />
