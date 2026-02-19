@@ -1,7 +1,6 @@
 import { Fragment } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import {
-  Clapperboard,
   Share2,
   Sparkles,
   Calendar,
@@ -29,8 +28,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   console.log('[Sidebar] User check:', { user: user?.email, role: user?.role, isAdmin: user?.role === 'admin' })
 
   const navigation = [
-    { label: 'Content Plan', to: '/planning', icon: Calendar, hint: 'Create & manage plans' },
-    { label: 'Content Studio', to: '/create', icon: Clapperboard, hint: 'Produce videos fast' },
+    { label: 'Content Studio', to: '/planning', icon: Calendar, hint: 'Calendar, uploads, AI videos, automation' },
     { label: 'Inbox / Engagement', to: '/social', icon: Share2 },
     { label: 'Instagram DMs', to: '/social/dms', icon: MessagesSquare },
     { label: 'Analytics', to: '/dashboard', icon: BarChart3 },
