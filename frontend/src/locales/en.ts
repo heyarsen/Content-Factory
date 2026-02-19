@@ -617,6 +617,10 @@ export const en = {
         update_plan_failed: "Failed to update plan",
         delete_plan_failed: "Failed to delete plan",
         update_item_failed: "Failed to update item",
+        upload_manual: "Upload manually",
+        create_one_video: "Create one video",
+        create_automation: "Create automation",
+        all_planned: "All planned",
         upload_plan: {
             cta: "Upload your own video",
             modal_title: "Upload & Plan",

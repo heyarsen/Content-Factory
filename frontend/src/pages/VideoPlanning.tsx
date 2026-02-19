@@ -1214,6 +1214,18 @@ export function VideoPlanning() {
     return `${displayHour}:${minutes} ${ampm}`
   }
 
+  const studioOverview = useMemo(() => {
+    const planned = planItems.length
+    const posted = scheduledPosts.filter((post) => normalizeStatusValue(post.status) === 'posted').length
+    const scheduled = scheduledPosts.filter((post) => {
+      const status = normalizeStatusValue(post.status)
+      return status === 'scheduled' || status === 'pending'
+    }).length
+    const failed = scheduledPosts.filter((post) => normalizeStatusValue(post.status) === 'failed').length
+
+    return { planned, posted, scheduled, failed }
+  }, [planItems, scheduledPosts])
+
   if (loading) {
     return (
       <Layout>
@@ -1241,24 +1253,54 @@ export function VideoPlanning() {
               {t('video_planning.subtitle')}
             </p>
           </div>
-          <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto">
+          <div className="grid w-full gap-2 sm:grid-cols-3 md:w-auto">
             <Button
               variant="secondary"
               onClick={() => setUploadPlanModal(true)}
-              className="w-full md:w-auto"
+              className="w-full"
             >
-              {t('video_planning.upload_plan.cta')}
+              {t('video_planning.upload_manual')}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => navigate('/create')}
+              leftIcon={<Clapperboard className="h-4 w-4" />}
+              className="w-full"
+              disabled={showUpgrade}
+            >
+              {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : t('video_planning.create_one_video')}
             </Button>
             <Button
               onClick={() => setCreateModal(true)}
               leftIcon={<Plus className="h-4 w-4" />}
-              className="w-full md:w-auto"
+              className="w-full"
               disabled={showUpgrade}
             >
-              {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : t('video_planning.new_plan')}
+              {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : t('video_planning.create_automation')}
             </Button>
           </div>
         </div>
+
+        <Card className="border-slate-200 bg-white/90 p-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('video_planning.all_planned')}</p>
+              <p className="mt-1 text-2xl font-semibold text-slate-900">{studioOverview.planned}</p>
+            </div>
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">{t('video_planning.scheduled')}</p>
+              <p className="mt-1 text-2xl font-semibold text-blue-800">{studioOverview.scheduled}</p>
+            </div>
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">{t('video_planning.posted')}</p>
+              <p className="mt-1 text-2xl font-semibold text-emerald-800">{studioOverview.posted}</p>
+            </div>
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-rose-600">{t('video_planning.failed')}</p>
+              <p className="mt-1 text-2xl font-semibold text-rose-800">{studioOverview.failed}</p>
+            </div>
+          </div>
+        </Card>
 
         <Card className="p-2">
           <div className="grid gap-2 md:grid-cols-2">
