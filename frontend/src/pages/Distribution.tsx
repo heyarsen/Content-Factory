@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ChangeEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
@@ -442,6 +442,24 @@ export function Distribution() {
     .filter((a: SocialAccount) => a.status === 'connected')
     .map((a: SocialAccount) => a.platform)
   const availablePlatforms = allPlatforms.filter((p) => !connectedPlatforms.includes(p))
+  const platformsByPriority = [...allPlatforms].sort((a, b) => {
+    const aConnected = connectedPlatforms.includes(a)
+    const bConnected = connectedPlatforms.includes(b)
+
+    if (aConnected === bConnected) {
+      return platformNames[a].localeCompare(platformNames[b])
+    }
+
+    return aConnected ? -1 : 1
+  })
+
+  const statusFilterOptions = [
+    { value: 'all', label: 'All', count: posts.length },
+    { value: 'pending', label: 'Pending', count: posts.filter((p) => p.status === 'pending').length },
+    { value: 'posted', label: 'Posted', count: posts.filter((p) => p.status === 'posted').length },
+    { value: 'failed', label: 'Failed', count: posts.filter((p) => p.status === 'failed').length },
+    { value: 'cancelled', label: 'Cancelled', count: posts.filter((p) => p.status === 'cancelled').length },
+  ]
 
   const togglePlatform = (platform: string) => {
     setSelectedPlatforms((prev) =>
@@ -470,6 +488,9 @@ export function Distribution() {
             <div>
               <h2 className="text-xl font-semibold text-primary">Social Accounts</h2>
               <p className="text-sm text-slate-500">Connect channels to push finished videos live automatically.</p>
+              <p className="mt-1 text-xs text-slate-400">
+                {connectedPlatforms.length} of {allPlatforms.length} platforms connected
+              </p>
             </div>
           </div>
 
@@ -487,7 +508,7 @@ export function Distribution() {
             />
           ) : (
             <div className="grid gap-6 md:grid-cols-2">
-              {allPlatforms.map((platform) => {
+              {platformsByPriority.map((platform) => {
                 const account = accounts.find((a: SocialAccount) => a.platform === platform)
                 const Icon = platformIcons[platform]
                 const isConnected = account?.status === 'connected'
@@ -570,18 +591,28 @@ export function Distribution() {
             </Button>
           </div>
 
-          <Card className="max-w-sm border-dashed border-white/40">
-            <Select
-              options={[
-                { value: 'all', label: 'All status' },
-                { value: 'pending', label: 'Pending' },
-                { value: 'posted', label: 'Posted' },
-                { value: 'failed', label: 'Failed' },
-                { value: 'cancelled', label: 'Cancelled' },
-              ]}
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            />
+          <Card className="border-dashed border-white/40 p-2">
+            <div className="flex flex-wrap gap-2">
+              {statusFilterOptions.map((option) => {
+                const active = statusFilter === option.value
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setStatusFilter(option.value)}
+                    className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition ${active
+                      ? 'border-brand-300 bg-brand-50 text-brand-600 shadow-[0_10px_25px_-18px_rgba(99,102,241,0.7)]'
+                      : 'border-white/70 bg-white/70 text-slate-500 hover:border-brand-200 hover:text-brand-600'
+                      }`}
+                  >
+                    <span>{option.label}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] ${active ? 'bg-brand-100 text-brand-600' : 'bg-slate-100 text-slate-500'}`}>
+                      {option.count}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
           </Card>
 
           {postsLoading ? (
@@ -802,7 +833,7 @@ export function Distribution() {
                 })),
               ]}
               value={selectedVideo}
-              onChange={(e) => setSelectedVideo(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLSelectElement>) => setSelectedVideo(e.target.value)}
             />
 
             <div>
