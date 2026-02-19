@@ -29,8 +29,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   console.log('[Sidebar] User check:', { user: user?.email, role: user?.role, isAdmin: user?.role === 'admin' })
 
   const navigation = [
-    { label: 'Calendar', to: '/planning', icon: Calendar },
-    { label: 'Content Studio', to: '/create', icon: Clapperboard },
+    { label: 'Content Plan', to: '/planning', icon: Calendar, hint: 'Create & manage plans' },
+    { label: 'Content Studio', to: '/create', icon: Clapperboard, hint: 'Produce videos fast' },
     { label: 'Inbox / Engagement', to: '/social', icon: Share2 },
     { label: 'Instagram DMs', to: '/social/dms', icon: MessagesSquare },
     { label: 'Analytics', to: '/dashboard', icon: BarChart3 },
@@ -81,7 +81,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
 
           <nav className="mt-10 flex flex-1 flex-col gap-2 overflow-y-auto">
-            {navigation.map(({ label, to, icon: Icon }) => {
+            {navigation.map(({ label, to, icon: Icon, hint }) => {
               const isActive = location.pathname === to || location.pathname.startsWith(to + '/')
               return (
                 <NavLink
@@ -101,7 +101,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   >
                     <Icon className="h-5 w-5" />
                   </div>
-                  <span>{label}</span>
+                  <div className="min-w-0">
+                    <span className="block truncate">{label}</span>
+                    {hint && <span className="block text-xs font-medium text-slate-400">{hint}</span>}
+                  </div>
                   {isActive && (
                     <span className="absolute inset-y-2 right-0 w-1.5 rounded-full bg-brand-500" />
                   )}

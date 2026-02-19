@@ -1260,6 +1260,37 @@ export function VideoPlanning() {
           </div>
         </div>
 
+        <Card className="p-2">
+          <div className="grid gap-2 md:grid-cols-2">
+            <button
+              type="button"
+              className="flex items-start gap-3 rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3 text-left"
+            >
+              <span className="mt-0.5 rounded-lg bg-white p-2 text-brand-600">
+                <Calendar className="h-4 w-4" />
+              </span>
+              <span>
+                <span className="block text-sm font-semibold text-brand-700">Content Plan</span>
+                <span className="block text-xs text-brand-600">Create plans, pick dates, and track what gets published.</span>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/create')}
+              className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left transition hover:border-brand-200 hover:bg-brand-50/40"
+            >
+              <span className="mt-0.5 rounded-lg bg-slate-100 p-2 text-slate-600">
+                <Clapperboard className="h-4 w-4" />
+              </span>
+              <span>
+                <span className="block text-sm font-semibold text-slate-700">Content Studio</span>
+                <span className="block text-xs text-slate-500">Generate scripts and videos from your approved plan items.</span>
+              </span>
+            </button>
+          </div>
+        </Card>
+
         {/* Content Variety Metrics */}
         {varietyMetrics && (
           <Card className="bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200">
