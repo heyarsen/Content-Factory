@@ -29,9 +29,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const navigation = [
     { label: 'Content Studio', to: '/planning', icon: Calendar, hint: 'Calendar, uploads, AI videos, automation' },
-    { label: 'Social Accounts', to: '/social', icon: Share2 },
+    { label: 'Social Accounts', to: '/social', icon: Share2, match: (pathname: string) => pathname === '/social' },
     { label: 'DMs', to: '/social/dms', icon: MessagesSquare },
-    { label: 'Analytics', to: '/dashboard', icon: BarChart3 },
+    { label: 'Analysts', to: '/analytics', icon: BarChart3 },
   ]
 
   const secondaryNavigation = [
@@ -79,8 +79,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
 
           <nav className="mt-10 flex flex-1 flex-col gap-2 overflow-y-auto">
-            {navigation.map(({ label, to, icon: Icon, hint }) => {
-              const isActive = location.pathname === to || location.pathname.startsWith(to + '/')
+            {navigation.map(({ label, to, icon: Icon, hint, match }) => {
+              const isActive = match ? match(location.pathname) : location.pathname === to || location.pathname.startsWith(to + '/')
               return (
                 <NavLink
                   key={to}
