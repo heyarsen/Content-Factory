@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
-import { BarChart3, TrendingUp, Users, AlertCircle } from 'lucide-react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { BarChart3, TrendingUp, Users, AlertCircle, Loader2, Search } from 'lucide-react'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Skeleton } from '../components/ui/Skeleton'
+import { Input } from '../components/ui/Input'
+import { Button } from '../components/ui/Button'
 import api from '../lib/api'
 
 interface SocialAnalyticsAccount {
@@ -26,10 +28,28 @@ interface PlatformAnalytics {
   message?: string
 }
 
+interface TrendItem {
+  platform: 'tiktok' | 'instagram_reels' | 'youtube_shorts'
+  trend: string
+  summary: string
+  contentIdea: string
+  observedAt: string
+}
+
+const PLATFORM_LABELS: Record<TrendItem['platform'], string> = {
+  tiktok: 'TikTok',
+  instagram_reels: 'Instagram Reels',
+  youtube_shorts: 'YouTube Shorts',
+}
+
 export function Analysts() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [analytics, setAnalytics] = useState<Record<string, PlatformAnalytics>>({})
+  const [trendQuery, setTrendQuery] = useState('')
+  const [trendLoading, setTrendLoading] = useState(false)
+  const [trendError, setTrendError] = useState<string | null>(null)
+  const [trends, setTrends] = useState<TrendItem[]>([])
 
   useEffect(() => {
     const loadAnalytics = async () => {
@@ -68,6 +88,31 @@ export function Analysts() {
     loadAnalytics()
   }, [])
 
+  const searchTrends = async (event?: FormEvent) => {
+    event?.preventDefault()
+    setTrendLoading(true)
+    setTrendError(null)
+
+    try {
+      const response = await api.post('/api/trends/search', {
+        query: trendQuery,
+        limit: 9,
+      })
+
+      setTrends(response.data?.trends || [])
+    } catch (requestError: any) {
+      const message = requestError?.response?.data?.error || requestError?.message || 'Failed to load trends'
+      setTrendError(message)
+      setTrends([])
+    } finally {
+      setTrendLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    searchTrends()
+  }, [])
+
   const totals = useMemo<{ followers: number; impressions: number; reach: number }>(() => {
     return Object.values(analytics).reduce<{ followers: number; impressions: number; reach: number }>(
       (acc, item) => ({
@@ -90,6 +135,57 @@ export function Analysts() {
           <p className="text-sm text-slate-500">Live metrics from your connected social accounts.</p>
         </div>
 
+        <Card className="p-5 md:p-6">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-semibold text-primary">TrendSearcher</h2>
+              <p className="text-sm text-slate-500">Latest trends from TikTok, Instagram Reels, and YouTube Shorts.</p>
+            </div>
+          </div>
+
+          <form onSubmit={searchTrends} className="mb-5 flex flex-col gap-3 sm:flex-row">
+            <Input
+              value={trendQuery}
+              onChange={(event) => setTrendQuery(event.target.value)}
+              placeholder="Optional topic (e.g. fitness, ai tools, marketing)"
+              className="sm:flex-1"
+            />
+            <Button type="submit" disabled={trendLoading} className="inline-flex items-center justify-center gap-2">
+              {trendLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              Check trends
+            </Button>
+          </form>
+
+          {trendError && (
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {trendError}
+            </div>
+          )}
+
+          {trendLoading ? (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {[1, 2, 3].map((item) => (
+                <Skeleton key={item} className="h-40 rounded-2xl" />
+              ))}
+            </div>
+          ) : trends.length === 0 ? (
+            <p className="text-sm text-slate-500">No trends yet. Try another query.</p>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {trends.map((trend, index) => (
+                <Card key={`${trend.platform}-${trend.trend}-${index}`} className="h-full p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">{PLATFORM_LABELS[trend.platform]}</p>
+                  <h3 className="mt-1 text-base font-semibold text-primary">{trend.trend}</h3>
+                  <p className="mt-2 text-sm text-slate-600">{trend.summary}</p>
+                  <p className="mt-3 rounded-lg bg-slate-50 p-2 text-sm text-slate-700">
+                    <span className="font-semibold text-primary">Idea:</span> {trend.contentIdea}
+                  </p>
+                </Card>
+              ))}
+            </div>
+          )}
+        </Card>
+
         {loading ? (
           <div className="space-y-4">
             <div className="grid gap-4 md:grid-cols-3">
@@ -100,7 +196,7 @@ export function Analysts() {
             <Skeleton className="h-64 rounded-3xl" />
           </div>
         ) : error ? (
-          <Card className="p-6 border-red-200 bg-red-50/60">
+          <Card className="border-red-200 bg-red-50/60 p-6">
             <div className="flex items-start gap-3 text-red-700">
               <AlertCircle className="mt-0.5 h-5 w-5" />
               <div>
