@@ -17,6 +17,7 @@ import { ForgotPassword } from './pages/ForgotPassword'
 import { ResetPassword } from './pages/ResetPassword'
 import { VerifyEmail } from './pages/VerifyEmail'
 import { Dashboard } from './pages/Dashboard'
+import { Analysts } from './pages/Analysts'
 import { Videos } from './pages/Videos'
 import { GenerateVideo } from './pages/GenerateVideo'
 import { QuickCreate } from './pages/QuickCreate'
@@ -62,6 +63,14 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute>
+              <Analysts />
             </ProtectedRoute>
           }
         />

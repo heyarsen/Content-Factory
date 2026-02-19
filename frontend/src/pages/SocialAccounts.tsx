@@ -475,8 +475,7 @@ export function SocialAccounts() {
         <Card className="space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold text-primary">Inbox views</h2>
-              <p className="text-sm text-slate-500">Filter unread, urgent, and assigned interactions across platforms.</p>
+              <h2 className="text-lg font-semibold text-primary">Inbox</h2>
             </div>
             <div className="w-52">
               <Select

@@ -1235,7 +1235,7 @@ export function VideoPlanning() {
               Content Studio
             </p>
             <h1 className="text-3xl font-semibold text-primary">
-              Content Studio
+              Content Calendar
             </h1>
             <p className="text-sm text-slate-500">
               Calendar view of all posted, planned, and upcoming videos.
@@ -1258,9 +1258,9 @@ export function VideoPlanning() {
               {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : 'Generate AI video'}
             </Button>
             <Button
-              variant="ghost"
+              variant="secondary"
               onClick={() => navigate('/workflows')}
-              className="w-full md:w-auto"
+              className="w-full md:w-auto border border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100"
             >
               Make an automatization
             </Button>
