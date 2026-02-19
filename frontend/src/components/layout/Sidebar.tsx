@@ -29,8 +29,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const navigation = [
     { label: 'Content Studio', to: '/planning', icon: Calendar, hint: 'Calendar, uploads, AI videos, automation' },
-    { label: 'Inbox / Engagement', to: '/social', icon: Share2 },
-    { label: 'Instagram DMs', to: '/social/dms', icon: MessagesSquare },
+    { label: 'Social Accounts', to: '/social', icon: Share2 },
+    { label: 'DMs', to: '/social/dms', icon: MessagesSquare },
     { label: 'Analytics', to: '/dashboard', icon: BarChart3 },
   ]
 
