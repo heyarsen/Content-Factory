@@ -13,6 +13,7 @@ import {
   getProfileAnalytics,
 } from '../lib/uploadpost.js'
 import { maybeEncryptToken } from '../lib/encryption.js'
+import { logSocialConnectionCheck } from '../lib/logger.js'
 
 const router = Router()
 
@@ -55,14 +56,10 @@ function mapPlatformToUploadPost(platform: string): string {
 // - social_accounts[platform] is null or empty string if NOT connected
 function isUploadPostPlatformConnected(profile: any, platform: string): boolean {
   if (!profile || !platform) {
-    console.log('[Connection Check] No profile or platform provided')
     return false
   }
 
   const platformLower = platform.toLowerCase()
-
-  // Log the profile structure for debugging
-  console.log('[Connection Check] Checking platform:', platform, 'Profile keys:', Object.keys(profile || {}))
 
   // Handle response structure: profile might be nested in a "profile" key
   const actualProfile = profile.profile || profile
@@ -81,20 +78,16 @@ function isUploadPostPlatformConnected(profile: any, platform: string): boolean 
       socialAccounts[uploadPostPlatformLower] ||
       socialAccounts[uploadPostPlatformName]
 
-    console.log('[Connection Check] social_accounts for platform:', platform, '(Upload-Post name:', uploadPostPlatformName, ') =', platformAccount)
-
     // If platformAccount is an object (not null, not empty string), it's connected
     if (platformAccount && typeof platformAccount === 'object') {
       // Verify it has connection data (display_name, username, etc.)
       if (platformAccount.display_name || platformAccount.username || Object.keys(platformAccount).length > 0) {
-        console.log('[Connection Check] ✓ Platform is CONNECTED. Account data:', platformAccount)
         return true
       }
     }
 
     // If platformAccount is null, empty string, or undefined, it's NOT connected
     if (platformAccount === null || platformAccount === '' || platformAccount === undefined) {
-      console.log('[Connection Check] ✗ Platform is NOT connected (null/empty)')
       return false
     }
   }
@@ -106,23 +99,27 @@ function isUploadPostPlatformConnected(profile: any, platform: string): boolean 
 
     if (platformAccount && typeof platformAccount === 'object') {
       if (platformAccount.display_name || platformAccount.username || Object.keys(platformAccount).length > 0) {
-        console.log('[Connection Check] ✓ Platform is CONNECTED (root level). Account data:', platformAccount)
         return true
       }
     }
 
     if (platformAccount === null || platformAccount === '' || platformAccount === undefined) {
-      console.log('[Connection Check] ✗ Platform is NOT connected (root level, null/empty)')
       return false
     }
   }
 
   // If we get here, social_accounts doesn't exist or platform isn't in it
-  console.log('[Connection Check] ✗ NO connection evidence found. social_accounts:',
-    actualProfile.social_accounts || profile.social_accounts || 'not found')
-  console.log('[Connection Check] Full profile structure (first 1500 chars):',
-    JSON.stringify(actualProfile || profile, null, 2).substring(0, 1500))
   return false
+}
+
+function getRequestCorrelationId(req: AuthRequest): string | undefined {
+  const requestIdHeader = req.headers['x-request-id'] || req.headers['x-correlation-id']
+
+  if (Array.isArray(requestIdHeader)) {
+    return requestIdHeader[0]
+  }
+
+  return typeof requestIdHeader === 'string' ? requestIdHeader : undefined
 }
 
 // List connected accounts
@@ -501,9 +498,6 @@ router.post('/callback', authenticate, requireSubscription, async (req: AuthRequ
       const usernameToVerify = uploadPostAccountUsername || uploadPostUsername
       const userProfile = await getUserProfile(usernameToVerify)
 
-      // Log the full profile for debugging
-      console.log('[Callback] Full Upload-Post profile:', JSON.stringify(userProfile, null, 2))
-
       const tokenPayload: Record<string, any> = {}
       if (typeof access_token === 'string' && access_token.trim()) {
         tokenPayload.access_token = maybeEncryptToken(access_token)
@@ -524,13 +518,14 @@ router.post('/callback', authenticate, requireSubscription, async (req: AuthRequ
 
       // Check if platform is actually connected - be VERY strict about this
       const platformConnected = isUploadPostPlatformConnected(userProfile, platform)
-
-      console.log('[Callback] Platform connection check result:', platformConnected, 'for platform:', platform)
+      logSocialConnectionCheck({
+        platform,
+        connected: platformConnected,
+        requestId: getRequestCorrelationId(req),
+      })
 
       // If platform is NOT connected, update status to pending and return error
       if (!platformConnected) {
-        console.log('[Callback] Platform NOT connected. Setting status to pending.')
-
         if (existing) {
           const { error: updateError } = await userSupabase
             .from('social_accounts')
@@ -566,8 +561,6 @@ router.post('/callback', authenticate, requireSubscription, async (req: AuthRequ
           platformConnected: false,
         })
       }
-
-      console.log('[Callback] Platform IS connected. Proceeding with connection.')
 
       if (existing) {
         const { error } = await userSupabase
