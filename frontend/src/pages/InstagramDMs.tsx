@@ -29,6 +29,7 @@ interface ChatMessage {
 
 interface Conversation {
   id: string
+  ownAccountId: string
   participantId: string
   participantLabel: string
   messages: ChatMessage[]
@@ -142,25 +143,54 @@ export function InstagramDMs() {
   }, [dms])
 
   const conversations = useMemo<Conversation[]>(() => {
+    const threadCountByUserId = new Map<string, Set<string>>()
+
+    dms.forEach((dm) => {
+      const threadId = String(dm.threadId || dm.id || 'unknown-thread')
+      const ids = new Set<string>()
+      const messages = extractMessages(dm)
+
+      messages.forEach((msg) => {
+        if (msg.senderId) ids.add(msg.senderId)
+        if (msg.recipientId) ids.add(msg.recipientId)
+      })
+
+      ids.forEach((id) => {
+        if (!threadCountByUserId.has(id)) {
+          threadCountByUserId.set(id, new Set<string>())
+        }
+        threadCountByUserId.get(id)!.add(threadId)
+      })
+    })
+
+    const inferredOwnAccountId = Array.from(threadCountByUserId.entries())
+      .sort((a, b) => b[1].size - a[1].size)[0]?.[0] || ''
+
     const map = new Map<string, Conversation>()
 
     dms.forEach((dm) => {
       const messages = extractMessages(dm)
       const threadId = String(dm.threadId || dm.id || 'unknown-thread')
-      const participants = dm.raw?.participants?.data
+      const participants = Array.isArray(dm.raw?.participants?.data) ? dm.raw.participants.data : []
 
-      const participantFromApi = Array.isArray(participants)
-        ? participants.find((participant: any) => participant?.id)?.id
-        : undefined
-      const participantUsername = Array.isArray(participants)
-        ? participants.find((participant: any) => participant?.username)?.username
-        : undefined
+      const threadIds = new Set<string>()
+      messages.forEach((msg) => {
+        if (msg.senderId) threadIds.add(msg.senderId)
+        if (msg.recipientId) threadIds.add(msg.recipientId)
+      })
+
+      const participantFromMessages = Array.from(threadIds).find((id) => id && id !== inferredOwnAccountId) || ''
+
+      const participantFromApi = participants.find((participant: any) => participant?.id && participant.id !== inferredOwnAccountId)
+      const participantUsername = participantFromApi?.username
+      const participantApiId = participantFromApi?.id
 
       if (!map.has(threadId)) {
         map.set(threadId, {
           id: threadId,
-          participantId: participantFromApi || dm.senderId || dm.recipientId || '',
-          participantLabel: participantUsername || participantFromApi || dm.senderId || dm.recipientId || 'Unknown user',
+          ownAccountId: inferredOwnAccountId,
+          participantId: participantFromMessages || participantApiId || dm.senderId || dm.recipientId || '',
+          participantLabel: participantUsername || participantFromMessages || participantApiId || dm.senderId || dm.recipientId || 'Unknown user',
           messages: [],
           lastTimestamp: dm.timestamp,
         })
@@ -174,11 +204,15 @@ export function InstagramDMs() {
         .pop()
 
       if (!existing.participantId) {
-        existing.participantId = participantFromApi || dm.senderId || dm.recipientId || ''
+        existing.participantId = participantFromMessages || participantApiId || dm.senderId || dm.recipientId || ''
       }
 
       if (existing.participantLabel === 'Unknown user') {
         existing.participantLabel = participantUsername || existing.participantId || 'Unknown user'
+      }
+
+      if (!existing.ownAccountId) {
+        existing.ownAccountId = inferredOwnAccountId
       }
     })
 
@@ -352,10 +386,7 @@ export function InstagramDMs() {
 
                   <div className="max-h-[420px] flex-1 space-y-3 overflow-y-auto bg-gradient-to-b from-white to-slate-50 p-5">
                     {selectedConversation.messages.map((dm) => {
-                      const ownAccountId = selectedConversation.messages.find((message) =>
-                        message.senderId && message.senderId !== selectedConversation.participantId
-                      )?.senderId || ''
-                      const isOutgoing = isOutgoingMessage(dm, selectedConversation.participantId, ownAccountId)
+                      const isOutgoing = isOutgoingMessage(dm, selectedConversation.participantId, selectedConversation.ownAccountId)
 
                       return (
                         <div key={dm.id} className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'}`}>
