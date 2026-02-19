@@ -473,10 +473,10 @@ export function Distribution() {
     <Layout>
       <div className="space-y-10">
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Distribution</p>
-          <h1 className="text-3xl font-semibold text-primary">Distribution</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Social Accounts</p>
+          <h1 className="text-3xl font-semibold text-primary">Social Accounts</h1>
           <p className="text-sm text-slate-500">
-            Connect social media accounts and schedule posts to distribute your videos automatically.
+            Connect social media accounts for posting videos, handling DMs, managing comments, and future engagement workflows.
           </p>
         </div>
 
@@ -575,7 +575,7 @@ export function Distribution() {
         </section>
 
         {/* Scheduled Posts Section */}
-        <section className="space-y-6">
+        <section className="hidden" aria-hidden="true">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
               <h2 className="text-xl font-semibold text-primary">Scheduled Posts</h2>

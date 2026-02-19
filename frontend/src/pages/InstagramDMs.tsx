@@ -84,6 +84,22 @@ const extractMessages = (dm: InstagramDM): ChatMessage[] => {
   ]
 }
 
+const isOutgoingMessage = (message: ChatMessage, participantId: string, ownAccountId: string) => {
+  if (ownAccountId && message.senderId) {
+    return message.senderId === ownAccountId
+  }
+
+  if (participantId && message.senderId) {
+    return message.senderId !== participantId
+  }
+
+  if (participantId && message.recipientId) {
+    return message.recipientId === participantId
+  }
+
+  return false
+}
+
 export function InstagramDMs() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -105,7 +121,7 @@ export function InstagramDMs() {
 
       setDms(dmsResponse.data.data || [])
     } catch (err: any) {
-      setError(err?.response?.data?.error || err?.message || 'Failed to load Instagram DMs')
+      setError(err?.response?.data?.error || err?.message || 'Failed to load DMs')
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -229,14 +245,14 @@ export function InstagramDMs() {
     <Layout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-primary">Instagram DMs</h1>
+          <h1 className="text-3xl font-bold text-primary">DMs</h1>
           <p className="mt-1 text-sm text-slate-600">Manage direct messages in a chat-style inbox.</p>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600">
             <CalendarRange className="h-4 w-4" />
-            Data source: Upload-Post Instagram DMs
+            Data source: Upload-Post social DMs
           </div>
           <Button onClick={handleRefresh} disabled={refreshing} variant="secondary" className="gap-2">
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -291,7 +307,7 @@ export function InstagramDMs() {
                   <EmptyState
                     icon={<MessageCircle className="h-8 w-8" />}
                     title="No direct messages found"
-                    description="Connect Instagram and receive DMs to see them here."
+                    description="Connect a social account and receive DMs to see them here."
                   />
                 </div>
               ) : (
@@ -336,7 +352,10 @@ export function InstagramDMs() {
 
                   <div className="max-h-[420px] flex-1 space-y-3 overflow-y-auto bg-gradient-to-b from-white to-slate-50 p-5">
                     {selectedConversation.messages.map((dm) => {
-                      const isOutgoing = dm.recipientId === selectedConversation.participantId
+                      const ownAccountId = selectedConversation.messages.find((message) =>
+                        message.senderId && message.senderId !== selectedConversation.participantId
+                      )?.senderId || ''
+                      const isOutgoing = isOutgoingMessage(dm, selectedConversation.participantId, ownAccountId)
 
                       return (
                         <div key={dm.id} className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'}`}>
