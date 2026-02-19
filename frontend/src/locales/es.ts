@@ -548,6 +548,10 @@ export const es = {
         update_plan_failed: "Error al actualizar el plan",
         delete_plan_failed: "Error al eliminar el plan",
         update_item_failed: "Error al actualizar el elemento",
+        upload_manual: "Subir manualmente",
+        create_one_video: "Crear un video",
+        create_automation: "Crear automatización",
+        all_planned: "Total planificados",
         upload_plan: {
             cta: "Sube tu propio video",
             modal_title: "Subir y planificar",
