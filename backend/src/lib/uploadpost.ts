@@ -12,6 +12,7 @@ const UPLOADPOST_ENDPOINTS = {
   instagramComments: '/uploadposts/instagram/comments',
   analytics: '/uploadposts/analytics',
   instagramAnalytics: '/uploadposts/instagram/analytics',
+  profileAnalytics: '/analytics',
 } as const
 const MAX_UPLOADPOST_TITLE_LENGTH = 100
 const DEFAULT_UPLOADPOST_RETRY_DELAY_MS = 2000
@@ -225,12 +226,51 @@ export interface AnalyticsRequest extends UploadPostDateRangeFilter, UploadPostP
   platform?: string
 }
 
+export interface ProfileAnalyticsRequest {
+  profileUsername: string
+  platforms: string[]
+  pageId?: string
+  pageUrn?: string
+}
+
 export function getAnalyticsEndpointCandidates(platform?: AnalyticsRequest['platform']): string[] {
   if (platform === 'instagram') {
     return [UPLOADPOST_ENDPOINTS.instagramAnalytics, UPLOADPOST_ENDPOINTS.analytics]
   }
 
   return [UPLOADPOST_ENDPOINTS.analytics]
+}
+
+export async function getProfileAnalytics(request: ProfileAnalyticsRequest): Promise<Record<string, any>> {
+  if (!request.profileUsername?.trim()) {
+    throw new Error('Profile username is required for analytics')
+  }
+
+  if (!request.platforms?.length) {
+    throw new Error('At least one platform is required for analytics')
+  }
+
+  try {
+    const response = await axios.get(
+      `${UPLOADPOST_API_URL}${UPLOADPOST_ENDPOINTS.profileAnalytics}/${encodeURIComponent(request.profileUsername.trim())}`,
+      {
+        headers: {
+          'Authorization': getAuthHeader(),
+          'Content-Type': 'application/json',
+        },
+        params: {
+          platforms: request.platforms.join(','),
+          ...(request.pageId ? { page_id: request.pageId } : {}),
+          ...(request.pageUrn ? { page_urn: request.pageUrn } : {}),
+        },
+        timeout: 30000,
+      }
+    )
+
+    return response.data || {}
+  } catch (error: any) {
+    throw normalizeUploadPostError(error, 'Failed to get Upload-Post profile analytics', `${UPLOADPOST_ENDPOINTS.profileAnalytics}/${request.profileUsername}`)
+  }
 }
 
 

@@ -5,7 +5,7 @@ import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Badge } from '../components/ui/Badge'
-import { Video, Calendar, Users, Zap, ArrowRight, Sparkles, ClipboardList, Lock } from 'lucide-react'
+import { Video, Calendar, Users, Zap, ArrowRight, Sparkles, ClipboardList, Lock, BarChart3 } from 'lucide-react'
 import api from '../lib/api'
 
 import { useLanguage } from '../contexts/LanguageContext'
@@ -51,6 +51,25 @@ interface PlanHealth {
   inFlightItems: number
 }
 
+
+interface SocialAnalyticsAccount {
+  id: string
+  platform: string
+  status: string
+  platform_account_id?: string | null
+  account_info?: {
+    username?: string | null
+    display_name?: string | null
+  } | null
+}
+
+interface PlatformAnalytics {
+  followers?: number
+  impressions?: number
+  profileViews?: number
+  reach?: number
+}
+
 interface OnboardingStats {
   isNewUser: boolean
   accountCreatedAt: string | null
@@ -72,6 +91,8 @@ export function Dashboard() {
   const [nextScheduled, setNextScheduled] = useState<NextScheduled | null>(null)
   const [planHealth, setPlanHealth] = useState<PlanHealth | null>(null)
   const [onboarding, setOnboarding] = useState<OnboardingStats | null>(null)
+  const [analyticsLoading, setAnalyticsLoading] = useState(false)
+  const [socialAnalytics, setSocialAnalytics] = useState<Record<string, PlatformAnalytics>>({})
   const [loading, setLoading] = useState(true)
 
   const hasSubscription = !!(user?.role === 'admin' || (subscription && ['active', 'pending'].includes(subscription.status)))
@@ -85,6 +106,7 @@ export function Dashboard() {
 
   useEffect(() => {
     loadStats()
+    loadSocialAnalytics()
 
     // Safety timeout to forcefully clear loading state if API hangs
     const timeout = setTimeout(() => {
@@ -114,6 +136,36 @@ export function Dashboard() {
       console.error('Failed to load stats:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadSocialAnalytics = async () => {
+    setAnalyticsLoading(true)
+
+    try {
+      const accountsRes = await api.get('/api/social/accounts')
+      const connectedAccounts: SocialAnalyticsAccount[] = (accountsRes.data?.accounts || [])
+        .filter((account: SocialAnalyticsAccount) => account.status === 'connected' && account.platform_account_id)
+
+      if (!connectedAccounts.length) {
+        setSocialAnalytics({})
+        return
+      }
+
+      const profileUsername = connectedAccounts[0].platform_account_id as string
+      const uniquePlatforms = Array.from(new Set(connectedAccounts.map((account) => account.platform)))
+      const analyticsRes = await api.get(`/api/social/analytics/${encodeURIComponent(profileUsername)}`, {
+        params: {
+          platforms: uniquePlatforms.join(','),
+        },
+      })
+
+      setSocialAnalytics(analyticsRes.data || {})
+    } catch (error) {
+      console.error('Failed to load social analytics:', error)
+      setSocialAnalytics({})
+    } finally {
+      setAnalyticsLoading(false)
     }
   }
 
@@ -223,6 +275,43 @@ export function Dashboard() {
               </Link>
             </div>
           </div>
+        </section>
+
+
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-slate-900">Social analytics</h2>
+            <Badge variant="default" className="inline-flex items-center gap-1">
+              <BarChart3 className="h-3.5 w-3.5" />
+              Upload-Post API
+            </Badge>
+          </div>
+          {analyticsLoading ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {[1, 2, 3, 4].map((index) => (
+                <Skeleton key={index} className="h-36 rounded-3xl" />
+              ))}
+            </div>
+          ) : Object.keys(socialAnalytics).length === 0 ? (
+            <Card className="p-6">
+              <p className="text-sm text-slate-600">Connect at least one social account to load analytics.</p>
+            </Card>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {Object.entries(socialAnalytics).map(([platform, analytics]) => (
+                <Card key={platform} className="p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{platform}</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-900">{analytics.followers ?? 0}</p>
+                  <p className="text-xs text-slate-500">Followers</p>
+                  <div className="mt-3 space-y-1 text-xs text-slate-500">
+                    <p>Reach: {analytics.reach ?? 0}</p>
+                    <p>Impressions: {analytics.impressions ?? 0}</p>
+                    <p>Profile views: {analytics.profileViews ?? 0}</p>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">

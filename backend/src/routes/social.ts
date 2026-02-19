@@ -10,6 +10,7 @@ import {
   getAnalytics,
   sendDirectMessage,
   buildUploadPostLookupFromProfile,
+  getProfileAnalytics,
 } from '../lib/uploadpost.js'
 import { maybeEncryptToken } from '../lib/encryption.js'
 
@@ -765,6 +766,37 @@ router.get('/instagram/analytics', authenticate, requireSubscription, async (req
   } catch (error: any) {
     console.error('Get Instagram analytics error:', error)
     res.status(500).json({ error: error.message || 'Failed to get Instagram analytics' })
+  }
+})
+
+router.get('/analytics/:profileUsername', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
+  try {
+    const profileUsername = (req.params.profileUsername || '').trim()
+    const platformsRaw = typeof req.query.platforms === 'string' ? req.query.platforms : ''
+    const platforms = platformsRaw
+      .split(',')
+      .map((platform) => platform.trim().toLowerCase())
+      .filter(Boolean)
+
+    if (!profileUsername) {
+      return res.status(400).json({ error: 'profileUsername path param is required' })
+    }
+
+    if (!platforms.length) {
+      return res.status(400).json({ error: 'platforms query param is required' })
+    }
+
+    const analytics = await getProfileAnalytics({
+      profileUsername,
+      platforms,
+      pageId: typeof req.query.page_id === 'string' ? req.query.page_id : undefined,
+      pageUrn: typeof req.query.page_urn === 'string' ? req.query.page_urn : undefined,
+    })
+
+    return res.json(analytics)
+  } catch (error: any) {
+    console.error('Get profile analytics error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to get profile analytics' })
   }
 })
 
