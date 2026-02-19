@@ -1,15 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
-import { EmptyState } from '../components/ui/EmptyState'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Modal } from '../components/ui/Modal'
-import { Input } from '../components/ui/Input'
-import { Textarea } from '../components/ui/Textarea'
-import { Select } from '../components/ui/Select'
 import {
   Users,
   Link2,
@@ -19,12 +15,6 @@ import {
   Facebook,
   Share2,
   Linkedin,
-  MessageCircle,
-  Send,
-  Sparkles,
-  AlertTriangle,
-  UserCheck,
-  MessageSquare,
 } from 'lucide-react'
 import api from '../lib/api'
 import { useLanguage } from '../contexts/LanguageContext'
@@ -45,27 +35,6 @@ interface SocialAccount {
   } | null
 }
 
-type InboxView = 'unread' | 'urgent' | 'assigned' | 'all'
-type InteractionType = 'comment' | 'mention' | 'dm'
-type Sentiment = 'positive' | 'neutral' | 'negative'
-type BrandPreset = 'Professional' | 'Friendly' | 'Playful'
-
-interface InboxInteraction {
-  id: string
-  platform: SocialAccount['platform']
-  platformAccountId: string
-  sender: string
-  type: InteractionType
-  message: string
-  unread: boolean
-  urgent: boolean
-  assignedTo: string | null
-  slaMinutes: number
-  createdAt: string
-  sentiment: Sentiment
-  needsEscalation: boolean
-}
-
 const platformIcons = {
   instagram: Instagram,
   tiktok: Users,
@@ -74,92 +43,6 @@ const platformIcons = {
   x: Share2,
   linkedin: Linkedin,
   threads: Share2,
-}
-
-const interactionTypeLabel: Record<InteractionType, string> = {
-  comment: 'Comment',
-  mention: 'Mention',
-  dm: 'Direct message',
-}
-
-const sentimentLabel: Record<Sentiment, string> = {
-  positive: 'Positive',
-  neutral: 'Neutral',
-  negative: 'Negative',
-}
-
-const teamMembers = ['Anna', 'Sam', 'Jordan', 'Priya']
-
-const brandVoicePresets: Record<BrandPreset, string> = {
-  Professional: 'clear, concise, and confidence-building',
-  Friendly: 'warm, conversational, and helpful',
-  Playful: 'lighthearted, energetic, and upbeat',
-}
-
-const relativeTime = (date: string) => {
-  const diffMs = Date.now() - new Date(date).getTime()
-  const diffMinutes = Math.max(1, Math.floor(diffMs / 60000))
-  if (diffMinutes < 60) return `${diffMinutes}m ago`
-  const diffHours = Math.floor(diffMinutes / 60)
-  if (diffHours < 24) return `${diffHours}h ago`
-  const diffDays = Math.floor(diffHours / 24)
-  return `${diffDays}d ago`
-}
-
-const buildDemoInteractions = (accounts: SocialAccount[]): InboxInteraction[] => {
-  const connected = accounts.filter((account) => account.status === 'connected')
-  return connected.flatMap((account, index) => {
-    const name = account.account_info?.display_name || account.account_info?.username || account.platform
-    const now = Date.now()
-
-    return [
-      {
-        id: `${account.id}-dm`,
-        platform: account.platform,
-        platformAccountId: account.id,
-        sender: `${name} community`,
-        type: 'dm' as const,
-        message: `Hi! Can you share pricing details and onboarding timeline for your service?`,
-        unread: true,
-        urgent: index % 2 === 0,
-        assignedTo: index % 2 === 0 ? 'Anna' : null,
-        slaMinutes: index % 2 === 0 ? 10 : 75,
-        createdAt: new Date(now - (index + 1) * 1000 * 60 * 23).toISOString(),
-        sentiment: index % 2 === 0 ? 'neutral' : 'positive',
-        needsEscalation: index % 3 === 0,
-      },
-      {
-        id: `${account.id}-mention`,
-        platform: account.platform,
-        platformAccountId: account.id,
-        sender: `${name} followers`,
-        type: 'mention' as const,
-        message: `@yourbrand can someone help me with order #${1130 + index}?`,
-        unread: index % 2 === 1,
-        urgent: index % 2 === 1,
-        assignedTo: index % 2 === 1 ? 'Jordan' : null,
-        slaMinutes: 35,
-        createdAt: new Date(now - (index + 2) * 1000 * 60 * 47).toISOString(),
-        sentiment: 'negative',
-        needsEscalation: true,
-      },
-      {
-        id: `${account.id}-comment`,
-        platform: account.platform,
-        platformAccountId: account.id,
-        sender: `${name} audience`,
-        type: 'comment' as const,
-        message: `Love this content! Do you also support team workflows for approvals?`,
-        unread: true,
-        urgent: false,
-        assignedTo: null,
-        slaMinutes: 120,
-        createdAt: new Date(now - (index + 2) * 1000 * 60 * 14).toISOString(),
-        sentiment: 'positive',
-        needsEscalation: false,
-      },
-    ]
-  })
 }
 
 export function SocialAccounts() {
@@ -174,11 +57,6 @@ export function SocialAccounts() {
   const [disconnectModal, setDisconnectModal] = useState<string | null>(null)
   const [disconnecting, setDisconnecting] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
-  const [inboxView, setInboxView] = useState<InboxView>('unread')
-  const [platformFilter, setPlatformFilter] = useState<'all' | SocialAccount['platform']>('all')
-  const [activeInteractionId, setActiveInteractionId] = useState<string | null>(null)
-  const [brandVoice, setBrandVoice] = useState<BrandPreset>('Professional')
-  const [replyDraft, setReplyDraft] = useState('')
 
   const platformNames: Record<string, string> = {
     instagram: t('platforms.instagram') !== 'platforms.instagram' ? t('platforms.instagram') : 'Instagram',
@@ -229,34 +107,7 @@ export function SocialAccounts() {
     }
   }, [searchParams, setSearchParams, loadAccounts])
 
-  const interactions = useMemo(() => buildDemoInteractions(accounts), [accounts])
-  const connectedPlatforms = useMemo(
-    () => accounts.filter((a: SocialAccount) => a.status === 'connected').map((a: SocialAccount) => a.platform),
-    [accounts]
-  )
-
-  const filteredInteractions = useMemo(() => {
-    return interactions.filter((interaction) => {
-      if (platformFilter !== 'all' && interaction.platform !== platformFilter) return false
-      if (inboxView === 'unread') return interaction.unread
-      if (inboxView === 'urgent') return interaction.urgent || interaction.slaMinutes <= 15
-      if (inboxView === 'assigned') return Boolean(interaction.assignedTo)
-      return true
-    })
-  }, [interactions, platformFilter, inboxView])
-
-  const activeInteraction = filteredInteractions.find((item) => item.id === activeInteractionId) || filteredInteractions[0]
-
-  useEffect(() => {
-    if (!activeInteraction && filteredInteractions.length > 0) {
-      setActiveInteractionId(filteredInteractions[0].id)
-      return
-    }
-
-    if (activeInteraction && replyDraft.trim() === '') {
-      setReplyDraft(`Thanks for reaching out! I'm checking this now and will share the next steps shortly.`)
-    }
-  }, [filteredInteractions, activeInteraction, replyDraft])
+  const connectedPlatforms = accounts.filter((a: SocialAccount) => a.status === 'connected')
 
   const handleConnect = async (platform: SocialAccount['platform']) => {
     const hasSub = user?.hasActiveSubscription || user?.role === 'admin'
@@ -344,28 +195,7 @@ export function SocialAccounts() {
     }
   }
 
-  const generateDraft = () => {
-    if (!activeInteraction) return
 
-    const voice = brandVoicePresets[brandVoice]
-    const escalationLine = activeInteraction.needsEscalation
-      ? 'I have flagged this for escalation and a specialist will also review it.'
-      : 'I can fully support this request from here.'
-
-    const draft = `Hi ${activeInteraction.sender},\n\nThanks for your message. We appreciate you reaching out. In our ${voice} brand voice, here's the update: ${escalationLine} We'll get this resolved within the expected response window.\n\nBest regards,\nContent Factory team`
-    setReplyDraft(draft)
-  }
-
-  const assignInteraction = (member: string) => {
-    if (!activeInteraction) return
-    toast.success(`${interactionTypeLabel[activeInteraction.type]} assigned to ${member}.`)
-  }
-
-  const submitReply = () => {
-    if (!activeInteraction || !replyDraft.trim()) return
-    toast.success(`Reply queued for ${platformNames[activeInteraction.platform]} ${interactionTypeLabel[activeInteraction.type].toLowerCase()}.`)
-    setReplyDraft('')
-  }
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, 'default' | 'success' | 'error'> = {
@@ -472,182 +302,6 @@ export function SocialAccounts() {
           </div>
         </Card>
 
-        <Card className="space-y-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-primary">Inbox</h2>
-            </div>
-            <div className="w-52">
-              <Select
-                value={platformFilter}
-                onChange={(e) => setPlatformFilter(e.target.value as typeof platformFilter)}
-                options={[
-                  { value: 'all', label: 'All connected platforms' },
-                  ...connectedPlatforms.map((platform) => ({ value: platform, label: platformNames[platform] })),
-                ]}
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {([
-              { key: 'unread', label: 'Unread', icon: MessageCircle },
-              { key: 'urgent', label: 'Urgent', icon: AlertTriangle },
-              { key: 'assigned', label: 'Assigned', icon: UserCheck },
-              { key: 'all', label: 'All activity', icon: MessageSquare },
-            ] as const).map(({ key, label, icon: Icon }) => {
-              const count = interactions.filter((item) => {
-                if (key === 'unread') return item.unread
-                if (key === 'urgent') return item.urgent || item.slaMinutes <= 15
-                if (key === 'assigned') return Boolean(item.assignedTo)
-                return true
-              }).length
-
-              const active = inboxView === key
-
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setInboxView(key)}
-                  className={`rounded-2xl border p-4 text-left transition ${active
-                    ? 'border-brand-200 bg-brand-50/70'
-                    : 'border-slate-200 bg-white hover:border-slate-300'
-                    }`}
-                >
-                  <div className="mb-2 flex items-center justify-between">
-                    <Icon className="h-4 w-4 text-slate-500" />
-                    <span className="text-lg font-semibold text-primary">{count}</span>
-                  </div>
-                  <p className="text-sm font-medium text-slate-700">{label}</p>
-                </button>
-              )
-            })}
-          </div>
-
-          {connectedPlatforms.length === 0 ? (
-            <EmptyState
-              icon={<Users className="w-12 h-12" />}
-              title="Connect at least one social channel"
-              description="Once connected, comments, mentions, and DMs will appear here for faster responses."
-            />
-          ) : (
-            <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
-              <div className="space-y-3">
-                {filteredInteractions.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-8 text-center text-sm text-slate-500">
-                    No interactions in this view.
-                  </div>
-                ) : (
-                  filteredInteractions.map((interaction) => {
-                    const isSelected = interaction.id === activeInteraction?.id
-                    const Icon = platformIcons[interaction.platform]
-
-                    return (
-                      <button
-                        type="button"
-                        key={interaction.id}
-                        onClick={() => setActiveInteractionId(interaction.id)}
-                        className={`w-full rounded-2xl border p-4 text-left transition ${isSelected
-                          ? 'border-brand-200 bg-brand-50/70'
-                          : 'border-slate-200 bg-white hover:border-slate-300'
-                          }`}
-                      >
-                        <div className="mb-2 flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <Icon className="h-4 w-4 text-brand-600" />
-                            <span className="text-sm font-semibold text-primary">{platformNames[interaction.platform]}</span>
-                            <Badge variant="default">{interactionTypeLabel[interaction.type]}</Badge>
-                          </div>
-                          <span className="text-xs text-slate-500">{relativeTime(interaction.createdAt)}</span>
-                        </div>
-
-                        <p className="line-clamp-2 text-sm text-slate-600">{interaction.message}</p>
-
-                        <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                          {interaction.unread && <Badge variant="default">Unread</Badge>}
-                          {(interaction.urgent || interaction.slaMinutes <= 15) && <Badge variant="error">Urgent</Badge>}
-                          {interaction.assignedTo && <Badge variant="success">Assigned: {interaction.assignedTo}</Badge>}
-                          <Badge variant="default">SLA: {interaction.slaMinutes}m</Badge>
-                          <Badge variant={interaction.sentiment === 'negative' ? 'error' : 'default'}>
-                            Sentiment: {sentimentLabel[interaction.sentiment]}
-                          </Badge>
-                          {interaction.needsEscalation && <Badge variant="error">Needs escalation</Badge>}
-                        </div>
-                      </button>
-                    )
-                  })
-                )}
-              </div>
-
-              <Card className="space-y-4 border border-slate-100 bg-slate-50/70 p-5 shadow-none">
-                {activeInteraction ? (
-                  <>
-                    <div className="space-y-2">
-                      <h3 className="text-base font-semibold text-primary">Respond faster with AI</h3>
-                      <p className="text-sm text-slate-500">Draft a reply aligned with your brand voice and team workflow.</p>
-                    </div>
-
-                    <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
-                      <p className="text-xs uppercase tracking-wide text-slate-400">Selected interaction</p>
-                      <p className="text-sm text-slate-700">{activeInteraction.message}</p>
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <Select
-                        value={brandVoice}
-                        onChange={(e) => setBrandVoice(e.target.value as BrandPreset)}
-                        options={(Object.keys(brandVoicePresets) as BrandPreset[]).map((preset) => ({
-                          value: preset,
-                          label: `${preset} voice`,
-                        }))}
-                      />
-                      <Select
-                        value={activeInteraction.assignedTo || ''}
-                        onChange={(e) => assignInteraction(e.target.value)}
-                        options={[
-                          { value: '', label: 'Assign owner' },
-                          ...teamMembers.map((member) => ({ value: member, label: member })),
-                        ]}
-                      />
-                    </div>
-
-                    <Input
-                      label="SLA target"
-                      value={`Respond in ${activeInteraction.slaMinutes} minutes`}
-                      readOnly
-                    />
-
-                    <div className="flex flex-wrap gap-2">
-                      <Button variant="ghost" size="sm" onClick={generateDraft} className="border border-slate-200 bg-white">
-                        <Sparkles className="mr-2 h-4 w-4" />
-                        Generate AI draft
-                      </Button>
-                      {activeInteraction.needsEscalation && (
-                        <Badge variant="error">Escalation flag enabled</Badge>
-                      )}
-                    </div>
-
-                    <Textarea
-                      label="Reply draft"
-                      value={replyDraft}
-                      onChange={(e) => setReplyDraft(e.target.value)}
-                      rows={8}
-                      placeholder="AI draft appears here..."
-                    />
-
-                    <Button variant="primary" onClick={submitReply} className="w-full" disabled={!replyDraft.trim()}>
-                      <Send className="mr-2 h-4 w-4" />
-                      Send reply
-                    </Button>
-                  </>
-                ) : (
-                  <p className="text-sm text-slate-500">Select an interaction to draft a reply.</p>
-                )}
-              </Card>
-            </div>
-          )}
-        </Card>
 
         <Modal
           isOpen={disconnectModal !== null}

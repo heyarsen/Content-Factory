@@ -8,10 +8,8 @@ import { Select } from '../components/ui/Select'
 import { Textarea } from '../components/ui/Textarea'
 import { Badge } from '../components/ui/Badge'
 import { Modal } from '../components/ui/Modal'
-import { EmptyState } from '../components/ui/EmptyState'
 import { Skeleton } from '../components/ui/Skeleton'
 import {
-  Calendar,
   Plus,
   Sparkles,
   Check,
@@ -1372,7 +1370,7 @@ export function VideoPlanning() {
         <CreditBanner />
 
         {/* Plan Items Calendar View */}
-        {selectedPlan ? (
+        {(
           <div className="space-y-6">
             {/* Status Summary and Filters */}
             <Card className="p-4">
@@ -2067,28 +2065,7 @@ export function VideoPlanning() {
                 </div>
               )}
           </div>
-        ) : (
-          <EmptyState
-            icon={<Calendar className="w-16 h-16" />}
-            title={t('video_planning.no_plans_yet')}
-            description={t('video_planning.no_plans_desc')}
-            action={
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Button
-                  variant="secondary"
-                  onClick={() => setUploadPlanModal(true)}
-                >
-                  {t('video_planning.upload_plan.cta')}
-                </Button>
-                <Button
-                  onClick={() => setCreateModal(true)}
-                  leftIcon={<Plus className="h-4 w-4" />}
-                >
-                  {t('video_planning.create_plan')}
-                </Button>
-              </div>
-            }
-          />
+
         )}
 
         <UploadAndPlanModal
