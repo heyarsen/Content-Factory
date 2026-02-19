@@ -4,7 +4,8 @@ import {
   Share2,
   Sparkles,
   Calendar,
-  Settings,
+  User,
+  SlidersHorizontal,
   BarChart3,
   MessagesSquare,
   X,
@@ -35,7 +36,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   ]
 
   const secondaryNavigation = [
-    { label: t('common.settings'), to: '/preferences', icon: Settings },
+    { label: 'Account', to: '/profile', icon: User },
+    { label: 'Workspace Preferences', to: '/preferences', icon: SlidersHorizontal },
   ]
 
   const adminNavigation = [
@@ -111,6 +113,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             })}
 
             <div className="mt-4 border-t border-slate-200 pt-4">
+              <p className="px-4 pb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">{t('common.settings')}</p>
               {secondaryNavigation.map(({ label, to, icon: Icon }) => {
                 const isActive = location.pathname === to || location.pathname.startsWith(to + '/')
                 return (

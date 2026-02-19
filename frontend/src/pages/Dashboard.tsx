@@ -185,7 +185,7 @@ export function Dashboard() {
     },
     {
       id: 'set_default_platforms_timezone',
-      title: 'Define social goals, platforms, voice, and cadence',
+      title: 'Set workspace goals, voice, cadence, and default platforms',
       path: '/preferences',
       completed: Boolean(onboarding?.completedSteps?.includes('set_default_platforms_timezone')),
     },

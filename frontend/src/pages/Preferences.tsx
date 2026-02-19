@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
@@ -246,12 +247,18 @@ export function Preferences() {
       <div className="space-y-8">
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('common.settings')}</p>
-            <h1 className="text-3xl font-semibold text-primary">{t('preferences.title')}</h1>
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Workspace settings</p>
+            <h1 className="text-3xl font-semibold text-primary">Workspace Preferences</h1>
             <p className="text-sm text-slate-500">
-              {t('preferences.description')}
+              Configure campaign defaults, social channels, and automation behavior used across your workspace.
             </p>
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-600">You are in: Workspace Preferences</span>
+              <Link to="/profile" className="rounded-full border border-brand-200 bg-brand-50 px-3 py-1 font-medium text-brand-700 transition hover:bg-brand-100">
+                Go to Account settings
+              </Link>
+            </div>
           </div>
           <Button onClick={handleSave} loading={saving}>
             {t('common.save')}
