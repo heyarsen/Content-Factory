@@ -17,13 +17,13 @@ import { ForgotPassword } from './pages/ForgotPassword'
 import { ResetPassword } from './pages/ResetPassword'
 import { VerifyEmail } from './pages/VerifyEmail'
 import { Dashboard } from './pages/Dashboard'
+import { Analysts } from './pages/Analysts'
 import { Videos } from './pages/Videos'
 import { GenerateVideo } from './pages/GenerateVideo'
 import { QuickCreate } from './pages/QuickCreate'
 import { SocialAccounts } from './pages/SocialAccounts'
 import { ScheduledPosts } from './pages/ScheduledPosts'
 import { SocialCallback } from './pages/SocialCallback'
-import { ContentFactory } from './pages/ContentFactory'
 import { Workflows } from './pages/Workflows'
 import { AdminPanel } from './pages/AdminPanel'
 import { VideoPlanning } from './pages/VideoPlanning'
@@ -40,6 +40,9 @@ import { TermsOfService } from './pages/TermsOfService'
 import { CookiePolicy } from './pages/CookiePolicy'
 import { AcceptableUsePolicy } from './pages/AcceptableUsePolicy'
 import { Dpa } from './pages/Dpa'
+import { InstagramDMs } from './pages/InstagramDMs'
+
+const isWorkflowRouteEnabled = import.meta.env.DEV
 
 function AppContent() {
   const { toasts, removeToast } = useToast()
@@ -59,6 +62,14 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute>
+              <Analysts />
             </ProtectedRoute>
           }
         />
@@ -111,6 +122,14 @@ function AppContent() {
           }
         />
         <Route
+          path="/social/dms"
+          element={
+            <ProtectedRoute>
+              <InstagramDMs />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/posts"
           element={
             <ProtectedRoute>
@@ -130,16 +149,22 @@ function AppContent() {
           path="/content"
           element={
             <ProtectedRoute>
-              <ContentFactory />
+              <Navigate to="/planning" replace />
             </ProtectedRoute>
           }
         />
         <Route
           path="/workflows"
           element={
-            <ProtectedRoute>
-              <Workflows />
-            </ProtectedRoute>
+            isWorkflowRouteEnabled ? (
+              <ProtectedRoute>
+                <Workflows />
+              </ProtectedRoute>
+            ) : (
+              <AdminRoute>
+                <Workflows />
+              </AdminRoute>
+            )
           }
         />
         <Route

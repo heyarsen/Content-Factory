@@ -17,6 +17,30 @@ export class JobService {
     payload: Record<string, any>,
     scheduledAt?: Date
   ): Promise<BackgroundJob> {
+    // Prevent duplicate pending/processing video generation jobs for the same reel.
+    // Without this guard, cron can enqueue many identical jobs while a reel remains
+    // in an unrecoverable state (e.g. insufficient credits), creating noisy retries.
+    if (jobType === 'video_generation' && payload?.reel_id) {
+      const { data: existingJob, error: existingJobError } = await supabase
+        .from('background_jobs')
+        .select('*')
+        .eq('job_type', 'video_generation')
+        .eq('payload->>reel_id', String(payload.reel_id))
+        .in('status', ['pending', 'processing'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (existingJobError) {
+        console.error('Error checking for existing video generation job:', existingJobError)
+      } else if (existingJob) {
+        console.log(
+          `[Job Queue] Skipping duplicate video_generation job for reel ${payload.reel_id}; existing job ${existingJob.id} is ${existingJob.status}`
+        )
+        return existingJob as BackgroundJob
+      }
+    }
+
     const { data: job, error } = await supabase
       .from('background_jobs')
       .insert({
@@ -34,6 +58,11 @@ export class JobService {
       console.error('Error scheduling job:', error)
       throw new Error(`Failed to schedule job: ${error.message}`)
     }
+
+    console.log(
+      `[Job Queue] Scheduled ${jobType} job ${job.id} for ${scheduledAt?.toISOString() || 'now'}`,
+      { payload }
+    )
 
     return job
   }
@@ -178,4 +207,3 @@ export class JobService {
     return approvedCount
   }
 }
-

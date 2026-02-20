@@ -31,6 +31,11 @@ export const ru = {
         credits_available: '{count} кредитов доступно',
         credits_message: 'У вас есть {count} кредит{plural} для создания видео. Для автоматизации, подключения социальных сетей и планирования постов нужна подписка.',
         subscription_inactive_message: 'Ваша подписка неактивна. Пожалуйста, обновите или используйте кредиты для продолжения создания видео и планирования постов.',
+
+        buy_subscription: "Buy subscription",
+        generate_video: "Generate a video",
+        trial_credits_ended_title: "You ran out of trial credits",
+        trial_credits_ended_message: "You ran out of free trial credits. Buy a subscription to continue generating videos, automation, and connecting social accounts.",
     },
     dashboard: {
         title: "Создатель видео",

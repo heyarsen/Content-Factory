@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { buildUploadPostDescription, buildUploadPostTitle } from './uploadpost'
+import { buildUploadPostDescription, buildUploadPostTitle, getAnalyticsEndpointCandidates } from './uploadpost'
 
 describe('buildUploadPostTitle', () => {
   it('uses fallback title when caption is missing', () => {
@@ -30,5 +30,20 @@ describe('buildUploadPostDescription', () => {
 
     assert.equal(result.length, 100)
     assert.equal(result, 'B'.repeat(100))
+  })
+})
+
+
+describe('getAnalyticsEndpointCandidates', () => {
+  it('prefers the instagram analytics endpoint with fallback to generic analytics', () => {
+    assert.deepEqual(getAnalyticsEndpointCandidates('instagram'), [
+      '/uploadposts/instagram/analytics',
+      '/uploadposts/analytics',
+    ])
+  })
+
+  it('uses generic analytics endpoint for non-instagram platforms', () => {
+    assert.deepEqual(getAnalyticsEndpointCandidates('tiktok'), ['/uploadposts/analytics'])
+    assert.deepEqual(getAnalyticsEndpointCandidates(undefined), ['/uploadposts/analytics'])
   })
 })

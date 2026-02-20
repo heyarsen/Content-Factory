@@ -505,10 +505,10 @@ export function Workflows() {
     <Layout>
       <div className="space-y-10">
         <div className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Content Workflows</p>
-          <h1 className="text-3xl font-semibold text-primary">Make.com Workflow Migration</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Internal Tools</p>
+          <h1 className="text-3xl font-semibold text-primary">Workflow Admin</h1>
           <p className="max-w-3xl text-sm text-slate-500">
-            Manage your content creation pipeline: generate topics, research them, create scripts, and approve reels for video generation.
+            Internal workflow controls for maintenance and debugging.
           </p>
         </div>
 

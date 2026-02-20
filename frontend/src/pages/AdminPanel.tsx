@@ -81,6 +81,25 @@ interface User {
   roles: string[]
 }
 
+type SoraProvider = 'kie' | 'poyo'
+type SoraModel = 'sora-2' | 'sora-2-private' | 'sora-2-stable'
+
+interface SoraSettings {
+  enabled: boolean
+  manualProvider: SoraProvider
+  manualModel: SoraModel
+  automationProvider: SoraProvider
+  automationModel: SoraModel
+}
+
+const defaultSoraSettings: SoraSettings = {
+  enabled: false,
+  manualProvider: 'kie',
+  manualModel: 'sora-2-stable',
+  automationProvider: 'kie',
+  automationModel: 'sora-2-stable'
+}
+
 export function AdminPanel() {
   const { user } = useAuth()
   const [stats, setStats] = useState<AdminStats | null>(null)
@@ -97,6 +116,8 @@ export function AdminPanel() {
     email: string
   } | null>(null)
   const [processing, setProcessing] = useState(false)
+  const [soraSettings, setSoraSettings] = useState<SoraSettings>(defaultSoraSettings)
+  const [savingSoraSettings, setSavingSoraSettings] = useState(false)
   const cutoffLabel = 'Feb 5, 2026'
 
   const rangeOptions = [
@@ -111,6 +132,7 @@ export function AdminPanel() {
   useEffect(() => {
     loadStats()
     loadUsers()
+    loadSoraSettings()
   }, [range])
 
   useEffect(() => {
@@ -154,6 +176,35 @@ export function AdminPanel() {
     } finally {
       setUsersLoading(false)
     }
+  }
+
+  const loadSoraSettings = async () => {
+    try {
+      const response = await api.get('/api/admin/sora-settings')
+      setSoraSettings(response.data)
+    } catch (error) {
+      console.error('Failed to load Sora settings:', error)
+    }
+  }
+
+  const handleSaveSoraSettings = async () => {
+    setSavingSoraSettings(true)
+    try {
+      const response = await api.put('/api/admin/sora-settings', soraSettings)
+      setSoraSettings(response.data)
+    } catch (error: any) {
+      alert(error.response?.data?.error || 'Failed to update Sora settings')
+    } finally {
+      setSavingSoraSettings(false)
+    }
+  }
+
+  const modelOptions = (provider: SoraProvider) => {
+    const models: SoraModel[] = ['sora-2', 'sora-2-stable']
+    if (provider === 'poyo') {
+      models.splice(1, 0, 'sora-2-private')
+    }
+    return models
   }
 
   const handleAssignAdmin = async () => {
@@ -565,6 +616,94 @@ export function AdminPanel() {
               <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
                 <p className="text-xs uppercase tracking-widest text-slate-400">Uptime</p>
                 <p className="mt-2 text-2xl font-semibold text-primary">{(stats?.system.uptime ?? 0).toFixed(1)}%</p>
+              </div>
+            </div>
+          </Card>
+        </section>
+
+        <section>
+          <Card>
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-primary">Sora Provider Routing</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Choose provider/model for manual and automation generation. If sora-2 or sora-2-private fails twice, the backend automatically falls back to sora-2-stable.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between rounded-2xl border border-slate-200 p-4">
+                <div>
+                  <p className="font-medium text-slate-900">Enable custom routing</p>
+                  <p className="text-xs text-slate-500">When disabled, all Sora jobs use KIE + sora-2-stable.</p>
+                </div>
+                <button
+                  onClick={() => setSoraSettings(prev => ({ ...prev, enabled: !prev.enabled }))}
+                  className={`h-8 w-14 rounded-full transition ${soraSettings.enabled ? 'bg-brand-600' : 'bg-slate-300'}`}
+                >
+                  <span className={`block h-6 w-6 rounded-full bg-white transition ${soraSettings.enabled ? 'translate-x-7' : 'translate-x-1'}`} />
+                </button>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 p-4">
+                  <p className="mb-3 text-sm font-semibold text-slate-800">Manual generation</p>
+                  <div className="space-y-3">
+                    <select
+                      value={soraSettings.manualProvider}
+                      onChange={(e) => {
+                        const provider = e.target.value as SoraProvider
+                        const models = modelOptions(provider)
+                        setSoraSettings(prev => ({ ...prev, manualProvider: provider, manualModel: models.includes(prev.manualModel) ? prev.manualModel : 'sora-2' }))
+                      }}
+                      className="w-full rounded-xl border border-slate-200 p-2 text-sm"
+                    >
+                      <option value="kie">KIE</option>
+                      <option value="poyo">POYO</option>
+                    </select>
+                    <select
+                      value={soraSettings.manualModel}
+                      onChange={(e) => setSoraSettings(prev => ({ ...prev, manualModel: e.target.value as SoraModel }))}
+                      className="w-full rounded-xl border border-slate-200 p-2 text-sm"
+                    >
+                      {modelOptions(soraSettings.manualProvider).map((model) => (
+                        <option key={model} value={model}>{model}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 p-4">
+                  <p className="mb-3 text-sm font-semibold text-slate-800">Automation generation</p>
+                  <div className="space-y-3">
+                    <select
+                      value={soraSettings.automationProvider}
+                      onChange={(e) => {
+                        const provider = e.target.value as SoraProvider
+                        const models = modelOptions(provider)
+                        setSoraSettings(prev => ({ ...prev, automationProvider: provider, automationModel: models.includes(prev.automationModel) ? prev.automationModel : 'sora-2' }))
+                      }}
+                      className="w-full rounded-xl border border-slate-200 p-2 text-sm"
+                    >
+                      <option value="kie">KIE</option>
+                      <option value="poyo">POYO</option>
+                    </select>
+                    <select
+                      value={soraSettings.automationModel}
+                      onChange={(e) => setSoraSettings(prev => ({ ...prev, automationModel: e.target.value as SoraModel }))}
+                      className="w-full rounded-xl border border-slate-200 p-2 text-sm"
+                    >
+                      {modelOptions(soraSettings.automationProvider).map((model) => (
+                        <option key={model} value={model}>{model}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button onClick={handleSaveSoraSettings} disabled={savingSoraSettings}>
+                  {savingSoraSettings ? 'Saving...' : 'Save Sora Settings'}
+                </Button>
               </div>
             </div>
           </Card>

@@ -4,6 +4,7 @@ import { AdminService } from '../services/adminService.js'
 import { SupportService } from '../services/supportService.js'
 import { logAdminAction } from '../services/adminAuditService.js'
 import { supabase } from '../lib/supabase.js'
+import { SoraGenerationSettingsService } from '../services/soraGenerationSettingsService.js'
 
 const router = Router()
 
@@ -213,6 +214,62 @@ router.get('/users', authenticate, isAdmin, async (req: AuthRequest, res: Respon
     } catch (error: any) {
         console.error('Admin users error:', error)
         res.status(500).json({ error: 'Failed to get users' })
+    }
+})
+
+router.get('/sora-settings', authenticate, isAdmin, async (req: AuthRequest, res: Response) => {
+    try {
+        const settings = await SoraGenerationSettingsService.getSettings()
+        res.json(settings)
+    } catch (error: any) {
+        console.error('Admin Sora settings error:', error)
+        res.status(500).json({ error: 'Failed to load Sora settings' })
+    }
+})
+
+router.put('/sora-settings', authenticate, isAdmin, async (req: AuthRequest, res: Response) => {
+    try {
+        const body = req.body || {}
+        const providerOptions = ['kie', 'poyo']
+        const modelOptions = ['sora-2', 'sora-2-private', 'sora-2-stable']
+
+        if (!providerOptions.includes(body.manualProvider) || !providerOptions.includes(body.automationProvider)) {
+            return res.status(400).json({ error: 'Invalid provider selection' })
+        }
+
+        if (!modelOptions.includes(body.manualModel) || !modelOptions.includes(body.automationModel)) {
+            return res.status(400).json({ error: 'Invalid model selection' })
+        }
+
+        if (body.manualModel === 'sora-2-private' && body.manualProvider !== 'poyo') {
+            return res.status(400).json({ error: 'sora-2-private is only available with POYO provider' })
+        }
+
+        if (body.automationModel === 'sora-2-private' && body.automationProvider !== 'poyo') {
+            return res.status(400).json({ error: 'sora-2-private is only available with POYO provider' })
+        }
+
+        const settings = await SoraGenerationSettingsService.updateSettings({
+            enabled: !!body.enabled,
+            manualProvider: body.manualProvider,
+            manualModel: body.manualModel,
+            automationProvider: body.automationProvider,
+            automationModel: body.automationModel,
+        })
+
+        await logAdminAction({
+            actorId: req.userId!,
+            action: 'update_sora_generation_settings',
+            targetType: 'system',
+            metadata: settings,
+            ipAddress: req.ip,
+            userAgent: req.get('User-Agent'),
+        })
+
+        res.json(settings)
+    } catch (error: any) {
+        console.error('Admin Sora settings update error:', error)
+        res.status(500).json({ error: 'Failed to update Sora settings' })
     }
 })
 

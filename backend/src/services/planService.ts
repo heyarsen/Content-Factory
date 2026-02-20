@@ -655,7 +655,7 @@ export class PlanService {
    */
   static async getPlanItems(planId: string, userId: string): Promise<VideoPlanItem[]> {
     // Verify plan belongs to user
-    await this.getPlanById(planId, userId)
+    const plan = await this.getPlanById(planId, userId)
 
     const { data, error } = await supabase
       .from('video_plan_items')
@@ -665,7 +665,16 @@ export class PlanService {
       .order('scheduled_time', { ascending: true })
 
     if (error) throw error
-    return data || []
+    const items = data || []
+
+    // If an item has no explicit platforms configured, inherit from plan defaults.
+    // This keeps legacy items and newly-generated items consistent in API responses.
+    return items.map((item: VideoPlanItem) => {
+      if (item.platforms == null && plan.default_platforms != null) {
+        return { ...item, platforms: plan.default_platforms }
+      }
+      return item
+    })
   }
 
   /**

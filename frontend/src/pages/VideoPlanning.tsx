@@ -8,10 +8,8 @@ import { Select } from '../components/ui/Select'
 import { Textarea } from '../components/ui/Textarea'
 import { Badge } from '../components/ui/Badge'
 import { Modal } from '../components/ui/Modal'
-import { EmptyState } from '../components/ui/EmptyState'
 import { Skeleton } from '../components/ui/Skeleton'
 import {
-  Calendar,
   Plus,
   Sparkles,
   Check,
@@ -34,6 +32,9 @@ import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useCreditsContext } from '../contexts/CreditContext'
 import { CreditBanner } from '../components/ui/CreditBanner'
+import { UploadAndPlanModal } from '../components/videos/UploadAndPlanModal'
+import { GenerateVideoModal } from '../components/videos/GenerateVideoModal'
+import { useNotifications } from '../contexts/NotificationContext'
 
 const STATUS_FILTER_KEY = 'video_planning_status_filter'
 
@@ -113,6 +114,7 @@ interface ScheduledPost {
 
 export function VideoPlanning() {
   const { t, language } = useLanguage()
+  const { addNotification } = useNotifications()
   const { user } = useAuth()
   const { credits, unlimited, loading: creditsLoading } = useCreditsContext()
   const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')
@@ -130,6 +132,8 @@ export function VideoPlanning() {
   const [loading, setLoading] = useState(true)
   const [varietyMetrics, setVarietyMetrics] = useState<any>(null)
   const [createModal, setCreateModal] = useState(false)
+  const [generateVideoModalOpen, setGenerateVideoModalOpen] = useState(false)
+  const [uploadPlanModal, setUploadPlanModal] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     // Initialize with today's date in YYYY-MM-DD format using local timezone
     const today = new Date()
@@ -205,6 +209,16 @@ export function VideoPlanning() {
 
 
   const [creating, setCreating] = useState(false)
+
+  const handleUploadPlanSuccess = async () => {
+    addNotification({
+      type: 'success',
+      title: t('video_planning.upload_plan.success_title'),
+      message: t('video_planning.upload_plan.success_message'),
+    })
+
+    await Promise.all([loadScheduledPosts(), selectedPlan ? loadPlanItems(selectedPlan.id) : Promise.resolve()])
+  }
   const loadSocialAccounts = async () => {
     try {
       const response = await api.get('/api/social/accounts')
@@ -784,6 +798,15 @@ export function VideoPlanning() {
 
 
 
+  const getDefaultSelectedPlatforms = (item?: VideoPlanItem) => {
+    if (item?.platforms?.length) return item.platforms
+    if (selectedPlan?.default_platforms?.length) return selectedPlan.default_platforms
+
+    return socialAccounts
+      .filter((acc: SocialAccount) => acc.status === 'connected')
+      .map((acc: SocialAccount) => acc.platform)
+  }
+
   const handleEditItem = (item: VideoPlanItem) => {
     setEditingItem(item)
     setEditForm({
@@ -793,7 +816,7 @@ export function VideoPlanning() {
       why_important: item.why_important || '',
       useful_tips: item.useful_tips || '',
       caption: item.caption || '',
-      platforms: item.platforms || [],
+      platforms: getDefaultSelectedPlatforms(item),
     })
   }
 
@@ -1052,7 +1075,7 @@ export function VideoPlanning() {
       why_important: item.why_important || '',
       useful_tips: item.useful_tips || '',
       caption: item.caption || '',
-      platforms: item.platforms || [],
+      platforms: getDefaultSelectedPlatforms(item),
     })
     setIsDetailDrawerOpen(true)
   }
@@ -1209,23 +1232,39 @@ export function VideoPlanning() {
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-              {t('video_planning.title')}
+              Content Studio
             </p>
             <h1 className="text-3xl font-semibold text-primary">
-              {t('video_planning.page_title')}
+              Content Calendar
             </h1>
             <p className="text-sm text-slate-500">
-              {t('video_planning.subtitle')}
+              Calendar view of all posted, planned, and upcoming videos.
             </p>
           </div>
-          <Button
-            onClick={() => setCreateModal(true)}
-            leftIcon={<Plus className="h-4 w-4" />}
-            className="w-full md:w-auto"
-            disabled={showUpgrade}
-          >
-            {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : t('video_planning.new_plan')}
-          </Button>
+          <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto md:flex-wrap md:justify-end">
+            <Button
+              variant="secondary"
+              onClick={() => setUploadPlanModal(true)}
+              className="w-full md:w-auto"
+            >
+              Upload video
+            </Button>
+            <Button
+              onClick={() => setGenerateVideoModalOpen(true)}
+              leftIcon={<Plus className="h-4 w-4" />}
+              className="w-full md:w-auto"
+              disabled={showUpgrade}
+            >
+              {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : 'Generate AI video'}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setCreateModal(true)}
+              className="w-full md:w-auto border border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100"
+            >
+              Make an automatization
+            </Button>
+          </div>
         </div>
 
         {/* Content Variety Metrics */}
@@ -1333,7 +1372,7 @@ export function VideoPlanning() {
         <CreditBanner />
 
         {/* Plan Items Calendar View */}
-        {selectedPlan ? (
+        {(
           <div className="space-y-6">
             {/* Status Summary and Filters */}
             <Card className="p-4">
@@ -2028,21 +2067,25 @@ export function VideoPlanning() {
                 </div>
               )}
           </div>
-        ) : (
-          <EmptyState
-            icon={<Calendar className="w-16 h-16" />}
-            title={t('video_planning.no_plans_yet')}
-            description={t('video_planning.no_plans_desc')}
-            action={
-              <Button
-                onClick={() => setCreateModal(true)}
-                leftIcon={<Plus className="h-4 w-4" />}
-              >
-                {t('video_planning.create_plan')}
-              </Button>
-            }
-          />
+
         )}
+
+        <UploadAndPlanModal
+          isOpen={uploadPlanModal}
+          onClose={() => setUploadPlanModal(false)}
+          onSuccess={handleUploadPlanSuccess}
+        />
+
+        <GenerateVideoModal
+          isOpen={generateVideoModalOpen}
+          onClose={() => setGenerateVideoModalOpen(false)}
+          onSuccess={async () => {
+            await Promise.all([
+              loadScheduledPosts(),
+              selectedPlan ? loadPlanItems(selectedPlan.id) : Promise.resolve(),
+            ])
+          }}
+        />
 
         {/* Item Detail Modal */}
         <Modal

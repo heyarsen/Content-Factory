@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
@@ -21,6 +22,11 @@ interface Preferences {
   auto_research_default: boolean
   auto_approve_default: boolean
   marketing_emails_enabled: boolean
+  social_goals: string
+  target_platforms: string[]
+  brand_voice: string
+  posting_cadence: string
+  campaign_objective: 'awareness' | 'engagement' | 'leads' | 'sales'
 }
 
 interface SocialAccount {
@@ -58,6 +64,11 @@ export function Preferences() {
     auto_research_default: true,
     auto_approve_default: false,
     marketing_emails_enabled: true,
+    social_goals: '',
+    target_platforms: [],
+    brand_voice: '',
+    posting_cadence: '3_times_week',
+    campaign_objective: 'awareness',
   })
   const [exporting, setExporting] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -108,6 +119,11 @@ export function Preferences() {
         setPreferences({
           ...storedPreferences,
           marketing_emails_enabled: storedPreferences?.marketing_emails_enabled ?? true,
+          social_goals: storedPreferences?.social_goals ?? '',
+          target_platforms: storedPreferences?.target_platforms ?? [],
+          brand_voice: storedPreferences?.brand_voice ?? '',
+          posting_cadence: storedPreferences?.posting_cadence ?? '3_times_week',
+          campaign_objective: storedPreferences?.campaign_objective ?? 'awareness',
           timezone: timezoneToApply,
         })
       } else {
@@ -138,6 +154,15 @@ export function Preferences() {
     } catch (error) {
       console.error('Failed to load social accounts:', error)
     }
+  }
+
+  const toggleTargetPlatform = (platform: string) => {
+    setPreferences((prev) => ({
+      ...prev,
+      target_platforms: prev.target_platforms.includes(platform)
+        ? prev.target_platforms.filter((item) => item !== platform)
+        : [...prev.target_platforms, platform],
+    }))
   }
 
   const handleSave = async () => {
@@ -222,12 +247,18 @@ export function Preferences() {
       <div className="space-y-8">
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('common.settings')}</p>
-            <h1 className="text-3xl font-semibold text-primary">{t('preferences.title')}</h1>
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Workspace settings</p>
+            <h1 className="text-3xl font-semibold text-primary">Workspace Preferences</h1>
             <p className="text-sm text-slate-500">
-              {t('preferences.description')}
+              Configure campaign defaults, social channels, and automation behavior used across your workspace.
             </p>
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-600">You are in: Workspace Preferences</span>
+              <Link to="/profile" className="rounded-full border border-brand-200 bg-brand-50 px-3 py-1 font-medium text-brand-700 transition hover:bg-brand-100">
+                Go to Account settings
+              </Link>
+            </div>
           </div>
           <Button onClick={handleSave} loading={saving}>
             {t('common.save')}
@@ -299,6 +330,72 @@ export function Preferences() {
             </p>
           </Card>
         )}
+
+        {/* Campaign onboarding profile */}
+        <Card className="p-6">
+          <div className="mb-6 flex items-center gap-3">
+            <Settings className="h-5 w-5 text-slate-400" />
+            <h2 className="text-lg font-semibold text-primary">Campaign onboarding</h2>
+          </div>
+          <div className="space-y-5">
+            <Input
+              label="Primary social goals"
+              value={preferences.social_goals}
+              onChange={(e) => setPreferences({ ...preferences, social_goals: e.target.value })}
+              placeholder="e.g. Grow qualified audience and boost product inquiries"
+            />
+
+            <div>
+              <p className="mb-2 text-sm font-medium text-slate-700">Target platforms</p>
+              <div className="flex flex-wrap gap-2">
+                {availablePlatforms.map((platform) => (
+                  <button
+                    key={`target-${platform}`}
+                    type="button"
+                    onClick={() => toggleTargetPlatform(platform)}
+                    className={`rounded-lg border px-4 py-2 text-sm font-medium capitalize transition ${preferences.target_platforms.includes(platform)
+                      ? 'border-brand-500 bg-brand-50 text-brand-700'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                      }`}
+                  >
+                    {platformNames[platform] || platform}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <Input
+              label="Brand voice"
+              value={preferences.brand_voice}
+              onChange={(e) => setPreferences({ ...preferences, brand_voice: e.target.value })}
+              placeholder="e.g. Confident, practical, and community-first"
+            />
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <Select
+                label="Posting cadence"
+                value={preferences.posting_cadence}
+                onChange={(e) => setPreferences({ ...preferences, posting_cadence: e.target.value })}
+                options={[
+                  { value: 'daily', label: 'Daily' },
+                  { value: '3_times_week', label: '3 times per week' },
+                  { value: 'weekly', label: 'Weekly' },
+                ]}
+              />
+              <Select
+                label="Campaign objective"
+                value={preferences.campaign_objective}
+                onChange={(e) => setPreferences({ ...preferences, campaign_objective: e.target.value as Preferences['campaign_objective'] })}
+                options={[
+                  { value: 'awareness', label: 'Awareness' },
+                  { value: 'engagement', label: 'Engagement' },
+                  { value: 'leads', label: 'Leads' },
+                  { value: 'sales', label: 'Sales' },
+                ]}
+              />
+            </div>
+          </div>
+        </Card>
 
         {/* Timezone */}
         <Card className="p-6">

@@ -1,13 +1,11 @@
 import { Fragment } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import {
-  Clapperboard,
-  LayoutDashboard,
   Share2,
   Sparkles,
-  Zap,
   Calendar,
-  Settings,
+  User,
+  SlidersHorizontal,
   BarChart3,
   MessagesSquare,
   X,
@@ -31,12 +29,15 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   console.log('[Sidebar] User check:', { user: user?.email, role: user?.role, isAdmin: user?.role === 'admin' })
 
   const navigation = [
-    { label: t('common.dashboard'), to: '/dashboard', icon: LayoutDashboard },
-    { label: t('sidebar.manual_creation'), to: '/create', icon: Zap },
-    { label: t('sidebar.automation'), to: '/planning', icon: Calendar },
-    { label: t('common.my_videos'), to: '/videos', icon: Clapperboard },
-    { label: t('common.social_accounts') || 'Social Accounts', to: '/social', icon: Share2 },
-    { label: t('common.settings'), to: '/preferences', icon: Settings },
+    { label: 'Content Studio', to: '/planning', icon: Calendar, hint: 'Calendar, uploads, AI videos, automation' },
+    { label: 'Social Accounts', to: '/social', icon: Share2, match: (pathname: string) => pathname === '/social' },
+    { label: 'DMs', to: '/social/dms', icon: MessagesSquare },
+    { label: 'Analysts', to: '/analytics', icon: BarChart3 },
+  ]
+
+  const secondaryNavigation = [
+    { label: 'Account', to: '/profile', icon: User },
+    { label: 'Workspace Preferences', to: '/preferences', icon: SlidersHorizontal },
   ]
 
   const adminNavigation = [
@@ -80,8 +81,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
 
           <nav className="mt-10 flex flex-1 flex-col gap-2 overflow-y-auto">
-            {navigation.map(({ label, to, icon: Icon }) => {
-              const isActive = location.pathname === to || location.pathname.startsWith(to + '/')
+            {navigation.map(({ label, to, icon: Icon, hint, match }) => {
+              const isActive = match ? match(location.pathname) : location.pathname === to || location.pathname.startsWith(to + '/')
               return (
                 <NavLink
                   key={to}
@@ -100,13 +101,44 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   >
                     <Icon className="h-5 w-5" />
                   </div>
-                  <span>{label}</span>
+                  <div className="min-w-0">
+                    <span className="block truncate">{label}</span>
+                    {hint && <span className="block text-xs font-medium text-slate-400">{hint}</span>}
+                  </div>
                   {isActive && (
                     <span className="absolute inset-y-2 right-0 w-1.5 rounded-full bg-brand-500" />
                   )}
                 </NavLink>
               )
             })}
+
+            <div className="mt-4 border-t border-slate-200 pt-4">
+              <p className="px-4 pb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">{t('common.settings')}</p>
+              {secondaryNavigation.map(({ label, to, icon: Icon }) => {
+                const isActive = location.pathname === to || location.pathname.startsWith(to + '/')
+                return (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    onClick={onClose}
+                    className={`group relative flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold transition-all duration-200 touch-manipulation active:scale-[0.98] ${isActive
+                      ? 'bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-transparent text-brand-600'
+                      : 'text-slate-500 hover:bg-white hover:text-primary'
+                      }`}
+                  >
+                    <div
+                      className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-200 ${isActive
+                        ? 'border-brand-200 bg-white text-brand-600 shadow-sm'
+                        : 'border-transparent bg-slate-100 text-slate-500 group-hover:border-slate-200'
+                        }`}
+                    >
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <span>{label}</span>
+                  </NavLink>
+                )
+              })}
+            </div>
 
             {user?.role === 'admin' && (
               <div className="mt-6 flex flex-col gap-2">

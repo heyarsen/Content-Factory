@@ -27,17 +27,17 @@ export class CreditsService {
 
     if (error) {
       console.error('[Credits] Error fetching user credits:', error)
-      // If profile doesn't exist, create it with 0 credits (free trial archived)
+      // If profile doesn't exist, create it with trial credits for new users
       try {
         const { data: newProfile } = await supabase
           .from('user_profiles')
-          .insert({ id: userId, credits: 0 })
+          .insert({ id: userId, credits: 3 })
           .select('credits')
           .single()
-        return newProfile?.credits ?? 0
+        return newProfile?.credits ?? 3
       } catch (createError) {
         console.error('[Credits] Error creating user profile:', createError)
-        return 0
+        return 3
       }
     }
 
@@ -242,7 +242,7 @@ export class CreditsService {
       // Try to create profile if it doesn't exist
       const { data: newProfile } = await supabase
         .from('user_profiles')
-        .insert({ id: userId, credits: 0, preferred_language: 'en' })
+        .insert({ id: userId, credits: 3, preferred_language: 'en' })
         .select('credits')
         .single()
 
@@ -351,7 +351,7 @@ export class CreditsService {
       // Try to create profile if it doesn't exist
       const { data: newProfile } = await supabase
         .from('user_profiles')
-        .insert({ id: userId, credits: 0, preferred_language: 'en' })
+        .insert({ id: userId, credits: 3, preferred_language: 'en' })
         .select('credits')
         .single()
 
@@ -488,4 +488,3 @@ export class CreditsService {
     return data
   }
 }
-

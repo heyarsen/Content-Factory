@@ -81,6 +81,7 @@ export function CreditBanner() {
     if (authLoading || creditsLoading) return null
 
     const hasSubscription = !!(user?.role === 'admin' || (subscription && ['active', 'pending'].includes(subscription.status)))
+    const hasTrialCredits = credits !== null && credits > 0
 
     // Only show banner if user has NO subscription AND is NOT unlimited (trial/free users)
     if (hasSubscription || unlimited) return null
@@ -92,32 +93,32 @@ export function CreditBanner() {
                     <Sparkles className="h-6 w-6 text-amber-500 shrink-0" />
                     <div>
                         <h3 className="font-semibold text-amber-900">
-                            {credits !== null && credits > 0
+                            {hasTrialCredits
                                 ? t('common.credits_available', { count: credits })
-                                : t('common.upgrade_required')}
+                                : t('common.trial_credits_ended_title')}
                         </h3>
                         <p className="text-sm opacity-90">
-                            {credits !== null && credits > 0
+                            {hasTrialCredits
                                 ? t('common.credits_message', {
                                     count: credits,
                                     plural: getPluralization(language, credits)
                                 })
-                                : t('common.subscription_inactive_message')
+                                : t('common.trial_credits_ended_message')
                             }
                         </p>
                     </div>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto shrink-0">
-                    {credits !== null && credits > 0 && (
+                    {hasTrialCredits && (
                         <Link to="/quick-create" className="w-full sm:w-auto">
                             <Button variant="primary" className="w-full bg-blue-600 hover:bg-blue-700 text-white border-none shadow-md">
-                                {t('common.create_video') || 'Create Video'}
+                                {t('common.generate_video') || 'Generate video'}
                             </Button>
                         </Link>
                     )}
                     <Link to="/credits" className="w-full sm:w-auto">
                         <Button variant="primary" className="w-full bg-amber-600 hover:bg-amber-700 text-white border-none shadow-md">
-                            {t('common.upgrade_now') || 'Upgrade Now'}
+                            {t('common.buy_subscription') || 'Buy subscription'}
                         </Button>
                     </Link>
                 </div>

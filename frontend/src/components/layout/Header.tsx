@@ -181,7 +181,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             type="button"
             onClick={() => navigate('/profile')}
             className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 touch-manipulation active:scale-95 sm:hidden"
-            aria-label={t('header.account') || 'Account'}
+            aria-label={t('header.account') || 'Account settings'}
           >
             <User className="h-5 w-5" />
           </button>
@@ -193,7 +193,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             className="hidden items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 shadow-sm transition hover:border-brand-400 hover:text-brand-500 sm:flex min-h-[44px] touch-manipulation active:scale-95 max-w-[200px]"
           >
             <div className="flex flex-col leading-tight min-w-0">
-              <span className="text-xs font-medium uppercase tracking-wide text-slate-400">{t('header.account')}</span>
+              <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Account</span>
               <span className="font-semibold text-slate-900 truncate">{user?.email}</span>
             </div>
             <User className="h-4 w-4 shrink-0" />
