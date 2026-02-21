@@ -40,6 +40,34 @@ function handleServiceError(res: Response, error: any, fallbackMessage: string) 
   return res.status(500).json({ error: errorMessage })
 }
 
+async function ensureVideoUploadBucketExists() {
+  const { data: buckets, error: listError } = await supabase.storage.listBuckets()
+
+  if (listError) {
+    throw new Error(
+      `Unable to verify storage bucket "${VIDEO_UPLOAD_BUCKET}": ${listError.message}`,
+    )
+  }
+
+  const bucketExists = buckets?.some((bucket) => bucket.name === VIDEO_UPLOAD_BUCKET)
+  if (bucketExists) {
+    return
+  }
+
+  const { error: createError } = await supabase.storage.createBucket(VIDEO_UPLOAD_BUCKET, {
+    public: true,
+    fileSizeLimit: '100MB',
+    allowedMimeTypes: ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-matroska'],
+  })
+
+  if (createError) {
+    throw new Error(
+      `Storage bucket "${VIDEO_UPLOAD_BUCKET}" is missing and could not be created automatically: ${createError.message}. ` +
+      'Please create this bucket in Supabase Dashboard > Storage or set VIDEO_UPLOAD_BUCKET to an existing bucket name.',
+    )
+  }
+}
+
 // Generate video
 router.post('/generate', authenticate, async (req: AuthRequest, res: Response) => {
   console.log('✅ Video generation endpoint hit!', {
@@ -224,6 +252,8 @@ router.post('/upload', authenticate, requireSubscription, async (req: AuthReques
       : sanitizeFileName(file_name).replace(/\.[^.]+$/, '').slice(0, 200)
 
     const objectPath = `${userId}/${Date.now()}-${sanitizeFileName(file_name)}`
+
+    await ensureVideoUploadBucketExists()
 
     const { error: uploadError } = await supabase.storage
       .from(VIDEO_UPLOAD_BUCKET)
