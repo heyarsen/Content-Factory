@@ -427,6 +427,56 @@ async function buildUploadVideoFormData(request: PostVideoRequest): Promise<any>
   return formData
 }
 
+async function buildUploadVideoFormDataWithBinary(request: PostVideoRequest): Promise<any> {
+  const { default: FormData } = await import('form-data')
+
+  const videoResponse = await axios.get<ArrayBuffer>(request.videoUrl, {
+    responseType: 'arraybuffer',
+    timeout: 20000,
+  })
+
+  const videoBuffer = Buffer.from(videoResponse.data)
+  const contentType = videoResponse.headers?.['content-type'] || 'video/mp4'
+  const extension = contentType.includes('webm') ? 'webm' : contentType.includes('quicktime') ? 'mov' : 'mp4'
+
+  const formData = new FormData()
+  formData.append('user', request.userId)
+  formData.append('video', videoBuffer, {
+    filename: `content-factory-upload.${extension}`,
+    contentType,
+  })
+
+  const postTitle = buildUploadPostTitle(request.caption)
+  formData.append('title', postTitle)
+
+  request.platforms.forEach(platform => {
+    formData.append('platform[]', platform)
+  })
+
+  if (request.platforms.includes('instagram')) {
+    formData.append('media_type', 'REELS')
+    formData.append('share_to_feed', 'true')
+  }
+
+  const postDescription = buildUploadPostDescription(request.caption)
+  if (postDescription) {
+    formData.append('description', postDescription)
+  }
+
+  const skipScheduling = process.env.UPLOADPOST_SKIP_SCHEDULING !== 'false'
+  if (request.scheduledTime && !skipScheduling) {
+    const dateObj = new Date(request.scheduledTime)
+    if (Number.isNaN(dateObj.getTime())) {
+      throw new Error(`Invalid scheduled time format: ${request.scheduledTime}`)
+    }
+    formData.append('scheduled_date', dateObj.toISOString())
+  }
+
+  formData.append('async_upload', String(request.asyncUpload ?? true))
+
+  return formData
+}
+
 
 // Create user profile in Upload-Post
 export async function createUserProfile(
@@ -936,6 +986,22 @@ export async function postVideo(
           }
         }
         
+        // Retry with binary upload when the remote URL is not reachable by Upload-Post.
+        const uploadPostMessage = String(error.response?.data?.message || error.response?.data?.error || '').toLowerCase()
+        const shouldRetryWithBinary = uploadPostMessage.includes('video url is not accessible')
+        if (shouldRetryWithBinary) {
+          console.warn('[Upload-Post] Retrying with binary video upload fallback')
+          const fallbackFormData = await buildUploadVideoFormDataWithBinary(request)
+          response = await axios.post(endpoint, fallbackFormData, {
+            headers: {
+              'Authorization': getAuthHeader(),
+              ...fallbackFormData.getHeaders(),
+            },
+            timeout: 45000,
+          })
+          break
+        }
+
         // For other errors, throw immediately
         throw new Error(
           errorData?.message || 
