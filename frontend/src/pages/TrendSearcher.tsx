@@ -8,7 +8,7 @@ import { Button } from '../components/ui/Button'
 import api from '../lib/api'
 
 interface TrendItem {
-  platform: 'tiktok' | 'instagram_reels' | 'youtube_shorts'
+  platform: 'youtube_shorts'
   trend: string
   videoTitle: string
   creator: string
@@ -20,15 +20,8 @@ interface TrendItem {
   observedAt: string
 }
 
-const PLATFORM_LABELS: Record<TrendItem['platform'], string> = {
-  tiktok: 'TikTok',
-  instagram_reels: 'Instagram Reels',
-  youtube_shorts: 'YouTube Shorts',
-}
-
 export function TrendSearcher() {
   const [trendQuery, setTrendQuery] = useState('')
-  const [selectedPlatforms, setSelectedPlatforms] = useState<TrendItem['platform'][]>(['tiktok', 'instagram_reels', 'youtube_shorts'])
   const [trendLoading, setTrendLoading] = useState(false)
   const [trendError, setTrendError] = useState<string | null>(null)
   const [trends, setTrends] = useState<TrendItem[]>([])
@@ -46,7 +39,6 @@ export function TrendSearcher() {
       const response = await api.post('/api/trends/search', {
         query: trendQuery,
         limit: 9,
-        platforms: selectedPlatforms,
       })
 
       if (latestSearchRequestId.current === requestId) {
@@ -67,7 +59,7 @@ export function TrendSearcher() {
 
   useEffect(() => {
     searchTrends()
-  }, [selectedPlatforms.join(',')])
+  }, [])
 
   return (
     <Layout>
@@ -75,35 +67,10 @@ export function TrendSearcher() {
         <div className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Insights</p>
           <h1 className="text-3xl font-semibold text-primary">Trend Searcher</h1>
-          <p className="text-sm text-slate-500">Find recent short-form trends, powered by YouTube Data API and connected trend providers.</p>
+          <p className="text-sm text-slate-500">Find recent YouTube Shorts trends from real YouTube search data.</p>
         </div>
 
         <Card className="p-5 md:p-6">
-          <div className="mb-4 flex flex-wrap gap-2">
-            {(Object.keys(PLATFORM_LABELS) as TrendItem['platform'][]).map((platform) => {
-              const isActive = selectedPlatforms.includes(platform)
-              return (
-                <button
-                  key={platform}
-                  type="button"
-                  onClick={() => {
-                    setSelectedPlatforms((prev) => {
-                      if (prev.includes(platform)) {
-                        return prev.length === 1 ? prev : prev.filter((item) => item !== platform)
-                      }
-                      return [...prev, platform]
-                    })
-                  }}
-                  className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide transition ${
-                    isActive ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-500'
-                  }`}
-                >
-                  {PLATFORM_LABELS[platform]}
-                </button>
-              )
-            })}
-          </div>
-
           <form onSubmit={searchTrends} className="mb-5 flex flex-col gap-3 sm:flex-row">
             <Input
               value={trendQuery}
@@ -136,7 +103,7 @@ export function TrendSearcher() {
               {trends.map((trend, index) => (
                 <Card key={`${trend.platform}-${trend.trend}-${index}`} className="h-full p-4">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">{PLATFORM_LABELS[trend.platform]}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">Trending format</p>
                     <p className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 text-xs font-semibold text-orange-700">
                       <Flame className="h-3 w-3" /> {trend.viewCount || 'Popular'}
                     </p>
