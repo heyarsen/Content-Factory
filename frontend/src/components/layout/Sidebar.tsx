@@ -4,7 +4,6 @@ import {
   Share2,
   Sparkles,
   Calendar,
-  User,
   SlidersHorizontal,
   BarChart3,
   MessagesSquare,
@@ -31,12 +30,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const navigation = [
     { label: 'Content Studio', to: '/planning', icon: Calendar, hint: 'Calendar, uploads, AI videos, automation' },
     { label: 'Social Accounts', to: '/social', icon: Share2, match: (pathname: string) => pathname === '/social' },
-    { label: 'DMs', to: '/social/dms', icon: MessagesSquare },
     { label: 'Analysts', to: '/analytics', icon: BarChart3 },
   ]
 
   const secondaryNavigation = [
-    { label: 'Account', to: '/profile', icon: User },
     { label: 'Workspace Preferences', to: '/preferences', icon: SlidersHorizontal },
   ]
 
