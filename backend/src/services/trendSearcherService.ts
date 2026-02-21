@@ -49,9 +49,27 @@ interface RankedVideo {
   viewCountValue: number
 }
 
+interface SearchRegion {
+  code: 'US' | 'CA' | 'GB' | 'AU'
+  label: string
+}
+
 const QUERY_STOP_WORDS = new Set([
   'a', 'an', 'and', 'are', 'at', 'by', 'for', 'from', 'how', 'in', 'is', 'it', 'of', 'on', 'or', 'the', 'to', 'with',
 ])
+
+const SEARCH_REGIONS: SearchRegion[] = [
+  { code: 'US', label: 'USA' },
+  { code: 'CA', label: 'Canada' },
+  { code: 'GB', label: 'UK' },
+  { code: 'AU', label: 'Australia' },
+]
+
+const QUERY_NORMALIZATIONS: Record<string, string[]> = {
+  smm: ['social media marketing'],
+  seo: ['search engine optimization'],
+  ugc: ['user generated content'],
+}
 
 function formatViewCount(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return 'Popular'
@@ -86,6 +104,19 @@ function tokenizeQuery(query: string): string[] {
     .filter((token) => token.length > 1 && !QUERY_STOP_WORDS.has(token))
 }
 
+function expandQueryTerms(query: string): string[] {
+  const trimmedQuery = query.trim()
+  if (!trimmedQuery) return []
+
+  const words = trimmedQuery
+    .split(/\s+/)
+    .map((word) => word.trim().toLowerCase())
+    .filter(Boolean)
+
+  const normalizedPhrases = words.flatMap((word) => QUERY_NORMALIZATIONS[word] || [])
+  return [trimmedQuery, ...normalizedPhrases]
+}
+
 function scoreVideoRelevance(video: YouTubeVideoItem, queryTokens: string[]): number {
   if (!queryTokens.length) return 0
 
@@ -102,35 +133,56 @@ function scoreVideoRelevance(video: YouTubeVideoItem, queryTokens: string[]): nu
   }, 0)
 }
 
+function buildSearchTerms(query: string): string {
+  const expandedTerms = expandQueryTerms(query)
+  return [...expandedTerms, 'shorts'].filter(Boolean).join(' ').trim() || 'viral shorts'
+}
+
+function buildEnhancedTokens(query: string): string[] {
+  const expandedTerms = expandQueryTerms(query)
+  return Array.from(new Set(expandedTerms.flatMap((term) => tokenizeQuery(term))))
+}
+
 async function searchYouTubeShortTrends(query: string, limit: number): Promise<TrendItem[]> {
   if (!YOUTUBE_DATA_API_KEY) {
     throw new Error('YOUTUBE_DATA_API_KEY is missing. YouTube trend search cannot run.')
   }
 
   const normalizedQuery = query.trim()
-  const queryTokens = tokenizeQuery(normalizedQuery)
-  const searchTerms = [normalizedQuery, 'shorts'].filter(Boolean).join(' ').trim() || 'viral shorts'
+  const queryTokens = buildEnhancedTokens(normalizedQuery)
+  const searchTerms = buildSearchTerms(normalizedQuery)
   const publishedAfter = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
-  const searchResponse = await axios.get(`${YOUTUBE_API_BASE_URL}/search`, {
-    params: {
-      key: YOUTUBE_DATA_API_KEY,
-      part: 'id',
-      q: searchTerms,
-      type: 'video',
-      maxResults: Math.min(Math.max(limit * 3, 12), 25),
-      order: normalizedQuery ? 'relevance' : 'viewCount',
-      videoDuration: 'short',
-      publishedAfter,
-      regionCode: 'US',
-      relevanceLanguage: 'en',
-    },
-  })
+  const regionalResponses = await Promise.all(
+    SEARCH_REGIONS.map(async (region) => {
+      const searchResponse = await axios.get(`${YOUTUBE_API_BASE_URL}/search`, {
+        params: {
+          key: YOUTUBE_DATA_API_KEY,
+          part: 'id',
+          q: searchTerms,
+          type: 'video',
+          maxResults: Math.min(Math.max(limit * 2, 8), 15),
+          order: normalizedQuery ? 'relevance' : 'viewCount',
+          videoDuration: 'short',
+          publishedAfter,
+          regionCode: region.code,
+          relevanceLanguage: 'en',
+        },
+      })
 
-  const searchItems: YouTubeSearchItem[] = searchResponse.data?.items || []
-  const videoIds = searchItems
-    .map((item) => item.id?.videoId)
-    .filter((videoId): videoId is string => Boolean(videoId))
+      const searchItems: YouTubeSearchItem[] = searchResponse.data?.items || []
+      return searchItems.map((item) => ({ videoId: item.id?.videoId, region: region.label }))
+    }),
+  )
+
+  const regionByVideoId = new Map<string, string>()
+  for (const item of regionalResponses.flat()) {
+    if (item.videoId && !regionByVideoId.has(item.videoId)) {
+      regionByVideoId.set(item.videoId, item.region)
+    }
+  }
+
+  const videoIds = Array.from(regionByVideoId.keys())
 
   if (!videoIds.length) {
     return []
@@ -173,6 +225,7 @@ async function searchYouTubeShortTrends(query: string, limit: number): Promise<T
     .map(({ video, viewCountValue }) => {
       const title = video.snippet?.title || 'Popular YouTube Short format'
       const firstTag = video.snippet?.tags?.[0]?.replace('#', '')
+      const regionLabel = video.id ? regionByVideoId.get(video.id) : undefined
 
       return {
         platform: 'youtube_shorts' as const,
@@ -180,7 +233,7 @@ async function searchYouTubeShortTrends(query: string, limit: number): Promise<T
         videoTitle: title,
         creator: video.snippet?.channelTitle || 'YouTube Creator',
         videoUrl: video.id ? `https://www.youtube.com/shorts/${video.id}` : 'https://www.youtube.com/shorts',
-        summary: `High-performing YouTube Short discovered from YouTube Data API search${normalizedQuery ? ` for “${normalizedQuery}”` : ''}.`,
+        summary: `High-performing YouTube Short discovered from YouTube Data API search${normalizedQuery ? ` for “${normalizedQuery}”` : ''}${regionLabel ? ` in ${regionLabel}` : ''}.`,
         contentIdea: `Create a short inspired by "${title}" and adapt it to your angle on ${normalizedQuery || 'your niche'}.`,
         viewCount: formatViewCount(viewCountValue),
         publishedAt: video.snippet?.publishedAt || nowIso,
