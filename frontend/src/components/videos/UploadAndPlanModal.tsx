@@ -40,7 +40,6 @@ export function UploadAndPlanModal({ isOpen, onClose, onSuccess }: UploadAndPlan
   const [validationError, setValidationError] = useState<string | null>(null)
 
   const [caption, setCaption] = useState('')
-  const [description, setDescription] = useState('')
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
   const [scheduleChoice, setScheduleChoice] = useState<'now' | 'later'>('now')
   const [scheduledDateTime, setScheduledDateTime] = useState('')
@@ -88,7 +87,6 @@ export function UploadAndPlanModal({ isOpen, onClose, onSuccess }: UploadAndPlan
     setUploadError(null)
     setValidationError(null)
     setCaption('')
-    setDescription('')
     setScheduleChoice('now')
     setScheduledDateTime('')
     setSubmitting(false)
@@ -200,7 +198,7 @@ export function UploadAndPlanModal({ isOpen, onClose, onSuccess }: UploadAndPlan
           mime_type: selectedFile.type,
           file_data_base64: fileDataBase64,
           duration,
-          topic: description || selectedFile.name.replace(/\.[^.]+$/, ''),
+          topic: caption || selectedFile.name.replace(/\.[^.]+$/, ''),
         },
         {
           onUploadProgress: (progressEvent) => {
@@ -279,7 +277,7 @@ export function UploadAndPlanModal({ isOpen, onClose, onSuccess }: UploadAndPlan
       await api.post('/api/posts/schedule', {
         video_id: uploadedVideoId,
         platforms: selectedPlatforms,
-        caption: caption || description,
+        caption,
         scheduled_time: scheduledTime,
         timezone,
       })
@@ -360,13 +358,6 @@ export function UploadAndPlanModal({ isOpen, onClose, onSuccess }: UploadAndPlan
 
         {step === 2 && (
           <div className="space-y-4">
-            <Textarea
-              label={t('video_planning.upload_plan.description_label')}
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              placeholder={t('video_planning.upload_plan.description_placeholder')}
-              rows={4}
-            />
             <Textarea
               label={t('video_planning.upload_plan.caption_label')}
               value={caption}
