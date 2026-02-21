@@ -18,6 +18,7 @@ import { ResetPassword } from './pages/ResetPassword'
 import { VerifyEmail } from './pages/VerifyEmail'
 import { Dashboard } from './pages/Dashboard'
 import { Analysts } from './pages/Analysts'
+import { TrendSearcher } from './pages/TrendSearcher'
 import { Videos } from './pages/Videos'
 import { GenerateVideo } from './pages/GenerateVideo'
 import { QuickCreate } from './pages/QuickCreate'
@@ -69,6 +70,15 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <Analysts />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/trend-searcher"
+          element={
+            <ProtectedRoute>
+              <TrendSearcher />
             </ProtectedRoute>
           }
         />
