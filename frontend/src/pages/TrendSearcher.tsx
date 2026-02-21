@@ -67,7 +67,7 @@ export function TrendSearcher() {
         <div className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Insights</p>
           <h1 className="text-3xl font-semibold text-primary">Trend Searcher</h1>
-          <p className="text-sm text-slate-500">Find recent YouTube Shorts trends from real YouTube search data.</p>
+          <p className="text-sm text-slate-500">Find viral YouTube Shorts only (100K+ views, published within 30 days) so you can turn proven trends into new video ideas.</p>
         </div>
 
         <Card className="p-5 md:p-6">
@@ -97,7 +97,7 @@ export function TrendSearcher() {
               ))}
             </div>
           ) : trends.length === 0 ? (
-            <p className="text-sm text-slate-500">No trends yet. Try another query.</p>
+            <p className="text-sm text-slate-500">No viral matches found yet (100K+ views in last 30 days). Try another topic.</p>
           ) : (
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {trends.map((trend, index) => (
