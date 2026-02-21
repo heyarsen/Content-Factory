@@ -54,6 +54,24 @@ function formatViewCount(value: number): string {
   return value.toString()
 }
 
+
+function summarizeTrendSearchError(error: unknown): Record<string, unknown> {
+  if (!axios.isAxiosError(error)) {
+    return {
+      message: error instanceof Error ? error.message : String(error),
+    }
+  }
+
+  return {
+    message: error.message,
+    code: error.code,
+    status: error.response?.status,
+    statusText: error.response?.statusText,
+    url: error.config?.url,
+    method: error.config?.method,
+  }
+}
+
 function getFallbackTrends(query: string, platforms: TrendPlatform[]): TrendSearchResponse {
   const now = new Date().toISOString()
   const fallbackByPlatform: Record<TrendPlatform, TrendItem> = {
@@ -268,7 +286,7 @@ export async function searchShortFormTrends(query = '', limit = 9, platforms: st
       trends: trends.slice(0, safeLimit),
     }
   } catch (error) {
-    console.error('Trend search failed, using fallback trends:', error)
+    console.error('Trend search failed, using fallback trends:', summarizeTrendSearchError(error))
     return getFallbackTrends(normalizedQuery, safePlatforms)
   }
 }
