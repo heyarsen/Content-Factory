@@ -5,6 +5,17 @@ import { authLimiter } from '../middleware/rateLimiter.js'
 
 const router = Router()
 
+
+const ADMIN_EMAILS = new Set(
+  (process.env.ADMIN_EMAILS || 'heyarsen@icloud.com')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean)
+)
+
+const isAdminEmail = (email?: string | null) => !!email && ADMIN_EMAILS.has(email.toLowerCase())
+
+
 const getClientIp = (req: Request) => {
   const forwarded = req.headers['x-forwarded-for']
   if (typeof forwarded === 'string') {
@@ -337,8 +348,8 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
       refresh_token: data.session.refresh_token,
       user: data.user,
       profile: {
-        role: (data.user.email === 'heyarsen@icloud.com' || profile?.role === 'admin') ? 'admin' : 'user',
-        hasActiveSubscription: !!profile?.has_active_subscription || (data.user.email === 'heyarsen@icloud.com'),
+        role: (isAdminEmail(data.user.email) || profile?.role === 'admin') ? 'admin' : 'user',
+        hasActiveSubscription: !!profile?.has_active_subscription || isAdminEmail(data.user.email),
         debugReason: profile?.has_active_subscription ? 'Profile Flag' : (latestSub ? `Sub: ${latestSub.status}` : 'No Sub'),
       }
     })
