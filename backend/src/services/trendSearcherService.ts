@@ -2,6 +2,8 @@ import axios from 'axios'
 
 const YOUTUBE_DATA_API_KEY = process.env.YOUTUBE_DATA_API_KEY
 const YOUTUBE_API_BASE_URL = 'https://www.googleapis.com/youtube/v3'
+const MIN_VIRAL_VIEW_COUNT = 100_000
+const MAX_VIDEO_AGE_DAYS = 30
 
 export type TrendPlatform = 'youtube_shorts'
 
@@ -143,6 +145,16 @@ function buildEnhancedTokens(query: string): string[] {
   return Array.from(new Set(expandedTerms.flatMap((term) => tokenizeQuery(term))))
 }
 
+function isPublishedWithinDays(publishedAt: string | undefined, maxAgeDays: number): boolean {
+  if (!publishedAt) return false
+
+  const publishedAtDate = new Date(publishedAt)
+  if (Number.isNaN(publishedAtDate.getTime())) return false
+
+  const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000
+  return Date.now() - publishedAtDate.getTime() <= maxAgeMs
+}
+
 async function searchYouTubeShortTrends(query: string, limit: number): Promise<TrendItem[]> {
   if (!YOUTUBE_DATA_API_KEY) {
     throw new Error('YOUTUBE_DATA_API_KEY is missing. YouTube trend search cannot run.')
@@ -151,7 +163,7 @@ async function searchYouTubeShortTrends(query: string, limit: number): Promise<T
   const normalizedQuery = query.trim()
   const queryTokens = buildEnhancedTokens(normalizedQuery)
   const searchTerms = buildSearchTerms(normalizedQuery)
-  const publishedAfter = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  const publishedAfter = new Date(Date.now() - MAX_VIDEO_AGE_DAYS * 24 * 60 * 60 * 1000).toISOString()
 
   const regionalResponses = await Promise.all(
     SEARCH_REGIONS.map(async (region) => {
@@ -210,6 +222,8 @@ async function searchYouTubeShortTrends(query: string, limit: number): Promise<T
   })
 
   const filteredAndSortedVideos = rankedVideos
+    .filter(({ viewCountValue }) => viewCountValue >= MIN_VIRAL_VIEW_COUNT)
+    .filter(({ video }) => isPublishedWithinDays(video.snippet?.publishedAt, MAX_VIDEO_AGE_DAYS))
     .filter(({ relevanceScore }) => !queryTokens.length || relevanceScore > 0)
     .sort((left, right) => {
       if (right.relevanceScore !== left.relevanceScore) {
@@ -218,8 +232,7 @@ async function searchYouTubeShortTrends(query: string, limit: number): Promise<T
       return right.viewCountValue - left.viewCountValue
     })
 
-  const selectedVideos = (filteredAndSortedVideos.length ? filteredAndSortedVideos : rankedVideos)
-    .slice(0, limit)
+  const selectedVideos = filteredAndSortedVideos.slice(0, limit)
 
   return selectedVideos
     .map(({ video, viewCountValue }) => {
@@ -233,8 +246,8 @@ async function searchYouTubeShortTrends(query: string, limit: number): Promise<T
         videoTitle: title,
         creator: video.snippet?.channelTitle || 'YouTube Creator',
         videoUrl: video.id ? `https://www.youtube.com/shorts/${video.id}` : 'https://www.youtube.com/shorts',
-        summary: `High-performing YouTube Short discovered from YouTube Data API search${normalizedQuery ? ` for “${normalizedQuery}”` : ''}${regionLabel ? ` in ${regionLabel}` : ''}.`,
-        contentIdea: `Create a short inspired by "${title}" and adapt it to your angle on ${normalizedQuery || 'your niche'}.`,
+        summary: `Viral YouTube Short (100K+ views in the last ${MAX_VIDEO_AGE_DAYS} days) discovered${normalizedQuery ? ` for “${normalizedQuery}”` : ''}${regionLabel ? ` in ${regionLabel}` : ''}.`,
+        contentIdea: `Use "${title}" as a proven hook style, then reframe it for your audience in ${normalizedQuery || 'your niche'} with your own POV and CTA.`,
         viewCount: formatViewCount(viewCountValue),
         publishedAt: video.snippet?.publishedAt || nowIso,
         observedAt: nowIso,
