@@ -6,8 +6,9 @@ const router = Router()
 
 router.post('/search', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
-    const { query = '', limit = 9 } = req.body || {}
-    const result = await searchShortFormTrends(String(query || ''), Number(limit) || 9)
+    const { query = '', limit = 9, platforms = [] } = req.body || {}
+    const safePlatforms = Array.isArray(platforms) ? platforms.map((platform) => String(platform)) : []
+    const result = await searchShortFormTrends(String(query || ''), Number(limit) || 9, safePlatforms)
     return res.json(result)
   } catch (error: any) {
     console.error('Trend search route error:', error)
