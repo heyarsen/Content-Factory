@@ -406,12 +406,6 @@ export function UploadAndPlanModal({ isOpen, onClose, onSuccess }: UploadAndPlan
               )}
             </div>
 
-            <Input
-              label={t('video_planning.upload_plan.schedule_label')}
-              type="datetime-local"
-              value={scheduledDateTime}
-              onChange={(event) => setScheduledDateTime(event.target.value)}
-            />
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-700">{t('video_planning.timezone_label')}</label>
               <select

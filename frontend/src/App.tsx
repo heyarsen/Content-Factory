@@ -248,8 +248,8 @@ function AppContent() {
         <Route path="/legal/acceptable-use" element={<AcceptableUsePolicy />} />
         <Route path="/legal/dpa" element={<Dpa />} />
 
-        <Route path="/" element={<Navigate to="/create" replace />} />
-        <Route path="*" element={<Navigate to="/create" replace />} />
+        <Route path="/" element={<Navigate to="/planning" replace />} />
+        <Route path="*" element={<Navigate to="/planning" replace />} />
       </Routes>
       <ToastContainer toasts={toasts} onClose={removeToast} />
       <CookieConsentManager />

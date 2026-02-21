@@ -46,7 +46,7 @@ export function VerifyEmail() {
           setStatus('success')
           // Redirect to Creator Studio after 2 seconds
           setTimeout(() => {
-            navigate('/create')
+            navigate('/planning')
           }, 2000)
         } else {
           throw new Error('Failed to create session')
@@ -94,7 +94,7 @@ export function VerifyEmail() {
               <p className="text-sm text-slate-500">
                 Your workspace is ready. We&apos;re redirecting you to Creator Studio now.
               </p>
-              <Button onClick={() => navigate('/create')} className="w-full">
+              <Button onClick={() => navigate('/planning')} className="w-full">
                 Go to Creator Studio
               </Button>
             </div>
