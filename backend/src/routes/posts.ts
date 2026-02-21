@@ -10,6 +10,9 @@ const PLATFORM_ALIASES: Record<string, string> = {
   twitter: 'x',
 }
 
+const DEFAULT_VIDEO_UPLOAD_BUCKET = 'videos'
+const LEGACY_VIDEO_UPLOAD_BUCKET_LITERAL = 'VIDEO_UPLOAD_BUCKET'
+
 function normalizePlatform(platform: string): string {
   const normalized = platform.toLowerCase().trim()
   return PLATFORM_ALIASES[normalized] || normalized
@@ -36,6 +39,76 @@ function isPlatformConnectedOnUploadPost(profile: any, platform: string): boolea
   }
 
   return Boolean(platformAccount.display_name || platformAccount.username || Object.keys(platformAccount).length > 0)
+}
+
+function extractSupabasePublicObjectInfo(rawUrl: string): { bucket: string, objectPath: string } | null {
+  try {
+    const parsedUrl = new URL(rawUrl)
+    const segments = parsedUrl.pathname.split('/').filter(Boolean)
+    // /storage/v1/object/public/{bucket}/{objectPath...}
+    if (segments.length < 6) {
+      return null
+    }
+
+    const [storage, v1, object, visibility, bucket, ...objectPathParts] = segments
+    if (storage !== 'storage' || v1 !== 'v1' || object !== 'object' || visibility !== 'public') {
+      return null
+    }
+
+    if (!bucket || objectPathParts.length === 0) {
+      return null
+    }
+
+    return {
+      bucket,
+      objectPath: objectPathParts.join('/'),
+    }
+  } catch {
+    return null
+  }
+}
+
+async function resolveAccessibleVideoUrl(videoUrl: string): Promise<string> {
+  const supabaseObjectInfo = extractSupabasePublicObjectInfo(videoUrl)
+  if (!supabaseObjectInfo) {
+    return videoUrl
+  }
+
+  try {
+    const headResponse = await fetch(videoUrl, { method: 'HEAD' })
+    if (headResponse.ok) {
+      return videoUrl
+    }
+  } catch {
+    // Keep going - we'll try generating a signed URL fallback.
+  }
+
+  const configuredBucket = process.env.VIDEO_UPLOAD_BUCKET?.trim()
+  const candidateBuckets = [
+    supabaseObjectInfo.bucket,
+    configuredBucket,
+    DEFAULT_VIDEO_UPLOAD_BUCKET,
+    LEGACY_VIDEO_UPLOAD_BUCKET_LITERAL,
+  ].filter((bucketName, index, allBuckets): bucketName is string => {
+    return !!bucketName && allBuckets.indexOf(bucketName) === index
+  })
+
+  for (const bucketName of candidateBuckets) {
+    const { data, error } = await supabase.storage
+      .from(bucketName)
+      .createSignedUrl(supabaseObjectInfo.objectPath, 60 * 60)
+
+    if (!error && data?.signedUrl) {
+      console.warn('[Posts] Using signed URL fallback for Upload-Post video upload.', {
+        originalBucket: supabaseObjectInfo.bucket,
+        resolvedBucket: bucketName,
+        objectPath: supabaseObjectInfo.objectPath,
+      })
+      return data.signedUrl
+    }
+  }
+
+  return videoUrl
 }
 
 // Schedule/Queue video for posting
@@ -143,7 +216,7 @@ router.post('/schedule', authenticate, requireSubscription, async (req: AuthRequ
 
     // Call upload-post.com API once for all platforms
     try {
-      const videoUrlToUse = video.video_url
+      const videoUrlToUse = await resolveAccessibleVideoUrl(video.video_url)
 
       let captionToUse = typeof caption === 'string' ? caption.trim() : ''
       if (!captionToUse) {
