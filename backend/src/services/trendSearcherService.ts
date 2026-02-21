@@ -1,14 +1,10 @@
 import axios from 'axios'
-import { retryWithBackoff } from '../lib/perplexity.js'
 
-const PERPLEXITY_API_URL = 'https://api.perplexity.ai/chat/completions'
-const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY
 const YOUTUBE_DATA_API_KEY = process.env.YOUTUBE_DATA_API_KEY
 const YOUTUBE_API_BASE_URL = 'https://www.googleapis.com/youtube/v3'
 
-export type TrendPlatform = 'tiktok' | 'instagram_reels' | 'youtube_shorts'
+export type TrendPlatform = 'youtube_shorts'
 
-const SUPPORTED_PLATFORMS: TrendPlatform[] = ['tiktok', 'instagram_reels', 'youtube_shorts']
 
 export interface TrendItem {
   platform: TrendPlatform
@@ -54,7 +50,6 @@ function formatViewCount(value: number): string {
   return value.toString()
 }
 
-
 function summarizeTrendSearchError(error: unknown): Record<string, unknown> {
   if (!axios.isAxiosError(error)) {
     return {
@@ -72,57 +67,9 @@ function summarizeTrendSearchError(error: unknown): Record<string, unknown> {
   }
 }
 
-function getFallbackTrends(query: string, platforms: TrendPlatform[]): TrendSearchResponse {
-  const now = new Date().toISOString()
-  const fallbackByPlatform: Record<TrendPlatform, TrendItem> = {
-    tiktok: {
-      platform: 'tiktok',
-      trend: 'POV expert micro-storytelling',
-      videoTitle: 'POV: fixing a common beginner mistake in 20 seconds',
-      creator: '@creatorcoach',
-      videoUrl: 'https://www.tiktok.com',
-      summary: 'Creators share short POV stories with one practical lesson and a hard hook in the first 2 seconds.',
-      contentIdea: `Create a 20-second "POV: You are fixing ${query || 'a common mistake'}" format with text overlays and one clear CTA.`,
-      viewCount: '1.2M',
-      publishedAt: now,
-      observedAt: now,
-    },
-    instagram_reels: {
-      platform: 'instagram_reels',
-      trend: 'Mini tutorials with captions-first editing',
-      videoTitle: '3-step reel framework for faster results',
-      creator: '@growthdigest',
-      videoUrl: 'https://www.instagram.com/reels/',
-      summary: 'Reels with bold on-screen captions, quick cuts, and 3-step frameworks are being widely reshared.',
-      contentIdea: `Publish a 3-step Reel "How to improve ${query || 'results'} in 7 days" with save-focused ending.`,
-      viewCount: '860K',
-      publishedAt: now,
-      observedAt: now,
-    },
-    youtube_shorts: {
-      platform: 'youtube_shorts',
-      trend: 'Myth vs fact Shorts',
-      videoTitle: 'Myth vs Fact: what actually works in this niche',
-      creator: '@marketbreakdown',
-      videoUrl: 'https://www.youtube.com/shorts',
-      summary: 'Short educational myth-busting videos with visual proof and quick examples continue to perform strongly.',
-      contentIdea: `Record a "Myth vs Fact" short about ${query || 'your niche'} and end with a comment prompt.`,
-      viewCount: '530K',
-      publishedAt: now,
-      observedAt: now,
-    },
-  }
-
-  return {
-    generatedAt: now,
-    query,
-    trends: platforms.map((platform) => fallbackByPlatform[platform]),
-  }
-}
-
 async function searchYouTubeShortTrends(query: string, limit: number): Promise<TrendItem[]> {
   if (!YOUTUBE_DATA_API_KEY) {
-    return []
+    throw new Error('YOUTUBE_DATA_API_KEY is missing. YouTube trend search cannot run.')
   }
 
   const searchTerms = [query.trim(), 'shorts'].filter(Boolean).join(' ').trim() || 'viral shorts'
@@ -186,107 +133,20 @@ async function searchYouTubeShortTrends(query: string, limit: number): Promise<T
     .slice(0, limit)
 }
 
-async function searchPerplexityTrends(query: string, limit: number, platforms: TrendPlatform[]): Promise<TrendItem[]> {
-  if (!PERPLEXITY_API_KEY || platforms.length === 0) {
-    return []
-  }
-
-  const systemPrompt = `You are TrendSearcher, a social media trends analyst.
-Find current trends for TikTok and Instagram Reels.
-Return only valid JSON in this format:
-{
-  "generatedAt": "ISO datetime",
-  "query": "string",
-  "trends": [
-    {
-      "platform": "tiktok | instagram_reels | youtube_shorts",
-      "trend": "short trend title",
-      "videoTitle": "title of a currently popular video example",
-      "creator": "channel or creator handle",
-      "videoUrl": "public URL to the video or platform page",
-      "summary": "one sentence insight",
-      "contentIdea": "one concrete content idea",
-      "viewCount": "human readable view count like 1.2M",
-      "publishedAt": "ISO datetime within last 30 days",
-      "observedAt": "ISO datetime"
-    }
-  ]
-}
-Only include items from the last 30 days. Focus on popular videos and practical takeaways. Do not include extra text.`
-
-  const userPrompt = `Find ${limit} latest short-form video trends on ${platforms.join(', ')}${query ? ` for topic: ${query}` : ''}. Prioritize popular videos published in the last 30 days and include creator + video URL.`
-
-  const response = await retryWithBackoff(async () => {
-    return axios.post(
-      PERPLEXITY_API_URL,
-      {
-        model: 'sonar-pro',
-        temperature: 0.2,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        web_search_options: {
-          search_context_size: 'high',
-        },
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${PERPLEXITY_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    )
-  })
-
-  const content = response.data?.choices?.[0]?.message?.content || ''
-  const jsonMatch = content.match(/\{[\s\S]*\}/)
-
-  if (!jsonMatch) {
-    return []
-  }
-
-  const parsed = JSON.parse(jsonMatch[0]) as TrendSearchResponse
-  if (!Array.isArray(parsed.trends)) {
-    return []
-  }
-
-  return parsed.trends.filter((item) => platforms.includes(item.platform)).slice(0, limit)
-}
-
-export async function searchShortFormTrends(query = '', limit = 9, platforms: string[] = SUPPORTED_PLATFORMS): Promise<TrendSearchResponse> {
-  const selectedPlatforms = platforms.filter((platform): platform is TrendPlatform => SUPPORTED_PLATFORMS.includes(platform as TrendPlatform))
-  const safePlatforms = selectedPlatforms.length ? selectedPlatforms : SUPPORTED_PLATFORMS
+export async function searchShortFormTrends(query = '', limit = 9): Promise<TrendSearchResponse> {
   const safeLimit = Math.min(Math.max(limit, 3), 15)
   const normalizedQuery = query.trim()
 
-  const platformLimit = Math.max(1, Math.ceil(safeLimit / safePlatforms.length))
-  const trends: TrendItem[] = []
-
   try {
-    if (safePlatforms.includes('youtube_shorts')) {
-      const youtubeTrends = await searchYouTubeShortTrends(normalizedQuery, platformLimit)
-      trends.push(...youtubeTrends)
-    }
-
-    const needsPerplexity = safePlatforms.filter((platform) => platform !== 'youtube_shorts')
-    if (needsPerplexity.length > 0) {
-      const perplexityTrends = await searchPerplexityTrends(normalizedQuery, platformLimit * needsPerplexity.length, needsPerplexity)
-      trends.push(...perplexityTrends)
-    }
-
-    const missingPlatforms = safePlatforms.filter((platform) => !trends.some((trend) => trend.platform === platform))
-    if (missingPlatforms.length) {
-      trends.push(...getFallbackTrends(normalizedQuery, missingPlatforms).trends)
-    }
+    const trends = await searchYouTubeShortTrends(normalizedQuery, safeLimit)
 
     return {
       generatedAt: new Date().toISOString(),
       query: normalizedQuery,
-      trends: trends.slice(0, safeLimit),
+      trends,
     }
   } catch (error) {
-    console.error('Trend search failed, using fallback trends:', summarizeTrendSearchError(error))
-    return getFallbackTrends(normalizedQuery, safePlatforms)
+    console.error('Trend search failed:', summarizeTrendSearchError(error))
+    throw error
   }
 }
