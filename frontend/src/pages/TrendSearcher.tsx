@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
 import { Loader2, Search, Flame } from 'lucide-react'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
@@ -32,9 +32,13 @@ export function TrendSearcher() {
   const [trendLoading, setTrendLoading] = useState(false)
   const [trendError, setTrendError] = useState<string | null>(null)
   const [trends, setTrends] = useState<TrendItem[]>([])
+  const latestSearchRequestId = useRef(0)
 
   const searchTrends = async (event?: FormEvent) => {
     event?.preventDefault()
+    const requestId = latestSearchRequestId.current + 1
+    latestSearchRequestId.current = requestId
+
     setTrendLoading(true)
     setTrendError(null)
 
@@ -45,13 +49,19 @@ export function TrendSearcher() {
         platforms: selectedPlatforms,
       })
 
-      setTrends(response.data?.trends || [])
+      if (latestSearchRequestId.current === requestId) {
+        setTrends(response.data?.trends || [])
+      }
     } catch (requestError: any) {
       const message = requestError?.response?.data?.error || requestError?.message || 'Failed to load trends'
-      setTrendError(message)
-      setTrends([])
+      if (latestSearchRequestId.current === requestId) {
+        setTrendError(message)
+        setTrends([])
+      }
     } finally {
-      setTrendLoading(false)
+      if (latestSearchRequestId.current === requestId) {
+        setTrendLoading(false)
+      }
     }
   }
 
