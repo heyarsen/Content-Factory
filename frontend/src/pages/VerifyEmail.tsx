@@ -44,9 +44,9 @@ export function VerifyEmail() {
         if (data.session) {
           localStorage.setItem('access_token', data.session.access_token)
           setStatus('success')
-          // Redirect to dashboard after 2 seconds
+          // Redirect to Creator Studio after 2 seconds
           setTimeout(() => {
-            navigate('/dashboard')
+            navigate('/create')
           }, 2000)
         } else {
           throw new Error('Failed to create session')
@@ -92,10 +92,10 @@ export function VerifyEmail() {
               </div>
               <h1 className="text-2xl font-semibold text-primary">Email verified</h1>
               <p className="text-sm text-slate-500">
-                Your workspace is ready. We&apos;re redirecting you to the dashboard now.
+                Your workspace is ready. We&apos;re redirecting you to Creator Studio now.
               </p>
-              <Button onClick={() => navigate('/dashboard')} className="w-full">
-                Go to dashboard
+              <Button onClick={() => navigate('/create')} className="w-full">
+                Go to Creator Studio
               </Button>
             </div>
           )}

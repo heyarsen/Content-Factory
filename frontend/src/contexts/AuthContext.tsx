@@ -197,7 +197,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithGoogle: async () => {
         await supabase.auth.signInWithOAuth({
           provider: 'google',
-          options: { redirectTo: `${appUrl}/dashboard` },
+          options: { redirectTo: `${appUrl}/create` },
         })
       },
       resetPassword: async (e) => { await api.post('/api/auth/reset-password', { email: e }) },

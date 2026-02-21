@@ -16,7 +16,13 @@ const openai = new OpenAI({
 
 const router = Router()
 
-const VIDEO_UPLOAD_BUCKET = process.env.VIDEO_UPLOAD_BUCKET || 'videos'
+const DEFAULT_VIDEO_UPLOAD_BUCKET = 'videos'
+const VIDEO_UPLOAD_BUCKET = process.env.VIDEO_UPLOAD_BUCKET?.trim() || DEFAULT_VIDEO_UPLOAD_BUCKET
+let resolvedVideoUploadBucket = VIDEO_UPLOAD_BUCKET
+
+function getVideoUploadBucket(): string {
+  return resolvedVideoUploadBucket
+}
 
 function sanitizeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_')
@@ -51,7 +57,21 @@ async function ensureVideoUploadBucketExists() {
 
   const bucketExists = buckets?.some((bucket) => bucket.name === VIDEO_UPLOAD_BUCKET)
   if (bucketExists) {
+    resolvedVideoUploadBucket = VIDEO_UPLOAD_BUCKET
     return
+  }
+
+  if (VIDEO_UPLOAD_BUCKET === DEFAULT_VIDEO_UPLOAD_BUCKET) {
+    const legacyEnvLiteralBucketName = 'VIDEO_UPLOAD_BUCKET'
+    const legacyBucketExists = buckets?.some((bucket) => bucket.name === legacyEnvLiteralBucketName)
+
+    if (legacyBucketExists) {
+      resolvedVideoUploadBucket = legacyEnvLiteralBucketName
+      console.warn(
+        `Using legacy storage bucket "${legacyEnvLiteralBucketName}". Set VIDEO_UPLOAD_BUCKET=${legacyEnvLiteralBucketName} to remove this fallback.`,
+      )
+      return
+    }
   }
 
   const { error: createError } = await supabase.storage.createBucket(VIDEO_UPLOAD_BUCKET, {
@@ -60,12 +80,25 @@ async function ensureVideoUploadBucketExists() {
     allowedMimeTypes: ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-matroska'],
   })
 
+  if (createError?.message?.toLowerCase().includes('maximum allowed size')) {
+    const { error: retryCreateError } = await supabase.storage.createBucket(VIDEO_UPLOAD_BUCKET, {
+      public: true,
+    })
+
+    if (!retryCreateError) {
+      resolvedVideoUploadBucket = VIDEO_UPLOAD_BUCKET
+      return
+    }
+  }
+
   if (createError) {
     throw new Error(
       `Storage bucket "${VIDEO_UPLOAD_BUCKET}" is missing and could not be created automatically: ${createError.message}. ` +
       'Please create this bucket in Supabase Dashboard > Storage or set VIDEO_UPLOAD_BUCKET to an existing bucket name.',
     )
   }
+
+  resolvedVideoUploadBucket = VIDEO_UPLOAD_BUCKET
 }
 
 // Generate video
@@ -256,7 +289,7 @@ router.post('/upload', authenticate, requireSubscription, async (req: AuthReques
     await ensureVideoUploadBucketExists()
 
     const { error: uploadError } = await supabase.storage
-      .from(VIDEO_UPLOAD_BUCKET)
+      .from(getVideoUploadBucket())
       .upload(objectPath, fileBuffer, {
         contentType: mime_type,
         upsert: false,
@@ -266,7 +299,7 @@ router.post('/upload', authenticate, requireSubscription, async (req: AuthReques
       return res.status(500).json({ error: `Upload failed: ${uploadError.message}` })
     }
 
-    const { data: urlData } = supabase.storage.from(VIDEO_UPLOAD_BUCKET).getPublicUrl(objectPath)
+    const { data: urlData } = supabase.storage.from(getVideoUploadBucket()).getPublicUrl(objectPath)
 
     const { data: video, error: insertError } = await supabase
       .from('videos')
