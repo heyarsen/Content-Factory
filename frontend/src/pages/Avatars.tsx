@@ -7,7 +7,7 @@ export function Avatars() {
     return (
         <Layout>
             <InDevelopmentCard
-                title={`${t('common.avatars')} In Development`}
+                title={t('avatars.title')}
                 description={t('avatars.description')}
             />
         </Layout>
