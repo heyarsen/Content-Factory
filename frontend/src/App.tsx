@@ -23,6 +23,7 @@ import { Videos } from './pages/Videos'
 import { GenerateVideo } from './pages/GenerateVideo'
 import { QuickCreate } from './pages/QuickCreate'
 import { SocialAccounts } from './pages/SocialAccounts'
+import { InstagramDMs } from './pages/InstagramDMs'
 import { ScheduledPosts } from './pages/ScheduledPosts'
 import { SocialCallback } from './pages/SocialCallback'
 import { Workflows } from './pages/Workflows'
@@ -134,7 +135,7 @@ function AppContent() {
           path="/social/dms"
           element={
             <ProtectedRoute>
-              <Navigate to="/social" replace />
+              <InstagramDMs />
             </ProtectedRoute>
           }
         />

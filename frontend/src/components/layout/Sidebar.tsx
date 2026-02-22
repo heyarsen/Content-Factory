@@ -7,7 +7,6 @@ import {
   SlidersHorizontal,
   BarChart3,
   MessagesSquare,
-  Search,
   X,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -31,8 +30,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const navigation = [
     { label: 'Content Studio', to: '/planning', icon: Calendar, hint: 'Calendar, uploads, AI videos, automation' },
     { label: 'Social Accounts', to: '/social', icon: Share2, match: (pathname: string) => pathname === '/social' },
+    { label: 'DM Inbox', to: '/social/dms', icon: MessagesSquare, hint: 'Revisited UI/UX for conversations' },
     { label: 'Analytics', to: '/analytics', icon: BarChart3 },
-    { label: 'Trend Searcher', to: '/trend-searcher', icon: Search },
   ]
 
   const secondaryNavigation = [
