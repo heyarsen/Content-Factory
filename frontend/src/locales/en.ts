@@ -697,7 +697,7 @@ export const en = {
         threads: "Threads",
     },
     avatars: {
-        title: "Avatars Coming Soon",
+        title: "Avatars In Development",
         description: "We are currently building the custom AI Avatars feature. Check back soon for updates!",
     },
     workflows: {
