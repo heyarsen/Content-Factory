@@ -318,6 +318,7 @@ export function VideoPlanning() {
 
   // Smart polling for plan items - only poll frequently when items are in progress
   const pollingIntervalRef = useRef<any | null>(null)
+  const currentPollMsRef = useRef<number | null>(null)
   const lastPollTimeRef = useRef<number>(0)
 
   useEffect(() => {
@@ -326,6 +327,7 @@ export function VideoPlanning() {
         clearInterval(pollingIntervalRef.current)
         pollingIntervalRef.current = null
       }
+      currentPollMsRef.current = null
       return
     }
 
@@ -352,6 +354,7 @@ export function VideoPlanning() {
       clearInterval(pollingIntervalRef.current)
       pollingIntervalRef.current = null
     }
+    currentPollMsRef.current = null
 
     const poll = async () => {
       const now = Date.now()
@@ -367,13 +370,13 @@ export function VideoPlanning() {
       // Use a timeout to check after state updates
       setTimeout(() => {
         const newInterval = getPollInterval()
-        // Only restart if interval changed significantly (more than 5 seconds difference)
-        const currentInterval = pollingIntervalRef.current ? getPollInterval() : null
-        if (!currentInterval || Math.abs(newInterval - currentInterval) > 5000) {
+        const currentInterval = currentPollMsRef.current
+        if (!currentInterval || newInterval !== currentInterval) {
           if (pollingIntervalRef.current) {
             clearInterval(pollingIntervalRef.current)
           }
           pollingIntervalRef.current = setInterval(poll, newInterval)
+          currentPollMsRef.current = newInterval
         }
       }, 1000)
     }
@@ -381,6 +384,7 @@ export function VideoPlanning() {
     // Start polling with initial interval
     const initialInterval = getPollInterval()
     pollingIntervalRef.current = setInterval(poll, initialInterval)
+    currentPollMsRef.current = initialInterval
 
     // Initial load
     poll()
@@ -390,13 +394,23 @@ export function VideoPlanning() {
         clearInterval(pollingIntervalRef.current)
         pollingIntervalRef.current = null
       }
+      currentPollMsRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPlan?.id])
 
   // Update polling interval when planItems change (but don't recreate the effect)
   useEffect(() => {
-    if (!selectedPlan || !pollingIntervalRef.current) return
+    if (!selectedPlan) {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
+      currentPollMsRef.current = null
+      return
+    }
+
+    if (!pollingIntervalRef.current) return
 
     const hasActiveItems = () => {
       return planItems.some(item =>
@@ -414,7 +428,7 @@ export function VideoPlanning() {
     // Debounce the interval update
     const timeoutId = setTimeout(() => {
       const newInterval = getPollInterval()
-      if (pollingIntervalRef.current) {
+      if (pollingIntervalRef.current && currentPollMsRef.current !== newInterval) {
         clearInterval(pollingIntervalRef.current)
 
         const poll = async () => {
@@ -427,10 +441,13 @@ export function VideoPlanning() {
         }
 
         pollingIntervalRef.current = setInterval(poll, newInterval)
+        currentPollMsRef.current = newInterval
       }
     }, 2000)
 
-    return () => clearTimeout(timeoutId)
+    return () => {
+      clearTimeout(timeoutId)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planItems, selectedPlan?.id])
 
