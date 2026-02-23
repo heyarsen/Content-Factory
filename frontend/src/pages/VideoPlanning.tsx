@@ -118,10 +118,31 @@ interface ScheduledPost {
   status: 'pending' | 'posted' | 'failed' | 'cancelled' | 'scheduled'
   posted_at: string | null
   error_message: string | null
+  caption?: string | null
   videos?: {
     topic: string
     video_url: string | null
   } | null
+}
+
+type ScheduledPostGroup = {
+  _isScheduledPostGroup: true
+  id: string
+  video_id: string
+  scheduled_date: string
+  scheduled_time: string | null
+  posted_at: string | null
+  status: 'pending' | 'posted' | 'failed' | 'scheduled'
+  caption: string | null
+  videos?: {
+    topic: string
+    video_url: string | null
+  } | null
+  platforms: Array<{
+    platform: ScheduledPost['platform']
+    status: ScheduledPost['status']
+    error_message: string | null
+  }>
 }
 
 export function VideoPlanning() {
@@ -1057,7 +1078,7 @@ export function VideoPlanning() {
   )
 
   // Combine plan items and scheduled posts by date
-  type CalendarItem = VideoPlanItem | (ScheduledPost & { _isScheduledPost: true; scheduled_date: string; topic: string })
+  type CalendarItem = VideoPlanItem | ScheduledPostGroup
   const itemsByDate = useMemo(() => {
     const combined: Record<string, CalendarItem[]> = {}
 
@@ -1071,13 +1092,47 @@ export function VideoPlanning() {
       if (!combined[date]) {
         combined[date] = []
       }
-      // Add scheduled posts to the date, marking them as posts
-      postsByDate[date].forEach((post: ScheduledPost) => {
+      const groupedByVideo = postsByDate[date].reduce((acc, post: ScheduledPost) => {
+        if (!acc[post.video_id]) {
+          acc[post.video_id] = []
+        }
+        acc[post.video_id].push(post)
+        return acc
+      }, {} as Record<string, ScheduledPost[]>)
+
+      Object.values(groupedByVideo).forEach((posts) => {
+        const firstPost = posts[0]
+        const postedTimes = posts
+          .map((post) => post.posted_at)
+          .filter((value): value is string => Boolean(value))
+
+        const failedCount = posts.filter((post) => post.status === 'failed').length
+        const postedCount = posts.filter((post) => post.status === 'posted').length
+        const pendingCount = posts.filter((post) => post.status === 'pending' || post.status === 'scheduled').length
+
+        const groupedStatus: ScheduledPostGroup['status'] = pendingCount > 0
+          ? 'scheduled'
+          : postedCount > 0 && failedCount === 0
+            ? 'posted'
+            : failedCount > 0 && postedCount === 0
+              ? 'failed'
+              : 'scheduled'
+
         combined[date].push({
-          ...post,
-          _isScheduledPost: true,
-          scheduled_date: date, // Add scheduled_date for compatibility
-          topic: post.videos?.topic || 'Scheduled Post',
+          _isScheduledPostGroup: true,
+          id: `post-group-${firstPost.video_id}-${date}`,
+          video_id: firstPost.video_id,
+          scheduled_date: date,
+          scheduled_time: firstPost.scheduled_time,
+          posted_at: postedTimes.length > 0 ? postedTimes.sort()[postedTimes.length - 1] || null : firstPost.posted_at,
+          status: groupedStatus,
+          caption: firstPost.caption || null,
+          videos: firstPost.videos,
+          platforms: posts.map((post) => ({
+            platform: post.platform,
+            status: post.status,
+            error_message: post.error_message,
+          })),
         })
       })
     })
@@ -1182,8 +1237,8 @@ export function VideoPlanning() {
   }
 
   // Helper to check if an item is a scheduled post
-  const isScheduledPost = (item: CalendarItem): item is ScheduledPost & { _isScheduledPost: true; scheduled_date: string; topic: string } => {
-    return '_isScheduledPost' in item && (item as any)._isScheduledPost === true
+  const isScheduledPost = (item: CalendarItem): item is ScheduledPostGroup => {
+    return '_isScheduledPostGroup' in item && item._isScheduledPostGroup === true
   }
 
 
@@ -1790,7 +1845,7 @@ export function VideoPlanning() {
                                 const isPost = isScheduledPost(item)
                                 const status = normalizeStatusValue((isPost ? item.status : item.videos?.status || item.status)) || 'pending'
                                 const displayTopic = isPost
-                                  ? item.videos?.topic || `${item.platform} Post`
+                                  ? item.videos?.topic || `${item.platforms.map((platformPost) => platformPost.platform).join(', ')} Post`
                                   : (item.topic || (item.scheduled_time ? t('video_planning.planned_with_time').replace('{time}', formatTime(item.scheduled_time)) : t('video_planning.planned')))
                                 const displayTime = isPost
                                   ? (item.scheduled_time || item.posted_at ? new Date(item.scheduled_time || item.posted_at || '').toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '')
@@ -1919,7 +1974,8 @@ export function VideoPlanning() {
                         const isPost = isScheduledPost(item)
                         if (isPost) {
                           // Render scheduled post differently
-                          const scheduledTime = item.scheduled_time
+                          const displayTime = item.posted_at || item.scheduled_time
+                          const caption = item.caption?.trim() || item.videos?.topic?.trim() || 'No caption name'
                           return (
                             <Card
                               key={item.id}
@@ -1930,7 +1986,7 @@ export function VideoPlanning() {
                                   <div className="flex items-center gap-3">
                                     <Clock className="h-4 w-4 text-slate-400" />
                                     <span className="text-sm font-medium text-slate-600">
-                                      {scheduledTime ? new Date(scheduledTime).toLocaleTimeString(language === 'ru' ? 'ru-RU' : language === 'uk' ? 'uk-UA' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US', {
+                                      {displayTime ? new Date(displayTime).toLocaleTimeString(language === 'ru' ? 'ru-RU' : language === 'uk' ? 'uk-UA' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US', {
                                         hour: 'numeric',
                                         minute: '2-digit',
                                         hour12: true
@@ -1945,17 +2001,35 @@ export function VideoPlanning() {
                                             ? t('video_planning.failed')
                                             : item.status}
                                     </Badge>
-                                    <Badge variant="info">{item.platform}</Badge>
+                                    <div className="flex flex-wrap gap-2">
+                                      {item.platforms.map((platformPost) => {
+                                        const isSuccessful = platformPost.status === 'posted'
+                                        const isFailed = platformPost.status === 'failed'
+                                        const style = isSuccessful
+                                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                          : isFailed
+                                            ? 'border-red-200 bg-red-50 text-red-700'
+                                            : 'border-amber-200 bg-amber-50 text-amber-700'
+
+                                        return (
+                                          <span
+                                            key={`${item.id}-${platformPost.platform}`}
+                                            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${style}`}
+                                            title={platformPost.error_message || undefined}
+                                          >
+                                            {platformPost.platform}
+                                          </span>
+                                        )
+                                      })}
+                                    </div>
                                   </div>
                                   <div>
                                     <h3 className="font-semibold text-primary">
                                       {item.videos?.topic || t('video_planning.scheduled_post')}
                                     </h3>
-                                    {item.videos && (
-                                      <p className="mt-1 text-sm text-slate-600">
-                                        {t('video_planning.video_id')}: {item.video_id}
-                                      </p>
-                                    )}
+                                    <p className="mt-1 text-sm text-slate-600">
+                                      Caption: {caption}
+                                    </p>
                                   </div>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
