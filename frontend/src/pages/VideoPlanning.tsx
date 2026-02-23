@@ -1537,30 +1537,46 @@ export function VideoPlanning() {
           </div>
         </div>
 
-        <Card className="border border-brand-100 bg-gradient-to-br from-white via-brand-50/40 to-violet-50/30 p-5 sm:p-6">
-          <div className="flex flex-col gap-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-brand-500">Video automation hub</p>
-                <h2 className="text-xl font-semibold text-primary">Everything video in one place</h2>
-                <p className="max-w-2xl text-sm text-slate-600">
-                  See all videos created by automations, generate a new AI video, or upload existing videos without leaving the studio.
-                </p>
-              </div>
+        <Card className="border border-slate-200 bg-white p-5 shadow-sm sm:rounded-3xl sm:p-6">
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">Content Studio container</p>
+              <h2 className="text-2xl font-semibold text-slate-950">Everything video in one place</h2>
+              <p className="max-w-2xl text-sm text-slate-600">
+                Prioritized workspace for production flow first, then enrichment tools, then utilities.
+              </p>
+            </div>
 
-              <div className="grid w-full max-w-xl grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-white/80 bg-white/80 p-3">
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Automation videos</p>
-                  <p className="mt-1 text-2xl font-semibold text-slate-900">{automationSummary.total}</p>
-                </div>
-                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/80 p-3">
-                  <p className="text-xs font-medium uppercase tracking-wide text-emerald-500">Ready</p>
-                  <p className="mt-1 text-2xl font-semibold text-emerald-700">{automationSummary.ready}</p>
-                </div>
-                <div className="rounded-2xl border border-blue-100 bg-blue-50/80 p-3">
-                  <p className="text-xs font-medium uppercase tracking-wide text-blue-500">In progress</p>
-                  <p className="mt-1 text-2xl font-semibold text-blue-700">{automationSummary.inProgress}</p>
-                </div>
+            <div className="grid gap-4 lg:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-brand-600">Level 1 · Core workflow</p>
+                <h3 className="mt-2 text-xl font-semibold text-slate-950">Brief · Editor · Output</h3>
+                <p className="mt-2 text-sm text-slate-600">Primary flow with strongest contrast and hierarchy.</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Level 2 · Supporting tools</p>
+                <h3 className="mt-2 text-lg font-semibold text-slate-900">Assets · SEO · Metadata</h3>
+                <p className="mt-2 text-sm text-slate-600">Secondary tools keep medium emphasis for enrichment tasks.</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Level 3 · Utilities</p>
+                <h3 className="mt-2 text-base font-medium text-slate-600">History · Templates · Settings</h3>
+                <p className="mt-2 text-sm text-slate-500">Subdued labels for low-attention utility destinations.</p>
+              </div>
+            </div>
+
+            <div className="grid w-full max-w-xl grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Automation videos</p>
+                <p className="mt-1 text-2xl font-semibold text-slate-900">{automationSummary.total}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Ready</p>
+                <p className="mt-1 text-2xl font-semibold text-slate-900">{automationSummary.ready}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">In progress</p>
+                <p className="mt-1 text-2xl font-semibold text-slate-900">{automationSummary.inProgress}</p>
               </div>
             </div>
 
@@ -1589,7 +1605,7 @@ export function VideoPlanning() {
               </div>
 
               {automationVideoItems.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-brand-200 bg-white/70 p-5 text-sm text-slate-500">
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500">
                   No automation videos yet. Generate your first AI video or upload one to start filling this feed.
                 </div>
               ) : (
@@ -1601,7 +1617,7 @@ export function VideoPlanning() {
                       <button
                         key={item.id}
                         onClick={() => item.video_id && navigate(`/videos?videoId=${item.video_id}`)}
-                        className="rounded-2xl border border-white/80 bg-white/90 p-4 text-left transition hover:border-brand-200 hover:shadow-sm"
+                        className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-brand-300"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
