@@ -32,24 +32,36 @@ export class AutomationService {
     ].some(fragment => message.includes(fragment))
   }
 
-  private static hasScheduledTimePassed(
+  static hasScheduledTimePassed(
     scheduledTime: string | null | undefined,
     nowInPlanTz: DateTime
   ): boolean {
     if (!scheduledTime) return true
 
-    const normalizedTime = scheduledTime.split(':').length === 3
-      ? scheduledTime
-      : `${scheduledTime}:00`
+    const trimmedTime = scheduledTime.trim()
+    const timeMatch = trimmedTime.match(/^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/)
 
-    const scheduledDateTime = DateTime.fromFormat(
-      `${nowInPlanTz.toFormat('yyyy-MM-dd')} ${normalizedTime}`,
-      'yyyy-MM-dd HH:mm:ss',
-      { zone: nowInPlanTz.zoneName || 'UTC' }
-    )
+    if (!timeMatch) return false
 
-    if (!scheduledDateTime.isValid) return false
-    return scheduledDateTime <= nowInPlanTz
+    const hour = Number(timeMatch[1])
+    const minute = Number(timeMatch[2])
+    const second = Number(timeMatch[3] || '0')
+
+    if (
+      Number.isNaN(hour) ||
+      Number.isNaN(minute) ||
+      Number.isNaN(second) ||
+      hour < 0 || hour > 23 ||
+      minute < 0 || minute > 59 ||
+      second < 0 || second > 59
+    ) {
+      return false
+    }
+
+    const scheduledSeconds = hour * 3600 + minute * 60 + second
+    const currentSeconds = nowInPlanTz.hour * 3600 + nowInPlanTz.minute * 60 + nowInPlanTz.second
+
+    return scheduledSeconds <= currentSeconds
   }
 
   private static buildScriptPrompt({
