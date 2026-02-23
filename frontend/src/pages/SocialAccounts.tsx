@@ -272,22 +272,14 @@ export function SocialAccounts() {
 
                 return (
                   <Card key={platform} hover className="flex h-full flex-col gap-4 border border-emerald-200 bg-emerald-50/40 p-4 shadow-none">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
-                          <Icon className="h-5 w-5" />
-                        </div>
-                        <div className="space-y-1">
-                          <h3 className="text-sm font-semibold text-primary">{platformNames[platform]}</h3>
-                          {getStatusBadge(account.status)}
-                        </div>
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+                        <Icon className="h-5 w-5" />
                       </div>
-                      <label className="group relative inline-flex cursor-default items-center gap-2" title="When enabled, messages from this channel are synced into AI Auto-DM.">
-                        <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-600">Inbox sync</span>
-                        <span className="relative inline-flex h-6 w-11 items-center rounded-full bg-emerald-500 px-1">
-                          <span className="h-4 w-4 translate-x-5 rounded-full bg-white shadow" />
-                        </span>
-                      </label>
+                      <div className="space-y-1">
+                        <h3 className="text-sm font-semibold text-primary">{platformNames[platform]}</h3>
+                        {getStatusBadge(account.status)}
+                      </div>
                     </div>
 
                     {resolvedHandle ? (
@@ -334,9 +326,6 @@ export function SocialAccounts() {
                       <div className="space-y-1">
                         <h3 className="text-sm font-semibold text-primary">{platformNames[platform]}</h3>
                         {account && getStatusBadge(account.status)}
-                        {isPendingLinkedIn && (
-                          <p className="text-xs text-amber-700">Waiting on our end — we'll notify you.</p>
-                        )}
                       </div>
                     </div>
                   </div>
