@@ -74,6 +74,7 @@ export function Preferences() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [draftLanguage, setDraftLanguage] = useState(language)
 
   const platformNames: Record<string, string> = {
     instagram: t('platforms.instagram'),
@@ -89,6 +90,10 @@ export function Preferences() {
     loadPreferences()
     loadSocialAccounts()
   }, [])
+
+  useEffect(() => {
+    setDraftLanguage(language)
+  }, [language])
 
   const resolveDetectedTimezone = async () => {
     const browserTimezone = normalizeTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone) || 'UTC'
@@ -130,13 +135,6 @@ export function Preferences() {
         setPreferences(prev => ({ ...prev, timezone: timezoneToApply }))
       }
 
-      if (shouldApplyDetectedTimezone && timezoneToApply && normalizedStoredTimezone !== timezoneToApply) {
-        try {
-          await api.put('/api/preferences', { timezone: timezoneToApply })
-        } catch (error) {
-          console.warn('Failed to persist detected timezone:', error)
-        }
-      }
     } catch (error) {
       console.error('Failed to load preferences:', error)
       const resolvedTimezone = await resolveDetectedTimezone()
@@ -169,6 +167,9 @@ export function Preferences() {
     setSaving(true)
     try {
       await api.put('/api/preferences', preferences)
+      if (draftLanguage !== language) {
+        setLanguage(draftLanguage as typeof language)
+      }
       toast.success(t('preferences.preferences_saved'))
     } catch (error) {
       toast.error(t('preferences.preferences_save_failed'))
@@ -281,15 +282,15 @@ export function Preferences() {
             ].map((lang) => (
               <button
                 key={lang.code}
-                onClick={() => setLanguage(lang.code as any)}
-                className={`flex items-center gap-3 rounded-2xl border-2 p-4 transition-all hover:scale-[1.02] ${language === lang.code
+                onClick={() => setDraftLanguage(lang.code as typeof language)}
+                className={`flex items-center gap-3 rounded-2xl border-2 p-4 transition-all hover:scale-[1.02] ${draftLanguage === lang.code
                   ? 'border-brand-500 bg-brand-50 shadow-md'
                   : 'border-slate-100 bg-white hover:border-brand-200'
                   }`}
               >
                 <span className="text-2xl">{lang.flag}</span>
                 <div className="text-left">
-                  <p className={`text-sm font-semibold ${language === lang.code ? 'text-brand-700' : 'text-slate-700'}`}>
+                  <p className={`text-sm font-semibold ${draftLanguage === lang.code ? 'text-brand-700' : 'text-slate-700'}`}>
                     {lang.name}
                   </p>
                 </div>
