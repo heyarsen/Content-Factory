@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BarChart3, TrendingUp, Users, AlertCircle } from 'lucide-react'
+import { BarChart3, TrendingUp, Users, AlertCircle, Eye, Activity, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Skeleton } from '../components/ui/Skeleton'
@@ -26,10 +26,70 @@ interface PlatformAnalytics {
   message?: string
 }
 
+type MetricKey = 'followers' | 'impressions' | 'reach' | 'profileViews'
+
+const metricLabels: Record<MetricKey, string> = {
+  followers: 'Followers',
+  impressions: 'Impressions',
+  reach: 'Reach',
+  profileViews: 'Profile views',
+}
+
+const metricDescriptions: Record<MetricKey, string> = {
+  followers: 'Audience size across all connected channels.',
+  impressions: 'Total number of times your content was shown.',
+  reach: 'Unique people who saw your content.',
+  profileViews: 'Visits to your social profile pages.',
+}
+
+const formatNumber = (value: number | undefined) => Number(value || 0).toLocaleString()
+
+const getTrendDelta = (series: TimeSeriesPoint[] | undefined) => {
+  const values = (series || []).map((item) => Number(item.value || 0)).filter((value) => Number.isFinite(value))
+  if (values.length < 2) return null
+
+  const previous = values[values.length - 2]
+  const current = values[values.length - 1]
+  if (previous === 0) {
+    return {
+      absolute: current,
+      percent: current === 0 ? 0 : 100,
+      up: current >= previous,
+    }
+  }
+
+  const absolute = current - previous
+  const percent = (absolute / previous) * 100
+
+  return {
+    absolute,
+    percent,
+    up: absolute >= 0,
+  }
+}
+
+const renderSparklinePath = (points: TimeSeriesPoint[]) => {
+  if (!points.length) return ''
+
+  const values = points.map((point) => Number(point.value || 0))
+  const max = Math.max(...values)
+  const min = Math.min(...values)
+  const range = max - min || 1
+
+  return values
+    .map((value, index) => {
+      const x = (index / Math.max(values.length - 1, 1)) * 100
+      const y = 100 - ((value - min) / range) * 100
+      return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`
+    })
+    .join(' ')
+}
+
 export function Analysts() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [analytics, setAnalytics] = useState<Record<string, PlatformAnalytics>>({})
+  const [selectedMetric, setSelectedMetric] = useState<MetricKey>('reach')
 
   useEffect(() => {
     const loadAnalytics = async () => {
@@ -68,18 +128,47 @@ export function Analysts() {
     loadAnalytics()
   }, [])
 
-  const totals = useMemo<{ followers: number; impressions: number; reach: number }>(() => {
-    return Object.values(analytics).reduce<{ followers: number; impressions: number; reach: number }>(
-      (acc, item) => ({
+  const platformEntries = useMemo(() => Object.entries(analytics), [analytics])
+
+  const totals = useMemo<Record<MetricKey, number>>(() => {
+    return platformEntries.reduce(
+      (acc, [, item]) => ({
         followers: acc.followers + Number(item.followers || 0),
         impressions: acc.impressions + Number(item.impressions || 0),
         reach: acc.reach + Number(item.reach || 0),
+        profileViews: acc.profileViews + Number(item.profileViews || 0),
       }),
-      { followers: 0, impressions: 0, reach: 0 }
+      { followers: 0, impressions: 0, reach: 0, profileViews: 0 }
     )
-  }, [analytics])
+  }, [platformEntries])
 
-  const platformEntries = Object.entries(analytics)
+  const aggregateReachSeries = useMemo(() => {
+    const buckets = new Map<string, number>()
+
+    platformEntries.forEach(([, stats]) => {
+      ;(stats.reach_timeseries || []).forEach((point) => {
+        const date = point.date || 'Unknown'
+        buckets.set(date, (buckets.get(date) || 0) + Number(point.value || 0))
+      })
+    })
+
+    return Array.from(buckets.entries())
+      .map(([date, value]) => ({ date, value }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+  }, [platformEntries])
+
+  const topPlatformByMetric = useMemo(() => {
+    if (!platformEntries.length) return null
+
+    return platformEntries
+      .map(([platform, stats]) => ({
+        platform,
+        value: Number(stats[selectedMetric] || 0),
+      }))
+      .sort((a, b) => b.value - a.value)[0]
+  }, [platformEntries, selectedMetric])
+
+  const overallTrend = useMemo(() => getTrendDelta(aggregateReachSeries), [aggregateReachSeries])
 
   return (
     <Layout>
@@ -87,18 +176,19 @@ export function Analysts() {
         <div className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Insights</p>
           <h1 className="text-3xl font-semibold text-primary">Analytics</h1>
-          <p className="text-sm text-slate-500">Live metrics from your connected social accounts.</p>
+          <p className="text-sm text-slate-500">Live cross-platform intelligence powered by your Upload-Post analytics data.</p>
         </div>
 
         <Card className="p-5 md:p-6">
           {loading ? (
             <div className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-3">
-                {[1, 2, 3].map((item) => (
+              <div className="grid gap-4 md:grid-cols-4">
+                {[1, 2, 3, 4].map((item) => (
                   <Skeleton key={item} className="h-24 rounded-2xl" />
                 ))}
               </div>
               <Skeleton className="h-64 rounded-3xl" />
+              <Skeleton className="h-52 rounded-3xl" />
             </div>
           ) : error ? (
             <Card className="border-red-200 bg-red-50/60 p-6">
@@ -116,58 +206,152 @@ export function Analysts() {
             </Card>
           ) : (
             <>
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <Card className="flex items-center gap-3 p-5">
                   <Users className="h-5 w-5 text-indigo-600" />
                   <div>
                     <p className="text-xs uppercase tracking-wide text-slate-400">Followers</p>
-                    <p className="text-xl font-semibold text-primary">{totals.followers.toLocaleString()}</p>
+                    <p className="text-xl font-semibold text-primary">{formatNumber(totals.followers)}</p>
                   </div>
                 </Card>
                 <Card className="flex items-center gap-3 p-5">
                   <BarChart3 className="h-5 w-5 text-brand-600" />
                   <div>
                     <p className="text-xs uppercase tracking-wide text-slate-400">Impressions</p>
-                    <p className="text-xl font-semibold text-primary">{totals.impressions.toLocaleString()}</p>
+                    <p className="text-xl font-semibold text-primary">{formatNumber(totals.impressions)}</p>
                   </div>
                 </Card>
                 <Card className="flex items-center gap-3 p-5">
                   <TrendingUp className="h-5 w-5 text-emerald-600" />
                   <div>
                     <p className="text-xs uppercase tracking-wide text-slate-400">Reach</p>
-                    <p className="text-xl font-semibold text-primary">{totals.reach.toLocaleString()}</p>
+                    <p className="text-xl font-semibold text-primary">{formatNumber(totals.reach)}</p>
+                  </div>
+                </Card>
+                <Card className="flex items-center gap-3 p-5">
+                  <Eye className="h-5 w-5 text-fuchsia-600" />
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-400">Profile views</p>
+                    <p className="text-xl font-semibold text-primary">{formatNumber(totals.profileViews)}</p>
                   </div>
                 </Card>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-2">
-                {platformEntries.map(([platform, stats]) => (
-                  <Card key={platform} className="p-5">
-                    <div className="mb-4 flex items-center justify-between">
-                      <h2 className="text-lg font-semibold capitalize text-primary">{platform}</h2>
-                      {stats.message && <span className="text-xs text-amber-600">{stats.message}</span>}
+              <div className="grid gap-4 lg:grid-cols-[1.5fr,1fr]">
+                <Card className="p-5">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-lg font-semibold text-primary">Reach trend snapshot</h2>
+                      <p className="text-sm text-slate-500">Combined reach over time from all connected channels.</p>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div className="rounded-xl bg-slate-50 p-3">
-                        <p className="text-slate-500">Followers</p>
-                        <p className="text-lg font-semibold text-primary">{(stats.followers || 0).toLocaleString()}</p>
+                    {overallTrend && (
+                      <div className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${overallTrend.up ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                        {overallTrend.up ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
+                        {overallTrend.percent.toFixed(1)}% vs previous point
                       </div>
-                      <div className="rounded-xl bg-slate-50 p-3">
-                        <p className="text-slate-500">Impressions</p>
-                        <p className="text-lg font-semibold text-primary">{(stats.impressions || 0).toLocaleString()}</p>
+                    )}
+                  </div>
+
+                  {aggregateReachSeries.length > 1 ? (
+                    <div className="space-y-3">
+                      <div className="h-44 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full">
+                          <path d={renderSparklinePath(aggregateReachSeries)} fill="none" stroke="rgb(79,70,229)" strokeWidth="2.5" />
+                        </svg>
                       </div>
-                      <div className="rounded-xl bg-slate-50 p-3">
-                        <p className="text-slate-500">Profile Views</p>
-                        <p className="text-lg font-semibold text-primary">{(stats.profileViews || 0).toLocaleString()}</p>
-                      </div>
-                      <div className="rounded-xl bg-slate-50 p-3">
-                        <p className="text-slate-500">Reach</p>
-                        <p className="text-lg font-semibold text-primary">{(stats.reach || 0).toLocaleString()}</p>
+                      <div className="grid grid-cols-2 gap-3 text-xs text-slate-500 md:grid-cols-4">
+                        {aggregateReachSeries.slice(-4).map((point) => (
+                          <div key={point.date} className="rounded-xl bg-slate-50 p-3">
+                            <p className="truncate font-medium text-slate-700">{point.date}</p>
+                            <p>{formatNumber(point.value)}</p>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  </Card>
-                ))}
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+                      Not enough time-series data yet to render a trend. Keep posting and check back soon.
+                    </div>
+                  )}
+                </Card>
+
+                <Card className="p-5">
+                  <div className="mb-4">
+                    <h2 className="text-lg font-semibold text-primary">Performance lens</h2>
+                    <p className="text-sm text-slate-500">Switch metrics to see which platform is currently strongest.</p>
+                  </div>
+
+                  <div className="mb-4 grid grid-cols-2 gap-2">
+                    {(Object.keys(metricLabels) as MetricKey[]).map((metric) => (
+                      <button
+                        key={metric}
+                        type="button"
+                        onClick={() => setSelectedMetric(metric)}
+                        className={`rounded-xl border px-3 py-2 text-xs font-medium transition ${selectedMetric === metric ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:text-indigo-600'}`}
+                      >
+                        {metricLabels[metric]}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <p className="text-xs uppercase tracking-wide text-slate-400">Top platform</p>
+                    <p className="mt-1 text-lg font-semibold capitalize text-primary">{topPlatformByMetric?.platform || 'N/A'}</p>
+                    <p className="text-sm text-slate-600">
+                      {metricLabels[selectedMetric]}: {formatNumber(topPlatformByMetric?.value)}
+                    </p>
+                    <p className="mt-2 text-xs text-slate-500">{metricDescriptions[selectedMetric]}</p>
+                  </div>
+                </Card>
               </div>
+
+              <Card className="p-5">
+                <div className="mb-4 flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-indigo-600" />
+                  <h2 className="text-lg font-semibold text-primary">Platform breakdown</h2>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
+                        <th className="px-2 py-3">Platform</th>
+                        <th className="px-2 py-3">Followers</th>
+                        <th className="px-2 py-3">Reach</th>
+                        <th className="px-2 py-3">Impressions</th>
+                        <th className="px-2 py-3">Profile views</th>
+                        <th className="px-2 py-3">Reach / follower</th>
+                        <th className="px-2 py-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {platformEntries.map(([platform, stats]) => {
+                        const followers = Number(stats.followers || 0)
+                        const reach = Number(stats.reach || 0)
+                        const ratio = followers > 0 ? (reach / followers).toFixed(2) : '0.00'
+
+                        return (
+                          <tr key={platform} className="border-b border-slate-100 text-slate-700">
+                            <td className="px-2 py-3 font-medium capitalize text-slate-900">{platform}</td>
+                            <td className="px-2 py-3">{formatNumber(stats.followers)}</td>
+                            <td className="px-2 py-3">{formatNumber(stats.reach)}</td>
+                            <td className="px-2 py-3">{formatNumber(stats.impressions)}</td>
+                            <td className="px-2 py-3">{formatNumber(stats.profileViews)}</td>
+                            <td className="px-2 py-3">{ratio}</td>
+                            <td className="px-2 py-3 text-xs">
+                              {stats.message ? (
+                                <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-700">{stats.message}</span>
+                              ) : (
+                                <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">Synced</span>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
             </>
           )}
         </Card>
