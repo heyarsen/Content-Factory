@@ -4,6 +4,7 @@ import {
   Share2,
   Sparkles,
   Clapperboard,
+  Film,
   SlidersHorizontal,
   BarChart3,
   MessagesSquare,
@@ -31,6 +32,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const navigation = [
     { label: 'Content Studio', to: '/planning', icon: Clapperboard, hint: 'Calendar, uploads, and AI videos' },
+    { label: 'Video Library', to: '/videos', icon: Film, hint: 'Browse and manage all videos' },
     { label: 'Social Accounts', to: '/social', icon: Share2, match: (pathname: string) => pathname === '/social' },
     { label: 'AI Auto-DM', to: '/social/dms', icon: MessagesSquare },
     { label: 'Trendwatcher', to: '/trend-searcher', icon: Search },
