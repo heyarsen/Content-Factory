@@ -41,6 +41,13 @@ const LEGACY_STATUS_FILTER_KEY = 'videoPlanning.statusFilter'
 const CALENDAR_VIEW_KEY = 'video_planning_calendar_view'
 type CalendarView = 'week' | 'month'
 
+const getLocalDateYMD = (date = new Date()) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 interface VideoPlan {
   id: string
   name: string
@@ -190,9 +197,7 @@ export function VideoPlanning() {
 
   // Create plan form
   const [planName, setPlanName] = useState('')
-  const [startDate, setStartDate] = useState(
-    new Date().toISOString().split('T')[0],
-  )
+  const [startDate, setStartDate] = useState(getLocalDateYMD)
   const [endDate, setEndDate] = useState('')
   const [triggerTime, setTriggerTime] = useState('08:00')
   const [defaultPlatforms, setDefaultPlatforms] = useState<string[]>([])
@@ -670,7 +675,7 @@ export function VideoPlanning() {
       }
       setCreateModal(false)
       setPlanName('')
-      setStartDate(new Date().toISOString().split('T')[0])
+      setStartDate(getLocalDateYMD())
       setEndDate('')
       // Avatar state reset removed - using AI video generation
       setTriggerTime('08:00')
@@ -783,7 +788,7 @@ export function VideoPlanning() {
       setEditPlanModal(null)
       // Reset form
       setPlanName('')
-      setStartDate(new Date().toISOString().split('T')[0])
+      setStartDate(getLocalDateYMD())
       setEndDate('')
       setTriggerTime('08:00')
       setDefaultPlatforms([])
@@ -2319,7 +2324,7 @@ export function VideoPlanning() {
           onClose={() => {
             setCreateModal(false)
             setPlanName('')
-            setStartDate(new Date().toISOString().split('T')[0])
+            setStartDate(getLocalDateYMD())
             setEndDate('')
             setTriggerTime('08:00')
             setDefaultPlatforms([])
@@ -2534,7 +2539,7 @@ export function VideoPlanning() {
             setEditPlanModal(null)
             // Reset form
             setPlanName('')
-            setStartDate(new Date().toISOString().split('T')[0])
+            setStartDate(getLocalDateYMD())
             setEndDate('')
             setTriggerTime('08:00')
             setDefaultPlatforms([])
@@ -2695,7 +2700,7 @@ export function VideoPlanning() {
                 onClick={() => {
                   setEditPlanModal(null)
                   setPlanName('')
-                  setStartDate(new Date().toISOString().split('T')[0])
+                  setStartDate(getLocalDateYMD())
                   setEndDate('')
                   setTriggerTime('08:00')
                   setDefaultPlatforms([])
