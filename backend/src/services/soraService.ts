@@ -10,7 +10,7 @@ import {
     type SoraModel,
 } from '../lib/kie.js'
 import type { Video } from '../types/database.js'
-import { getMaxCharactersForDuration, getMaxWordsForDuration } from '../lib/scriptLimits.js'
+import { buildSoraVoiceoverPrompt } from '../lib/soraPrompt.js'
 import { VideoService } from './videoService.js'
 import { SoraGenerationSettingsService, type GenerationMode } from './soraGenerationSettingsService.js'
 
@@ -118,22 +118,7 @@ export async function generateVideoWithSora(
             aspectRatio: options.aspectRatio,
         })
 
-        const maxWords = getMaxWordsForDuration(video.duration || 15)
-        const maxCharacters = getMaxCharactersForDuration(video.duration || 15)
-
-        // Build the prompt from topic, style, and script
-        let prompt = `Style: ${video.style}. Topic: ${video.topic}. VoiceOver must be no more than 15 seconds. Keep the voiceover under ${maxWords} words and ${maxCharacters} characters. Match the video pacing to the voiceover timing and avoid fast cuts.`
-        if (video.script) {
-            // Combine topic, style and script for a more detailed prompt
-            prompt = `Style: ${video.style}. Topic: ${video.topic}. Script: ${video.script}. VoiceOver must be no more than 15 seconds. Keep the voiceover under ${maxWords} words and ${maxCharacters} characters. Match the video pacing to the voiceover timing and avoid fast cuts.`
-        }
-
-        // Limit prompt length (Sora has limits)
-        const maxPromptLength = 1000
-        if (prompt.length > maxPromptLength) {
-            prompt = prompt.substring(0, maxPromptLength) + '...'
-            console.log('[Sora Service] Prompt truncated to max length:', maxPromptLength)
-        }
+        const prompt = buildSoraVoiceoverPrompt(video)
 
         // Map aspect ratio
         const soraAspectRatio = mapAspectRatioToSora(options.aspectRatio)
