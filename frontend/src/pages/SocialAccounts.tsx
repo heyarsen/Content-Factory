@@ -32,6 +32,13 @@ interface SocialAccount {
     username?: string | null
     display_name?: string | null
     avatar_url?: string | null
+    bio?: string | null
+    profile_url?: string | null
+    follower_count?: number | null
+    following_count?: number | null
+    post_count?: number | null
+    verified?: boolean | null
+    metadata?: Record<string, string | number | boolean> | null
   } | null
 }
 
@@ -123,6 +130,35 @@ export function SocialAccounts() {
     const handle = username || displayName
     if (!handle) return null
     return handle.startsWith('@') ? handle : `@${handle}`
+  }
+
+  const formatMetadataLabel = (key: string) => key
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+
+  const getMetadataEntries = (account: SocialAccount) => {
+    const metadata = account.account_info?.metadata
+    if (!metadata) return []
+
+    const skipKeys = new Set([
+      'username',
+      'display_name',
+      'name',
+      'bio',
+      'profile_url',
+      'url',
+      'avatar_url',
+      'profile_picture',
+      'social_images',
+      'follower_count',
+      'following_count',
+      'post_count',
+      'verified',
+    ])
+
+    return Object.entries(metadata)
+      .filter(([key]) => !skipKeys.has(key))
+      .slice(0, 4)
   }
 
   const isNumericId = (value: string) => /^\d{8,}$/.test(value)
@@ -276,19 +312,76 @@ export function SocialAccounts() {
                       <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
                         <Icon className="h-5 w-5" />
                       </div>
-                      <div className="space-y-1">
+                      <div className="space-y-1 min-w-0">
                         <h3 className="text-sm font-semibold text-primary">{platformNames[platform]}</h3>
                         {getStatusBadge(account.status)}
                       </div>
                     </div>
 
-                    {resolvedHandle ? (
-                      <p className="text-xs text-slate-600">{resolvedHandle}</p>
-                    ) : (
-                      <p className="text-xs text-slate-500">Handle unavailable</p>
-                    )}
+                    <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-white/90 p-3">
+                      {account.account_info?.avatar_url ? (
+                        <img
+                          src={account.account_info.avatar_url}
+                          alt={`${account.account_info.display_name || resolvedHandle || platformNames[platform]} avatar`}
+                          className="h-12 w-12 rounded-full border border-emerald-100 object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-700">
+                          {(account.account_info?.display_name || resolvedHandle || platformNames[platform]).slice(0, 2).toUpperCase()}
+                        </div>
+                      )}
+
+                      <div className="min-w-0 space-y-0.5">
+                        <p className="truncate text-sm font-semibold text-primary">
+                          {account.account_info?.display_name || platformNames[platform]}
+                        </p>
+                        <p className="truncate text-xs text-slate-600">{resolvedHandle || 'Handle unavailable'}</p>
+                      </div>
+                    </div>
+
                     {!resolvedHandle && account.account_info?.username && isNumericId(account.account_info.username) && (
                       <p className="text-[11px] text-slate-400">ID: {account.account_info.username}</p>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600">
+                      {typeof account.account_info?.follower_count === 'number' && (
+                        <div className="rounded-lg bg-white/80 px-2 py-1">Followers: {account.account_info.follower_count.toLocaleString()}</div>
+                      )}
+                      {typeof account.account_info?.following_count === 'number' && (
+                        <div className="rounded-lg bg-white/80 px-2 py-1">Following: {account.account_info.following_count.toLocaleString()}</div>
+                      )}
+                      {typeof account.account_info?.post_count === 'number' && (
+                        <div className="rounded-lg bg-white/80 px-2 py-1">Posts: {account.account_info.post_count.toLocaleString()}</div>
+                      )}
+                      {typeof account.account_info?.verified === 'boolean' && (
+                        <div className="rounded-lg bg-white/80 px-2 py-1">Verified: {account.account_info.verified ? 'Yes' : 'No'}</div>
+                      )}
+                    </div>
+
+                    {account.account_info?.bio && (
+                      <p className="line-clamp-2 text-xs text-slate-600">{account.account_info.bio}</p>
+                    )}
+
+                    {getMetadataEntries(account).length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {getMetadataEntries(account).map(([key, value]) => (
+                          <Badge key={`${account.id}-${key}`} variant="default" className="bg-white/90 text-[10px] font-medium text-slate-600">
+                            {formatMetadataLabel(key)}: {String(value)}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+
+                    {account.account_info?.profile_url && (
+                      <a
+                        href={account.account_info.profile_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs font-medium text-brand-600 hover:underline"
+                      >
+                        View profile
+                      </a>
                     )}
 
                     <div className="mt-auto">

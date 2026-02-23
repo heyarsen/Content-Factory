@@ -122,6 +122,32 @@ function getRequestCorrelationId(req: AuthRequest): string | undefined {
   return typeof requestIdHeader === 'string' ? requestIdHeader : undefined
 }
 
+function toNullableString(value: unknown): string | null {
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value)
+  }
+
+  return null
+}
+
+function sanitizeMetadataRecord(source: Record<string, unknown>) {
+  const metadata: Record<string, string | number | boolean> = {}
+
+  Object.entries(source).forEach(([key, value]) => {
+    if (value === null || value === undefined) return
+    if (['string', 'number', 'boolean'].includes(typeof value)) {
+      metadata[key] = value as string | number | boolean
+    }
+  })
+
+  return metadata
+}
+
 // List connected accounts
 router.get('/accounts', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
@@ -156,15 +182,33 @@ router.get('/accounts', authenticate, requireSubscription, async (req: AuthReque
               socialAccounts[account.platform.toLowerCase()]
 
             if (platformAccount && typeof platformAccount === 'object') {
+              const typedPlatformAccount = platformAccount as Record<string, unknown>
+              const socialImages = (typedPlatformAccount.social_images || {}) as Record<string, unknown>
+
               return {
                 ...account,
                 account_info: {
-                  username: platformAccount.username || platformAccount.display_name || null,
-                  display_name: platformAccount.display_name || platformAccount.username || null,
-                  avatar_url: platformAccount.social_images?.profile_picture ||
-                    platformAccount.profile_picture ||
-                    platformAccount.avatar_url ||
+                  username: toNullableString(typedPlatformAccount.username) || toNullableString(typedPlatformAccount.handle) || null,
+                  display_name: toNullableString(typedPlatformAccount.display_name) || toNullableString(typedPlatformAccount.name) || null,
+                  avatar_url: toNullableString(socialImages.profile_picture) ||
+                    toNullableString(typedPlatformAccount.profile_picture) ||
+                    toNullableString(typedPlatformAccount.avatar_url) ||
                     null,
+                  bio: toNullableString(typedPlatformAccount.bio),
+                  profile_url: toNullableString(typedPlatformAccount.profile_url) || toNullableString(typedPlatformAccount.url),
+                  follower_count: typeof typedPlatformAccount.follower_count === 'number'
+                    ? typedPlatformAccount.follower_count
+                    : null,
+                  following_count: typeof typedPlatformAccount.following_count === 'number'
+                    ? typedPlatformAccount.following_count
+                    : null,
+                  post_count: typeof typedPlatformAccount.post_count === 'number'
+                    ? typedPlatformAccount.post_count
+                    : null,
+                  verified: typeof typedPlatformAccount.verified === 'boolean'
+                    ? typedPlatformAccount.verified
+                    : null,
+                  metadata: sanitizeMetadataRecord(typedPlatformAccount),
                 },
               }
             }
