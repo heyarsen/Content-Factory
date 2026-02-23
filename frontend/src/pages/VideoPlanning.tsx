@@ -1756,22 +1756,30 @@ export function VideoPlanning() {
                 ) : (
                   <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     {filteredStudioVideos.map((video) => (
-                      <button
+                      <article
                         key={video.id}
-                        type="button"
-                        onClick={() => setSelectedStudioVideo(video)}
                         className="group overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-md"
                       >
                         <div className="relative aspect-[9/11] bg-gradient-to-br from-slate-800 via-brand-600 to-slate-200">
+                          {video.videoUrl && (
+                            <video
+                              src={video.videoUrl}
+                              controls
+                              preload="metadata"
+                              className="h-full w-full object-cover"
+                            />
+                          )}
                           <span className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${sourceBadgeClasses[video.type]}`}>
                             {video.type === 'AI' ? 'AI Generated' : video.type === 'Uploaded' ? 'Uploaded' : 'Automation'}
                           </span>
                           <span className={`absolute right-3 top-3 h-2.5 w-2.5 rounded-full ring-2 ring-white ${statusDotClasses[video.status]}`} />
-                          <span className="absolute inset-0 grid place-items-center">
-                            <span className="grid h-12 w-12 place-items-center rounded-full bg-white/90 text-slate-700 opacity-0 transition group-hover:opacity-100">
-                              <Play className="h-5 w-5 fill-current" />
+                          {!video.videoUrl && (
+                            <span className="absolute inset-0 grid place-items-center">
+                              <span className="grid h-12 w-12 place-items-center rounded-full bg-white/90 text-slate-700">
+                                <Play className="h-5 w-5 fill-current" />
+                              </span>
                             </span>
-                          </span>
+                          )}
                         </div>
                         <div className="space-y-3 p-4">
                           <div>
@@ -1779,12 +1787,18 @@ export function VideoPlanning() {
                             <p className="text-xs text-slate-500">{video.date} · {video.time}</p>
                           </div>
                           <div className="grid grid-cols-3 gap-2">
-                            <span className="inline-flex items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-2 py-1 text-xs font-semibold text-brand-700">▶ Preview</span>
+                            <span className="inline-flex items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-2 py-1 text-xs font-semibold text-brand-700">▶ Live preview</span>
                             <span className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600">✎ Edit</span>
-                            <span className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600">🚀 Post</span>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedStudioVideo(video)}
+                              className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600 transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700"
+                            >
+                              🚀 Details
+                            </button>
                           </div>
                         </div>
-                      </button>
+                      </article>
                     ))}
                   </div>
                 )}

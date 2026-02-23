@@ -79,7 +79,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </button>
           </div>
 
-          <nav className="mt-10 flex flex-1 flex-col gap-2 overflow-y-auto">
+          <nav className="mt-10 flex flex-1 flex-col gap-1.5 overflow-y-auto">
             {navigation.map(({ label, to, icon: Icon, hint, match }) => {
               const isActive = match ? match(location.pathname) : location.pathname === to || location.pathname.startsWith(to + '/')
               return (
@@ -87,25 +87,25 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   key={to}
                   to={to}
                   onClick={onClose}
-                  className={`group relative flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold transition-all duration-200 touch-manipulation active:scale-[0.98] ${isActive
-                    ? 'bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-transparent text-brand-600'
-                    : 'text-slate-500 hover:bg-white hover:text-primary'
+                  className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 touch-manipulation active:scale-[0.98] ${isActive
+                    ? 'bg-brand-50 text-brand-600'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                     }`}
                 >
                   <div
-                    className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-200 ${isActive
-                      ? 'border-brand-200 bg-white text-brand-600 shadow-sm'
-                      : 'border-transparent bg-slate-100 text-slate-500 group-hover:border-slate-200'
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200 ${isActive
+                      ? 'bg-brand-100 text-brand-600'
+                      : 'bg-transparent text-slate-500 group-hover:bg-white/80 group-hover:text-slate-700'
                       }`}
                   >
-                    <Icon className="h-5 w-5" />
+                    <Icon className="h-4 w-4" />
                   </div>
                   <div className="min-w-0">
                     <span className="block truncate">{label}</span>
-                    {hint && <span className="block text-xs font-medium text-slate-400">{hint}</span>}
+                    {hint && <span className="block text-[11px] font-medium text-slate-400">{hint}</span>}
                   </div>
                   {isActive && (
-                    <span className="absolute inset-y-2 right-0 w-1.5 rounded-full bg-brand-500" />
+                    <span className="absolute inset-y-2 right-0 w-1 rounded-full bg-brand-500" />
                   )}
                 </NavLink>
               )
@@ -121,22 +121,22 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                       key={to}
                       to={to}
                       onClick={onClose}
-                      className={`group relative flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold transition-all duration-200 touch-manipulation active:scale-[0.98] ${isActive
-                        ? 'bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-transparent text-brand-600'
-                        : 'text-slate-500 hover:bg-white hover:text-primary'
+                    className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 touch-manipulation active:scale-[0.98] ${isActive
+                        ? 'bg-brand-50 text-brand-600'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                         }`}
                     >
                       <div
-                        className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-200 ${isActive
-                          ? 'border-brand-200 bg-white text-brand-600 shadow-sm'
-                          : 'border-transparent bg-slate-100 text-slate-500 group-hover:border-slate-200'
+                        className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200 ${isActive
+                          ? 'bg-brand-100 text-brand-600'
+                          : 'bg-transparent text-slate-500 group-hover:bg-white/80 group-hover:text-slate-700'
                           }`}
                       >
-                        <Icon className="h-5 w-5" />
+                        <Icon className="h-4 w-4" />
                       </div>
                       <span>{label}</span>
                       {isActive && (
-                        <span className="absolute inset-y-2 right-0 w-1.5 rounded-full bg-brand-500" />
+                        <span className="absolute inset-y-2 right-0 w-1 rounded-full bg-brand-500" />
                       )}
                     </NavLink>
                   )
