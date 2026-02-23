@@ -42,6 +42,10 @@ const LEGACY_STATUS_FILTER_KEY = 'videoPlanning.statusFilter'
 const CALENDAR_VIEW_KEY = 'video_planning_calendar_view'
 type CalendarView = 'week' | 'month'
 
+const WEEK_TIMELINE_START_HOUR = 0
+const WEEK_TIMELINE_END_HOUR = 23
+const WEEK_TIMELINE_ROW_HEIGHT = 64
+
 
 type CalendarVideoSource = 'AI' | 'Auto'
 
@@ -1223,6 +1227,54 @@ export function VideoPlanning() {
     return `${startMonth} ${start.getDate()} – ${endMonth} ${end.getDate()}, ${year}`
   }
 
+  const timelineHours = useMemo(
+    () => Array.from(
+      { length: WEEK_TIMELINE_END_HOUR - WEEK_TIMELINE_START_HOUR + 1 },
+      (_, index) => WEEK_TIMELINE_START_HOUR + index,
+    ),
+    [],
+  )
+
+  const getTimeLabel = (hour: number) => `${String(hour).padStart(2, '0')}:00`
+
+  const getTimelineItemsForDate = (dateItems: CalendarItem[]) => {
+    const datedItems = dateItems
+      .filter((item) => {
+        const itemTime = isScheduledPost(item) ? item.scheduled_time || item.posted_at : item.scheduled_time
+        return Boolean(itemTime)
+      })
+      .map((item, index) => {
+        const fallbackTitle = `Video ${index + 1}`
+        const isPost = isScheduledPost(item)
+        const title = isPost
+          ? getReadableVideoTitle(item.videos?.topic, 'Auto') || fallbackTitle
+          : getReadableVideoTitle(item.topic, item.video_id ? 'Auto' : 'AI') || fallbackTitle
+        const rawTime = isPost ? item.scheduled_time || item.posted_at : item.scheduled_time
+
+        if (!rawTime) return null
+
+        const parsedTime = isPost
+          ? new Date(rawTime).toISOString().substring(11, 16)
+          : rawTime.substring(0, 5)
+
+        const [hoursPart, minutesPart] = parsedTime.split(':').map(Number)
+        if (Number.isNaN(hoursPart) || Number.isNaN(minutesPart)) return null
+
+        const minutesFromStart = (hoursPart - WEEK_TIMELINE_START_HOUR) * 60 + minutesPart
+        if (minutesFromStart < 0 || hoursPart > WEEK_TIMELINE_END_HOUR) return null
+
+        return {
+          id: item.id,
+          top: (minutesFromStart / 60) * WEEK_TIMELINE_ROW_HEIGHT,
+          timeLabel: parsedTime,
+          title,
+        }
+      })
+      .filter((item): item is { id: string; top: number; timeLabel: string; title: string } => Boolean(item))
+
+    return datedItems
+  }
+
   const navigateCalendar = (direction: 'prev' | 'next') => {
     setCurrentMonth((prev: Date) => {
       const newDate = new Date(prev)
@@ -1685,14 +1737,14 @@ export function VideoPlanning() {
                     size="sm"
                     onClick={() => setCalendarView('week')}
                   >
-                    Weekly view
+                    Week (Timeline)
                   </Button>
                   <Button
                     variant={calendarView === 'month' ? 'primary' : 'ghost'}
                     size="sm"
                     onClick={() => setCalendarView('month')}
                   >
-                    Monthly view
+                    Month
                   </Button>
                 </div>
               </div>
@@ -1706,12 +1758,101 @@ export function VideoPlanning() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-7 gap-2">
-                {[{ key: 'sun' }, { key: 'mon' }, { key: 'tue' }, { key: 'wed' }, { key: 'thu' }, { key: 'fri' }, { key: 'sat' }].map((day) => (
-                  <div key={day.key} className="p-2 text-center text-xs font-semibold text-slate-500">{t(`video_planning.${day.key}`)}</div>
-                ))}
+              {calendarView === 'week' ? (
+                <div className="overflow-x-auto rounded-lg border border-slate-200">
+                  <div className="grid min-w-[860px]" style={{ gridTemplateColumns: '84px repeat(7, minmax(0, 1fr))' }}>
+                    <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Time
+                    </div>
+                    {weekDays.map((day) => {
+                      const dayKey = getDateKey(day)
+                      const isToday = dayKey === getDateKey(new Date())
+                      const isSelected = dayKey === selectedDate
+                      return (
+                        <button
+                          key={dayKey}
+                          onClick={() => {
+                            setSelectedDate(dayKey)
+                            setIsDetailDrawerOpen(true)
+                          }}
+                          className={`border-b border-r border-slate-200 px-2 py-2 text-center transition ${isSelected
+                            ? 'bg-brand-50 text-brand-700'
+                            : isToday
+                              ? 'bg-brand-50/60 text-brand-700'
+                              : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                            }`}
+                        >
+                          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            {day.toLocaleDateString('en-US', { weekday: 'short' })}
+                          </div>
+                          <div className="text-sm font-semibold">{day.getDate()}</div>
+                        </button>
+                      )
+                    })}
 
-                {(calendarView === 'week' ? weekDays : getDaysInMonth(currentMonth)).map((date, index) => {
+                    <div className="relative border-r border-slate-200 bg-slate-50" style={{ height: timelineHours.length * WEEK_TIMELINE_ROW_HEIGHT }}>
+                      {timelineHours.map((hour, hourIndex) => (
+                        <div
+                          key={hour}
+                          className="absolute left-0 right-0 border-b border-slate-200 px-3 text-xs text-slate-500"
+                          style={{ top: hourIndex * WEEK_TIMELINE_ROW_HEIGHT, height: WEEK_TIMELINE_ROW_HEIGHT }}
+                        >
+                          <span className="relative -top-2 inline-block bg-slate-50 pr-1">{getTimeLabel(hour)}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {weekDays.map((date) => {
+                      const dateKey = getDateKey(date)
+                      const items = getItemsForDate(date)
+                      const timelineItems = getTimelineItemsForDate(items)
+                      return (
+                        <div
+                          key={dateKey}
+                          className="relative border-r border-slate-200 bg-white"
+                          onDragOver={(event) => {
+                            if (!draggingItemId) return
+                            event.preventDefault()
+                          }}
+                          onDrop={async (event) => {
+                            event.preventDefault()
+                            if (!draggingItemId) return
+                            await movePlanItemToDate(draggingItemId, dateKey)
+                            setDraggingItemId(null)
+                          }}
+                          style={{ height: timelineHours.length * WEEK_TIMELINE_ROW_HEIGHT }}
+                        >
+                          {timelineHours.map((hour, hourIndex) => (
+                            <div
+                              key={`${dateKey}-${hour}`}
+                              className="absolute inset-x-0 border-b border-slate-100"
+                              style={{ top: hourIndex * WEEK_TIMELINE_ROW_HEIGHT, height: WEEK_TIMELINE_ROW_HEIGHT }}
+                            />
+                          ))}
+
+                          {timelineItems.map((item) => (
+                            <div
+                              key={item.id}
+                              className="absolute left-1 right-1 z-10 rounded-md border border-brand-200 bg-brand-50 px-2 py-1 text-xs shadow-sm"
+                              style={{ top: item.top + 4, minHeight: 42 }}
+                              title={`${item.timeLabel} - ${item.title}`}
+                            >
+                              <div className="font-semibold text-brand-700">{item.timeLabel}</div>
+                              <div className="truncate text-slate-700">{item.title}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-7 gap-2">
+                  {[{ key: 'sun' }, { key: 'mon' }, { key: 'tue' }, { key: 'wed' }, { key: 'thu' }, { key: 'fri' }, { key: 'sat' }].map((day) => (
+                    <div key={day.key} className="p-2 text-center text-xs font-semibold text-slate-500">{t(`video_planning.${day.key}`)}</div>
+                  ))}
+
+                  {getDaysInMonth(currentMonth).map((date, index) => {
                   const dateKey = getDateKey(date)
                   const items = getItemsForDate(date)
                   const isToday = date && dateKey === getDateKey(new Date())
@@ -1805,8 +1946,9 @@ export function VideoPlanning() {
                       )}
                     </button>
                   )
-                })}
-              </div>
+                  })}
+                </div>
+              )}
 
               {/* Status Legend */}
               <div className="mt-6 pt-6 border-t border-slate-200">
