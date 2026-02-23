@@ -37,6 +37,7 @@ import { GenerateVideoModal } from '../components/videos/GenerateVideoModal'
 import { useNotifications } from '../contexts/NotificationContext'
 
 const STATUS_FILTER_KEY = 'video_planning_status_filter'
+const LEGACY_STATUS_FILTER_KEY = 'videoPlanning.statusFilter'
 const CALENDAR_VIEW_KEY = 'video_planning_calendar_view'
 type CalendarView = 'week' | 'month'
 
@@ -154,7 +155,17 @@ export function VideoPlanning() {
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>(() => {
     if (typeof window === 'undefined') return 'all'
-    return localStorage.getItem(STATUS_FILTER_KEY) || 'all'
+    const storedStatusFilter = localStorage.getItem(STATUS_FILTER_KEY)
+    if (storedStatusFilter) return storedStatusFilter
+
+    const legacyStatusFilter = localStorage.getItem(LEGACY_STATUS_FILTER_KEY)
+    if (legacyStatusFilter) {
+      localStorage.setItem(STATUS_FILTER_KEY, legacyStatusFilter)
+      localStorage.removeItem(LEGACY_STATUS_FILTER_KEY)
+      return legacyStatusFilter
+    }
+
+    return 'all'
   })
   const [scriptPreviewItem, setScriptPreviewItem] =
     useState<VideoPlanItem | null>(null)
@@ -265,11 +276,6 @@ export function VideoPlanning() {
       console.error('Failed to load user preferences:', error)
     }
   }
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    localStorage.setItem('videoPlanning.statusFilter', statusFilter)
-  }, [statusFilter])
 
   // Avatar-related useEffect removed - using AI video generation
 
