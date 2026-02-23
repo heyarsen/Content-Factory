@@ -78,7 +78,7 @@ router.post('/', authenticate, requireSubscription, async (req: AuthRequest, res
         start_date,
         end_date: end_date || null,
         enabled: enabled !== false,
-        auto_research: auto_research !== false,
+        auto_research: auto_research === true,
         auto_create: auto_create === true,
         auto_schedule_trigger: auto_schedule_trigger || 'daily',
         trigger_time: trigger_time || null,

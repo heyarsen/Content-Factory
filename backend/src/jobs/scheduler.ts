@@ -49,7 +49,7 @@ export function initializeScheduler(): void {
   })
 
   // Script generation job: Runs every 10 minutes
-  // Processes pending content items (done=false) with research
+  // Processes pending content items (done=false) that are ready for script generation
   cron.schedule('*/10 * * * *', async () => {
     console.log('[Cron] Running script generation job...')
     try {
@@ -105,33 +105,6 @@ export function initializeScheduler(): void {
     }
   })
 
-  // Research job: Runs every 15 minutes
-  // Processes content items without research
-  cron.schedule('*/15 * * * *', async () => {
-    console.log('[Cron] Running research job...')
-    try {
-      const contentWithoutResearch = await ContentService.getContentWithoutResearch(undefined, 3)
-
-      for (const contentItem of contentWithoutResearch) {
-        try {
-          // Schedule research job
-          await JobService.scheduleJob('research', {
-            content_item_id: contentItem.id,
-          })
-          console.log(`[Research] Scheduled research for content ${contentItem.id}`)
-        } catch (error: any) {
-          console.error(`[Research] Error scheduling job for content ${contentItem.id}:`, error)
-        }
-      }
-
-      if (contentWithoutResearch.length > 0) {
-        console.log(`[Research] Processed ${contentWithoutResearch.length} content items`)
-      }
-    } catch (error: any) {
-      console.error('[Research] Error:', error)
-    }
-  })
-
   // Job queue processor: Runs every minute
   // Processes background_jobs table
   cron.schedule('* * * * *', async () => {
@@ -152,16 +125,6 @@ export function initializeScheduler(): void {
       await AutomationService.processScheduledPlans()
     } catch (error: any) {
       console.error('[Automation] Error processing scheduled plans:', error)
-    }
-  })
-
-  // Automation: Generate research for ready items with topics but no research (Step 1.5)
-  // Runs every 5 minutes for faster processing
-  cron.schedule('*/5 * * * *', async () => {
-    try {
-      await AutomationService.generateResearchForReadyItems()
-    } catch (error: any) {
-      console.error('[Automation] Error generating research:', error)
     }
   })
 

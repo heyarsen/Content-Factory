@@ -108,7 +108,7 @@ router.post('/signup', authLimiter, async (req: Request, res: Response) => {
           timezone: detectedTimezone,
           default_platforms: [],
           notifications_enabled: true,
-          auto_research_default: true,
+          auto_research_default: false,
           auto_approve_default: false,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' })

@@ -1,5 +1,4 @@
 import { supabase } from '../lib/supabase.js'
-import { ResearchService } from './researchService.js'
 import { ContentService } from './contentService.js'
 import type { Topic } from '../lib/perplexity.js'
 
@@ -74,7 +73,7 @@ export class PlanService {
         start_date: data.start_date,
         end_date: data.end_date || null,
         enabled: data.enabled ?? true,
-        auto_research: data.auto_research ?? true,
+        auto_research: data.auto_research ?? false,
         auto_create: data.auto_create ?? false,
       })
       .select()
@@ -546,9 +545,6 @@ export class PlanService {
     // No topic exists, generate a new one
 
     try {
-      // Generate topics using Perplexity
-      const topics = await ResearchService.generateTopics(userId)
-      
       // Get the plan item to find which category slot it should be
       const { data: item } = await supabase
         .from('video_plan_items')
@@ -558,29 +554,25 @@ export class PlanService {
 
       if (!item) throw new Error('Plan item not found')
 
-      // Get all items for this date to determine which topic to use
+      // Get all items for this date to determine which fallback topic to use
       const { data: sameDateItems } = await supabase
         .from('video_plan_items')
-        .select('category')
+        .select('id, topic, category')
         .eq('plan_id', item.plan_id)
         .eq('scheduled_date', item.scheduled_date)
         .order('scheduled_time')
 
-      const usedCategories = (sameDateItems || [])
-        .map((i: any) => i.category)
-        .filter(Boolean)
-
-      // Find an unused category
-      const availableTopic = topics.find(
-        (t) => !usedCategories.includes(t.Category)
-      ) || topics[0]
+      const position = (sameDateItems || []).findIndex((i: any) => i.id === itemId)
+      const safePosition = position >= 0 ? position + 1 : 1
+      const fallbackTopic = `Video idea ${safePosition}`
+      const fallbackCategory = item.category || 'general'
 
       // Update the plan item
       await supabase
         .from('video_plan_items')
         .update({
-          topic: availableTopic.Idea,
-          category: availableTopic.Category as string,
+          topic: fallbackTopic,
+          category: fallbackCategory,
           status: 'ready',
           error_message: null,
         })
@@ -590,10 +582,7 @@ export class PlanService {
       // Extract user-friendly error message
       let errorMessage = error.message || 'Failed to prepare topic'
       
-      // Handle rate limit errors specifically
-      if (errorMessage.includes('Rate limit') || errorMessage.includes('429')) {
-        errorMessage = 'Rate limit exceeded. The research service is temporarily unavailable. Please try again in a few minutes.'
-      } else if (errorMessage.includes('Failed to prepare topic')) {
+      if (errorMessage.includes('Failed to prepare topic')) {
         errorMessage = `Failed to prepare topic: ${errorMessage}`
       }
       
