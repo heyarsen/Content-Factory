@@ -279,7 +279,7 @@ export function InstagramDMs() {
     <Layout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-primary">DMs</h1>
+          <h1 className="text-3xl font-bold text-primary">AI DMs</h1>
           <p className="mt-1 text-sm text-slate-600">Manage direct messages in a chat-style inbox.</p>
         </div>
 
