@@ -34,12 +34,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { label: 'Social Accounts', to: '/social', icon: Share2, match: (pathname: string) => pathname === '/social' },
     { label: 'AI Auto-DM', to: '/social/dms', icon: MessagesSquare },
     { label: 'Trendwatcher', to: '/trend-searcher', icon: Search },
-    { label: t('common.avatars') || 'Avatars', to: '/avatars', icon: User, hint: 'In development' },
+    { label: t('common.avatars') || 'Avatars', to: '/avatars', icon: User },
     { label: 'Analytics', to: '/analytics', icon: BarChart3 },
-  ]
-
-  const secondaryNavigation = [
-    { label: 'Workspace Preferences', to: '/preferences', icon: SlidersHorizontal },
+    { label: t('common.preferences') || 'Preferences', to: '/preferences', icon: SlidersHorizontal },
   ]
 
   const adminNavigation = [
@@ -113,34 +110,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 </NavLink>
               )
             })}
-
-            <div className="mt-4 border-t border-slate-200 pt-4">
-              <p className="px-4 pb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">{t('common.settings')}</p>
-              {secondaryNavigation.map(({ label, to, icon: Icon }) => {
-                const isActive = location.pathname === to || location.pathname.startsWith(to + '/')
-                return (
-                  <NavLink
-                    key={to}
-                    to={to}
-                    onClick={onClose}
-                    className={`group relative flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold transition-all duration-200 touch-manipulation active:scale-[0.98] ${isActive
-                      ? 'bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-transparent text-brand-600'
-                      : 'text-slate-500 hover:bg-white hover:text-primary'
-                      }`}
-                  >
-                    <div
-                      className={`flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-200 ${isActive
-                        ? 'border-brand-200 bg-white text-brand-600 shadow-sm'
-                        : 'border-transparent bg-slate-100 text-slate-500 group-hover:border-slate-200'
-                        }`}
-                    >
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <span>{label}</span>
-                  </NavLink>
-                )
-              })}
-            </div>
 
             {user?.role === 'admin' && (
               <div className="mt-6 flex flex-col gap-2">
