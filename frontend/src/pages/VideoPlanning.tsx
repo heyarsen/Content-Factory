@@ -142,6 +142,7 @@ export function VideoPlanning() {
   const [plans, setPlans] = useState<VideoPlan[]>([])
   const [selectedPlan, setSelectedPlan] = useState<VideoPlan | null>(null)
   const [planItems, setPlanItems] = useState<VideoPlanItem[]>([])
+  const [calendarPlanItems, setCalendarPlanItems] = useState<VideoPlanItem[]>([])
   const [loading, setLoading] = useState(true)
   const [varietyMetrics, setVarietyMetrics] = useState<any>(null)
   const [createModal, setCreateModal] = useState(false)
@@ -457,7 +458,9 @@ export function VideoPlanning() {
   const loadPlans = async () => {
     try {
       const response = await api.get('/api/plans')
-      setPlans(response.data.plans || [])
+      const loadedPlans = response.data.plans || []
+      setPlans(loadedPlans)
+      await loadAllPlanItems(loadedPlans)
 
       // Load variety metrics if we have plans
       if (response.data.plans && response.data.plans.length > 0) {
@@ -493,31 +496,12 @@ export function VideoPlanning() {
           hasItems: items.length > 0,
         })
       }
-      const normalizedItems = items.map((item: VideoPlanItem) => {
-        const normalizedItemStatus = normalizeStatusValue(item.status) as VideoPlanItem['status']
-        const normalizedScriptStatus = normalizeStatusValue(item.script_status) as VideoPlanItem['script_status']
-        const normalizedVideoStatus = normalizeStatusValue(item.videos?.status)
-        const hasVideoFailure = ['failed', 'error'].includes(normalizedVideoStatus || '')
-        const hasItemFailure = Boolean(item.error_message)
-        const status = (hasVideoFailure || hasItemFailure)
-          ? 'failed'
-          : (item.video_id && normalizedVideoStatus
-            ? normalizedVideoStatus
-            : normalizedItemStatus)
-
-        return {
-          ...item,
-          status,
-          script_status: normalizedScriptStatus,
-          videos: item.videos
-            ? {
-              ...item.videos,
-              status: normalizedVideoStatus,
-            }
-            : item.videos,
-        }
-      })
+      const normalizedItems = normalizePlanItems(items)
       setPlanItems(normalizedItems)
+      setCalendarPlanItems((prevItems) => {
+        const remainingItems = prevItems.filter((item) => item.plan_id !== planId)
+        return [...remainingItems, ...normalizedItems]
+      })
       if (isDev) {
         console.log(`[VideoPlanning] ✓ Loaded ${items.length} plan items for plan ${planId}`)
       }
@@ -531,6 +515,49 @@ export function VideoPlanning() {
         status: error.response?.status,
         planId,
       })
+    }
+  }
+
+  const normalizePlanItems = (items: VideoPlanItem[]): VideoPlanItem[] => {
+    return items.map((item: VideoPlanItem) => {
+        const normalizedItemStatus = normalizeStatusValue(item.status) as VideoPlanItem['status']
+        const normalizedScriptStatus = normalizeStatusValue(item.script_status) as VideoPlanItem['script_status']
+        const normalizedVideoStatus = normalizeStatusValue(item.videos?.status)
+        const hasVideoFailure = ['failed', 'error'].includes(normalizedVideoStatus || '')
+        const hasItemFailure = Boolean(item.error_message)
+        const status = ((hasVideoFailure || hasItemFailure)
+          ? 'failed'
+          : (item.video_id && normalizedVideoStatus
+            ? normalizedVideoStatus
+            : normalizedItemStatus)) as VideoPlanItem['status']
+
+        return {
+          ...item,
+          status,
+          script_status: normalizedScriptStatus,
+          videos: item.videos
+            ? {
+              ...item.videos,
+              status: normalizedVideoStatus,
+            }
+            : item.videos,
+        }
+      })
+  }
+
+  const loadAllPlanItems = async (plansToLoad: VideoPlan[]) => {
+    if (!plansToLoad.length) {
+      setCalendarPlanItems([])
+      return
+    }
+
+    try {
+      const planResponses = await Promise.all(plansToLoad.map((plan) => api.get(`/api/plans/${plan.id}`)))
+      const allItems = planResponses.flatMap((response) => response.data.items || [])
+      const normalizedItems = normalizePlanItems(allItems)
+      setCalendarPlanItems(normalizedItems)
+    } catch (error) {
+      console.error('Failed to load all plan items for calendar:', error)
     }
   }
 
@@ -868,7 +895,7 @@ export function VideoPlanning() {
 
   const handleSaveItem = async () => {
     const targetItem = editingItem || selectedItem
-    if (!targetItem || !selectedPlan) return
+    if (!targetItem) return
 
     try {
       await api.patch(`/api/plans/items/${targetItem.id}`, {
@@ -887,7 +914,7 @@ export function VideoPlanning() {
       }
 
       setEditingItem(null)
-      loadPlanItems(selectedPlan.id)
+      await loadPlanItems(targetItem.plan_id)
     } catch (error: any) {
       alert(error.response?.data?.error || t('video_planning.update_item_failed'))
     }
@@ -906,7 +933,7 @@ export function VideoPlanning() {
 
   // Filter items by status (for plan items only, scheduled posts are shown separately)
   const filteredItems = useMemo(() => {
-    if (statusFilter === 'all') return planItems
+    if (statusFilter === 'all') return calendarPlanItems
     if (statusFilter === 'active') {
       const activeStatuses = [
         'pending',
@@ -916,18 +943,18 @@ export function VideoPlanning() {
         'approved',
         'scheduled',
       ]
-      return planItems.filter((item: VideoPlanItem) => activeStatuses.includes(item.status))
+      return calendarPlanItems.filter((item: VideoPlanItem) => activeStatuses.includes(item.status))
     }
     if (statusFilter === 'completed') {
-      return planItems.filter(
+      return calendarPlanItems.filter(
         (item: VideoPlanItem) => item.status === 'completed' || item.status === 'posted',
       )
     }
     if (statusFilter === 'failed') {
-      return planItems.filter((item: VideoPlanItem) => item.status === 'failed')
+      return calendarPlanItems.filter((item: VideoPlanItem) => item.status === 'failed')
     }
-    return planItems.filter((item: VideoPlanItem) => item.status === statusFilter)
-  }, [planItems, statusFilter])
+    return calendarPlanItems.filter((item: VideoPlanItem) => item.status === statusFilter)
+  }, [calendarPlanItems, statusFilter])
 
   // Filter scheduled posts by status
   const filteredPosts =
@@ -1126,10 +1153,13 @@ export function VideoPlanning() {
   }
 
   const movePlanItemToDate = async (itemId: string, dateKey: string) => {
-    if (!selectedPlan) return
     try {
       await api.put(`/api/plans/items/${itemId}`, { scheduled_date: dateKey })
-      await loadPlanItems(selectedPlan.id)
+      if (selectedPlan) {
+        await loadPlanItems(selectedPlan.id)
+      } else {
+        await loadAllPlanItems(plans)
+      }
       addNotification({
         type: 'success',
         title: 'Schedule updated',
@@ -1183,27 +1213,27 @@ export function VideoPlanning() {
     const postedCount = scheduledPosts.filter((p: ScheduledPost) => p.status === 'posted').length
 
     return {
-      all: planItems.length + scheduledPosts.length,
-      pending: planItems.filter((i: VideoPlanItem) => i.status === 'pending').length + scheduledCount,
-      ready: planItems.filter((i: VideoPlanItem) => i.status === 'ready').length,
-      completed: planItems.filter((i: VideoPlanItem) => i.status === 'completed').length,
-      scheduled: planItems.filter((i: VideoPlanItem) => i.status === 'scheduled').length + scheduledCount,
-      posted: planItems.filter((i: VideoPlanItem) => i.status === 'posted').length + postedCount,
-      failed: planItems.filter((i: VideoPlanItem) => i.status === 'failed').length + scheduledPosts.filter((p: ScheduledPost) => p.status === 'failed').length,
+      all: calendarPlanItems.length + scheduledPosts.length,
+      pending: calendarPlanItems.filter((i: VideoPlanItem) => i.status === 'pending').length + scheduledCount,
+      ready: calendarPlanItems.filter((i: VideoPlanItem) => i.status === 'ready').length,
+      completed: calendarPlanItems.filter((i: VideoPlanItem) => i.status === 'completed').length,
+      scheduled: calendarPlanItems.filter((i: VideoPlanItem) => i.status === 'scheduled').length + scheduledCount,
+      posted: calendarPlanItems.filter((i: VideoPlanItem) => i.status === 'posted').length + postedCount,
+      failed: calendarPlanItems.filter((i: VideoPlanItem) => i.status === 'failed').length + scheduledPosts.filter((p: ScheduledPost) => p.status === 'failed').length,
     }
   }
 
   const statusCounts = getStatusCounts()
 
   const automationVideoItems = useMemo(() => {
-    return [...planItems]
+    return [...calendarPlanItems]
       .filter((item) => item.video_id || item.videos?.video_url)
       .sort((a, b) => {
         const aDate = new Date(`${a.scheduled_date}T${a.scheduled_time || '00:00:00'}`).getTime()
         const bDate = new Date(`${b.scheduled_date}T${b.scheduled_time || '00:00:00'}`).getTime()
         return bDate - aDate
       })
-  }, [planItems])
+  }, [calendarPlanItems])
 
   const automationSummary = useMemo(() => {
     const total = automationVideoItems.length
@@ -3024,7 +3054,7 @@ export function VideoPlanning() {
           {selectedItem && (() => {
             // Get all items for the selected item's date
             const itemDate = selectedItem.scheduled_date
-            const itemsForDate = planItems.filter(item => item.scheduled_date === itemDate)
+            const itemsForDate = calendarPlanItems.filter(item => item.scheduled_date === itemDate)
               .sort((a, b) => {
                 // Sort by scheduled_time
                 const timeA = a.scheduled_time || '00:00'
@@ -3327,8 +3357,13 @@ export function VideoPlanning() {
                         try {
                           const response = await api.post(`/api/plans/items/${selectedItem.id}/refresh-status`)
                           if (response.data.item) {
-                            // Update the item in the planItems array
+                            // Update the item in both selected plan and calendar arrays
                             setPlanItems(prevItems =>
+                              prevItems.map(item =>
+                                item.id === selectedItem.id ? response.data.item : item
+                              )
+                            )
+                            setCalendarPlanItems(prevItems =>
                               prevItems.map(item =>
                                 item.id === selectedItem.id ? response.data.item : item
                               )
