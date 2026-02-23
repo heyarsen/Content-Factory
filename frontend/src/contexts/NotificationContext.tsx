@@ -3,6 +3,38 @@ import { supabase } from '../lib/supabase'
 import api from '../lib/api'
 import { useAuth } from './AuthContext'
 
+const NOTIFICATION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
+const DEFAULT_TOAST_DURATION = 5000
+
+const getStorageKey = (userId?: string) => `notifications:${userId || 'guest'}`
+
+const parseStoredNotifications = (value: string | null): Notification[] => {
+  if (!value) return []
+
+  try {
+    const parsed = JSON.parse(value)
+    if (!Array.isArray(parsed)) return []
+
+    return parsed.filter((item): item is Notification => {
+      return (
+        typeof item?.id === 'string' &&
+        ['success', 'error', 'info', 'warning'].includes(item?.type) &&
+        typeof item?.title === 'string' &&
+        typeof item?.message === 'string' &&
+        typeof item?.read === 'boolean' &&
+        typeof item?.createdAt === 'number'
+      )
+    })
+  } catch {
+    return []
+  }
+}
+
+const pruneExpiredNotifications = (items: Notification[], now = Date.now()) => {
+  const cutoff = now - NOTIFICATION_RETENTION_MS
+  return items.filter((notification) => notification.createdAt >= cutoff)
+}
+
 export interface Notification {
   id: string
   type: 'success' | 'error' | 'info' | 'warning'
@@ -30,6 +62,7 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([])
+  const [toastQueue, setToastQueue] = useState<Notification[]>([])
   const [unreadSupportCount, setUnreadSupportCount] = useState(0)
   const { user } = useAuth()
 
@@ -46,9 +79,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setNotifications((prev) => [newNotification, ...prev]) // Add to top
 
     if (notification.duration !== 0) {
+      setToastQueue((prev) => [newNotification, ...prev])
       setTimeout(() => {
-        removeNotification(id)
-      }, notification.duration || 5000)
+        setToastQueue((prev) => prev.filter((toast) => toast.id !== id))
+      }, notification.duration || DEFAULT_TOAST_DURATION)
     }
 
     // Show browser notification if permission granted
@@ -62,6 +96,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const removeNotification = useCallback((id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id))
+    setToastQueue((prev) => prev.filter((n) => n.id !== id))
   }, [])
 
   const markAsRead = useCallback((id: string) => {
@@ -71,6 +106,35 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const markAllAsRead = useCallback(() => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })))
   }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const key = getStorageKey(user?.id)
+    const storedNotifications = parseStoredNotifications(localStorage.getItem(key))
+    const activeNotifications = pruneExpiredNotifications(storedNotifications)
+
+    setNotifications(activeNotifications)
+    setToastQueue([])
+
+    if (activeNotifications.length !== storedNotifications.length) {
+      localStorage.setItem(key, JSON.stringify(activeNotifications))
+    }
+  }, [user?.id])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const key = getStorageKey(user?.id)
+    const activeNotifications = pruneExpiredNotifications(notifications)
+
+    if (activeNotifications.length !== notifications.length) {
+      setNotifications(activeNotifications)
+      return
+    }
+
+    localStorage.setItem(key, JSON.stringify(activeNotifications))
+  }, [notifications, user?.id])
 
   const refreshSupportCount = async () => {
     if (!user) return
@@ -189,8 +253,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }}>
       {children}
       <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
-        {notifications.slice(0, 5).map((notification) => (
-          <NotificationToast key={notification.id} {...notification} onClose={() => removeNotification(notification.id)} />
+        {toastQueue.slice(0, 5).map((notification) => (
+          <NotificationToast key={notification.id} {...notification} onClose={() => setToastQueue((prev) => prev.filter((toast) => toast.id !== notification.id))} />
         ))}
       </div>
     </NotificationContext.Provider>
