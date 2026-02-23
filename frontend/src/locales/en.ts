@@ -1,7 +1,7 @@
 export const en = {
     common: {
         dashboard: "Dashboard",
-        my_videos: "My Videos",
+        my_videos: "Video Library",
         manual_creation: "Manual Creation",
         automation: "Automation",
         create: "Create",
@@ -253,7 +253,7 @@ export const en = {
     videos: {
         library_title: "Video Library",
         library_desc: "View and manage all your videos.",
-        my_videos: "My Videos",
+        my_videos: "Video Library",
         create_video: "Create Video",
         search_placeholder: "Search videos by topic or style...",
         all_status: "All status",

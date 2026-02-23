@@ -1703,19 +1703,11 @@ export function VideoPlanning() {
 
         <Card className="border border-slate-200 bg-white p-5 shadow-sm sm:rounded-3xl sm:p-6">
           <div className="space-y-6">
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">Content Studio</p>
-              <h2 className="text-2xl font-semibold text-slate-950">Everything video in one place</h2>
-              <p className="max-w-2xl text-sm text-slate-600">
-                Calendar, video library, and automations in a single flow. Preview is the hero action on each video.
-              </p>
-            </div>
-
             <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
               {[
-                { id: 'calendar', label: 'Calendar', icon: '📅' },
-                { id: 'library', label: 'Video Library', icon: '🎞' },
-                { id: 'automations', label: 'Automations', icon: '⚡' },
+                { id: 'calendar', label: 'Calendar' },
+                { id: 'library', label: 'Video Library' },
+                { id: 'automations', label: 'Automations' },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -1726,17 +1718,10 @@ export function VideoPlanning() {
                     : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
                     }`}
                 >
-                  <span className="mr-1.5" aria-hidden="true">{tab.icon}</span>
                   {tab.label}
                 </button>
               ))}
             </div>
-
-            {contentStudioTab === 'calendar' && (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                Calendar remains your planning anchor. Use the calendar section below to manage publishing windows and drag videos between dates.
-              </div>
-            )}
 
             {contentStudioTab === 'library' && (
               <div className="space-y-4">

@@ -523,7 +523,7 @@ export function Videos() {
       <div className="space-y-10">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('videos.my_videos') || 'My Videos'}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('videos.my_videos') || 'Video Library'}</p>
             <h1 className="text-3xl font-semibold text-primary">{t('videos.library_title')}</h1>
             <p className="text-sm text-slate-500">{t('videos.library_desc')}</p>
           </div>
