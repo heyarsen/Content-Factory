@@ -1160,9 +1160,24 @@ export function VideoPlanning() {
   const itemsByDate = useMemo(() => {
     const combined: Record<string, CalendarItem[]> = {}
 
+    const postedVideoIdsByDate = new Map<string, Set<string>>()
+    Object.entries(postsByDate).forEach(([date, posts]) => {
+      posts.forEach((post) => {
+        if (!post.video_id) return
+        if (!postedVideoIdsByDate.has(date)) {
+          postedVideoIdsByDate.set(date, new Set())
+        }
+        postedVideoIdsByDate.get(date)?.add(post.video_id)
+      })
+    })
+
     // Add plan items
     Object.keys(planItemsByDate).forEach(date => {
-      combined[date] = [...(planItemsByDate[date] || [])]
+      const scheduledPostVideoIds = postedVideoIdsByDate.get(date)
+      combined[date] = (planItemsByDate[date] || []).filter((item) => {
+        if (!item.video_id) return true
+        return !scheduledPostVideoIds?.has(item.video_id)
+      })
     })
 
     // Add scheduled posts
