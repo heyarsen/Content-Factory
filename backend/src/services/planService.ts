@@ -502,7 +502,8 @@ export class PlanService {
   }
 
   /**
-   * Generate topic for a plan item using Perplexity
+   * Generate a topic for a plan item and mark it ready for script generation.
+   * Research is intentionally skipped.
    */
   static async generateTopicForItem(itemId: string, userId: string): Promise<void> {
     // First, check if item already has a topic (user-provided)
@@ -512,9 +513,8 @@ export class PlanService {
       .eq('id', itemId)
       .single()
 
-    // If item already has a topic, don't overwrite it - just research it if needed
+    // If item already has a topic, don't overwrite it - mark ready immediately.
     if (existingItem?.topic) {
-      // Item has a user-provided topic, research it instead of generating a new one
       try {
         // Get the plan item to find category
         const { data: item } = await supabase
@@ -525,39 +525,12 @@ export class PlanService {
 
         if (!item) throw new Error('Plan item not found')
 
-        // Update status to researching
-        await supabase
-          .from('video_plan_items')
-          .update({ status: 'researching' })
-          .eq('id', itemId)
-
-        // Research the existing topic
-        const research = await ResearchService.researchTopic(
-          existingItem.topic,
-          item.category || 'general',
-          userId
-        )
-
-        // Update the plan item with research data but keep the original topic and prompt fields
-        // Only update description, why_important, useful_tips if they're not already set (from prompts)
         const updateData: any = {
-          // Keep the original topic - don't overwrite it
-          category: research.category as string || item.category,
-          research_data: research,
           status: 'ready',
+          error_message: null,
+          category: item.category || 'general',
         }
-        
-        // Only overwrite if field is empty/null (preserve prompt values)
-        if (!item.description) {
-          updateData.description = research.description
-        }
-        if (!item.why_important) {
-          updateData.why_important = research.whyItMatters
-        }
-        if (!item.useful_tips) {
-          updateData.useful_tips = research.usefulTips
-        }
-        
+
         await supabase
           .from('video_plan_items')
           .update(updateData)
@@ -565,17 +538,12 @@ export class PlanService {
         
         return
       } catch (error: any) {
-        console.error('Error researching existing topic:', error)
+        console.error('Error preparing existing topic:', error)
         throw error
       }
     }
 
     // No topic exists, generate a new one
-    // Update status to researching
-    await supabase
-      .from('video_plan_items')
-      .update({ status: 'researching' })
-      .eq('id', itemId)
 
     try {
       // Generate topics using Perplexity
@@ -607,36 +575,26 @@ export class PlanService {
         (t) => !usedCategories.includes(t.Category)
       ) || topics[0]
 
-      // Research the topic
-      const research = await ResearchService.researchTopic(
-        availableTopic.Idea,
-        availableTopic.Category as string,
-        userId
-      )
-
       // Update the plan item
       await supabase
         .from('video_plan_items')
         .update({
-          topic: research.idea,
-          category: research.category as string,
-          description: research.description,
-          why_important: research.whyItMatters,
-          useful_tips: research.usefulTips,
-          research_data: research,
+          topic: availableTopic.Idea,
+          category: availableTopic.Category as string,
           status: 'ready',
+          error_message: null,
         })
         .eq('id', itemId)
 
     } catch (error: any) {
       // Extract user-friendly error message
-      let errorMessage = error.message || 'Failed to research topic'
+      let errorMessage = error.message || 'Failed to prepare topic'
       
       // Handle rate limit errors specifically
       if (errorMessage.includes('Rate limit') || errorMessage.includes('429')) {
         errorMessage = 'Rate limit exceeded. The research service is temporarily unavailable. Please try again in a few minutes.'
-      } else if (errorMessage.includes('Failed to research topic')) {
-        errorMessage = `Failed to research topic: ${errorMessage}`
+      } else if (errorMessage.includes('Failed to prepare topic')) {
+        errorMessage = `Failed to prepare topic: ${errorMessage}`
       }
       
       await supabase
@@ -735,7 +693,7 @@ export class PlanService {
   }
 
   /**
-   * Get items with research but no script
+   * Get items ready for script generation.
    */
   static async getItemsReadyForScriptGeneration(): Promise<VideoPlanItem[]> {
     const { data } = await supabase
@@ -744,7 +702,6 @@ export class PlanService {
       .eq('plan.enabled', true)
       .eq('status', 'ready')
       .is('script', null)
-      .not('research_data', 'is', null)
 
     return data || []
   }
