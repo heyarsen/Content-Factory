@@ -25,6 +25,8 @@ import {
   FileText,
   ExternalLink,
   Video,
+  Upload,
+  Library,
 } from 'lucide-react'
 import api from '../lib/api'
 import { normalizeTimezone, timezones } from '../lib/timezones'
@@ -1193,6 +1195,41 @@ export function VideoPlanning() {
 
   const statusCounts = getStatusCounts()
 
+  const automationVideoItems = useMemo(() => {
+    return [...planItems]
+      .filter((item) => item.video_id || item.videos?.video_url)
+      .sort((a, b) => {
+        const aDate = new Date(`${a.scheduled_date}T${a.scheduled_time || '00:00:00'}`).getTime()
+        const bDate = new Date(`${b.scheduled_date}T${b.scheduled_time || '00:00:00'}`).getTime()
+        return bDate - aDate
+      })
+  }, [planItems])
+
+  const automationSummary = useMemo(() => {
+    const total = automationVideoItems.length
+    const ready = automationVideoItems.filter((item) => {
+      const normalizedVideoStatus = normalizeStatusValue(item.videos?.status)
+      const normalizedItemStatus = normalizeStatusValue(item.status)
+      return normalizedVideoStatus === 'completed' || normalizedItemStatus === 'completed'
+    }).length
+    const inProgress = automationVideoItems.filter((item) => {
+      const normalizedVideoStatus = normalizeStatusValue(item.videos?.status)
+      const normalizedItemStatus = normalizeStatusValue(item.status)
+      return (
+        normalizedVideoStatus === 'generating' ||
+        normalizedItemStatus === 'generating' ||
+        normalizedItemStatus === 'researching' ||
+        normalizedItemStatus === 'draft'
+      )
+    }).length
+
+    return {
+      total,
+      ready,
+      inProgress,
+    }
+  }, [automationVideoItems])
+
   const getStatusBadge = (status: string, scriptStatus?: string | null, item?: VideoPlanItem) => {
     // Clear, user-friendly status labels that explain what's happening in the workflow
     const normalizedItemStatus = normalizeStatusValue(status) || ''
@@ -1355,6 +1392,90 @@ export function VideoPlanning() {
             </Button>
           </div>
         </div>
+
+        <Card className="border border-brand-100 bg-gradient-to-br from-white via-brand-50/40 to-violet-50/30 p-5 sm:p-6">
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-brand-500">Video automation hub</p>
+                <h2 className="text-xl font-semibold text-primary">Everything video in one place</h2>
+                <p className="max-w-2xl text-sm text-slate-600">
+                  See all videos created by automations, generate a new AI video, or upload existing videos without leaving the studio.
+                </p>
+              </div>
+
+              <div className="grid w-full max-w-xl grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-white/80 bg-white/80 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Automation videos</p>
+                  <p className="mt-1 text-2xl font-semibold text-slate-900">{automationSummary.total}</p>
+                </div>
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/80 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-emerald-500">Ready</p>
+                  <p className="mt-1 text-2xl font-semibold text-emerald-700">{automationSummary.ready}</p>
+                </div>
+                <div className="rounded-2xl border border-blue-100 bg-blue-50/80 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-blue-500">In progress</p>
+                  <p className="mt-1 text-2xl font-semibold text-blue-700">{automationSummary.inProgress}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <Button variant="secondary" onClick={() => navigate('/videos')} leftIcon={<Library className="h-4 w-4" />}>
+                See all videos
+              </Button>
+              <Button onClick={() => setGenerateVideoModalOpen(true)} leftIcon={<Sparkles className="h-4 w-4" />} disabled={showUpgrade}>
+                {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : 'Generate AI video'}
+              </Button>
+              <Button variant="secondary" onClick={() => setUploadPlanModal(true)} leftIcon={<Upload className="h-4 w-4" />}>
+                Upload video
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-slate-700">Latest automation outputs</p>
+                <button
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700"
+                  onClick={() => navigate('/videos')}
+                >
+                  Open library
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              {automationVideoItems.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-brand-200 bg-white/70 p-5 text-sm text-slate-500">
+                  No automation videos yet. Generate your first AI video or upload one to start filling this feed.
+                </div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {automationVideoItems.slice(0, 6).map((item) => {
+                    const normalizedVideoStatus = normalizeStatusValue(item.videos?.status)
+                    const resolvedStatus = normalizedVideoStatus || normalizeStatusValue(item.status) || 'pending'
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => item.video_id && navigate(`/videos?videoId=${item.video_id}`)}
+                        className="rounded-2xl border border-white/80 bg-white/90 p-4 text-left transition hover:border-brand-200 hover:shadow-sm"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="line-clamp-2 text-sm font-semibold text-slate-800">{item.topic || 'Untitled video'}</p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {item.scheduled_date} {item.scheduled_time ? `• ${formatTime(item.scheduled_time)}` : ''}
+                            </p>
+                          </div>
+                          {getStatusBadge(resolvedStatus, item.script_status, item)}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
 
         {/* Content Variety Metrics */}
         {varietyMetrics && (
