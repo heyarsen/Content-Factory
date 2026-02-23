@@ -401,6 +401,36 @@ export function Credits() {
     }
   }
 
+  const formatCreditsAmount = (amount: number) => `${Math.abs(amount)} ${Math.abs(amount) === 1 ? 'credit' : 'credits'}`
+
+  const formatOperationLabel = (operation?: string | null) => {
+    if (!operation) return ''
+    const normalized = operation.toLowerCase().replace(/_/g, ' ')
+    if (normalized.includes('video generation')) return 'AI video generation'
+    if (normalized.includes('subscription')) return 'subscription renewal'
+    return normalized
+  }
+
+  const getTransactionDescription = (transaction: CreditTransaction) => {
+    const operationLabel = formatOperationLabel(transaction.operation)
+
+    if (transaction.type === 'deduction') {
+      return `${formatCreditsAmount(transaction.amount)} used${operationLabel ? ` for ${operationLabel}` : ''}`
+    }
+
+    if (transaction.type === 'topup' || transaction.type === 'refund') {
+      return `${formatCreditsAmount(transaction.amount)} added${operationLabel ? ` from ${operationLabel}` : ''}`
+    }
+
+    if (transaction.type === 'adjustment') {
+      return transaction.amount >= 0
+        ? `${formatCreditsAmount(transaction.amount)} added as an account adjustment`
+        : `${formatCreditsAmount(transaction.amount)} removed as an account adjustment`
+    }
+
+    return transaction.description || transaction.operation || transaction.type
+  }
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     const { language } = useLanguage()
@@ -423,17 +453,6 @@ export function Credits() {
           <div>
             <h1 className="text-3xl font-bold text-slate-900">{t('credits.title')}</h1>
             <p className="mt-2 text-slate-600">{t('credits.subtitle')}</p>
-            {hasSubscription && subscription?.status === 'active' && (
-              <div className="mt-2 flex items-center gap-4">
-                <button
-                  onClick={handleCancelClick}
-                  disabled={purchasing === 'cancel'}
-                  className="text-sm text-red-600 hover:text-red-700 font-medium underline"
-                >
-                  {t('credits.cancel_subscription')}
-                </button>
-              </div>
-            )}
           </div>
           <div className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-6 py-4 shadow-sm sm:w-auto">
             <Coins className="h-6 w-6 text-amber-500" />
@@ -528,9 +547,12 @@ export function Credits() {
                           <span className="text-sm text-slate-500">{t('credits.credits_unit')}</span>
                         </div>
                       </div>
-                      <div className="mb-6 flex items-baseline gap-2">
-                        <span className="text-2xl font-bold text-brand-600">${plan.price_usd.toFixed(2)}</span>
-                        <span className="text-sm text-slate-500">USD</span>
+                      <div className="mb-6">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-2xl font-bold text-brand-600">${plan.price_usd.toFixed(2)}</span>
+                          <span className="text-sm text-slate-500">USD</span>
+                        </div>
+                        <p className="mt-1 text-xs text-slate-500">${(plan.price_usd / Math.max(plan.credits, 1)).toFixed(2)} per credit</p>
                       </div>
                       <ul className="mb-6 space-y-2">
                         {[
@@ -608,6 +630,21 @@ export function Credits() {
           )}
         </div>
 
+        {hasSubscription && subscription?.status === 'active' && (
+          <Card className="border border-rose-200 bg-rose-50/40 p-5">
+            <h2 className="text-lg font-semibold text-rose-700">Danger zone</h2>
+            <p className="mt-1 text-sm text-rose-700/80">Canceling your subscription stops future renewals. Your current period remains active until it ends.</p>
+            <Button
+              onClick={handleCancelClick}
+              disabled={purchasing === 'cancel'}
+              variant="danger"
+              className="mt-4"
+            >
+              {t('credits.cancel_subscription')}
+            </Button>
+          </Card>
+        )}
+
         {/* Transaction History */}
         <div>
           <h2 className="mb-4 text-xl font-semibold text-slate-900">{t('credits.history_title')}</h2>
@@ -634,7 +671,7 @@ export function Credits() {
                       </div>
                       <div>
                         <p className="font-medium text-slate-900">
-                          {transaction.description || transaction.operation || transaction.type}
+                          {getTransactionDescription(transaction)}
                         </p>
                         <p className="text-sm text-slate-500">{formatDate(transaction.created_at)}</p>
                       </div>

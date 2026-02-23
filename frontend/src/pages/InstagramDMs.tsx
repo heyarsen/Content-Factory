@@ -5,7 +5,7 @@ import { Button } from '../components/ui/Button'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Badge } from '../components/ui/Badge'
-import { MessageCircle, RefreshCw, CalendarRange, Send } from 'lucide-react'
+import { MessageCircle, RefreshCw, CalendarRange, Send, Sparkles } from 'lucide-react'
 import api from '../lib/api'
 
 interface InstagramDM {
@@ -57,6 +57,13 @@ const formatTime = (value?: string) => {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+const getInitials = (name: string) => {
+  const clean = name.trim()
+  if (!clean) return 'U'
+  const parts = clean.split(/\s+/).filter(Boolean)
+  return (parts[0]?.[0] || 'U').toUpperCase() + (parts[1]?.[0] || '').toUpperCase()
 }
 
 const extractMessages = (dm: InstagramDM): ChatMessage[] => {
@@ -247,6 +254,21 @@ export function InstagramDMs() {
     loadData()
   }
 
+  const handleGenerateAiReply = () => {
+    if (!selectedConversation) return
+    const lastInbound = [...selectedConversation.messages]
+      .reverse()
+      .find((dm) => !isOutgoingMessage(dm, selectedConversation.participantId, selectedConversation.ownAccountId))
+
+    const baseText = (lastInbound?.text || '').trim()
+    if (!baseText) {
+      setMessage("Thanks for reaching out! I'll get back to you shortly.")
+      return
+    }
+
+    setMessage(`Thanks for your message! Regarding "${baseText.slice(0, 80)}${baseText.length > 80 ? '…' : ''}", happy to help — can you share one more detail so I can give you the best answer?`)
+  }
+
   const handleSend = async () => {
     try {
       setSendError(null)
@@ -376,12 +398,17 @@ export function InstagramDMs() {
               {selectedConversation ? (
                 <>
                   <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-                    <div>
-                      <p className="text-sm text-slate-500">Chatting with</p>
-                      <h3 className="text-lg font-semibold text-primary">{selectedConversation.participantLabel}</h3>
-                      <p className="text-xs text-slate-500">Recipient ID: {selectedConversation.participantId || 'Unknown'}</p>
+                    <div className="flex items-center gap-3">
+                      <div className="grid h-10 w-10 place-items-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700">
+                        {getInitials(selectedConversation.participantLabel)}
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-500">Chatting with</p>
+                        <h3 className="text-lg font-semibold text-primary">{selectedConversation.participantLabel}</h3>
+                        <p className="text-xs text-slate-500">Instagram DM</p>
+                      </div>
                     </div>
-                    <Badge variant="default">Thread {selectedConversation.id}</Badge>
+                    <Badge variant="default">AI Auto-DM</Badge>
                   </div>
 
                   <div className="max-h-[420px] flex-1 space-y-3 overflow-y-auto bg-gradient-to-b from-white to-slate-50 p-5">
@@ -440,10 +467,16 @@ export function InstagramDMs() {
                     rows={3}
                     className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none"
                   />
-                  <Button onClick={handleSend} disabled={sending} className="h-fit gap-2 md:self-end">
-                    <Send className={`h-4 w-4 ${sending ? 'animate-pulse' : ''}`} />
-                    {sending ? 'Sending...' : 'Send'}
-                  </Button>
+                  <div className="flex flex-col gap-2 md:self-end">
+                    <Button variant="secondary" onClick={handleGenerateAiReply} disabled={!selectedConversation} className="h-fit gap-2">
+                      <Sparkles className="h-4 w-4" />
+                      Generate AI Reply
+                    </Button>
+                    <Button onClick={handleSend} disabled={sending} className="h-fit gap-2">
+                      <Send className={`h-4 w-4 ${sending ? 'animate-pulse' : ''}`} />
+                      {sending ? 'Sending...' : 'Send'}
+                    </Button>
+                  </div>
                 </div>
 
                 {sendError && <p className="mt-2 text-sm text-red-600">{sendError}</p>}

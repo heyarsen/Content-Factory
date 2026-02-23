@@ -153,6 +153,18 @@ type ContentStudioTab = 'calendar' | 'library' | 'automations'
 type StudioVideoType = 'AI' | 'Uploaded' | 'Auto'
 type StudioVideoStatus = 'Ready' | 'Posted' | 'Failed'
 
+const UUID_LIKE_PATTERN = /^[a-f0-9]{32,}$/i
+
+const getReadableVideoTitle = (title: string | null | undefined, type: StudioVideoType = 'AI') => {
+  const safeTitle = (title || '').trim()
+  if (!safeTitle || UUID_LIKE_PATTERN.test(safeTitle)) {
+    if (type === 'Uploaded') return 'Untitled uploaded video'
+    if (type === 'Auto') return 'Untitled automation video'
+    return 'Untitled AI video'
+  }
+  return safeTitle
+}
+
 type StudioVideo = {
   id: string
   title: string
@@ -1426,7 +1438,7 @@ export function VideoPlanning() {
 
         return {
           id: video.id,
-          title: video.topic || 'Untitled video',
+          title: getReadableVideoTitle(video.topic, type),
           type,
           status: status || 'Ready',
           date: createdAt.toLocaleDateString(locale, { month: 'short', day: 'numeric' }),
@@ -2167,8 +2179,11 @@ export function VideoPlanning() {
                                 const isPost = isScheduledPost(item)
                                 const status = normalizeStatusValue((isPost ? item.status : item.videos?.status || item.status)) || 'pending'
                                 const displayTopic = isPost
-                                  ? item.videos?.topic || `${item.platforms.map((platformPost) => platformPost.platform).join(', ')} Post`
-                                  : (item.topic || (item.scheduled_time ? t('video_planning.planned_with_time').replace('{time}', formatTime(item.scheduled_time)) : t('video_planning.planned')))
+                                  ? getReadableVideoTitle(item.videos?.topic, 'Auto')
+                                  : getReadableVideoTitle(
+                                    item.topic || (item.scheduled_time ? t('video_planning.planned_with_time').replace('{time}', formatTime(item.scheduled_time)) : t('video_planning.planned')),
+                                    item.video_id ? 'Auto' : 'AI',
+                                  )
                                 const displayTime = isPost
                                   ? (item.scheduled_time || item.posted_at ? new Date(item.scheduled_time || item.posted_at || '').toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '')
                                   : (item.scheduled_time ? formatTime(item.scheduled_time) : '')
