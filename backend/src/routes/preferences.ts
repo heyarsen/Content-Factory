@@ -26,7 +26,7 @@ router.get('/', authenticate, requireSubscription, async (req: AuthRequest, res:
       timezone: 'UTC',
       default_platforms: [],
       notifications_enabled: true,
-      auto_research_default: true,
+      auto_research_default: false,
       auto_approve_default: false,
       marketing_emails_enabled: true,
     }

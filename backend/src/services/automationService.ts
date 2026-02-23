@@ -1,6 +1,5 @@
 import { supabase } from '../lib/supabase.js'
 import { PlanService } from './planService.js'
-import { ResearchService } from './researchService.js'
 import { VideoService } from './videoService.js'
 import { SubscriptionService } from './subscriptionService.js'
 import { postVideo } from '../lib/uploadpost.js'
@@ -149,38 +148,18 @@ export class AutomationService {
             `[Automation] Plan ${plan.id}: due pending items after time filter = ${duePendingItems.length}`,
             duePendingItems.map(item => ({ id: item.id, scheduled_time: item.scheduled_time || 'N/A' }))
           )
-          const researchPromises: Promise<void>[] = []
+          const topicPreparationPromises: Promise<void>[] = []
 
           for (const item of duePendingItems) {
-            // If item has a topic but status is pending, check if we need to research it
-            if (plan.auto_research) {
-              if (item.topic) {
-                // Has user-provided topic - research it (generateTopicForItem will preserve the topic)
-                // This will research the topic without overwriting it
-                researchPromises.push(
-                  PlanService.generateTopicForItem(item.id, plan.user_id).catch((error) => {
-                    console.error(`Error researching topic for item ${item.id}:`, error)
-                  })
-                )
-              } else {
-                // No topic, generate topic first (which will also research it)
-                researchPromises.push(
-                  PlanService.generateTopicForItem(item.id, plan.user_id).catch((error) => {
-                    console.error(`Error generating topic for item ${item.id}:`, error)
-                  })
-                )
-              }
-            } else if (item.topic) {
-              // Has topic but no auto_research, mark as ready for script generation
-              await supabase
-                .from('video_plan_items')
-                .update({ status: 'ready' })
-                .eq('id', item.id)
-            }
+            topicPreparationPromises.push(
+              PlanService.generateTopicForItem(item.id, plan.user_id).catch((error) => {
+                console.error(`Error preparing topic for item ${item.id}:`, error)
+              })
+            )
           }
 
-          // Wait for all research to complete before generating scripts
-          await Promise.all(researchPromises)
+          // Wait for topic preparation before generating scripts
+          await Promise.all(topicPreparationPromises)
 
           // Small delay to ensure database updates are reflected
           await new Promise(resolve => setTimeout(resolve, 2000))
@@ -572,82 +551,10 @@ export class AutomationService {
   }
 
   /**
-   * Generate research for items with topics but no research
-   * Only processes today's items after trigger time
+   * Research stage removed from automation pipeline.
    */
   static async generateResearchForReadyItems(): Promise<void> {
-    // Get all enabled plans with trigger times and auto_research enabled
-    const { data: plans } = await supabase
-      .from('video_plans')
-      .select('id, trigger_time, timezone, user_id, auto_research, auto_schedule_trigger')
-      .eq('enabled', true)
-      .eq('auto_research', true)
-      .in('auto_schedule_trigger', ['daily', 'time_based'])
-      .not('trigger_time', 'is', null)
-
-    if (!plans || plans.length === 0) return
-
-    // Process each plan that has passed its trigger time today
-    for (const plan of plans) {
-      try {
-        const planTimezone = plan.timezone || 'UTC'
-        const nowInPlanTz = DateTime.now().setZone(planTimezone)
-        const today = nowInPlanTz.toFormat('yyyy-MM-dd')
-
-        // Check if user has an active subscription
-        const hasActiveSub = await SubscriptionService.hasActiveSubscription(plan.user_id)
-        if (!hasActiveSub) {
-          console.log(`[Automation] Skipping research generation for plan ${plan.id} - user ${plan.user_id} has no active subscription`)
-          continue
-        }
-
-        // Check if trigger time has passed
-        if (plan.trigger_time) {
-          const [triggerHourStr, triggerMinuteStr] = plan.trigger_time.split(':')
-          const triggerHour = parseInt(triggerHourStr, 10)
-          const triggerMinute = parseInt(triggerMinuteStr || '0', 10)
-
-          const triggerMinutes = triggerHour * 60 + triggerMinute
-          const currentMinutes = nowInPlanTz.hour * 60 + nowInPlanTz.minute
-
-          // Only process if trigger time has passed
-          if (currentMinutes < triggerMinutes) {
-            continue // Skip this plan, trigger time hasn't arrived yet
-          }
-        }
-
-        // Get items with topics but no research for today
-        const query = supabase
-          .from('video_plan_items')
-          .select('*')
-          .eq('plan_id', plan.id)
-          .eq('scheduled_date', today)
-          .eq('status', 'ready')
-          .not('topic', 'is', null)
-          .is('research_data', null)
-
-        const { data: items } = await query.limit(100)
-
-        const dueItems = (items || []).filter(item =>
-          plan.auto_schedule_trigger !== 'time_based' || this.hasScheduledTimePassed(item.scheduled_time, nowInPlanTz)
-        )
-
-        if (dueItems.length === 0) continue
-
-        for (const item of dueItems) {
-          try {
-            if (!item.topic) continue
-
-            // Generate research for the topic
-            await PlanService.generateTopicForItem(item.id, plan.user_id)
-          } catch (error: any) {
-            console.error(`Error generating research for item ${item.id}:`, error)
-          }
-        }
-      } catch (error: any) {
-        console.error(`Error processing plan ${plan.id} for research generation:`, error)
-      }
-    }
+    return
   }
 
   /**
@@ -1905,66 +1812,7 @@ export class AutomationService {
       throw new Error('No topic available for script generation')
     }
 
-    // Check if we have all prompt fields filled - if so, we can skip research or use it as fallback only
-    const hasAllPromptFields = !!(item.description && item.why_important && item.useful_tips)
-
-    // Always (re)run research so scripts are based on fresh data and long topics
-    // But if we have prompt fields, they will take priority
-    const researchCategory = item.category || existingResearch?.Category || existingResearch?.category || 'Lifestyle'
-    let enrichedResearch: any = null
-    try {
-      console.log('[Research] Starting research for item', {
-        itemId,
-        topic: topicToUse,
-        category: researchCategory,
-        planId: item.plan_id,
-        hasPromptFields: hasAllPromptFields,
-        promptDescription: item.description ? 'yes' : 'no',
-        promptWhyImportant: item.why_important ? 'yes' : 'no',
-        promptUsefulTips: item.useful_tips ? 'yes' : 'no',
-      })
-
-      enrichedResearch = await ResearchService.researchTopic(topicToUse, researchCategory, userId)
-
-      console.log('[Research] Completed research for item', {
-        itemId,
-        topic: topicToUse,
-        category: enrichedResearch?.category || researchCategory,
-        hasDescription: !!enrichedResearch?.description,
-        hasTips: !!enrichedResearch?.usefulTips,
-        willUsePromptFields: hasAllPromptFields,
-      })
-
-      // Only update description, why_important, useful_tips if they're not already set (from prompts)
-      // This preserves user-provided values from prompts
-      const updateData: any = {
-        category: enrichedResearch.category || item.category,
-        research_data: enrichedResearch,
-      }
-
-      // Only overwrite if field is empty/null (preserve prompt values)
-      if (!item.description) {
-        updateData.description = enrichedResearch.description
-      }
-      if (!item.why_important) {
-        updateData.why_important = enrichedResearch.whyItMatters
-      }
-      if (!item.useful_tips) {
-        updateData.useful_tips = enrichedResearch.usefulTips
-      }
-
-      await supabase
-        .from('video_plan_items')
-        .update(updateData)
-        .eq('id', itemId)
-    } catch (researchError: any) {
-      console.error('[Research] Failed for item; aborting script generation to avoid low-quality output:', {
-        itemId,
-        topic: topicToUse,
-        error: researchError.message,
-      })
-      throw new Error('Research failed; unable to generate script')
-    }
+    const enrichedResearch: any = existingResearch || null
 
     // Pull a few recent scripts to discourage repetition
     const { data: recentItems } = await supabase
