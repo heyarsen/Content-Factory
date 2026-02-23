@@ -12,10 +12,6 @@ import { Skeleton } from '../components/ui/Skeleton'
 import {
   Plus,
   Sparkles,
-  Search,
-  Grid2X2,
-  List,
-  Play,
   Check,
   Clapperboard,
   Clock,
@@ -45,6 +41,19 @@ const STATUS_FILTER_KEY = 'video_planning_status_filter'
 const LEGACY_STATUS_FILTER_KEY = 'videoPlanning.statusFilter'
 const CALENDAR_VIEW_KEY = 'video_planning_calendar_view'
 type CalendarView = 'week' | 'month'
+
+
+type CalendarVideoSource = 'AI' | 'Auto'
+
+const UUID_LIKE_PATTERN = /^[a-f0-9]{32,}$/i
+
+const getReadableVideoTitle = (title: string | null | undefined, source: CalendarVideoSource = 'AI') => {
+  const safeTitle = (title || '').trim()
+  if (!safeTitle || UUID_LIKE_PATTERN.test(safeTitle)) {
+    return source === 'Auto' ? 'Untitled automation video' : 'Untitled AI video'
+  }
+  return safeTitle
+}
 
 const getLocalDateYMD = (date = new Date()) => {
   const year = date.getFullYear()
@@ -148,34 +157,6 @@ type ScheduledPostGroup = {
   }>
 }
 
-type StudioVideoType = 'AI' | 'Uploaded' | 'Auto'
-type StudioVideoStatus = 'Ready' | 'Posted' | 'Failed'
-
-const UUID_LIKE_PATTERN = /^[a-f0-9]{32,}$/i
-
-const getReadableVideoTitle = (title: string | null | undefined, type: StudioVideoType = 'AI') => {
-  const safeTitle = (title || '').trim()
-  if (!safeTitle || UUID_LIKE_PATTERN.test(safeTitle)) {
-    if (type === 'Uploaded') return 'Untitled uploaded video'
-    if (type === 'Auto') return 'Untitled automation video'
-    return 'Untitled AI video'
-  }
-  return safeTitle
-}
-
-type StudioVideo = {
-  id: string
-  title: string
-  type: StudioVideoType
-  status: StudioVideoStatus
-  date: string
-  time: string
-  caption: string
-  platforms: Array<'yt' | 'ig'>
-  videoUrl: string | null
-  _isVisibleInLibrary?: boolean
-}
-
 export function VideoPlanning() {
   const isDev = import.meta.env.DEV
   const { t, language } = useLanguage()
@@ -266,11 +247,6 @@ export function VideoPlanning() {
   // Avatar-related state removed - using AI video generation
   const [deleteModal, setDeleteModal] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
-  const [librarySearch, setLibrarySearch] = useState('')
-  const [libraryTypeFilter, setLibraryTypeFilter] = useState<'all' | StudioVideoType>('all')
-  const [libraryStatusFilter, setLibraryStatusFilter] = useState<'all' | StudioVideoStatus>('all')
-  const [studioVideos, setStudioVideos] = useState<StudioVideo[]>([])
-  const [selectedStudioVideo, setSelectedStudioVideo] = useState<StudioVideo | null>(null)
   const [editPlanModal, setEditPlanModal] = useState<VideoPlan | null>(null)
   const [editingPlan, setEditingPlan] = useState(false)
   const [selectedItem, setSelectedItem] = useState<VideoPlanItem | null>(null)
@@ -309,7 +285,7 @@ export function VideoPlanning() {
       message: t('video_planning.upload_plan.success_message'),
     })
 
-    await Promise.all([loadScheduledPosts(), loadStudioVideos(), selectedPlan ? loadPlanItems(selectedPlan.id) : Promise.resolve()])
+    await Promise.all([loadScheduledPosts(), selectedPlan ? loadPlanItems(selectedPlan.id) : Promise.resolve()])
   }
   const loadSocialAccounts = async () => {
     try {
@@ -327,21 +303,10 @@ export function VideoPlanning() {
     }
   }
 
-  const loadStudioVideos = async () => {
-    try {
-      const response = await api.get('/api/videos')
-      const videos = response.data.videos || []
-      setStudioVideos(videos)
-    } catch (error) {
-      console.error('Failed to load studio videos:', error)
-    }
-  }
-
   useEffect(() => {
     loadPlans()
     loadUserPreferences()
     loadSocialAccounts()
-    loadStudioVideos()
   }, [])
 
   const loadUserPreferences = async () => {
@@ -372,7 +337,6 @@ export function VideoPlanning() {
       }
     }
     loadScheduledPosts()
-    loadStudioVideos()
   }, [selectedPlan])
 
   useEffect(() => {
@@ -385,7 +349,6 @@ export function VideoPlanning() {
     // Use a longer interval to reduce API calls
     const interval = setInterval(() => {
       loadScheduledPosts()
-      loadStudioVideos()
     }, 30000) // Poll every 30 seconds (reduced from 10 seconds)
 
     return () => clearInterval(interval)
@@ -1345,142 +1308,6 @@ export function VideoPlanning() {
 
   const statusCounts = getStatusCounts()
 
-  const automationVideoItems = useMemo(() => {
-    return [...calendarPlanItems]
-      .filter((item) => item.video_id || item.videos?.video_url)
-      .sort((a, b) => {
-        const aDate = new Date(`${a.scheduled_date}T${a.scheduled_time || '00:00:00'}`).getTime()
-        const bDate = new Date(`${b.scheduled_date}T${b.scheduled_time || '00:00:00'}`).getTime()
-        return bDate - aDate
-      })
-  }, [calendarPlanItems])
-
-  const sourceBadgeClasses: Record<StudioVideoType, string> = {
-    AI: 'bg-purple-100 text-purple-700',
-    Uploaded: 'bg-blue-100 text-blue-700',
-    Auto: 'bg-emerald-100 text-emerald-700',
-  }
-
-  const statusDotClasses: Record<StudioVideoStatus, string> = {
-    Ready: 'bg-purple-500',
-    Posted: 'bg-emerald-500',
-    Failed: 'bg-rose-500',
-  }
-
-  const filteredStudioVideos = useMemo(() => {
-    const query = librarySearch.trim().toLowerCase()
-    const locale = language === 'ru' ? 'ru-RU' : language === 'uk' ? 'uk-UA' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US'
-    const automationVideoIds = new Set(
-      calendarPlanItems
-        .map((item) => item.video_id)
-        .filter((id): id is string => Boolean(id))
-    )
-
-    const postedVideoIds = new Set(
-      scheduledPosts
-        .filter((post) => post.status === 'posted')
-        .map((post) => post.video_id)
-    )
-
-    const toStudioStatus = (status?: string | null, isPosted?: boolean): StudioVideoStatus | null => {
-      if (isPosted) return 'Posted'
-      const normalized = normalizeStatusValue(status)
-      if (normalized === 'failed' || normalized === 'error') return 'Failed'
-      if (normalized === 'completed') return 'Ready'
-      return null
-    }
-
-    const hasPlayableVideoUrl = (url?: string | null) => {
-      if (!url) return false
-      const trimmed = url.trim()
-      if (!trimmed) return false
-      return trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/')
-    }
-
-    const isUploadedVideo = (video: any, isAutomationVideo: boolean) => {
-      if (isAutomationVideo) return false
-      const topic = (video.topic || '').toLowerCase()
-      const url = (video.video_url || '').toLowerCase()
-      return topic.includes('upload') || url.includes('upload') || (!video.script && video.status === 'completed')
-    }
-
-    return [...(studioVideos || [])]
-      .sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
-      .map((video: any): StudioVideo => {
-        const isAutomationVideo = automationVideoIds.has(video.id)
-        const type: StudioVideoType = isAutomationVideo
-          ? 'Auto'
-          : (isUploadedVideo(video, isAutomationVideo) ? 'Uploaded' : 'AI')
-
-        const createdAt = video.created_at ? new Date(video.created_at) : new Date()
-        const videoPosts = scheduledPosts.filter((post) => post.video_id === video.id)
-        const hasPostedPost = postedVideoIds.has(video.id)
-        const status = toStudioStatus(video.status, hasPostedPost)
-        const platforms: Array<'yt' | 'ig'> = Array.from(new Set(
-          videoPosts
-            .map((post) => post.platform)
-            .filter((platform) => platform === 'youtube' || platform === 'instagram')
-            .map((platform) => platform === 'youtube' ? 'yt' : 'ig')
-        )) as Array<'yt' | 'ig'>
-
-        return {
-          id: video.id,
-          title: getReadableVideoTitle(video.topic, type),
-          type,
-          status: status || 'Ready',
-          date: createdAt.toLocaleDateString(locale, { month: 'short', day: 'numeric' }),
-          time: createdAt.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' }),
-          caption: video.script || 'No caption yet.',
-          platforms,
-          videoUrl: video.video_url || null,
-          _isVisibleInLibrary: Boolean(status) && hasPlayableVideoUrl(video.video_url),
-        }
-      })
-      .filter((video) => {
-        if (!video._isVisibleInLibrary) return false
-        const matchesSearch =
-          !query ||
-          video.title.toLowerCase().includes(query) ||
-          video.type.toLowerCase().includes(query)
-        const matchesType = libraryTypeFilter === 'all' || video.type === libraryTypeFilter
-        const matchesStatus = libraryStatusFilter === 'all' || video.status === libraryStatusFilter
-        return matchesSearch && matchesType && matchesStatus
-      })
-  }, [
-    librarySearch,
-    libraryTypeFilter,
-    libraryStatusFilter,
-    language,
-    studioVideos,
-    calendarPlanItems,
-    scheduledPosts,
-  ])
-
-  const automationSummary = useMemo(() => {
-    const total = automationVideoItems.length
-    const ready = automationVideoItems.filter((item) => {
-      const normalizedVideoStatus = normalizeStatusValue(item.videos?.status)
-      const normalizedItemStatus = normalizeStatusValue(item.status)
-      return normalizedVideoStatus === 'completed' || normalizedItemStatus === 'completed'
-    }).length
-    const inProgress = automationVideoItems.filter((item) => {
-      const normalizedVideoStatus = normalizeStatusValue(item.videos?.status)
-      const normalizedItemStatus = normalizeStatusValue(item.status)
-      return (
-        normalizedVideoStatus === 'generating' ||
-        normalizedItemStatus === 'generating' ||
-        normalizedItemStatus === 'researching' ||
-        normalizedItemStatus === 'draft'
-      )
-    }).length
-
-    return {
-      total,
-      ready,
-      inProgress,
-    }
-  }, [automationVideoItems])
-
   const getStatusBadge = (status: string, scriptStatus?: string | null, item?: VideoPlanItem) => {
     // Clear, user-friendly status labels that explain what's happening in the workflow
     const normalizedItemStatus = normalizeStatusValue(status) || ''
@@ -1647,188 +1474,6 @@ export function VideoPlanning() {
             </Button>
           </div>
         </div>
-
-        <Card className="border border-slate-200 bg-white p-5 shadow-sm sm:rounded-3xl sm:p-6">
-          <div className="space-y-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-base font-semibold text-slate-900">Video Library</h2>
-                  <p className="text-xs text-slate-500">Browse uploaded, AI generated, and automation videos in one place.</p>
-                </div>
-              </div>
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-                  <div className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 lg:max-w-sm">
-                    <Search className="h-4 w-4 text-slate-400" />
-                    <input
-                      value={librarySearch}
-                      onChange={(event) => setLibrarySearch(event.target.value)}
-                      placeholder="Search videos…"
-                      className="w-full border-none bg-transparent text-sm text-slate-700 outline-none"
-                    />
-                  </div>
-                  <select
-                    value={libraryTypeFilter}
-                    onChange={(event) => setLibraryTypeFilter(event.target.value as 'all' | StudioVideoType)}
-                    className="h-10 rounded-xl border border-slate-200 px-3 text-sm text-slate-600"
-                  >
-                    <option value="all">All types</option>
-                    <option value="AI">AI Generated</option>
-                    <option value="Uploaded">Uploaded</option>
-                    <option value="Auto">Automation</option>
-                  </select>
-                  <select
-                    value={libraryStatusFilter}
-                    onChange={(event) => setLibraryStatusFilter(event.target.value as 'all' | StudioVideoStatus)}
-                    className="h-10 rounded-xl border border-slate-200 px-3 text-sm text-slate-600"
-                  >
-                    <option value="all">All statuses</option>
-                    <option value="Ready">Ready</option>
-                    <option value="Posted">Posted</option>
-                    <option value="Failed">Failed</option>
-                  </select>
-                  <div className="ml-auto hidden items-center overflow-hidden rounded-xl border border-slate-200 lg:flex">
-                    <button type="button" className="bg-brand-50 px-3 py-2 text-brand-600"><Grid2X2 className="h-4 w-4" /></button>
-                    <button type="button" className="px-3 py-2 text-slate-400"><List className="h-4 w-4" /></button>
-                  </div>
-                </div>
-
-                {filteredStudioVideos.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
-                    No videos found. Try adjusting your search or filters.
-                  </div>
-                ) : (
-                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {filteredStudioVideos.map((video) => (
-                      <article
-                        key={video.id}
-                        className="group overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-md"
-                      >
-                        <div className="relative aspect-[9/11] bg-gradient-to-br from-slate-800 via-brand-600 to-slate-200">
-                          {video.videoUrl && (
-                            <video
-                              src={video.videoUrl}
-                              controls
-                              preload="metadata"
-                              className="h-full w-full object-cover"
-                            />
-                          )}
-                          <span className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${sourceBadgeClasses[video.type]}`}>
-                            {video.type === 'AI' ? 'AI Generated' : video.type === 'Uploaded' ? 'Uploaded' : 'Automation'}
-                          </span>
-                          <span className={`absolute right-3 top-3 h-2.5 w-2.5 rounded-full ring-2 ring-white ${statusDotClasses[video.status]}`} />
-                          {!video.videoUrl && (
-                            <span className="absolute inset-0 grid place-items-center">
-                              <span className="grid h-12 w-12 place-items-center rounded-full bg-white/90 text-slate-700">
-                                <Play className="h-5 w-5 fill-current" />
-                              </span>
-                            </span>
-                          )}
-                        </div>
-                        <div className="space-y-3 p-4">
-                          <div>
-                            <p className="truncate text-sm font-semibold text-slate-900">{video.title}</p>
-                            <p className="text-xs text-slate-500">{video.date} · {video.time}</p>
-                          </div>
-                          <div className="grid grid-cols-3 gap-2">
-                            <span className="inline-flex items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-2 py-1 text-xs font-semibold text-brand-700">▶ Live preview</span>
-                            <span className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600">✎ Edit</span>
-                            <button
-                              type="button"
-                              onClick={() => setSelectedStudioVideo(video)}
-                              className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600 transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700"
-                            >
-                              🚀 Details
-                            </button>
-                          </div>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                )}
-              </div>
-            <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-base font-semibold text-slate-900">Automations</h2>
-                  <p className="text-xs text-slate-500">Track auto-generated content and quickly spin up a new workflow.</p>
-                </div>
-                <Button
-                  onClick={() => setCreateModal(true)}
-                  leftIcon={<Sparkles className="h-4 w-4" />}
-                  className="w-full sm:w-auto"
-                  disabled={showUpgrade}
-                >
-                  {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : 'Create automation'}
-                </Button>
-              </div>
-                <div className="grid w-full max-w-xl grid-cols-1 gap-3 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Automation videos</p>
-                    <p className="mt-1 text-2xl font-semibold text-slate-900">{automationSummary.total}</p>
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Ready</p>
-                    <p className="mt-1 text-2xl font-semibold text-slate-900">{automationSummary.ready}</p>
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">In progress</p>
-                    <p className="mt-1 text-2xl font-semibold text-slate-900">{automationSummary.inProgress}</p>
-                  </div>
-                </div>
-            </div>
-          </div>
-        </Card>
-
-        <Modal isOpen={Boolean(selectedStudioVideo)} onClose={() => setSelectedStudioVideo(null)} title={selectedStudioVideo?.title || 'Video preview'}>
-          {selectedStudioVideo && (
-            <div className="space-y-5">
-              {selectedStudioVideo.videoUrl ? (
-                <video
-                  src={selectedStudioVideo.videoUrl}
-                  controls
-                  className="aspect-[9/16] w-full max-w-[260px] rounded-2xl bg-black object-cover"
-                />
-              ) : (
-                <div className="aspect-[9/16] w-full max-w-[260px] rounded-2xl bg-gradient-to-br from-slate-800 via-brand-600 to-slate-200" />
-              )}
-              <div className="flex flex-wrap gap-2 text-xs font-semibold">
-                <span className={`rounded-full px-2.5 py-1 ${sourceBadgeClasses[selectedStudioVideo.type]}`}>
-                  {selectedStudioVideo.type === 'AI' ? 'AI Generated' : selectedStudioVideo.type === 'Uploaded' ? 'Uploaded' : 'Automation'}
-                </span>
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">{selectedStudioVideo.status}</span>
-                {selectedStudioVideo.platforms.length === 0 && (
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">No platforms</span>
-                )}
-                {selectedStudioVideo.platforms.map((platform) => (
-                  <span key={platform} className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
-                    {platform === 'yt' ? 'YouTube' : 'Instagram'}
-                  </span>
-                ))}
-              </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Caption</p>
-                <p className="mt-1 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{selectedStudioVideo.caption}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Scheduled for</p>
-                <p className="mt-1 text-sm text-slate-700">{selectedStudioVideo.date}, 2026 · {selectedStudioVideo.time}</p>
-              </div>
-              <div className="flex flex-wrap gap-2 pt-1">
-                {selectedStudioVideo.videoUrl && (
-                  <Button
-                    variant="secondary"
-                    onClick={() => window.open(selectedStudioVideo.videoUrl || '', '_blank', 'noopener,noreferrer')}
-                  >
-                    Download
-                  </Button>
-                )}
-                <Button variant="secondary">Edit</Button>
-                <Button>Schedule & Post</Button>
-              </div>
-            </div>
-          )}
-        </Modal>
 
         {/* Content Variety Metrics */}
         {varietyMetrics && (
