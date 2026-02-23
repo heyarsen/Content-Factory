@@ -1532,8 +1532,9 @@ export function VideoPlanning() {
         variant = 'warning';
         break;
       case 'researching':
-        label = t('video_planning.ready_for_script');
+        label = t('video_planning.generating_video');
         variant = 'info';
+        showLoader = true;
         break;
       case 'ready':
         label = t('video_planning.ready_for_script');

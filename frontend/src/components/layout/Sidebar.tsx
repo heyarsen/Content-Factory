@@ -104,9 +104,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     <span className="block truncate">{label}</span>
                     {hint && <span className="block text-[11px] font-medium text-slate-400">{hint}</span>}
                   </div>
-                  {isActive && (
-                    <span className="absolute inset-y-2 right-0 w-1 rounded-full bg-brand-500" />
-                  )}
                 </NavLink>
               )
             })}
@@ -135,9 +132,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         <Icon className="h-4 w-4" />
                       </div>
                       <span>{label}</span>
-                      {isActive && (
-                        <span className="absolute inset-y-2 right-0 w-1 rounded-full bg-brand-500" />
-                      )}
                     </NavLink>
                   )
                 })}
