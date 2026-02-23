@@ -27,6 +27,8 @@ describe('AutomationService.hasScheduledTimePassed', () => {
     assert.equal(AutomationService.hasScheduledTimePassed('25:00', now), false)
     assert.equal(AutomationService.hasScheduledTimePassed('09:75', now), false)
     assert.equal(AutomationService.hasScheduledTimePassed('invalid', now), false)
+    assert.equal(AutomationService.hasScheduledTimePassed('', now), false)
+    assert.equal(AutomationService.hasScheduledTimePassed('   ', now), false)
     assert.equal(AutomationService.hasScheduledTimePassed(null, now), true)
     assert.equal(AutomationService.hasScheduledTimePassed(undefined, now), true)
   })

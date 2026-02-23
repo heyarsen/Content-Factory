@@ -36,9 +36,10 @@ export class AutomationService {
     scheduledTime: string | null | undefined,
     nowInPlanTz: DateTime
   ): boolean {
-    if (!scheduledTime) return true
+    if (scheduledTime == null) return true
 
     const trimmedTime = scheduledTime.trim()
+    if (!trimmedTime) return false
     const timeMatch = trimmedTime.match(/^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/)
 
     if (!timeMatch) return false
@@ -97,7 +98,6 @@ export class AutomationService {
 
     if (!plans) return
 
-    const now = new Date()
     let pipelineTriggered = false
 
     for (const plan of plans) {
