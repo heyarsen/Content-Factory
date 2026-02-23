@@ -123,6 +123,7 @@ interface ScheduledPost {
 }
 
 export function VideoPlanning() {
+  const isDev = import.meta.env.DEV
   const { t, language } = useLanguage()
   const { addNotification } = useNotifications()
   const { user } = useAuth()
@@ -478,14 +479,18 @@ export function VideoPlanning() {
 
   const loadPlanItems = async (planId: string) => {
     try {
-      console.log(`[VideoPlanning] Loading plan items for plan ${planId}...`)
+      if (isDev) {
+        console.log(`[VideoPlanning] Loading plan items for plan ${planId}...`)
+      }
       const response = await api.get(`/api/plans/${planId}`)
       const items = response.data.items || []
-      console.log(`[VideoPlanning] API response:`, {
-        planId,
-        itemsCount: items.length,
-        responseData: response.data
-      })
+      if (isDev) {
+        console.log(`[VideoPlanning] Plan items API metadata:`, {
+          planId,
+          itemsCount: items.length,
+          hasItems: items.length > 0,
+        })
+      }
       const normalizedItems = items.map((item: VideoPlanItem) => {
         const normalizedItemStatus = normalizeStatusValue(item.status) as VideoPlanItem['status']
         const normalizedScriptStatus = normalizeStatusValue(item.script_status) as VideoPlanItem['script_status']
@@ -511,32 +516,18 @@ export function VideoPlanning() {
         }
       })
       setPlanItems(normalizedItems)
-      console.log(`[VideoPlanning] ✓ Loaded ${items.length} plan items for plan ${planId}`)
-      if (items.length > 0) {
-        console.log(`[VideoPlanning] Sample items:`, items.slice(0, 5).map((item: VideoPlanItem) => ({
-          id: item.id,
-          date: item.scheduled_date,
-          dateType: typeof item.scheduled_date,
-          time: item.scheduled_time,
-          topic: item.topic,
-          status: item.status
-        })))
-        // Log date range
-        const dates = items.map((item: VideoPlanItem) => item.scheduled_date).filter(Boolean)
-        if (dates.length > 0) {
-          const sortedDates = [...new Set(dates)].sort()
-          console.log(`[VideoPlanning] Date range: ${sortedDates[0]} to ${sortedDates[sortedDates.length - 1]} (${sortedDates.length} unique dates)`)
-          console.log(`[VideoPlanning] All dates:`, sortedDates.slice(0, 10))
-        }
-      } else {
+      if (isDev) {
+        console.log(`[VideoPlanning] ✓ Loaded ${items.length} plan items for plan ${planId}`)
+      }
+      if (items.length === 0) {
         console.warn(`[VideoPlanning] ⚠️ No plan items found for plan ${planId}. Plan might not have items created yet.`)
       }
     } catch (error: any) {
       console.error('Failed to load plan items:', error)
-      console.error('Error details:', {
+      console.error('Plan items request failed:', {
         message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
+        status: error.response?.status,
+        planId,
       })
     }
   }
@@ -551,7 +542,9 @@ export function VideoPlanning() {
         status: normalizeStatusValue(post.status) as ScheduledPost['status'],
       }))
       setScheduledPosts(normalizedPosts)
-      console.log(`[VideoPlanning] Loaded ${posts.length} scheduled posts`)
+      if (isDev) {
+        console.log(`[VideoPlanning] Loaded ${posts.length} scheduled posts`)
+      }
     } catch (error) {
       console.error('Failed to load scheduled posts:', error)
     }
@@ -645,13 +638,14 @@ export function VideoPlanning() {
         // Avatars removed - using AI video generation
       })
 
-      console.log(`[VideoPlanning] Plan creation response:`, {
-        plan: response.data.plan,
-        items: response.data.items,
-        itemsCount: response.data.itemsCount ?? response.data.items?.length ?? 0,
-        hasItems: response.data.hasItems ?? (!!response.data.items && response.data.items.length > 0),
-        warning: response.data.warning
-      })
+      if (isDev) {
+        console.log(`[VideoPlanning] Plan creation metadata:`, {
+          planId: response.data.plan?.id,
+          itemsCount: response.data.itemsCount ?? response.data.items?.length ?? 0,
+          hasItems: response.data.hasItems ?? (!!response.data.items && response.data.items.length > 0),
+          warning: response.data.warning,
+        })
+      }
 
       // Show warning if items generation had issues
       if (response.data.warning) {
@@ -659,8 +653,8 @@ export function VideoPlanning() {
         // You could show a toast notification here if you have a toast system
       }
 
-    setPlans([response.data.plan, ...plans])
-    setSelectedPlan(response.data.plan)
+      setPlans([response.data.plan, ...plans])
+      setSelectedPlan(response.data.plan)
 
       // Navigate to plan start date
       if (response.data.plan.start_date) {
@@ -678,15 +672,19 @@ export function VideoPlanning() {
 
       if (hasItems && response.data.items && Array.isArray(response.data.items) && response.data.items.length > 0) {
         setPlanItems(response.data.items)
-        console.log(`[VideoPlanning] ✓ Plan created with ${itemsCount} items`)
+        if (isDev) {
+          console.log(`[VideoPlanning] ✓ Plan created with ${itemsCount} items`)
+        }
       } else {
-        console.warn(`[VideoPlanning] ⚠️ Plan created but no items in response (itemsCount: ${itemsCount}, hasItems: ${hasItems}). Items array:`, response.data.items)
+        console.warn(`[VideoPlanning] ⚠️ Plan created but no items in response (itemsCount: ${itemsCount}, hasItems: ${hasItems})`)
         if (response.data.warning) {
           console.warn(`[VideoPlanning] Server warning: ${response.data.warning}`)
         }
         // Wait a bit then try to load items (might be async creation or items were created but not returned)
         setTimeout(async () => {
-          console.log(`[VideoPlanning] Attempting to load items for plan ${response.data.plan.id}...`)
+          if (isDev) {
+            console.log(`[VideoPlanning] Attempting to load items for plan ${response.data.plan.id}...`)
+          }
           await loadPlanItems(response.data.plan.id)
         }, 1000)
       }
@@ -960,7 +958,9 @@ export function VideoPlanning() {
       const day = String(date.getDate()).padStart(2, '0')
       return `${year}-${month}-${day}`
     } catch (e) {
-      console.warn(`[VideoPlanning] Failed to parse date: ${dateStr}`)
+      if (isDev) {
+        console.warn(`[VideoPlanning] Failed to parse date: ${dateStr}`)
+      }
       return ''
     }
   }
@@ -972,7 +972,9 @@ export function VideoPlanning() {
         // Database returns scheduled_date as YYYY-MM-DD string, use it directly
         const dateKey = normalizeDate(item.scheduled_date)
         if (!dateKey) {
-          console.warn(`[VideoPlanning] Item ${item.id} has invalid scheduled_date:`, item.scheduled_date)
+          if (isDev) {
+            console.warn(`[VideoPlanning] Item ${item.id} has invalid scheduled_date`)
+          }
           return acc
         }
         if (!acc[dateKey]) acc[dateKey] = []
@@ -985,11 +987,12 @@ export function VideoPlanning() {
     // Debug logging (only log once when items change)
     if (Object.keys(grouped).length > 0 && filteredItems.length > 0) {
       const dateKeys = Object.keys(grouped).sort()
-      console.log(`[VideoPlanning] Grouped ${filteredItems.length} items into ${dateKeys.length} dates`, {
-        firstDate: dateKeys[0],
-        lastDate: dateKeys[dateKeys.length - 1],
-        sampleDates: dateKeys.slice(0, 3).map(d => ({ date: d, count: grouped[d].length }))
-      })
+      if (isDev) {
+        console.log(`[VideoPlanning] Grouped ${filteredItems.length} items into ${dateKeys.length} dates`, {
+          firstDate: dateKeys[0],
+          lastDate: dateKeys[dateKeys.length - 1],
+        })
+      }
     }
 
     return grouped
@@ -997,17 +1000,10 @@ export function VideoPlanning() {
 
   // Debug warning if items exist but none are grouped
   useEffect(() => {
-    if (planItems.length > 0 && Object.keys(planItemsByDate).length === 0) {
-      console.warn(`[VideoPlanning] WARNING: ${planItems.length} items but none grouped!`, {
-        sampleItems: planItems.slice(0, 3).map(item => ({
-          id: item.id,
-          scheduled_date: item.scheduled_date,
-          normalized: normalizeDate(item.scheduled_date),
-          status: item.status
-        }))
-      })
+    if (isDev && planItems.length > 0 && Object.keys(planItemsByDate).length === 0) {
+      console.warn(`[VideoPlanning] WARNING: ${planItems.length} items but none grouped!`)
     }
-  }, [planItems, planItemsByDate])
+  }, [isDev, planItems, planItemsByDate])
 
   // Group scheduled posts by date (using filtered posts)
   const postsByDate = useMemo(() => {
@@ -3218,7 +3214,9 @@ export function VideoPlanning() {
                             )
                             // Update selectedItem
                             setSelectedItem(response.data.item)
-                            console.log('[VideoPlanning] Status refreshed:', response.data.message)
+                            if (isDev) {
+                              console.log('[VideoPlanning] Status refreshed:', response.data.message)
+                            }
                           }
                         } catch (error: any) {
                           console.error('[VideoPlanning] Error refreshing status:', error)
