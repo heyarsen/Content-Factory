@@ -13,6 +13,10 @@ import {
   Plus,
   Sparkles,
   MoreVertical,
+  Search,
+  Grid2X2,
+  List,
+  Play,
   Check,
   Clapperboard,
   Clock,
@@ -27,7 +31,6 @@ import {
   ExternalLink,
   Video,
   Upload,
-  Library,
 } from 'lucide-react'
 import api from '../lib/api'
 import { normalizeTimezone, timezones } from '../lib/timezones'
@@ -146,6 +149,30 @@ type ScheduledPostGroup = {
   }>
 }
 
+type ContentStudioTab = 'calendar' | 'library' | 'automations'
+type StudioVideoType = 'AI' | 'Uploaded' | 'Auto'
+type StudioVideoStatus = 'Ready' | 'Posted' | 'Failed'
+
+type StudioVideo = {
+  id: number
+  title: string
+  type: StudioVideoType
+  status: StudioVideoStatus
+  date: string
+  time: string
+  caption: string
+  platforms: Array<'yt' | 'ig'>
+}
+
+const demoStudioVideos: StudioVideo[] = [
+  { id: 1, title: 'Summer Collection Reveal', type: 'AI', status: 'Ready', date: 'Feb 23', time: '12:00 PM', platforms: ['yt', 'ig'], caption: 'Summer vibes are here! ☀️ Check out our latest drops and get 20% off with code SUMMER26.' },
+  { id: 2, title: 'Behind the Scenes Tour', type: 'Uploaded', status: 'Posted', date: 'Feb 22', time: '2:00 PM', platforms: ['yt'], caption: 'Take a sneak peek behind the curtains of our studio and meet the team.' },
+  { id: 3, title: 'Weekly Roundup #12', type: 'Auto', status: 'Posted', date: 'Feb 22', time: '10:00 AM', platforms: ['ig', 'yt'], caption: 'Your weekly dose of updates, tips, and highlights from all channels.' },
+  { id: 4, title: 'Product Unboxing – Pro Kit', type: 'AI', status: 'Ready', date: 'Feb 24', time: '12:00 PM', platforms: ['yt', 'ig'], caption: 'Unboxing the brand new Pro Kit. Is it worth it? Watch to find out.' },
+  { id: 5, title: 'Community Q&A Session', type: 'Uploaded', status: 'Failed', date: 'Feb 20', time: '3:00 PM', platforms: ['ig'], caption: 'Answering your top questions from last week and sharing next steps.' },
+  { id: 6, title: 'Flash Sale Announcement', type: 'Auto', status: 'Ready', date: 'Feb 25', time: '12:00 PM', platforms: ['ig', 'yt'], caption: '48-hour flash sale starts NOW. Don’t miss your chance to grab it.' },
+]
+
 export function VideoPlanning() {
   const isDev = import.meta.env.DEV
   const { t, language } = useLanguage()
@@ -238,6 +265,11 @@ export function VideoPlanning() {
   // Avatar-related state removed - using AI video generation
   const [deleteModal, setDeleteModal] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [contentStudioTab, setContentStudioTab] = useState<ContentStudioTab>('library')
+  const [librarySearch, setLibrarySearch] = useState('')
+  const [libraryTypeFilter, setLibraryTypeFilter] = useState<'all' | StudioVideoType>('all')
+  const [libraryStatusFilter, setLibraryStatusFilter] = useState<'all' | StudioVideoStatus>('all')
+  const [selectedStudioVideo, setSelectedStudioVideo] = useState<StudioVideo | null>(null)
   const [editPlanModal, setEditPlanModal] = useState<VideoPlan | null>(null)
   const [editingPlan, setEditingPlan] = useState(false)
   const [selectedItem, setSelectedItem] = useState<VideoPlanItem | null>(null)
@@ -1317,6 +1349,31 @@ export function VideoPlanning() {
       })
   }, [calendarPlanItems])
 
+  const sourceBadgeClasses: Record<StudioVideoType, string> = {
+    AI: 'bg-purple-100 text-purple-700',
+    Uploaded: 'bg-blue-100 text-blue-700',
+    Auto: 'bg-emerald-100 text-emerald-700',
+  }
+
+  const statusDotClasses: Record<StudioVideoStatus, string> = {
+    Ready: 'bg-purple-500',
+    Posted: 'bg-emerald-500',
+    Failed: 'bg-rose-500',
+  }
+
+  const filteredStudioVideos = useMemo(() => {
+    const query = librarySearch.trim().toLowerCase()
+    return demoStudioVideos.filter((video) => {
+      const matchesSearch =
+        !query ||
+        video.title.toLowerCase().includes(query) ||
+        video.type.toLowerCase().includes(query)
+      const matchesType = libraryTypeFilter === 'all' || video.type === libraryTypeFilter
+      const matchesStatus = libraryStatusFilter === 'all' || video.status === libraryStatusFilter
+      return matchesSearch && matchesType && matchesStatus
+    })
+  }, [librarySearch, libraryTypeFilter, libraryStatusFilter])
+
   const automationSummary = useMemo(() => {
     const total = automationVideoItems.length
     const ready = automationVideoItems.filter((item) => {
@@ -1540,102 +1597,170 @@ export function VideoPlanning() {
         <Card className="border border-slate-200 bg-white p-5 shadow-sm sm:rounded-3xl sm:p-6">
           <div className="space-y-6">
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">Content Studio container</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">Content Studio</p>
               <h2 className="text-2xl font-semibold text-slate-950">Everything video in one place</h2>
               <p className="max-w-2xl text-sm text-slate-600">
-                Prioritized workspace for production flow first, then enrichment tools, then utilities.
+                Calendar, video library, and automations in a single flow. Preview is the hero action on each video.
               </p>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-3">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-brand-600">Level 1 · Core workflow</p>
-                <h3 className="mt-2 text-xl font-semibold text-slate-950">Brief · Editor · Output</h3>
-                <p className="mt-2 text-sm text-slate-600">Primary flow with strongest contrast and hierarchy.</p>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Level 2 · Supporting tools</p>
-                <h3 className="mt-2 text-lg font-semibold text-slate-900">Assets · SEO · Metadata</h3>
-                <p className="mt-2 text-sm text-slate-600">Secondary tools keep medium emphasis for enrichment tasks.</p>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Level 3 · Utilities</p>
-                <h3 className="mt-2 text-base font-medium text-slate-600">History · Templates · Settings</h3>
-                <p className="mt-2 text-sm text-slate-500">Subdued labels for low-attention utility destinations.</p>
-              </div>
-            </div>
-
-            <div className="grid w-full max-w-xl grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Automation videos</p>
-                <p className="mt-1 text-2xl font-semibold text-slate-900">{automationSummary.total}</p>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Ready</p>
-                <p className="mt-1 text-2xl font-semibold text-slate-900">{automationSummary.ready}</p>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">In progress</p>
-                <p className="mt-1 text-2xl font-semibold text-slate-900">{automationSummary.inProgress}</p>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-              <Button variant="secondary" onClick={() => navigate('/videos')} leftIcon={<Library className="h-4 w-4" />}>
-                See all videos
-              </Button>
-              <Button onClick={() => setGenerateVideoModalOpen(true)} leftIcon={<Sparkles className="h-4 w-4" />} disabled={showUpgrade}>
-                {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : 'Generate AI video'}
-              </Button>
-              <Button variant="secondary" onClick={() => setUploadPlanModal(true)} leftIcon={<Upload className="h-4 w-4" />}>
-                Upload video
-              </Button>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-slate-700">Latest automation outputs</p>
+            <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+              {[
+                { id: 'calendar', label: 'Calendar', icon: '📅' },
+                { id: 'library', label: 'Video Library', icon: '🎞' },
+                { id: 'automations', label: 'Automations', icon: '⚡' },
+              ].map((tab) => (
                 <button
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700"
-                  onClick={() => navigate('/videos')}
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setContentStudioTab(tab.id as ContentStudioTab)}
+                  className={`rounded-lg px-3 py-2 text-sm font-medium transition ${contentStudioTab === tab.id
+                    ? 'bg-brand-50 text-brand-700'
+                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                    }`}
                 >
-                  Open library
-                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span className="mr-1.5" aria-hidden="true">{tab.icon}</span>
+                  {tab.label}
                 </button>
-              </div>
+              ))}
+            </div>
 
-              {automationVideoItems.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500">
-                  No automation videos yet. Generate your first AI video or upload one to start filling this feed.
+            {contentStudioTab === 'calendar' && (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                Calendar remains your planning anchor. Use the calendar section below to manage publishing windows and drag videos between dates.
+              </div>
+            )}
+
+            {contentStudioTab === 'library' && (
+              <div className="space-y-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                  <div className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 lg:max-w-sm">
+                    <Search className="h-4 w-4 text-slate-400" />
+                    <input
+                      value={librarySearch}
+                      onChange={(event) => setLibrarySearch(event.target.value)}
+                      placeholder="Search videos…"
+                      className="w-full border-none bg-transparent text-sm text-slate-700 outline-none"
+                    />
+                  </div>
+                  <select
+                    value={libraryTypeFilter}
+                    onChange={(event) => setLibraryTypeFilter(event.target.value as 'all' | StudioVideoType)}
+                    className="h-10 rounded-xl border border-slate-200 px-3 text-sm text-slate-600"
+                  >
+                    <option value="all">All types</option>
+                    <option value="AI">AI Generated</option>
+                    <option value="Uploaded">Uploaded</option>
+                    <option value="Auto">Automation</option>
+                  </select>
+                  <select
+                    value={libraryStatusFilter}
+                    onChange={(event) => setLibraryStatusFilter(event.target.value as 'all' | StudioVideoStatus)}
+                    className="h-10 rounded-xl border border-slate-200 px-3 text-sm text-slate-600"
+                  >
+                    <option value="all">All statuses</option>
+                    <option value="Ready">Ready</option>
+                    <option value="Posted">Posted</option>
+                    <option value="Failed">Failed</option>
+                  </select>
+                  <div className="ml-auto hidden items-center overflow-hidden rounded-xl border border-slate-200 lg:flex">
+                    <button type="button" className="bg-brand-50 px-3 py-2 text-brand-600"><Grid2X2 className="h-4 w-4" /></button>
+                    <button type="button" className="px-3 py-2 text-slate-400"><List className="h-4 w-4" /></button>
+                  </div>
                 </div>
-              ) : (
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  {automationVideoItems.slice(0, 6).map((item) => {
-                    const normalizedVideoStatus = normalizeStatusValue(item.videos?.status)
-                    const resolvedStatus = normalizedVideoStatus || normalizeStatusValue(item.status) || 'pending'
-                    return (
+
+                {filteredStudioVideos.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
+                    No videos found. Try adjusting your search or filters.
+                  </div>
+                ) : (
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {filteredStudioVideos.map((video) => (
                       <button
-                        key={item.id}
-                        onClick={() => item.video_id && navigate(`/videos?videoId=${item.video_id}`)}
-                        className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-brand-300"
+                        key={video.id}
+                        type="button"
+                        onClick={() => setSelectedStudioVideo(video)}
+                        className="group overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-md"
                       >
-                        <div className="flex items-start justify-between gap-3">
+                        <div className="relative aspect-[9/11] bg-gradient-to-br from-slate-800 via-brand-600 to-slate-200">
+                          <span className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${sourceBadgeClasses[video.type]}`}>
+                            {video.type === 'AI' ? 'AI Generated' : video.type === 'Uploaded' ? 'Uploaded' : 'Automation'}
+                          </span>
+                          <span className={`absolute right-3 top-3 h-2.5 w-2.5 rounded-full ring-2 ring-white ${statusDotClasses[video.status]}`} />
+                          <span className="absolute inset-0 grid place-items-center">
+                            <span className="grid h-12 w-12 place-items-center rounded-full bg-white/90 text-slate-700 opacity-0 transition group-hover:opacity-100">
+                              <Play className="h-5 w-5 fill-current" />
+                            </span>
+                          </span>
+                        </div>
+                        <div className="space-y-3 p-4">
                           <div>
-                            <p className="line-clamp-2 text-sm font-semibold text-slate-800">{item.topic || 'Untitled video'}</p>
-                            <p className="mt-1 text-xs text-slate-500">
-                              {item.scheduled_date} {item.scheduled_time ? `• ${formatTime(item.scheduled_time)}` : ''}
-                            </p>
+                            <p className="truncate text-sm font-semibold text-slate-900">{video.title}</p>
+                            <p className="text-xs text-slate-500">{video.date} · {video.time}</p>
                           </div>
-                          {getStatusBadge(resolvedStatus, item.script_status, item)}
+                          <div className="grid grid-cols-3 gap-2">
+                            <span className="inline-flex items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-2 py-1 text-xs font-semibold text-brand-700">▶ Preview</span>
+                            <span className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600">✎ Edit</span>
+                            <span className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600">🚀 Post</span>
+                          </div>
                         </div>
                       </button>
-                    )
-                  })}
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {contentStudioTab === 'automations' && (
+              <div className="grid w-full max-w-xl grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Automation videos</p>
+                  <p className="mt-1 text-2xl font-semibold text-slate-900">{automationSummary.total}</p>
                 </div>
-              )}
-            </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Ready</p>
+                  <p className="mt-1 text-2xl font-semibold text-slate-900">{automationSummary.ready}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">In progress</p>
+                  <p className="mt-1 text-2xl font-semibold text-slate-900">{automationSummary.inProgress}</p>
+                </div>
+              </div>
+            )}
           </div>
         </Card>
+
+        <Modal isOpen={Boolean(selectedStudioVideo)} onClose={() => setSelectedStudioVideo(null)} title={selectedStudioVideo?.title || 'Video preview'}>
+          {selectedStudioVideo && (
+            <div className="space-y-5">
+              <div className="aspect-[9/16] w-full max-w-[260px] rounded-2xl bg-gradient-to-br from-slate-800 via-brand-600 to-slate-200" />
+              <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                <span className={`rounded-full px-2.5 py-1 ${sourceBadgeClasses[selectedStudioVideo.type]}`}>
+                  {selectedStudioVideo.type === 'AI' ? 'AI Generated' : selectedStudioVideo.type === 'Uploaded' ? 'Uploaded' : 'Automation'}
+                </span>
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">{selectedStudioVideo.status}</span>
+                {selectedStudioVideo.platforms.map((platform) => (
+                  <span key={platform} className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
+                    {platform === 'yt' ? 'YouTube' : 'Instagram'}
+                  </span>
+                ))}
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Caption</p>
+                <p className="mt-1 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{selectedStudioVideo.caption}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Scheduled for</p>
+                <p className="mt-1 text-sm text-slate-700">{selectedStudioVideo.date}, 2026 · {selectedStudioVideo.time}</p>
+              </div>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Button variant="secondary">Download</Button>
+                <Button variant="secondary">Edit</Button>
+                <Button>Schedule & Post</Button>
+              </div>
+            </div>
+          )}
+        </Modal>
 
         {/* Content Variety Metrics */}
         {varietyMetrics && (
