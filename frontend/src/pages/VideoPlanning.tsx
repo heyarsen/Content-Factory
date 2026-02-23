@@ -163,6 +163,7 @@ type StudioVideo = {
   caption: string
   platforms: Array<'yt' | 'ig'>
   videoUrl: string | null
+  _isVisibleInLibrary?: boolean
 }
 
 export function VideoPlanning() {
@@ -1382,11 +1383,19 @@ export function VideoPlanning() {
         .map((post) => post.video_id)
     )
 
-    const toStudioStatus = (status?: string | null, isPosted?: boolean): StudioVideoStatus => {
+    const toStudioStatus = (status?: string | null, isPosted?: boolean): StudioVideoStatus | null => {
       if (isPosted) return 'Posted'
       const normalized = normalizeStatusValue(status)
       if (normalized === 'failed' || normalized === 'error') return 'Failed'
-      return 'Ready'
+      if (normalized === 'completed') return 'Ready'
+      return null
+    }
+
+    const hasPlayableVideoUrl = (url?: string | null) => {
+      if (!url) return false
+      const trimmed = url.trim()
+      if (!trimmed) return false
+      return trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/')
     }
 
     const isUploadedVideo = (video: any, isAutomationVideo: boolean) => {
@@ -1419,15 +1428,17 @@ export function VideoPlanning() {
           id: video.id,
           title: video.topic || 'Untitled video',
           type,
-          status,
+          status: status || 'Ready',
           date: createdAt.toLocaleDateString(locale, { month: 'short', day: 'numeric' }),
           time: createdAt.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' }),
           caption: video.script || 'No caption yet.',
           platforms,
           videoUrl: video.video_url || null,
+          _isVisibleInLibrary: Boolean(status) && hasPlayableVideoUrl(video.video_url),
         }
       })
       .filter((video) => {
+        if (!video._isVisibleInLibrary) return false
         const matchesSearch =
           !query ||
           video.title.toLowerCase().includes(query) ||
