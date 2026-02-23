@@ -141,6 +141,9 @@ export function SocialAccounts() {
     if (!metadata) return []
 
     const skipKeys = new Set([
+      'handle',
+      'auth_required',
+      'coreauth_required',
       'username',
       'display_name',
       'name',
@@ -280,10 +283,9 @@ export function SocialAccounts() {
     <Layout>
       <div className="space-y-10">
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Inbox / Engagement</p>
-          <h1 className="text-3xl font-semibold text-primary">Unified social inbox</h1>
+          <h1 className="text-3xl font-semibold text-primary">Social accounts</h1>
           <p className="text-sm text-slate-500">
-            Connect your social channels and manage comments, mentions, and messages in one workspace with AI-assisted responses.
+            Connect your social channels, receive social profile images, and keep your accounts ready for posting videos from one workspace.
           </p>
         </div>
 

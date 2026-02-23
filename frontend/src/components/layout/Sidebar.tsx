@@ -28,11 +28,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const location = useLocation()
 
-  console.log('[Sidebar] User check:', { user: user?.email, role: user?.role, isAdmin: user?.role === 'admin' })
-
   const navigation = [
-    { label: 'Content Studio', to: '/planning', icon: Clapperboard, hint: 'Calendar, uploads, and AI videos' },
-    { label: 'Video Library', to: '/videos', icon: Film, hint: 'Browse and manage all videos' },
+    { label: 'Content Studio', to: '/planning', icon: Clapperboard },
+    { label: 'Video Library', to: '/videos', icon: Film },
     { label: 'Social Accounts', to: '/social', icon: Share2, match: (pathname: string) => pathname === '/social' },
     { label: 'AI Auto-DM', to: '/social/dms', icon: MessagesSquare },
     { label: 'Trendwatcher', to: '/trend-searcher', icon: Search },
@@ -55,11 +53,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       />
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-72 transform transition-all duration-300 lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed inset-y-0 left-0 z-40 w-64 transform transition-all duration-300 lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
           } ${!isOpen ? 'pointer-events-none lg:pointer-events-auto' : ''}`}
       >
         <div
-          className="flex h-screen flex-col border-r border-white/60 bg-white/80 px-6 py-8 backdrop-blur-xl shadow-[0_25px_70px_-35px_rgba(15,23,42,0.35)]"
+          className="flex h-screen flex-col border-r border-white/60 bg-white/80 px-4 py-5 backdrop-blur-xl shadow-[0_25px_70px_-35px_rgba(15,23,42,0.35)]"
         >
           <div className="flex items-center justify-between">
             <Link to="/dashboard" className="flex items-center gap-3">
@@ -81,30 +79,29 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </button>
           </div>
 
-          <nav className="mt-10 flex flex-1 flex-col gap-1.5 overflow-y-auto">
-            {navigation.map(({ label, to, icon: Icon, hint, match }) => {
+          <nav className="mt-6 flex flex-1 flex-col gap-1 overflow-y-auto">
+            {navigation.map(({ label, to, icon: Icon, match }) => {
               const isActive = match ? match(location.pathname) : location.pathname === to || location.pathname.startsWith(to + '/')
               return (
                 <NavLink
                   key={to}
                   to={to}
                   onClick={onClose}
-                  className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 touch-manipulation active:scale-[0.98] ${isActive
+                  className={`group relative flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium transition-all duration-200 touch-manipulation active:scale-[0.98] ${isActive
                     ? 'bg-brand-50 text-brand-600'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                     }`}
                 >
                   <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200 ${isActive
+                    className={`flex h-7 w-7 items-center justify-center rounded-lg transition-all duration-200 ${isActive
                       ? 'bg-brand-100 text-brand-600'
                       : 'bg-transparent text-slate-500 group-hover:bg-white/80 group-hover:text-slate-700'
                       }`}
                   >
-                    <Icon className="h-4 w-4" />
+                    <Icon className="h-3.5 w-3.5" />
                   </div>
                   <div className="min-w-0">
-                    <span className="block truncate">{label}</span>
-                    {hint && <span className="block text-[11px] font-medium text-slate-400">{hint}</span>}
+                    <span className="block truncate text-[13px]">{label}</span>
                   </div>
                 </NavLink>
               )
@@ -120,18 +117,18 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                       key={to}
                       to={to}
                       onClick={onClose}
-                    className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 touch-manipulation active:scale-[0.98] ${isActive
+                    className={`group relative flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium transition-all duration-200 touch-manipulation active:scale-[0.98] ${isActive
                         ? 'bg-brand-50 text-brand-600'
                         : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                         }`}
                     >
                       <div
-                        className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200 ${isActive
+                        className={`flex h-7 w-7 items-center justify-center rounded-lg transition-all duration-200 ${isActive
                           ? 'bg-brand-100 text-brand-600'
                           : 'bg-transparent text-slate-500 group-hover:bg-white/80 group-hover:text-slate-700'
                           }`}
                       >
-                        <Icon className="h-4 w-4" />
+                        <Icon className="h-3.5 w-3.5" />
                       </div>
                       <span>{label}</span>
                     </NavLink>
@@ -151,7 +148,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${credits !== null && credits < 5 && !unlimited ? 'bg-amber-100 text-amber-600' : 'bg-brand-100 text-brand-600'}`}>
+                  <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${credits !== null && credits < 5 && !unlimited ? 'bg-amber-100 text-amber-600' : 'bg-brand-100 text-brand-600'}`}>
                     <Sparkles className="h-4 w-4" />
                   </div>
                   <div className="min-w-0 flex-1">
