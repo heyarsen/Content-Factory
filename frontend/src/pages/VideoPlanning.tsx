@@ -154,7 +154,7 @@ type StudioVideoType = 'AI' | 'Uploaded' | 'Auto'
 type StudioVideoStatus = 'Ready' | 'Posted' | 'Failed'
 
 type StudioVideo = {
-  id: number
+  id: string
   title: string
   type: StudioVideoType
   status: StudioVideoStatus
@@ -162,16 +162,8 @@ type StudioVideo = {
   time: string
   caption: string
   platforms: Array<'yt' | 'ig'>
+  videoUrl: string | null
 }
-
-const demoStudioVideos: StudioVideo[] = [
-  { id: 1, title: 'Summer Collection Reveal', type: 'AI', status: 'Ready', date: 'Feb 23', time: '12:00 PM', platforms: ['yt', 'ig'], caption: 'Summer vibes are here! ☀️ Check out our latest drops and get 20% off with code SUMMER26.' },
-  { id: 2, title: 'Behind the Scenes Tour', type: 'Uploaded', status: 'Posted', date: 'Feb 22', time: '2:00 PM', platforms: ['yt'], caption: 'Take a sneak peek behind the curtains of our studio and meet the team.' },
-  { id: 3, title: 'Weekly Roundup #12', type: 'Auto', status: 'Posted', date: 'Feb 22', time: '10:00 AM', platforms: ['ig', 'yt'], caption: 'Your weekly dose of updates, tips, and highlights from all channels.' },
-  { id: 4, title: 'Product Unboxing – Pro Kit', type: 'AI', status: 'Ready', date: 'Feb 24', time: '12:00 PM', platforms: ['yt', 'ig'], caption: 'Unboxing the brand new Pro Kit. Is it worth it? Watch to find out.' },
-  { id: 5, title: 'Community Q&A Session', type: 'Uploaded', status: 'Failed', date: 'Feb 20', time: '3:00 PM', platforms: ['ig'], caption: 'Answering your top questions from last week and sharing next steps.' },
-  { id: 6, title: 'Flash Sale Announcement', type: 'Auto', status: 'Ready', date: 'Feb 25', time: '12:00 PM', platforms: ['ig', 'yt'], caption: '48-hour flash sale starts NOW. Don’t miss your chance to grab it.' },
-]
 
 export function VideoPlanning() {
   const isDev = import.meta.env.DEV
@@ -269,6 +261,7 @@ export function VideoPlanning() {
   const [librarySearch, setLibrarySearch] = useState('')
   const [libraryTypeFilter, setLibraryTypeFilter] = useState<'all' | StudioVideoType>('all')
   const [libraryStatusFilter, setLibraryStatusFilter] = useState<'all' | StudioVideoStatus>('all')
+  const [studioVideos, setStudioVideos] = useState<StudioVideo[]>([])
   const [selectedStudioVideo, setSelectedStudioVideo] = useState<StudioVideo | null>(null)
   const [editPlanModal, setEditPlanModal] = useState<VideoPlan | null>(null)
   const [editingPlan, setEditingPlan] = useState(false)
@@ -331,7 +324,7 @@ export function VideoPlanning() {
       message: t('video_planning.upload_plan.success_message'),
     })
 
-    await Promise.all([loadScheduledPosts(), selectedPlan ? loadPlanItems(selectedPlan.id) : Promise.resolve()])
+    await Promise.all([loadScheduledPosts(), loadStudioVideos(), selectedPlan ? loadPlanItems(selectedPlan.id) : Promise.resolve()])
   }
   const loadSocialAccounts = async () => {
     try {
@@ -349,10 +342,21 @@ export function VideoPlanning() {
     }
   }
 
+  const loadStudioVideos = async () => {
+    try {
+      const response = await api.get('/api/videos')
+      const videos = response.data.videos || []
+      setStudioVideos(videos)
+    } catch (error) {
+      console.error('Failed to load studio videos:', error)
+    }
+  }
+
   useEffect(() => {
     loadPlans()
     loadUserPreferences()
     loadSocialAccounts()
+    loadStudioVideos()
   }, [])
 
   const loadUserPreferences = async () => {
@@ -383,6 +387,7 @@ export function VideoPlanning() {
       }
     }
     loadScheduledPosts()
+    loadStudioVideos()
   }, [selectedPlan])
 
   useEffect(() => {
@@ -395,6 +400,7 @@ export function VideoPlanning() {
     // Use a longer interval to reduce API calls
     const interval = setInterval(() => {
       loadScheduledPosts()
+      loadStudioVideos()
     }, 30000) // Poll every 30 seconds (reduced from 10 seconds)
 
     return () => clearInterval(interval)
@@ -1363,16 +1369,82 @@ export function VideoPlanning() {
 
   const filteredStudioVideos = useMemo(() => {
     const query = librarySearch.trim().toLowerCase()
-    return demoStudioVideos.filter((video) => {
-      const matchesSearch =
-        !query ||
-        video.title.toLowerCase().includes(query) ||
-        video.type.toLowerCase().includes(query)
-      const matchesType = libraryTypeFilter === 'all' || video.type === libraryTypeFilter
-      const matchesStatus = libraryStatusFilter === 'all' || video.status === libraryStatusFilter
-      return matchesSearch && matchesType && matchesStatus
-    })
-  }, [librarySearch, libraryTypeFilter, libraryStatusFilter])
+    const locale = language === 'ru' ? 'ru-RU' : language === 'uk' ? 'uk-UA' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US'
+    const automationVideoIds = new Set(
+      calendarPlanItems
+        .map((item) => item.video_id)
+        .filter((id): id is string => Boolean(id))
+    )
+
+    const postedVideoIds = new Set(
+      scheduledPosts
+        .filter((post) => post.status === 'posted')
+        .map((post) => post.video_id)
+    )
+
+    const toStudioStatus = (status?: string | null, isPosted?: boolean): StudioVideoStatus => {
+      if (isPosted) return 'Posted'
+      const normalized = normalizeStatusValue(status)
+      if (normalized === 'failed' || normalized === 'error') return 'Failed'
+      return 'Ready'
+    }
+
+    const isUploadedVideo = (video: any, isAutomationVideo: boolean) => {
+      if (isAutomationVideo) return false
+      const topic = (video.topic || '').toLowerCase()
+      const url = (video.video_url || '').toLowerCase()
+      return topic.includes('upload') || url.includes('upload') || (!video.script && video.status === 'completed')
+    }
+
+    return [...(studioVideos || [])]
+      .sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+      .map((video: any): StudioVideo => {
+        const isAutomationVideo = automationVideoIds.has(video.id)
+        const type: StudioVideoType = isAutomationVideo
+          ? 'Auto'
+          : (isUploadedVideo(video, isAutomationVideo) ? 'Uploaded' : 'AI')
+
+        const createdAt = video.created_at ? new Date(video.created_at) : new Date()
+        const videoPosts = scheduledPosts.filter((post) => post.video_id === video.id)
+        const hasPostedPost = postedVideoIds.has(video.id)
+        const status = toStudioStatus(video.status, hasPostedPost)
+        const platforms: Array<'yt' | 'ig'> = Array.from(new Set(
+          videoPosts
+            .map((post) => post.platform)
+            .filter((platform) => platform === 'youtube' || platform === 'instagram')
+            .map((platform) => platform === 'youtube' ? 'yt' : 'ig')
+        )) as Array<'yt' | 'ig'>
+
+        return {
+          id: video.id,
+          title: video.topic || 'Untitled video',
+          type,
+          status,
+          date: createdAt.toLocaleDateString(locale, { month: 'short', day: 'numeric' }),
+          time: createdAt.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' }),
+          caption: video.script || 'No caption yet.',
+          platforms,
+          videoUrl: video.video_url || null,
+        }
+      })
+      .filter((video) => {
+        const matchesSearch =
+          !query ||
+          video.title.toLowerCase().includes(query) ||
+          video.type.toLowerCase().includes(query)
+        const matchesType = libraryTypeFilter === 'all' || video.type === libraryTypeFilter
+        const matchesStatus = libraryStatusFilter === 'all' || video.status === libraryStatusFilter
+        return matchesSearch && matchesType && matchesStatus
+      })
+  }, [
+    librarySearch,
+    libraryTypeFilter,
+    libraryStatusFilter,
+    language,
+    studioVideos,
+    calendarPlanItems,
+    scheduledPosts,
+  ])
 
   const automationSummary = useMemo(() => {
     const total = automationVideoItems.length
@@ -1538,6 +1610,15 @@ export function VideoPlanning() {
           </div>
           <div className="flex w-full items-center gap-2 sm:justify-end md:w-auto">
             <Button
+              onClick={() => setUploadPlanModal(true)}
+              leftIcon={<Upload className="h-4 w-4" />}
+              variant="secondary"
+              className="w-full sm:w-auto min-h-[44px] px-5"
+              disabled={showUpgrade}
+            >
+              {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : 'Upload video'}
+            </Button>
+            <Button
               onClick={() => setGenerateVideoModalOpen(true)}
               leftIcon={<Plus className="h-4 w-4" />}
               className="w-full sm:w-auto min-h-[44px] px-5 shadow-md shadow-brand-500/20"
@@ -1564,18 +1645,6 @@ export function VideoPlanning() {
                   aria-label="Content Studio actions"
                   className="absolute right-0 z-20 mt-2 min-w-[220px] rounded-2xl border border-slate-200 bg-white p-2 shadow-xl"
                 >
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setUploadPlanModal(true)
-                      setHeaderActionsOpen(false)
-                    }}
-                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-                  >
-                    <Upload className="h-4 w-4 text-slate-500" />
-                    Upload video
-                  </button>
                   <button
                     type="button"
                     role="menuitem"
@@ -1712,18 +1781,28 @@ export function VideoPlanning() {
             )}
 
             {contentStudioTab === 'automations' && (
-              <div className="grid w-full max-w-xl grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Automation videos</p>
-                  <p className="mt-1 text-2xl font-semibold text-slate-900">{automationSummary.total}</p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Ready</p>
-                  <p className="mt-1 text-2xl font-semibold text-slate-900">{automationSummary.ready}</p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">In progress</p>
-                  <p className="mt-1 text-2xl font-semibold text-slate-900">{automationSummary.inProgress}</p>
+              <div className="space-y-4">
+                <Button
+                  onClick={() => setCreateModal(true)}
+                  leftIcon={<Sparkles className="h-4 w-4" />}
+                  className="w-full sm:w-auto"
+                  disabled={showUpgrade}
+                >
+                  {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : 'Create automation workflow'}
+                </Button>
+                <div className="grid w-full max-w-xl grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Automation videos</p>
+                    <p className="mt-1 text-2xl font-semibold text-slate-900">{automationSummary.total}</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Ready</p>
+                    <p className="mt-1 text-2xl font-semibold text-slate-900">{automationSummary.ready}</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">In progress</p>
+                    <p className="mt-1 text-2xl font-semibold text-slate-900">{automationSummary.inProgress}</p>
+                  </div>
                 </div>
               </div>
             )}
@@ -1733,12 +1812,23 @@ export function VideoPlanning() {
         <Modal isOpen={Boolean(selectedStudioVideo)} onClose={() => setSelectedStudioVideo(null)} title={selectedStudioVideo?.title || 'Video preview'}>
           {selectedStudioVideo && (
             <div className="space-y-5">
-              <div className="aspect-[9/16] w-full max-w-[260px] rounded-2xl bg-gradient-to-br from-slate-800 via-brand-600 to-slate-200" />
+              {selectedStudioVideo.videoUrl ? (
+                <video
+                  src={selectedStudioVideo.videoUrl}
+                  controls
+                  className="aspect-[9/16] w-full max-w-[260px] rounded-2xl bg-black object-cover"
+                />
+              ) : (
+                <div className="aspect-[9/16] w-full max-w-[260px] rounded-2xl bg-gradient-to-br from-slate-800 via-brand-600 to-slate-200" />
+              )}
               <div className="flex flex-wrap gap-2 text-xs font-semibold">
                 <span className={`rounded-full px-2.5 py-1 ${sourceBadgeClasses[selectedStudioVideo.type]}`}>
                   {selectedStudioVideo.type === 'AI' ? 'AI Generated' : selectedStudioVideo.type === 'Uploaded' ? 'Uploaded' : 'Automation'}
                 </span>
                 <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">{selectedStudioVideo.status}</span>
+                {selectedStudioVideo.platforms.length === 0 && (
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">No platforms</span>
+                )}
                 {selectedStudioVideo.platforms.map((platform) => (
                   <span key={platform} className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
                     {platform === 'yt' ? 'YouTube' : 'Instagram'}
@@ -1754,7 +1844,14 @@ export function VideoPlanning() {
                 <p className="mt-1 text-sm text-slate-700">{selectedStudioVideo.date}, 2026 · {selectedStudioVideo.time}</p>
               </div>
               <div className="flex flex-wrap gap-2 pt-1">
-                <Button variant="secondary">Download</Button>
+                {selectedStudioVideo.videoUrl && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => window.open(selectedStudioVideo.videoUrl || '', '_blank', 'noopener,noreferrer')}
+                  >
+                    Download
+                  </Button>
+                )}
                 <Button variant="secondary">Edit</Button>
                 <Button>Schedule & Post</Button>
               </div>
