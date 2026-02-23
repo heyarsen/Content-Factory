@@ -12,6 +12,7 @@ import { Skeleton } from '../components/ui/Skeleton'
 import {
   Plus,
   Sparkles,
+  MoreVertical,
   Check,
   Clapperboard,
   Clock,
@@ -169,6 +170,8 @@ export function VideoPlanning() {
   const [createModal, setCreateModal] = useState(false)
   const [generateVideoModalOpen, setGenerateVideoModalOpen] = useState(false)
   const [uploadPlanModal, setUploadPlanModal] = useState(false)
+  const [headerActionsOpen, setHeaderActionsOpen] = useState(false)
+  const headerActionsRef = useRef<HTMLDivElement | null>(null)
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     // Initialize with today's date in YYYY-MM-DD format using local timezone
     const today = new Date()
@@ -238,6 +241,30 @@ export function VideoPlanning() {
   const [editPlanModal, setEditPlanModal] = useState<VideoPlan | null>(null)
   const [editingPlan, setEditingPlan] = useState(false)
   const [selectedItem, setSelectedItem] = useState<VideoPlanItem | null>(null)
+
+  useEffect(() => {
+    if (!headerActionsOpen) return
+
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (headerActionsRef.current && !headerActionsRef.current.contains(event.target as Node)) {
+        setHeaderActionsOpen(false)
+      }
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setHeaderActionsOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [headerActionsOpen])
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([])
   const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false)
   // Preset times for quick selection
@@ -1452,29 +1479,61 @@ export function VideoPlanning() {
               Calendar view of all posted, planned, and upcoming videos.
             </p>
           </div>
-          <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto md:flex-wrap md:justify-end">
-            <Button
-              variant="secondary"
-              onClick={() => setUploadPlanModal(true)}
-              className="w-full md:w-auto"
-            >
-              Upload video
-            </Button>
+          <div className="flex w-full items-center gap-2 sm:justify-end md:w-auto">
             <Button
               onClick={() => setGenerateVideoModalOpen(true)}
               leftIcon={<Plus className="h-4 w-4" />}
-              className="w-full md:w-auto"
+              className="w-full sm:w-auto min-h-[44px] px-5 shadow-md shadow-brand-500/20"
               disabled={showUpgrade}
             >
               {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : 'Generate AI video'}
             </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setCreateModal(true)}
-              className="w-full md:w-auto border border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100"
-            >
-              Create automation workflow
-            </Button>
+
+            <div className="relative" ref={headerActionsRef}>
+              <button
+                type="button"
+                onClick={() => setHeaderActionsOpen((open) => !open)}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-brand-300 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+                aria-label="More actions"
+                aria-expanded={headerActionsOpen}
+                aria-haspopup="menu"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </button>
+
+              {headerActionsOpen && (
+                <div
+                  role="menu"
+                  aria-label="Content Studio actions"
+                  className="absolute right-0 z-20 mt-2 min-w-[220px] rounded-2xl border border-slate-200 bg-white p-2 shadow-xl"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setUploadPlanModal(true)
+                      setHeaderActionsOpen(false)
+                    }}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                  >
+                    <Upload className="h-4 w-4 text-slate-500" />
+                    Upload video
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setCreateModal(true)
+                      setHeaderActionsOpen(false)
+                    }}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                  >
+                    <Sparkles className="h-4 w-4 text-brand-500" />
+                    Create automation workflow
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
