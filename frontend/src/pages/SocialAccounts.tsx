@@ -68,6 +68,9 @@ export function SocialAccounts() {
     threads: t('platforms.threads') !== 'platforms.threads' ? t('platforms.threads') : 'Threads',
   }
 
+  const allPlatforms = ['instagram', 'tiktok', 'youtube', 'facebook', 'x', 'linkedin', 'threads'] as const
+
+
   const loadAccounts = useCallback(async () => {
     try {
       const response = await api.get('/api/social/accounts')
@@ -108,6 +111,21 @@ export function SocialAccounts() {
   }, [searchParams, setSearchParams, loadAccounts])
 
   const connectedPlatforms = accounts.filter((a: SocialAccount) => a.status === 'connected')
+  const inactivePlatforms = allPlatforms.filter((platform) => {
+    const account = accounts.find((a: SocialAccount) => a.platform === platform)
+    return !account || account.status !== 'connected'
+  })
+
+  const getResolvedHandle = (account?: SocialAccount) => {
+    if (!account) return null
+    const username = account.account_info?.username?.trim()
+    const displayName = account.account_info?.display_name?.trim()
+    const handle = username || displayName
+    if (!handle) return null
+    return handle.startsWith('@') ? handle : `@${handle}`
+  }
+
+  const isNumericId = (value: string) => /^\d{8,}$/.test(value)
 
   const handleConnect = async (platform: SocialAccount['platform']) => {
     const hasSub = user?.hasActiveSubscription || user?.role === 'admin'
@@ -207,8 +225,6 @@ export function SocialAccounts() {
     return <Badge variant={variants[status] || 'default'}>{t(`social_accounts.status_${status}`)}</Badge>
   }
 
-  const allPlatforms = ['instagram', 'tiktok', 'youtube', 'facebook', 'x', 'linkedin', 'threads'] as const
-
   if (loading) {
     return (
       <Layout>
@@ -237,20 +253,76 @@ export function SocialAccounts() {
 
         <CreditBanner />
 
-        <Card className="space-y-5">
+        <Card className="space-y-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold text-primary">Connected channels</h2>
-              <p className="text-sm text-slate-500">Link channels to ingest messages, comments, and mentions.</p>
+              <h2 className="text-lg font-semibold text-primary">Channel connections</h2>
+              <p className="text-sm text-slate-500">Connected channels appear first so you can see what's active at a glance.</p>
             </div>
             <Badge variant="default">{connectedPlatforms.length} connected</Badge>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {allPlatforms.map((platform) => {
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-emerald-700">Active channels</h3>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {connectedPlatforms.map((account) => {
+                const platform = account.platform
+                const Icon = platformIcons[platform]
+                const resolvedHandle = getResolvedHandle(account)
+
+                return (
+                  <Card key={platform} hover className="flex h-full flex-col gap-4 border border-emerald-200 bg-emerald-50/40 p-4 shadow-none">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <div className="space-y-1">
+                          <h3 className="text-sm font-semibold text-primary">{platformNames[platform]}</h3>
+                          {getStatusBadge(account.status)}
+                        </div>
+                      </div>
+                      <label className="group relative inline-flex cursor-default items-center gap-2" title="When enabled, messages from this channel are synced into AI Auto-DM.">
+                        <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-600">Inbox sync</span>
+                        <span className="relative inline-flex h-6 w-11 items-center rounded-full bg-emerald-500 px-1">
+                          <span className="h-4 w-4 translate-x-5 rounded-full bg-white shadow" />
+                        </span>
+                      </label>
+                    </div>
+
+                    {resolvedHandle ? (
+                      <p className="text-xs text-slate-600">{resolvedHandle}</p>
+                    ) : (
+                      <p className="text-xs text-slate-500">Handle unavailable</p>
+                    )}
+                    {!resolvedHandle && account.account_info?.username && isNumericId(account.account_info.username) && (
+                      <p className="text-[11px] text-slate-400">ID: {account.account_info.username}</p>
+                    )}
+
+                    <div className="mt-auto">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDisconnectModal(account.id)}
+                        className="w-full border border-rose-200 bg-rose-50/70 text-rose-600 hover:border-rose-300 hover:bg-rose-50"
+                      >
+                        <X className="mr-2 h-4 w-4" />
+                        Disconnect channel
+                      </Button>
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Add channel</h3>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {inactivePlatforms.map((platform) => {
               const account = accounts.find((a: SocialAccount) => a.platform === platform)
               const Icon = platformIcons[platform]
-              const isConnected = account?.status === 'connected'
+              const isPendingLinkedIn = platform === 'linkedin' && account?.status === 'pending'
 
               return (
                 <Card key={platform} hover className="flex h-full flex-col gap-4 border border-slate-100 bg-slate-50/60 p-4 shadow-none">
@@ -262,43 +334,30 @@ export function SocialAccounts() {
                       <div className="space-y-1">
                         <h3 className="text-sm font-semibold text-primary">{platformNames[platform]}</h3>
                         {account && getStatusBadge(account.status)}
+                        {isPendingLinkedIn && (
+                          <p className="text-xs text-amber-700">Waiting on our end — we'll notify you.</p>
+                        )}
                       </div>
                     </div>
-                    {isConnected && <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-500">Inbox sync on</span>}
                   </div>
 
-                  {isConnected && account?.account_info?.username && (
-                    <p className="text-xs text-slate-500">@{account.account_info.username}</p>
-                  )}
-
                   <div className="mt-auto">
-                    {isConnected ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDisconnectModal(account!.id)}
-                        className="w-full border border-rose-200 bg-rose-50/70 text-rose-600 hover:border-rose-300 hover:bg-rose-50"
-                      >
-                        <X className="mr-2 h-4 w-4" />
-                        Disconnect channel
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() => handleConnect(platform)}
-                        loading={connectingPlatform === platform}
-                        disabled={!hasSubscription}
-                        className="w-full"
-                      >
-                        <Link2 className="mr-2 h-4 w-4" />
-                        Connect channel
-                      </Button>
-                    )}
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => handleConnect(platform)}
+                      loading={connectingPlatform === platform}
+                      disabled={!hasSubscription || Boolean(isPendingLinkedIn)}
+                      className="w-full"
+                    >
+                      <Link2 className="mr-2 h-4 w-4" />
+                      {isPendingLinkedIn ? 'Pending availability' : 'Connect channel'}
+                    </Button>
                   </div>
                 </Card>
               )
             })}
+          </div>
           </div>
         </Card>
 
