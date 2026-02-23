@@ -37,6 +37,8 @@ import { GenerateVideoModal } from '../components/videos/GenerateVideoModal'
 import { useNotifications } from '../contexts/NotificationContext'
 
 const STATUS_FILTER_KEY = 'video_planning_status_filter'
+const CALENDAR_VIEW_KEY = 'video_planning_calendar_view'
+type CalendarView = 'week' | 'month'
 
 interface VideoPlan {
   id: string
@@ -144,6 +146,12 @@ export function VideoPlanning() {
   })
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([])
   const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [calendarView, setCalendarView] = useState<CalendarView>(() => {
+    if (typeof window === 'undefined') return 'week'
+    const stored = window.localStorage.getItem(CALENDAR_VIEW_KEY)
+    return stored === 'month' ? 'month' : 'week'
+  })
+  const [draggingItemId, setDraggingItemId] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>(() => {
     if (typeof window === 'undefined') return 'all'
     return localStorage.getItem(STATUS_FILTER_KEY) || 'all'
@@ -204,6 +212,12 @@ export function VideoPlanning() {
       window.localStorage.setItem(STATUS_FILTER_KEY, statusFilter)
     }
   }, [statusFilter])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(CALENDAR_VIEW_KEY, calendarView)
+    }
+  }, [calendarView])
 
   // Avatar-related functions removed - using AI video generation
 
@@ -971,8 +985,9 @@ export function VideoPlanning() {
   const postsByDate = useMemo(() => {
     return filteredPosts.reduce(
       (acc, post: ScheduledPost) => {
-        if (!post.scheduled_time) return acc
-        const date = new Date(post.scheduled_time)
+        const anchorDate = post.scheduled_time || post.posted_at
+        if (!anchorDate) return acc
+        const date = new Date(anchorDate)
         const dateKey = getDateKey(date)
         if (!dateKey) return acc
         if (!acc[dateKey]) acc[dateKey] = []
@@ -1042,16 +1057,66 @@ export function VideoPlanning() {
     return date.toLocaleDateString(language === 'ru' ? 'ru-RU' : language === 'uk' ? 'uk-UA' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US', { month: 'long', year: 'numeric' })
   }
 
-  const navigateMonth = (direction: 'prev' | 'next') => {
+
+
+
+  const getStartOfWeek = (date: Date) => {
+    const start = new Date(date)
+    start.setHours(0, 0, 0, 0)
+    start.setDate(start.getDate() - start.getDay())
+    return start
+  }
+
+  const weekDays = useMemo(() => {
+    const start = getStartOfWeek(currentMonth)
+    return Array.from({ length: 7 }, (_, index) => {
+      const day = new Date(start)
+      day.setDate(start.getDate() + index)
+      return day
+    })
+  }, [currentMonth])
+
+  const formatWeekRange = (days: Date[]) => {
+    if (!days.length) return ''
+    const start = days[0]
+    const end = days[days.length - 1]
+    const locale = language === 'ru' ? 'ru-RU' : language === 'uk' ? 'uk-UA' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US'
+    const startMonth = start.toLocaleDateString(locale, { month: 'short' })
+    const endMonth = end.toLocaleDateString(locale, { month: 'short' })
+    const year = end.getFullYear()
+    return `${startMonth} ${start.getDate()} – ${endMonth} ${end.getDate()}, ${year}`
+  }
+
+  const navigateCalendar = (direction: 'prev' | 'next') => {
     setCurrentMonth((prev: Date) => {
       const newDate = new Date(prev)
-      if (direction === 'prev') {
-        newDate.setMonth(prev.getMonth() - 1)
+      if (calendarView === 'week') {
+        newDate.setDate(prev.getDate() + (direction === 'prev' ? -7 : 7))
       } else {
-        newDate.setMonth(prev.getMonth() + 1)
+        newDate.setMonth(prev.getMonth() + (direction === 'prev' ? -1 : 1))
       }
       return newDate
     })
+  }
+
+  const movePlanItemToDate = async (itemId: string, dateKey: string) => {
+    if (!selectedPlan) return
+    try {
+      await api.put(`/api/plans/items/${itemId}`, { scheduled_date: dateKey })
+      await loadPlanItems(selectedPlan.id)
+      addNotification({
+        type: 'success',
+        title: 'Schedule updated',
+        message: `Moved item to ${new Date(dateKey).toLocaleDateString()}`,
+      })
+    } catch (error) {
+      console.error('Failed to move plan item:', error)
+      addNotification({
+        type: 'error',
+        title: 'Could not move item',
+        message: 'Please try again.',
+      })
+    }
   }
 
   const getItemsForDate = (date: Date | null) => {
@@ -1262,7 +1327,7 @@ export function VideoPlanning() {
               onClick={() => setCreateModal(true)}
               className="w-full md:w-auto border border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100"
             >
-              Make an automatization
+              Create automation workflow
             </Button>
           </div>
         </div>
@@ -1467,64 +1532,46 @@ export function VideoPlanning() {
 
             {/* Calendar Grid */}
             <Card className="p-6">
-              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-xl font-semibold text-primary text-center sm:text-left">
-                  {formatMonthYear(currentMonth)}
+                  {calendarView === 'week' ? formatWeekRange(weekDays) : formatMonthYear(currentMonth)}
                 </h2>
-                <div className="flex justify-center gap-2">
+                <div className="flex items-center justify-center gap-2">
                   <Button
-                    variant="ghost"
+                    variant={calendarView === 'week' ? 'primary' : 'ghost'}
                     size="sm"
-                    onClick={() => navigateMonth('prev')}
-                    className="flex-1 sm:flex-none"
+                    onClick={() => setCalendarView('week')}
                   >
-                    ← {t('video_planning.prev')}
+                    Weekly view
                   </Button>
                   <Button
-                    variant="ghost"
+                    variant={calendarView === 'month' ? 'primary' : 'ghost'}
                     size="sm"
-                    onClick={() => setCurrentMonth(new Date())}
-                    className="flex-1 sm:flex-none"
+                    onClick={() => setCalendarView('month')}
                   >
-                    {t('video_planning.today')}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigateMonth('next')}
-                    className="flex-1 sm:flex-none"
-                  >
-                    {t('video_planning.next')} →
+                    Monthly view
                   </Button>
                 </div>
               </div>
 
-              {/* Calendar Grid */}
+              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-slate-500">Overall calendar for your full content plan: uploads, AI videos, scheduled, and posted.</p>
+                <div className="flex justify-center gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => navigateCalendar('prev')} className="flex-1 sm:flex-none">← {t('video_planning.prev')}</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setCurrentMonth(new Date())} className="flex-1 sm:flex-none">{t('video_planning.today')}</Button>
+                  <Button variant="ghost" size="sm" onClick={() => navigateCalendar('next')} className="flex-1 sm:flex-none">{t('video_planning.next')} →</Button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-7 gap-2">
-                {/* Day Headers */}
-                {[
-                  { key: 'sun', label: 'Sun' },
-                  { key: 'mon', label: 'Mon' },
-                  { key: 'tue', label: 'Tue' },
-                  { key: 'wed', label: 'Wed' },
-                  { key: 'thu', label: 'Thu' },
-                  { key: 'fri', label: 'Fri' },
-                  { key: 'sat', label: 'Sat' },
-                ].map((day) => (
-                  <div
-                    key={day.key}
-                    className="p-2 text-center text-xs font-semibold text-slate-500"
-                  >
-                    {t(`video_planning.${day.key}`)}
-                  </div>
+                {[{ key: 'sun' }, { key: 'mon' }, { key: 'tue' }, { key: 'wed' }, { key: 'thu' }, { key: 'fri' }, { key: 'sat' }].map((day) => (
+                  <div key={day.key} className="p-2 text-center text-xs font-semibold text-slate-500">{t(`video_planning.${day.key}`)}</div>
                 ))}
 
-                {/* Calendar Days */}
-                {getDaysInMonth(currentMonth).map((date, index) => {
+                {(calendarView === 'week' ? weekDays : getDaysInMonth(currentMonth)).map((date, index) => {
                   const dateKey = getDateKey(date)
                   const items = getItemsForDate(date)
-                  const isToday =
-                    date && dateKey === getDateKey(new Date())
+                  const isToday = date && dateKey === getDateKey(new Date())
                   const isSelected = date && dateKey === selectedDate
 
                   return (
@@ -1535,7 +1582,17 @@ export function VideoPlanning() {
                         setSelectedDate(dateKey)
                         setIsDetailDrawerOpen(true)
                       }}
-                      className={`min-h-[120px] rounded-lg border p-2 text-left transition relative ${!date
+                      onDragOver={(event) => {
+                        if (!date || !draggingItemId) return
+                        event.preventDefault()
+                      }}
+                      onDrop={async (event) => {
+                        event.preventDefault()
+                        if (!date || !draggingItemId) return
+                        await movePlanItemToDate(draggingItemId, dateKey)
+                        setDraggingItemId(null)
+                      }}
+                      className={`min-h-[140px] rounded-lg border p-2 text-left transition relative ${!date
                         ? 'border-transparent bg-transparent cursor-default'
                         : isSelected
                           ? 'border-brand-500 bg-brand-50 shadow-md'
@@ -1548,57 +1605,28 @@ export function VideoPlanning() {
                     >
                       {date && (
                         <>
-                          <div className="flex items-center justify-between mb-1">
-                            <div
-                              className={`text-sm font-semibold ${isToday ? 'text-brand-600' : 'text-slate-700'}`}
-                            >
-                              {date.getDate()}
-                            </div>
-                            {items.length > 0 && (
-                              <div className="flex items-center gap-1">
-                                <div className="h-1.5 w-1.5 rounded-full bg-brand-500"></div>
-                                <span className="text-xs font-medium text-slate-600">
-                                  {items.length}
-                                </span>
-                              </div>
-                            )}
+                          <div className="mb-1 flex items-center justify-between">
+                            <div className={`text-sm font-semibold ${isToday ? 'text-brand-600' : 'text-slate-700'}`}>{date.getDate()}</div>
+                            {items.length > 0 && <span className="text-xs font-medium text-slate-600">{items.length}</span>}
                           </div>
                           {items.length > 0 && (
-                            <div className="mt-1 space-y-1 max-h-[88px] overflow-y-auto">
-                              {items.slice(0, 4).map((item) => {
+                            <div className="mt-1 space-y-1 max-h-[104px] overflow-y-auto">
+                              {items.slice(0, 5).map((item) => {
                                 const isPost = isScheduledPost(item)
-                                let status: string
-                                let displayTopic: string
-                                let displayTime: string
-
-                                if (isPost) {
-                                  status = normalizeStatusValue(item.status) || 'pending'
-                                  displayTopic = item.videos?.topic || `${item.platform} Post`
-                                  displayTime = item.scheduled_time
-                                    ? new Date(item.scheduled_time).toLocaleTimeString('en-US', {
-                                      hour: 'numeric',
-                                      minute: '2-digit',
-                                      hour12: true
-                                    })
-                                    : ''
-                                } else {
-                                  status = normalizeStatusValue(item.videos?.status || item.status) || 'pending'
-                                  // Show "Planned" or time if no topic, otherwise show topic
-                                  if (item.topic) {
-                                    displayTopic = item.topic
-                                  } else if (item.scheduled_time) {
-                                    displayTopic = t('video_planning.planned_with_time').replace('{time}', formatTime(item.scheduled_time))
-                                  } else {
-                                    displayTopic = t('video_planning.planned')
-                                  }
-                                  displayTime = item.scheduled_time ? formatTime(item.scheduled_time) : ''
-                                }
+                                const status = normalizeStatusValue((isPost ? item.status : item.videos?.status || item.status)) || 'pending'
+                                const displayTopic = isPost
+                                  ? item.videos?.topic || `${item.platform} Post`
+                                  : (item.topic || (item.scheduled_time ? t('video_planning.planned_with_time').replace('{time}', formatTime(item.scheduled_time)) : t('video_planning.planned')))
+                                const displayTime = isPost
+                                  ? (item.scheduled_time || item.posted_at ? new Date(item.scheduled_time || item.posted_at || '').toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '')
+                                  : (item.scheduled_time ? formatTime(item.scheduled_time) : '')
 
                                 return (
                                   <div
                                     key={item.id}
-                                    className={`truncate rounded px-1.5 py-1 text-xs border ${status === 'completed' ||
-                                      status === 'posted'
+                                    draggable={!isPost}
+                                    onDragStart={() => !isPost && setDraggingItemId(item.id)}
+                                    className={`truncate rounded px-1.5 py-1 text-xs border ${status === 'completed' || status === 'posted'
                                       ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
                                       : status === 'scheduled'
                                         ? 'bg-purple-50 border-purple-200 text-purple-800'
@@ -1614,28 +1642,17 @@ export function VideoPlanning() {
                                                   ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
                                                   : status === 'researching'
                                                     ? 'bg-cyan-50 border-cyan-200 text-cyan-800'
-                                                    : 'bg-slate-50 border-slate-200 text-slate-700'
-                                      }`}
+                                                    : 'bg-slate-50 border-slate-200 text-slate-700'}`}
                                     title={`${displayTime ? displayTime + ' - ' : ''}${displayTopic} (${status})`}
                                   >
                                     <div className="flex items-center gap-1">
-                                      {displayTime && (
-                                        <span className="text-[10px] font-medium opacity-75">
-                                          {displayTime}
-                                        </span>
-                                      )}
-                                      <span className="flex-1 truncate font-medium">
-                                        {displayTopic}
-                                      </span>
+                                      {displayTime && <span className="text-[10px] font-medium opacity-75">{displayTime}</span>}
+                                      <span className="flex-1 truncate font-medium">{displayTopic}</span>
                                     </div>
                                   </div>
                                 )
                               })}
-                              {items.length > 4 && (
-                                <div className="text-xs font-medium text-slate-500 px-1.5 py-0.5 bg-slate-100 rounded">
-                                  {t('video_planning.more_items').replace('{count}', (items.length - 4).toString())}
-                                </div>
-                              )}
+                              {items.length > 5 && <div className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-500">{t('video_planning.more_items').replace('{count}', (items.length - 5).toString())}</div>}
                             </div>
                           )}
                         </>

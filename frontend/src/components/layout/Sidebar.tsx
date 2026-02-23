@@ -3,7 +3,7 @@ import { Link, NavLink, useLocation } from 'react-router-dom'
 import {
   Share2,
   Sparkles,
-  Calendar,
+  Clapperboard,
   SlidersHorizontal,
   BarChart3,
   MessagesSquare,
@@ -30,7 +30,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   console.log('[Sidebar] User check:', { user: user?.email, role: user?.role, isAdmin: user?.role === 'admin' })
 
   const navigation = [
-    { label: 'Content Studio', to: '/planning', icon: Calendar, hint: 'Calendar, uploads, AI videos, automation' },
+    { label: 'Content Studio', to: '/planning', icon: Clapperboard, hint: 'Calendar, uploads, and AI videos' },
     { label: 'Social Accounts', to: '/social', icon: Share2, match: (pathname: string) => pathname === '/social' },
     { label: 'AI Auto-DM', to: '/social/dms', icon: MessagesSquare },
     { label: 'Trendwatcher', to: '/trend-searcher', icon: Search },
