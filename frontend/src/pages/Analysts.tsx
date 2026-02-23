@@ -26,22 +26,6 @@ interface PlatformAnalytics {
   message?: string
 }
 
-type MetricKey = 'followers' | 'impressions' | 'reach' | 'profileViews'
-
-const metricLabels: Record<MetricKey, string> = {
-  followers: 'Followers',
-  impressions: 'Impressions',
-  reach: 'Reach',
-  profileViews: 'Profile views',
-}
-
-const metricDescriptions: Record<MetricKey, string> = {
-  followers: 'Audience size across all connected channels.',
-  impressions: 'Total number of times your content was shown.',
-  reach: 'Unique people who saw your content.',
-  profileViews: 'Visits to your social profile pages.',
-}
-
 const formatNumber = (value: number | undefined) => Number(value || 0).toLocaleString()
 
 const getTrendDelta = (series: TimeSeriesPoint[] | undefined) => {
@@ -89,7 +73,6 @@ export function Analysts() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [analytics, setAnalytics] = useState<Record<string, PlatformAnalytics>>({})
-  const [selectedMetric, setSelectedMetric] = useState<MetricKey>('reach')
 
   useEffect(() => {
     const loadAnalytics = async () => {
@@ -130,7 +113,7 @@ export function Analysts() {
 
   const platformEntries = useMemo(() => Object.entries(analytics), [analytics])
 
-  const totals = useMemo<Record<MetricKey, number>>(() => {
+  const totals = useMemo(() => {
     return platformEntries.reduce(
       (acc, [, item]) => ({
         followers: acc.followers + Number(item.followers || 0),
@@ -157,22 +140,11 @@ export function Analysts() {
       .sort((a, b) => a.date.localeCompare(b.date))
   }, [platformEntries])
 
-  const topPlatformByMetric = useMemo(() => {
-    if (!platformEntries.length) return null
-
-    return platformEntries
-      .map(([platform, stats]) => ({
-        platform,
-        value: Number(stats[selectedMetric] || 0),
-      }))
-      .sort((a, b) => b.value - a.value)[0]
-  }, [platformEntries, selectedMetric])
-
   const overallTrend = useMemo(() => getTrendDelta(aggregateReachSeries), [aggregateReachSeries])
 
   return (
     <Layout>
-      <div className="space-y-8">
+      <div className="space-y-6">
         <div className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Insights</p>
           <h1 className="text-3xl font-semibold text-primary">Analytics</h1>
@@ -205,8 +177,8 @@ export function Analysts() {
               No connected social accounts found. Connect your social account to start seeing analytics.
             </Card>
           ) : (
-            <>
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <Card className="flex items-center gap-3 p-5">
                   <Users className="h-5 w-5 text-indigo-600" />
                   <div>
@@ -237,73 +209,42 @@ export function Analysts() {
                 </Card>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-[1.5fr,1fr]">
-                <Card className="p-5">
-                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <h2 className="text-lg font-semibold text-primary">Reach trend snapshot</h2>
-                      <p className="text-sm text-slate-500">Combined reach over time from all connected channels.</p>
-                    </div>
-                    {overallTrend && (
-                      <div className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${overallTrend.up ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                        {overallTrend.up ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
-                        {overallTrend.percent.toFixed(1)}% vs previous point
-                      </div>
-                    )}
+              <Card className="p-5">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold text-primary">Reach trend snapshot</h2>
+                    <p className="text-sm text-slate-500">Combined reach over time from all connected channels.</p>
                   </div>
-
-                  {aggregateReachSeries.length > 1 ? (
-                    <div className="space-y-3">
-                      <div className="h-44 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full">
-                          <path d={renderSparklinePath(aggregateReachSeries)} fill="none" stroke="rgb(79,70,229)" strokeWidth="2.5" />
-                        </svg>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3 text-xs text-slate-500 md:grid-cols-4">
-                        {aggregateReachSeries.slice(-4).map((point) => (
-                          <div key={point.date} className="rounded-xl bg-slate-50 p-3">
-                            <p className="truncate font-medium text-slate-700">{point.date}</p>
-                            <p>{formatNumber(point.value)}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
-                      Not enough time-series data yet to render a trend. Keep posting and check back soon.
+                  {overallTrend && (
+                    <div className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${overallTrend.up ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                      {overallTrend.up ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
+                      {overallTrend.percent.toFixed(1)}% vs previous point
                     </div>
                   )}
-                </Card>
+                </div>
 
-                <Card className="p-5">
-                  <div className="mb-4">
-                    <h2 className="text-lg font-semibold text-primary">Performance lens</h2>
-                    <p className="text-sm text-slate-500">Switch metrics to see which platform is currently strongest.</p>
+                {aggregateReachSeries.length > 1 ? (
+                  <div className="space-y-3">
+                    <div className="h-44 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full">
+                        <path d={renderSparklinePath(aggregateReachSeries)} fill="none" stroke="rgb(79,70,229)" strokeWidth="2.5" />
+                      </svg>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-xs text-slate-500 md:grid-cols-4">
+                      {aggregateReachSeries.slice(-4).map((point) => (
+                        <div key={point.date} className="rounded-xl bg-slate-50 p-3">
+                          <p className="truncate font-medium text-slate-700">{point.date}</p>
+                          <p>{formatNumber(point.value)}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-
-                  <div className="mb-4 grid grid-cols-2 gap-2">
-                    {(Object.keys(metricLabels) as MetricKey[]).map((metric) => (
-                      <button
-                        key={metric}
-                        type="button"
-                        onClick={() => setSelectedMetric(metric)}
-                        className={`rounded-xl border px-3 py-2 text-xs font-medium transition ${selectedMetric === metric ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:text-indigo-600'}`}
-                      >
-                        {metricLabels[metric]}
-                      </button>
-                    ))}
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+                    Not enough time-series data yet to render a trend. Keep posting and check back soon.
                   </div>
-
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <p className="text-xs uppercase tracking-wide text-slate-400">Top platform</p>
-                    <p className="mt-1 text-lg font-semibold capitalize text-primary">{topPlatformByMetric?.platform || 'N/A'}</p>
-                    <p className="text-sm text-slate-600">
-                      {metricLabels[selectedMetric]}: {formatNumber(topPlatformByMetric?.value)}
-                    </p>
-                    <p className="mt-2 text-xs text-slate-500">{metricDescriptions[selectedMetric]}</p>
-                  </div>
-                </Card>
-              </div>
+                )}
+              </Card>
 
               <Card className="p-5">
                 <div className="mb-4 flex items-center gap-2">
@@ -320,7 +261,7 @@ export function Analysts() {
                         <th className="px-2 py-3">Reach</th>
                         <th className="px-2 py-3">Impressions</th>
                         <th className="px-2 py-3">Profile views</th>
-                        <th className="px-2 py-3">Reach / follower</th>
+                        <th className="px-2 py-3">Reach/Follower</th>
                         <th className="px-2 py-3">Status</th>
                       </tr>
                     </thead>
@@ -352,7 +293,7 @@ export function Analysts() {
                   </table>
                 </div>
               </Card>
-            </>
+            </div>
           )}
         </Card>
       </div>
