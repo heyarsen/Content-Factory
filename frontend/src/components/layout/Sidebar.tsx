@@ -32,7 +32,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const navigation = [
     { label: 'Content Studio', to: '/planning', icon: Calendar, hint: 'Calendar, uploads, AI videos, automation' },
     { label: 'Social Accounts', to: '/social', icon: Share2, match: (pathname: string) => pathname === '/social' },
-    { label: 'AI DMs', to: '/social/dms', icon: MessagesSquare },
+    { label: 'AI Auto-DM', to: '/social/dms', icon: MessagesSquare },
     { label: 'Trendwatcher', to: '/trend-searcher', icon: Search },
     { label: t('common.avatars') || 'Avatars', to: '/avatars', icon: User, hint: 'In development' },
     { label: 'Analytics', to: '/analytics', icon: BarChart3 },
