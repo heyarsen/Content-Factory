@@ -124,7 +124,7 @@ export function InstagramDMs() {
     try {
       setError(null)
       const dmsResponse = await api.get<ListResponse<InstagramDM>>('/api/social/instagram/dms', {
-        params: { per_page: 50 },
+        params: { per_page: 30 },
       })
 
       setDms(dmsResponse.data.data || [])
@@ -139,15 +139,6 @@ export function InstagramDMs() {
   useEffect(() => {
     loadData()
   }, [loadData])
-
-  const uniqueParticipants = useMemo(() => {
-    const ids = new Set<string>()
-    dms.forEach((dm) => {
-      if (dm.senderId) ids.add(dm.senderId)
-      if (dm.recipientId) ids.add(dm.recipientId)
-    })
-    return ids.size
-  }, [dms])
 
   const conversations = useMemo<Conversation[]>(() => {
     const threadCountByUserId = new Map<string, Set<string>>()
@@ -316,32 +307,9 @@ export function InstagramDMs() {
           </Button>
         </div>
 
-        {loading ? (
-          <div className="grid gap-4 md:grid-cols-2">
-            {Array.from({ length: 2 }).map((_, idx) => (
-              <Card key={idx}>
-                <Skeleton className="h-24 w-full" />
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card className="space-y-3">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Messages</p>
-              <p className="text-3xl font-bold text-primary">{dms.length}</p>
-              <Badge variant="default" className="w-fit">DM inbox</Badge>
-            </Card>
-            <Card className="space-y-3">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Participants</p>
-              <p className="text-3xl font-bold text-primary">{uniqueParticipants}</p>
-              <Badge variant="default" className="w-fit">User IDs detected</Badge>
-            </Card>
-          </div>
-        )}
-
         <Card className="p-0">
           <div className="grid min-h-[640px] md:grid-cols-[320px,1fr]">
-            <div className="border-b border-slate-200 bg-slate-50 p-4 md:border-b-0 md:border-r">
+            <div className="max-h-[640px] overflow-y-auto border-b border-slate-200 bg-slate-50 p-4 md:border-b-0 md:border-r">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Conversations</h2>
 
               {error ? (

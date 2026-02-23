@@ -44,7 +44,7 @@ type CalendarView = 'week' | 'month'
 
 const WEEK_TIMELINE_START_HOUR = 0
 const WEEK_TIMELINE_END_HOUR = 23
-const WEEK_TIMELINE_ROW_HEIGHT = 64
+const WEEK_TIMELINE_ROW_HEIGHT = 36
 
 
 type CalendarVideoSource = 'AI' | 'Auto'

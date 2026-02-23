@@ -183,14 +183,20 @@ router.get('/accounts', authenticate, requireSubscription, async (req: AuthReque
 
             if (platformAccount && typeof platformAccount === 'object') {
               const typedPlatformAccount = platformAccount as Record<string, unknown>
-              const socialImages = (typedPlatformAccount.social_images || {}) as Record<string, unknown>
+              const rawSocialImages = typedPlatformAccount.social_images
+              const socialImages = (rawSocialImages && typeof rawSocialImages === 'object')
+                ? rawSocialImages as Record<string, unknown>
+                : null
+              const socialImageUrl = typeof rawSocialImages === 'string' ? rawSocialImages : null
 
               return {
                 ...account,
                 account_info: {
                   username: toNullableString(typedPlatformAccount.username) || toNullableString(typedPlatformAccount.handle) || null,
                   display_name: toNullableString(typedPlatformAccount.display_name) || toNullableString(typedPlatformAccount.name) || null,
-                  avatar_url: toNullableString(socialImages.profile_picture) ||
+                  avatar_url: toNullableString(socialImages?.profile_picture) ||
+                    toNullableString(socialImages?.avatar_url) ||
+                    toNullableString(socialImageUrl) ||
                     toNullableString(typedPlatformAccount.profile_picture) ||
                     toNullableString(typedPlatformAccount.avatar_url) ||
                     null,

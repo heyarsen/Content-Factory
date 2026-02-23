@@ -153,23 +153,14 @@ export function Preferences() {
       console.error('Failed to load social accounts:', error)
     }
   }
-
-  const toggleTargetPlatform = (platform: string) => {
-    setPreferences((prev) => ({
-      ...prev,
-      target_platforms: prev.target_platforms.includes(platform)
-        ? prev.target_platforms.filter((item) => item !== platform)
-        : [...prev.target_platforms, platform],
-    }))
-  }
-
   const handleSave = async () => {
     setSaving(true)
     try {
-      await api.put('/api/preferences', preferences)
       if (draftLanguage !== language) {
         setLanguage(draftLanguage as typeof language)
       }
+
+      await api.put('/api/preferences', preferences)
       toast.success(t('preferences.preferences_saved'))
     } catch (error) {
       toast.error(t('preferences.preferences_save_failed'))
@@ -331,72 +322,6 @@ export function Preferences() {
             </p>
           </Card>
         )}
-
-        {/* Campaign onboarding profile */}
-        <Card className="p-6">
-          <div className="mb-6 flex items-center gap-3">
-            <Settings className="h-5 w-5 text-slate-400" />
-            <h2 className="text-lg font-semibold text-primary">Campaign onboarding</h2>
-          </div>
-          <div className="space-y-5">
-            <Input
-              label="Primary social goals"
-              value={preferences.social_goals}
-              onChange={(e) => setPreferences({ ...preferences, social_goals: e.target.value })}
-              placeholder="e.g. Grow qualified audience and boost product inquiries"
-            />
-
-            <div>
-              <p className="mb-2 text-sm font-medium text-slate-700">Target platforms</p>
-              <div className="flex flex-wrap gap-2">
-                {availablePlatforms.map((platform) => (
-                  <button
-                    key={`target-${platform}`}
-                    type="button"
-                    onClick={() => toggleTargetPlatform(platform)}
-                    className={`rounded-lg border px-4 py-2 text-sm font-medium capitalize transition ${preferences.target_platforms.includes(platform)
-                      ? 'border-brand-500 bg-brand-50 text-brand-700'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                      }`}
-                  >
-                    {platformNames[platform] || platform}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <Input
-              label="Brand voice"
-              value={preferences.brand_voice}
-              onChange={(e) => setPreferences({ ...preferences, brand_voice: e.target.value })}
-              placeholder="e.g. Confident, practical, and community-first"
-            />
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <Select
-                label="Posting cadence"
-                value={preferences.posting_cadence}
-                onChange={(e) => setPreferences({ ...preferences, posting_cadence: e.target.value })}
-                options={[
-                  { value: 'daily', label: 'Daily' },
-                  { value: '3_times_week', label: '3 times per week' },
-                  { value: 'weekly', label: 'Weekly' },
-                ]}
-              />
-              <Select
-                label="Campaign objective"
-                value={preferences.campaign_objective}
-                onChange={(e) => setPreferences({ ...preferences, campaign_objective: e.target.value as Preferences['campaign_objective'] })}
-                options={[
-                  { value: 'awareness', label: 'Awareness' },
-                  { value: 'engagement', label: 'Engagement' },
-                  { value: 'leads', label: 'Leads' },
-                  { value: 'sales', label: 'Sales' },
-                ]}
-              />
-            </div>
-          </div>
-        </Card>
 
         {/* Timezone */}
         <Card className="p-6">
