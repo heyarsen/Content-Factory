@@ -29,13 +29,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation()
 
   const navigation = [
-    { label: 'Content Studio', to: '/planning', icon: Clapperboard },
-    { label: 'Video Library', to: '/videos', icon: Film },
-    { label: 'Social Accounts', to: '/social', icon: Share2, match: (pathname: string) => pathname === '/social' },
-    { label: 'DMs', to: '/social/dms', icon: MessagesSquare },
-    { label: 'Trendwatcher', to: '/trend-searcher', icon: Search },
+    { label: t('common.content_studio') || 'Content Studio', to: '/planning', icon: Clapperboard },
+    { label: t('common.my_videos') || 'Video Library', to: '/videos', icon: Film },
+    { label: t('common.social_accounts') || 'Social Accounts', to: '/social', icon: Share2, match: (pathname: string) => pathname === '/social' },
+    { label: t('common.dms') || 'DMs', to: '/social/dms', icon: MessagesSquare },
+    { label: t('common.trendwatcher') || 'Trendwatcher', to: '/trend-searcher', icon: Search },
     { label: t('common.avatars') || 'Avatars', to: '/avatars', icon: User },
-    { label: 'Analytics', to: '/analytics', icon: BarChart3 },
+    { label: t('common.analytics') || 'Analytics', to: '/analytics', icon: BarChart3 },
     { label: t('common.preferences') || 'Preferences', to: '/preferences', icon: SlidersHorizontal },
   ]
 
