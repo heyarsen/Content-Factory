@@ -116,15 +116,15 @@ export function ProfileSettings() {
       <div className="space-y-8">
         {/* Header */}
         <div className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Account settings</p>
-          <h1 className="text-3xl font-semibold text-primary">Profile & Security</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('preferences.account_settings_label')}</p>
+          <h1 className="text-3xl font-semibold text-primary">{t('preferences.profile_security_title')}</h1>
           <p className="text-sm text-slate-500">
-            Manage your login credentials, account identity, and sign-in security for this workspace.
+            {t('preferences.profile_security_desc')}
           </p>
           <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-600">You are in: Account</span>
+            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-600">{t('preferences.you_are_in_account')}</span>
             <Link to="/preferences" className="rounded-full border border-brand-200 bg-brand-50 px-3 py-1 font-medium text-brand-700 transition hover:bg-brand-100">
-              Go to Workspace Preferences
+              {t('preferences.go_to_workspace_preferences')}
             </Link>
           </div>
         </div>
