@@ -3,6 +3,17 @@ import axios from 'axios'
 const KIE_API_URL = 'https://api.kie.ai/api/v1'
 const POYO_API_URL = process.env.POYO_API_URL || 'https://api.poyo.ai/api/v1'
 
+const CREATE_TASK_ENDPOINTS: Record<SoraProvider, string[]> = {
+    kie: ['/jobs/createTask'],
+    // POYO has shipped endpoint variants; try canonical first, then fallbacks.
+    poyo: ['/jobs/createTask', '/jobs/create', '/job/createTask'],
+}
+
+const TASK_DETAILS_ENDPOINTS: Record<SoraProvider, string[]> = {
+    kie: ['/jobs/recordInfo'],
+    poyo: ['/jobs/recordInfo', '/jobs/getTask', '/job/recordInfo'],
+}
+
 export type SoraProvider = 'kie' | 'poyo'
 export type SoraModel = 'sora-2' | 'sora-2-private' | 'sora-2-stable'
 
@@ -192,23 +203,41 @@ export async function createSoraTask(
     })
 
     try {
-        const response = await retryWithBackoff(
-            async () => {
-                return await axios.post<CreateSoraTaskResponse>(
-                    `${baseUrl}/jobs/createTask`,
-                    payload,
-                    {
-                        headers: {
-                            'Authorization': `Bearer ${apiKey}`,
-                            'Content-Type': 'application/json',
-                        },
-                        timeout: 30000,
-                    }
+        const endpoints = CREATE_TASK_ENDPOINTS[provider]
+        let response: { data: CreateSoraTaskResponse } | null = null
+        let lastError: any = null
+
+        for (const endpoint of endpoints) {
+            try {
+                response = await retryWithBackoff(
+                    async () => {
+                        return await axios.post<CreateSoraTaskResponse>(`${baseUrl}${endpoint}`, payload, {
+                            headers: {
+                                'Authorization': `Bearer ${apiKey}`,
+                                'Content-Type': 'application/json',
+                            },
+                            timeout: 30000,
+                        })
+                    },
+                    3,
+                    1000
                 )
-            },
-            3, // maxRetries
-            1000 // initialDelay
-        )
+                break
+            } catch (error: any) {
+                lastError = error
+                const status = error?.response?.status
+                // If endpoint was not found, continue to next known variant.
+                if (status === 404 && provider === 'poyo') {
+                    console.warn(`[Sora API] Endpoint returned 404 for provider=${provider}: ${endpoint}`)
+                    continue
+                }
+                throw error
+            }
+        }
+
+        if (!response) {
+            throw lastError || new Error('Failed to create Sora task: no valid endpoint found')
+        }
 
         if (response.data.code !== 200) {
             throw new Error(`KIE API error: ${response.data.msg}`)
@@ -217,7 +246,13 @@ export async function createSoraTask(
         console.log('[Sora API] Task created successfully:', response.data.data.taskId)
         return response.data
     } catch (error: any) {
-        console.error('[Sora API] Failed to create task:', error)
+        console.error('[Sora API] Failed to create task:', {
+            provider,
+            status: error?.response?.status,
+            code: error?.code,
+            message: error?.message,
+            responseData: error?.response?.data,
+        })
 
         let errorMessage = 'Failed to create Sora video generation task'
 
@@ -259,15 +294,35 @@ export async function getTaskDetails(taskId: string, provider: SoraProvider = 'k
     const { apiKey, baseUrl } = getApiConfig(provider)
 
     try {
-        // Per docs, task status endpoint is /jobs/recordInfo?taskId=...
-        const response = await axios.get<SoraTaskDetail>(`${baseUrl}/jobs/recordInfo`, {
-            params: { taskId },
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-            },
-            timeout: 15000,
-        })
+        const endpoints = TASK_DETAILS_ENDPOINTS[provider]
+        let response: { data: SoraTaskDetail } | null = null
+        let lastError: any = null
+
+        for (const endpoint of endpoints) {
+            try {
+                response = await axios.get<SoraTaskDetail>(`${baseUrl}${endpoint}`, {
+                    params: { taskId },
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`,
+                        'Content-Type': 'application/json',
+                    },
+                    timeout: 15000,
+                })
+                break
+            } catch (error: any) {
+                lastError = error
+                const status = error?.response?.status
+                if (status === 404 && provider === 'poyo') {
+                    console.warn(`[Sora API] Task details endpoint returned 404 for provider=${provider}: ${endpoint}`)
+                    continue
+                }
+                throw error
+            }
+        }
+
+        if (!response) {
+            throw lastError || new Error('Failed to retrieve task status: no valid endpoint found')
+        }
 
         if (response.data.code !== 200) {
             if (response.data.msg?.includes('recordInfo is null')) {
@@ -294,7 +349,14 @@ export async function getTaskDetails(taskId: string, provider: SoraProvider = 'k
 
         return response.data
     } catch (error: any) {
-        console.error('[Sora API] Failed to get task details:', error)
+        console.error('[Sora API] Failed to get task details:', {
+            provider,
+            taskId,
+            status: error?.response?.status,
+            code: error?.code,
+            message: error?.message,
+            responseData: error?.response?.data,
+        })
 
         let errorMessage = 'Failed to retrieve task status'
 
