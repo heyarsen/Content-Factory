@@ -14,6 +14,24 @@ import { buildSoraVoiceoverPrompt } from '../lib/soraPrompt.js'
 import { VideoService } from './videoService.js'
 import { SoraGenerationSettingsService, type GenerationMode } from './soraGenerationSettingsService.js'
 
+const MAX_RETRIES_PER_MODEL = 2
+
+function buildModelAttemptPlan(selectedModel: SoraModel): SoraModel[] {
+    const attempts: SoraModel[] = []
+
+    for (let retry = 0; retry < MAX_RETRIES_PER_MODEL; retry++) {
+        attempts.push(selectedModel)
+    }
+
+    if (selectedModel !== 'sora-2-stable') {
+        for (let retry = 0; retry < MAX_RETRIES_PER_MODEL; retry++) {
+            attempts.push('sora-2-stable')
+        }
+    }
+
+    return attempts
+}
+
 /**
  * Map Sora task status to internal video status
  * KIE API uses: 'waiting', 'success', 'fail'
@@ -129,10 +147,7 @@ export async function generateVideoWithSora(
         const generationMode = options.generationMode || 'manual'
         const selected = await SoraGenerationSettingsService.resolveProviderConfig(generationMode)
 
-        const attemptedModels: SoraModel[] =
-            selected.model === 'sora-2' || selected.model === 'sora-2-private'
-                ? [selected.model, selected.model, 'sora-2-stable']
-                : [selected.model]
+        const attemptedModels = buildModelAttemptPlan(selected.model)
 
         let lastError: Error | null = null
         let successfulTaskDetail: SoraTaskDetail | null = null
