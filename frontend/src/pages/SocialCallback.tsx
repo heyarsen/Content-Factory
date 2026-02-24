@@ -50,7 +50,7 @@ export function SocialCallback() {
     const uploadPostUsername = usernameParam || storedUsername
 
     if (!uploadPostUsername) {
-      setError('Missing Upload-Post username. Please restart the connection flow.')
+      setError('Missing account identifier. Please restart the connection flow.')
       setLoading(false)
       return
     }

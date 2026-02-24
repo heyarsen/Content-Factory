@@ -283,7 +283,7 @@ export function Dashboard() {
             <h2 className="text-lg font-semibold text-slate-900">Social analytics</h2>
             <Badge variant="default" className="inline-flex items-center gap-1">
               <BarChart3 className="h-3.5 w-3.5" />
-              Upload-Post API
+              Connected Channels
             </Badge>
           </div>
           {analyticsLoading ? (

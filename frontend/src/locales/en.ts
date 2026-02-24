@@ -5,7 +5,7 @@ export const en = {
         manual_creation: "Manual Creation",
         automation: "Automation",
         content_studio: "Content Studio",
-        dms: "DMs",
+        dms: "Messages",
         trendwatcher: "Trendwatcher",
         analytics: "Analytics",
         create: "Create",
@@ -197,7 +197,7 @@ export const en = {
     },
 
     instagram_dms: {
-        title: "DMs",
+        title: "Direct Messages",
         description: "Manage direct messages in a chat-style inbox.",
         conversations: "Conversations",
         conversations_count: "{count} conversations",
@@ -219,13 +219,13 @@ export const en = {
         },
         empty: {
             title: "No direct messages found",
-            description: "Connect a social account and receive DMs to see them here.",
+            description: "Connect a social account and receive direct messages to see them here.",
         },
         success: {
-            sent: "DM sent successfully.",
+            sent: "Message sent successfully.",
         },
         errors: {
-            load_failed: "Unable to load DMs",
+            load_failed: "Unable to load messages",
             recipient_message_required: "Recipient ID and message are required.",
             send_failed: "Failed to send direct message",
         },
@@ -938,7 +938,7 @@ export const en = {
     analysts: {
         eyebrow: "Insights",
         title: "Analytics",
-        subtitle: "Live cross-platform intelligence powered by your Upload-Post analytics data.",
+        subtitle: "Live cross-platform intelligence powered by your channel analytics data.",
         load_failed_title: "Unable to load analytics",
         no_accounts: "No connected social accounts found. Connect your social account to start seeing analytics.",
         followers: "Followers",

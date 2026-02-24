@@ -226,7 +226,7 @@ export function Distribution() {
         return true
       }
     } catch (error) {
-      console.error('Failed to open Upload-Post portal window:', error)
+      console.error('Failed to open connection portal window:', error)
     }
 
     return false
@@ -290,7 +290,7 @@ export function Distribution() {
             url: resolvedAccessUrl,
             duration,
             redirectUrl,
-            message: `${defaultMessage} We couldn't automatically open the Upload-Post portal. Use the link below to continue.`,
+            message: `${defaultMessage} We couldn't automatically open the connection portal. Use the link below to continue.`,
             embedDisabled: true,
           })
         }
@@ -301,7 +301,7 @@ export function Distribution() {
 
         if (!fallbackOpened) {
           const fallbackParts = [
-            `${defaultMessage} We couldn't automatically open the Upload-Post portal.`,
+            `${defaultMessage} We couldn't automatically open the connection portal.`,
           ]
 
           if (duration) {
@@ -723,7 +723,7 @@ export function Distribution() {
                   />
                 ) : (
                   <div className="flex h-full flex-col items-center justify-center space-y-4 p-6 text-sm text-slate-500">
-                    <p>We couldn't display the connection portal here. Use the link below to continue at Upload-Post.</p>
+                    <p>We couldn't display the connection portal here. Use the link below to continue.</p>
                     <Button
                       type="button"
                       variant="primary"
