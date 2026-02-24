@@ -1922,10 +1922,77 @@ export function VideoPlanning() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <p className="text-xs text-slate-500 sm:hidden">
+                  <div className="space-y-3 sm:hidden">
+                    <p className="rounded-lg border border-brand-100 bg-brand-50/70 px-3 py-2 text-xs text-brand-700">
+                      Mobile view: tap a day to open details and quickly review scheduled items.
+                    </p>
+                    <div className="space-y-2">
+                      {getDaysInMonth(currentMonth)
+                        .filter((date): date is Date => Boolean(date))
+                        .map((date) => {
+                          const dateKey = getDateKey(date)
+                          const items = getItemsForDate(date)
+                          const isToday = dateKey === getDateKey(new Date())
+                          const isSelected = dateKey === selectedDate
+
+                          return (
+                            <button
+                              key={dateKey}
+                              onClick={() => {
+                                setSelectedDate(dateKey)
+                                setIsDetailDrawerOpen(true)
+                              }}
+                              className={`w-full rounded-xl border p-3 text-left transition ${isSelected
+                                ? 'border-brand-500 bg-brand-50 shadow-sm'
+                                : isToday
+                                  ? 'border-brand-300 bg-brand-50/60'
+                                  : 'border-slate-200 bg-white'
+                                }`}
+                            >
+                              <div className="mb-2 flex items-center justify-between gap-2">
+                                <p className="text-sm font-semibold text-primary">
+                                  {date.toLocaleDateString(language === 'ru' ? 'ru-RU' : language === 'uk' ? 'uk-UA' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US', {
+                                    weekday: 'short',
+                                    month: 'short',
+                                    day: 'numeric',
+                                  })}
+                                </p>
+                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                                  {items.length} items
+                                </span>
+                              </div>
+                              {items.length > 0 ? (
+                                <div className="space-y-1">
+                                  {items.slice(0, 3).map((item) => {
+                                    const isPost = isScheduledPost(item)
+                                    const displayTopic = isPost
+                                      ? getReadableVideoTitle(item.videos?.topic, 'Auto')
+                                      : getReadableVideoTitle(item.topic || t('video_planning.planned'), item.video_id ? 'Auto' : 'AI')
+
+                                    return (
+                                      <p key={item.id} className="truncate text-xs text-slate-600">
+                                        • {displayTopic}
+                                      </p>
+                                    )
+                                  })}
+                                  {items.length > 3 && (
+                                    <p className="text-xs font-medium text-brand-600">
+                                      +{items.length - 3} more
+                                    </p>
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-slate-400">No scheduled items</p>
+                              )}
+                            </button>
+                          )
+                        })}
+                    </div>
+                  </div>
+                  <p className="hidden text-xs text-slate-500 sm:block">
                     Swipe horizontally to view the full month calendar.
                   </p>
-                  <div className="overflow-x-auto rounded-lg border border-slate-200 p-2">
+                  <div className="hidden overflow-x-auto rounded-lg border border-slate-200 p-2 sm:block">
                     <div className="grid min-w-[700px] grid-cols-7 gap-2">
                   {[{ key: 'sun' }, { key: 'mon' }, { key: 'tue' }, { key: 'wed' }, { key: 'thu' }, { key: 'fri' }, { key: 'sat' }].map((day) => (
                     <div key={day.key} className="p-2 text-center text-xs font-semibold text-slate-500">{t(`video_planning.${day.key}`)}</div>
