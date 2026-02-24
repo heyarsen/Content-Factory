@@ -165,6 +165,41 @@ export const es = {
         account: "Cuenta",
         open_navigation: "Abrir navegación",
     },
+
+    instagram_dms: {
+        title: "DMs",
+        description: "Manage direct messages in a chat-style inbox.",
+        conversations: "Conversations",
+        conversations_count: "{count} conversations",
+        no_messages_yet: "No messages yet",
+        chatting_with: "Chatting with",
+        channel: "Instagram DM",
+        reply: "Reply",
+        recipient_placeholder: "Recipient ID (e.g. 17841400123456789)",
+        reply_placeholder: "Write a reply…",
+        message_placeholder: "Write your message",
+        generate_ai_reply: "Generate AI Reply",
+        ai_reply_fallback: "Thanks for reaching out! I'll get back to you shortly.",
+        ai_reply_template: "Thanks for your message! Regarding \"{snippet}\", happy to help — can you share one more detail so I can give you the best answer?",
+        sending: "Sending...",
+        send: "Send",
+        select: {
+            title: "Select a conversation",
+            description: "Choose a conversation from the left to view messages in chat mode.",
+        },
+        empty: {
+            title: "No direct messages found",
+            description: "Connect a social account and receive DMs to see them here.",
+        },
+        success: {
+            sent: "DM sent successfully.",
+        },
+        errors: {
+            load_failed: "Unable to load DMs",
+            recipient_message_required: "Recipient ID and message are required.",
+            send_failed: "Failed to send direct message",
+        },
+    },
     support: {
         title: "Tickets de Soporte",
         mark_all_read: "Marcar todo como leído",

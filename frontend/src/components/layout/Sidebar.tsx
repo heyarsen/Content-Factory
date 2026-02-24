@@ -32,7 +32,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { label: 'Content Studio', to: '/planning', icon: Clapperboard },
     { label: 'Video Library', to: '/videos', icon: Film },
     { label: 'Social Accounts', to: '/social', icon: Share2, match: (pathname: string) => pathname === '/social' },
-    { label: 'AI Auto-DM', to: '/social/dms', icon: MessagesSquare },
+    { label: 'DMs', to: '/social/dms', icon: MessagesSquare },
     { label: 'Trendwatcher', to: '/trend-searcher', icon: Search },
     { label: t('common.avatars') || 'Avatars', to: '/avatars', icon: User },
     { label: 'Analytics', to: '/analytics', icon: BarChart3 },
@@ -53,7 +53,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       />
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 transform transition-all duration-300 lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed inset-y-0 left-0 z-40 w-56 transform transition-all duration-300 lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
           } ${!isOpen ? 'pointer-events-none lg:pointer-events-auto' : ''}`}
       >
         <div

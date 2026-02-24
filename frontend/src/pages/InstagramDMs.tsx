@@ -7,6 +7,7 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { Badge } from '../components/ui/Badge'
 import { MessageCircle, RefreshCw, CalendarRange, Send, Sparkles } from 'lucide-react'
 import api from '../lib/api'
+import { useLanguage } from '../contexts/LanguageContext'
 
 interface InstagramDM {
   id: string
@@ -109,6 +110,7 @@ const isOutgoingMessage = (message: ChatMessage, participantId: string, ownAccou
 }
 
 export function InstagramDMs() {
+  const { t } = useLanguage()
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [sending, setSending] = useState(false)
@@ -120,6 +122,30 @@ export function InstagramDMs() {
   const [manualRecipientId, setManualRecipientId] = useState('')
   const [message, setMessage] = useState('')
 
+  const cacheKey = 'instagram_dms_cache_v1'
+
+  const loadCachedDms = () => {
+    try {
+      const cachedValue = sessionStorage.getItem(cacheKey)
+      if (!cachedValue) return false
+
+      const parsed = JSON.parse(cachedValue) as { timestamp: number; dms: InstagramDM[] }
+      if (!Array.isArray(parsed.dms)) return false
+
+      // Keep cache short-lived to avoid stale inbox perception.
+      if (Date.now() - parsed.timestamp > 60_000) {
+        sessionStorage.removeItem(cacheKey)
+        return false
+      }
+
+      setDms(parsed.dms)
+      setLoading(false)
+      return true
+    } catch {
+      return false
+    }
+  }
+
   const loadData = useCallback(async () => {
     try {
       setError(null)
@@ -127,16 +153,23 @@ export function InstagramDMs() {
         params: { per_page: 30 },
       })
 
-      setDms(dmsResponse.data.data || [])
+      const nextDms = dmsResponse.data.data || []
+      setDms(nextDms)
+      sessionStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), dms: nextDms }))
     } catch (err: any) {
-      setError(err?.response?.data?.error || err?.message || 'Failed to load DMs')
+      setError(err?.response?.data?.error || err?.message || t('instagram_dms.errors.load_failed'))
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
+    const hasWarmCache = loadCachedDms()
+    if (hasWarmCache) {
+      setRefreshing(true)
+    }
+
     loadData()
   }, [loadData])
 
@@ -253,11 +286,11 @@ export function InstagramDMs() {
 
     const baseText = (lastInbound?.text || '').trim()
     if (!baseText) {
-      setMessage("Thanks for reaching out! I'll get back to you shortly.")
+      setMessage(t('instagram_dms.ai_reply_fallback'))
       return
     }
 
-    setMessage(`Thanks for your message! Regarding "${baseText.slice(0, 80)}${baseText.length > 80 ? '…' : ''}", happy to help — can you share one more detail so I can give you the best answer?`)
+    setMessage(t('instagram_dms.ai_reply_template').replace('{snippet}', `${baseText.slice(0, 80)}${baseText.length > 80 ? '…' : ''}`))
   }
 
   const handleSend = async () => {
@@ -268,7 +301,7 @@ export function InstagramDMs() {
       const resolvedRecipientId = selectedConversation?.participantId || manualRecipientId
 
       if (!resolvedRecipientId.trim() || !message.trim()) {
-        setSendError('Recipient ID and message are required.')
+        setSendError(t('instagram_dms.errors.recipient_message_required'))
         return
       }
 
@@ -278,11 +311,11 @@ export function InstagramDMs() {
         message: message.trim(),
       })
 
-      setSendSuccess(response?.data?.message || 'DM sent successfully.')
+      setSendSuccess(response?.data?.message || t('instagram_dms.success.sent'))
       setMessage('')
       await loadData()
     } catch (err: any) {
-      setSendError(err?.response?.data?.error || err?.message || 'Failed to send direct message')
+      setSendError(err?.response?.data?.error || err?.message || t('instagram_dms.errors.send_failed'))
     } finally {
       setSending(false)
     }
@@ -292,31 +325,31 @@ export function InstagramDMs() {
     <Layout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-primary">AI Auto-DM</h1>
-          <p className="mt-1 text-sm text-slate-600">Manage direct messages in a chat-style inbox.</p>
+          <h1 className="text-3xl font-bold text-primary">{t('instagram_dms.title')}</h1>
+          <p className="mt-1 text-sm text-slate-600">{t('instagram_dms.description')}</p>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600">
             <CalendarRange className="h-4 w-4" />
-            Data source: Upload-Post social DMs
+            {t('instagram_dms.conversations_count').replace('{count}', String(conversations.length))}
           </div>
           <Button onClick={handleRefresh} disabled={refreshing} variant="secondary" className="gap-2">
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
+            {t('common.refresh') || 'Refresh'}
           </Button>
         </div>
 
         <Card className="p-0">
           <div className="grid min-h-[640px] md:grid-cols-[320px,1fr]">
             <div className="max-h-[640px] overflow-y-auto border-b border-slate-200 bg-slate-50 p-4 md:border-b-0 md:border-r">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Conversations</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t('instagram_dms.conversations')}</h2>
 
               {error ? (
                 <div className="mt-4">
                   <EmptyState
                     icon={<MessageCircle className="h-7 w-7" />}
-                    title="Unable to load DMs"
+                    title={t('instagram_dms.errors.load_failed')}
                     description={error}
                   />
                 </div>
@@ -330,8 +363,8 @@ export function InstagramDMs() {
                 <div className="mt-4">
                   <EmptyState
                     icon={<MessageCircle className="h-8 w-8" />}
-                    title="No direct messages found"
-                    description="Connect a social account and receive DMs to see them here."
+                    title={t('instagram_dms.empty.title')}
+                    description={t('instagram_dms.empty.description')}
                   />
                 </div>
               ) : (
@@ -354,7 +387,7 @@ export function InstagramDMs() {
                           <p className="line-clamp-1 text-sm font-semibold text-slate-900">{conversation.participantLabel}</p>
                           <span className="text-xs text-slate-500">{formatTime(conversation.lastTimestamp)}</span>
                         </div>
-                        <p className="mt-1 line-clamp-2 text-xs text-slate-600">{lastMessage?.text || 'No messages yet'}</p>
+                        <p className="mt-1 line-clamp-2 text-xs text-slate-600">{lastMessage?.text || t('instagram_dms.no_messages_yet')}</p>
                       </button>
                     )
                   })}
@@ -371,12 +404,12 @@ export function InstagramDMs() {
                         {getInitials(selectedConversation.participantLabel)}
                       </div>
                       <div>
-                        <p className="text-sm text-slate-500">Chatting with</p>
+                        <p className="text-sm text-slate-500">{t('instagram_dms.chatting_with')}</p>
                         <h3 className="text-lg font-semibold text-primary">{selectedConversation.participantLabel}</h3>
-                        <p className="text-xs text-slate-500">Instagram DM</p>
+                        <p className="text-xs text-slate-500">{t('instagram_dms.channel')}</p>
                       </div>
                     </div>
-                    <Badge variant="default">AI Auto-DM</Badge>
+                    <Badge variant="default">{t('instagram_dms.title')}</Badge>
                   </div>
 
                   <div className="max-h-[420px] flex-1 space-y-3 overflow-y-auto bg-gradient-to-b from-white to-slate-50 p-5">
@@ -406,8 +439,8 @@ export function InstagramDMs() {
                 <div className="flex flex-1 items-center justify-center p-6">
                   <EmptyState
                     icon={<MessageCircle className="h-8 w-8" />}
-                    title="Select a conversation"
-                    description="Choose a conversation from the left to view messages in chat mode."
+                    title={t('instagram_dms.select.title')}
+                    description={t('instagram_dms.select.description')}
                   />
                 </div>
               )}
@@ -415,14 +448,14 @@ export function InstagramDMs() {
               <div className="border-t border-slate-200 bg-white p-4">
                 <div className="mb-3 flex items-center gap-2">
                   <Send className="h-4 w-4 text-brand-600" />
-                  <h4 className="text-sm font-semibold text-slate-800">Reply</h4>
+                  <h4 className="text-sm font-semibold text-slate-800">{t('instagram_dms.reply')}</h4>
                 </div>
 
                 {!selectedConversation && (
                   <input
                     value={manualRecipientId}
                     onChange={(e) => setManualRecipientId(e.target.value)}
-                    placeholder="Recipient ID (e.g. 17841400123456789)"
+                    placeholder={t('instagram_dms.recipient_placeholder')}
                     className="mb-3 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none"
                   />
                 )}
@@ -431,18 +464,18 @@ export function InstagramDMs() {
                   <textarea
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
-                    placeholder={selectedConversation ? 'Write a reply…' : 'Write your message'}
+                    placeholder={selectedConversation ? t('instagram_dms.reply_placeholder') : t('instagram_dms.message_placeholder')}
                     rows={3}
                     className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none"
                   />
                   <div className="flex flex-col gap-2 md:self-end">
                     <Button variant="secondary" onClick={handleGenerateAiReply} disabled={!selectedConversation} className="h-fit gap-2">
                       <Sparkles className="h-4 w-4" />
-                      Generate AI Reply
+                      {t('instagram_dms.generate_ai_reply')}
                     </Button>
                     <Button onClick={handleSend} disabled={sending} className="h-fit gap-2">
                       <Send className={`h-4 w-4 ${sending ? 'animate-pulse' : ''}`} />
-                      {sending ? 'Sending...' : 'Send'}
+                      {sending ? t('instagram_dms.sending') : t('instagram_dms.send')}
                     </Button>
                   </div>
                 </div>

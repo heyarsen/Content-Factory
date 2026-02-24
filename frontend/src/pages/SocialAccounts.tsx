@@ -144,6 +144,8 @@ export function SocialAccounts() {
       'handle',
       'auth_required',
       'coreauth_required',
+      'reauth_required',
+      'reauthrequired',
       'username',
       'display_name',
       'name',
