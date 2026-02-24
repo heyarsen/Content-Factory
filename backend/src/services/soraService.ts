@@ -10,7 +10,7 @@ import {
     type SoraModel,
 } from '../lib/kie.js'
 import type { Video } from '../types/database.js'
-import { buildSoraVoiceoverPrompt } from '../lib/soraPrompt.js'
+import { buildSoraVideoPrompt } from '../lib/soraPrompt.js'
 import { VideoService } from './videoService.js'
 import { SoraGenerationSettingsService, type GenerationMode } from './soraGenerationSettingsService.js'
 
@@ -136,7 +136,7 @@ export async function generateVideoWithSora(
             aspectRatio: options.aspectRatio,
         })
 
-        const prompt = buildSoraVoiceoverPrompt(video)
+        const prompt = buildSoraVideoPrompt(video)
 
         // Map aspect ratio
         const soraAspectRatio = mapAspectRatioToSora(options.aspectRatio)
