@@ -8,6 +8,7 @@ import { Video } from 'lucide-react'
 import { createVideo } from '../../lib/videos'
 import { countWords, getMaxCharsForDuration, getMaxWordsForDuration } from '../../lib/scriptLimits'
 import { useNotifications } from '../../contexts/NotificationContext'
+import { useLanguage } from '../../contexts/LanguageContext'
 
 interface GenerateVideoModalProps {
   isOpen: boolean
@@ -17,6 +18,7 @@ interface GenerateVideoModalProps {
 
 export function GenerateVideoModal({ isOpen, onClose, onSuccess }: GenerateVideoModalProps) {
   const { addNotification } = useNotifications()
+  const { t } = useLanguage()
   const [topic, setTopic] = useState('')
   const [script, setScript] = useState('')
   const [style, setStyle] = useState<'casual' | 'professional' | 'energetic' | 'educational'>('professional')
@@ -56,8 +58,8 @@ export function GenerateVideoModal({ isOpen, onClose, onSuccess }: GenerateVideo
       setSuccess(true)
       addNotification({
         type: 'info',
-        title: 'Video Generation Started!',
-        message: `"${topic}" is now being generated. This typically takes 1-3 minutes. You'll be notified when it's ready!`,
+        title: t('generate_video.generation_started_title'),
+        message: t('generate_video.generation_started_message', { topic }),
       })
       
       // Reset form after showing success
@@ -72,7 +74,7 @@ export function GenerateVideoModal({ isOpen, onClose, onSuccess }: GenerateVideo
         onClose()
       }, 3000) // Show success message for 3 seconds
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to generate video')
+      setError(err.response?.data?.error || t('generate_video.generation_failed'))
       setLoading(false)
     }
   }
@@ -89,10 +91,10 @@ export function GenerateVideoModal({ isOpen, onClose, onSuccess }: GenerateVideo
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Generate a new video" size="lg">
+    <Modal isOpen={isOpen} onClose={handleClose} title={t('generate_video.modal_title')} size="lg">
       <form onSubmit={handleSubmit} className="space-y-6">
         <p className="text-sm text-slate-500">
-          Guide the AI with a topic, optional script, and tone. We will orchestrate the visuals, audio, and timing for you.
+          {t('generate_video.modal_desc')}
         </p>
 
         {error && (
@@ -110,12 +112,12 @@ export function GenerateVideoModal({ isOpen, onClose, onSuccess }: GenerateVideo
                 </svg>
               </div>
               <div className="flex-1">
-                <h3 className="text-sm font-semibold text-emerald-800">Video Generation Started!</h3>
+                <h3 className="text-sm font-semibold text-emerald-800">{t('generate_video.generation_started_title')}</h3>
                 <p className="mt-1 text-sm text-emerald-700">
-                  Your video is now being generated. This typically takes 3-7 minutes depending on the duration.
+                  {t('generate_video.generation_started_desc')}
                 </p>
                 <p className="mt-2 text-xs text-emerald-600">
-                  You can track the progress in your video library. We'll notify you when it's ready!
+                  {t('generate_video.generation_started_hint')}
                 </p>
               </div>
             </div>
@@ -124,14 +126,14 @@ export function GenerateVideoModal({ isOpen, onClose, onSuccess }: GenerateVideo
 
         <div className="grid gap-6 lg:grid-cols-2">
           <Input
-            label="Video topic"
-            placeholder="e.g., Product launch announcement"
+            label={t('generate_video.topic_label')}
+            placeholder={t('generate_video.topic_placeholder')}
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
             required
           />
           <Select
-            label="Style"
+            label={t('generate_video.style_label')}
             options={[
               { value: 'casual', label: 'Casual' },
               { value: 'professional', label: 'Professional' },
@@ -144,8 +146,8 @@ export function GenerateVideoModal({ isOpen, onClose, onSuccess }: GenerateVideo
         </div>
 
         <Textarea
-          label="Script (optional)"
-          placeholder="Add a detailed script or talking points if you have them - otherwise we'll generate it."
+          label={t('generate_video.script_optional')}
+          placeholder={t('generate_video.script_placeholder')}
           rows={8}
           value={script}
           onChange={(e) => {
@@ -162,14 +164,14 @@ export function GenerateVideoModal({ isOpen, onClose, onSuccess }: GenerateVideo
           maxLength={maxChars || undefined}
         />
         <div className="flex items-center justify-between text-xs text-slate-400">
-          <span>Keep scripts concise for short videos to avoid cutoffs.</span>
-          <span>{scriptWordCount}/{maxWords} words</span>
+          <span>{t('generate_video.script_helper')}</span>
+          <span>{t('generate_video.words_counter', { used: scriptWordCount, total: maxWords })}</span>
         </div>
 
         <div className="rounded-2xl border border-white/60 bg-white/70 px-5 py-6">
           <div className="flex items-center justify-between">
-            <label className="text-sm font-semibold text-primary">Duration</label>
-            <span className="text-xs font-medium uppercase tracking-wide text-slate-400">{duration} seconds</span>
+            <label className="text-sm font-semibold text-primary">{t('generate_video.duration_label')}</label>
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-400">{t('generate_video.duration_seconds', { duration })}</span>
           </div>
           <input
             type="range"
@@ -194,11 +196,11 @@ export function GenerateVideoModal({ isOpen, onClose, onSuccess }: GenerateVideo
             disabled={loading}
             className="border border-white/60 bg-white/70 text-slate-500 hover:border-slate-200 hover:bg-white sm:w-auto"
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button type="submit" className="sm:w-auto" loading={loading}>
             <Video className="mr-2 h-4 w-4" />
-            Generate video
+            {t('generate_video.generate_button')}
           </Button>
         </div>
       </form>

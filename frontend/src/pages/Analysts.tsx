@@ -4,6 +4,7 @@ import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Skeleton } from '../components/ui/Skeleton'
 import api from '../lib/api'
+import { useLanguage } from '../contexts/LanguageContext'
 
 interface SocialAnalyticsAccount {
   id: string
@@ -70,6 +71,7 @@ const renderSparklinePath = (points: TimeSeriesPoint[]) => {
 }
 
 export function Analysts() {
+  const { t } = useLanguage()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [analytics, setAnalytics] = useState<Record<string, PlatformAnalytics>>({})
@@ -100,7 +102,7 @@ export function Analysts() {
 
         setAnalytics(analyticsRes.data || {})
       } catch (requestError: any) {
-        const message = requestError?.response?.data?.error || requestError?.message || 'Failed to load analytics'
+        const message = requestError?.response?.data?.error || requestError?.message || t('analysts.load_failed_title')
         setError(message)
         setAnalytics({})
       } finally {
@@ -109,7 +111,7 @@ export function Analysts() {
     }
 
     loadAnalytics()
-  }, [])
+  }, [t])
 
   const platformEntries = useMemo(() => Object.entries(analytics), [analytics])
 
@@ -146,9 +148,9 @@ export function Analysts() {
     <Layout>
       <div className="space-y-6">
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Insights</p>
-          <h1 className="text-3xl font-semibold text-primary">Analytics</h1>
-          <p className="text-sm text-slate-500">Live cross-platform intelligence powered by your Upload-Post analytics data.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('analysts.eyebrow')}</p>
+          <h1 className="text-3xl font-semibold text-primary">{t('analysts.title')}</h1>
+          <p className="text-sm text-slate-500">{t('analysts.subtitle')}</p>
         </div>
 
         <Card className="p-5 md:p-6">
@@ -167,14 +169,14 @@ export function Analysts() {
               <div className="flex items-start gap-3 text-red-700">
                 <AlertCircle className="mt-0.5 h-5 w-5" />
                 <div>
-                  <p className="font-semibold">Unable to load analytics</p>
+                  <p className="font-semibold">{t('analysts.load_failed_title')}</p>
                   <p className="text-sm">{error}</p>
                 </div>
               </div>
             </Card>
           ) : platformEntries.length === 0 ? (
             <Card className="p-6 text-sm text-slate-600">
-              No connected social accounts found. Connect your social account to start seeing analytics.
+              {t('analysts.no_accounts')}
             </Card>
           ) : (
             <div className="space-y-5">
@@ -182,28 +184,28 @@ export function Analysts() {
                 <Card className="flex items-center gap-3 p-5">
                   <Users className="h-5 w-5 text-indigo-600" />
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-400">Followers</p>
+                    <p className="text-xs uppercase tracking-wide text-slate-400">{t('analysts.followers')}</p>
                     <p className="text-xl font-semibold text-primary">{formatNumber(totals.followers)}</p>
                   </div>
                 </Card>
                 <Card className="flex items-center gap-3 p-5">
                   <BarChart3 className="h-5 w-5 text-brand-600" />
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-400">Impressions</p>
+                    <p className="text-xs uppercase tracking-wide text-slate-400">{t('analysts.impressions')}</p>
                     <p className="text-xl font-semibold text-primary">{formatNumber(totals.impressions)}</p>
                   </div>
                 </Card>
                 <Card className="flex items-center gap-3 p-5">
                   <TrendingUp className="h-5 w-5 text-emerald-600" />
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-400">Reach</p>
+                    <p className="text-xs uppercase tracking-wide text-slate-400">{t('analysts.reach')}</p>
                     <p className="text-xl font-semibold text-primary">{formatNumber(totals.reach)}</p>
                   </div>
                 </Card>
                 <Card className="flex items-center gap-3 p-5">
                   <Eye className="h-5 w-5 text-fuchsia-600" />
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-400">Profile views</p>
+                    <p className="text-xs uppercase tracking-wide text-slate-400">{t('analysts.profile_views')}</p>
                     <p className="text-xl font-semibold text-primary">{formatNumber(totals.profileViews)}</p>
                   </div>
                 </Card>
@@ -212,13 +214,13 @@ export function Analysts() {
               <Card className="p-5">
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-lg font-semibold text-primary">Reach trend snapshot</h2>
-                    <p className="text-sm text-slate-500">Combined reach over time from all connected channels.</p>
+                    <h2 className="text-lg font-semibold text-primary">{t('analysts.reach_trend_title')}</h2>
+                    <p className="text-sm text-slate-500">{t('analysts.reach_trend_desc')}</p>
                   </div>
                   {overallTrend && (
                     <div className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${overallTrend.up ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
                       {overallTrend.up ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
-                      {overallTrend.percent.toFixed(1)}% vs previous point
+                      {overallTrend.percent.toFixed(1)}% {t('analysts.vs_previous_point')}
                     </div>
                   )}
                 </div>
@@ -241,7 +243,7 @@ export function Analysts() {
                   </div>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
-                    Not enough time-series data yet to render a trend. Keep posting and check back soon.
+                    {t('analysts.not_enough_data')}
                   </div>
                 )}
               </Card>
@@ -249,20 +251,20 @@ export function Analysts() {
               <Card className="p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <Activity className="h-4 w-4 text-indigo-600" />
-                  <h2 className="text-lg font-semibold text-primary">Platform breakdown</h2>
+                  <h2 className="text-lg font-semibold text-primary">{t('analysts.platform_breakdown')}</h2>
                 </div>
 
                 <div className="overflow-x-auto">
                   <table className="min-w-full text-sm">
                     <thead>
                       <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
-                        <th className="px-2 py-3">Platform</th>
-                        <th className="px-2 py-3">Followers</th>
-                        <th className="px-2 py-3">Reach</th>
-                        <th className="px-2 py-3">Impressions</th>
-                        <th className="px-2 py-3">Profile views</th>
-                        <th className="px-2 py-3">Reach/Follower</th>
-                        <th className="px-2 py-3">Status</th>
+                        <th className="px-2 py-3">{t('analysts.platform')}</th>
+                        <th className="px-2 py-3">{t('analysts.followers')}</th>
+                        <th className="px-2 py-3">{t('analysts.reach')}</th>
+                        <th className="px-2 py-3">{t('analysts.impressions')}</th>
+                        <th className="px-2 py-3">{t('analysts.profile_views')}</th>
+                        <th className="px-2 py-3">{t('analysts.reach_follower')}</th>
+                        <th className="px-2 py-3">{t('analysts.status')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -283,7 +285,7 @@ export function Analysts() {
                               {stats.message ? (
                                 <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-700">{stats.message}</span>
                               ) : (
-                                <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">Synced</span>
+                                <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-700">{t('analysts.synced')}</span>
                               )}
                             </td>
                           </tr>

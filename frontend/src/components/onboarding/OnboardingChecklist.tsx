@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { CheckCircle2, ChevronDown, ChevronUp, PartyPopper, Circle } from 'lucide-react'
 import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
+import { useLanguage } from '../../contexts/LanguageContext'
 
 export interface OnboardingChecklistStep {
   id: string
@@ -30,6 +31,7 @@ export function OnboardingChecklist({
 }: OnboardingChecklistProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const { t } = useLanguage()
 
   const completedCount = useMemo(() => steps.filter((step) => step.completed).length, [steps])
 
@@ -50,12 +52,12 @@ export function OnboardingChecklist({
     <Card className="border-brand-200/70 bg-gradient-to-br from-white to-brand-50/40">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">Getting started</p>
-          <h2 className="mt-1 text-lg font-semibold text-slate-900">Onboarding checklist</h2>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">{t('onboarding.getting_started')}</p>
+          <h2 className="mt-1 text-lg font-semibold text-slate-900">{t('onboarding.checklist_title')}</h2>
           <p className="mt-1 text-sm text-slate-500">
             {allCompleted
-              ? 'You completed your setup. You are ready to launch campaigns consistently.'
-              : `${completedCount}/${steps.length} steps complete${accountAgeDays !== null ? ` · Day ${accountAgeDays + 1}` : ''}`}
+              ? t('onboarding.completed_setup')
+              : t('onboarding.steps_complete', { completed: completedCount, total: steps.length }) + (accountAgeDays !== null ? t('onboarding.day_label', { day: accountAgeDays + 1 }) : '')}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -64,7 +66,7 @@ export function OnboardingChecklist({
           </Button>
           {allCompleted && (
             <Button size="sm" variant="secondary" onClick={handleHide} disabled={isSaving}>
-              {isSaving ? 'Hiding…' : 'Hide'}
+              {isSaving ? t('onboarding.hiding') : t('onboarding.hide')}
             </Button>
           )}
         </div>
@@ -75,7 +77,7 @@ export function OnboardingChecklist({
           {allCompleted && (
             <div className="mb-2 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
               <PartyPopper className="h-4 w-4" />
-              Nice work—every activation milestone is complete.
+              {t('onboarding.all_milestones_complete')}
             </div>
           )}
 

@@ -97,7 +97,7 @@ const normalizeStatus = (status: Post['status']): 'draft' | 'scheduled' | 'publi
 const formatDateKey = (date: Date) => date.toISOString().split('T')[0]
 
 export function ScheduledPosts() {
-  useLanguage()
+  const { t } = useLanguage()
   const { user } = useAuth()
   const { credits, unlimited } = useCreditsContext()
   const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
@@ -402,9 +402,9 @@ export function ScheduledPosts() {
       <div className="space-y-6 sm:space-y-8">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Automation</p>
-            <h1 className="text-3xl font-semibold text-primary">Calendar & Scheduling</h1>
-            <p className="text-sm text-slate-500">Manage drafts, approvals, queue timing, and publishing retries.</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('scheduled_posts.automation_eyebrow')}</p>
+            <h1 className="text-3xl font-semibold text-primary">{t('scheduled_posts.calendar_title')}</h1>
+            <p className="text-sm text-slate-500">{t('scheduled_posts.calendar_desc')}</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Card className="border-dashed border-white/40 p-0 min-w-[170px]">
@@ -442,7 +442,7 @@ export function ScheduledPosts() {
               disabled={!safeCanCreate}
             >
               <Calendar className="mr-2 h-4 w-4" />
-              {safeCanCreate ? 'Create campaign' : 'Upgrade to schedule'}
+              {safeCanCreate ? t('scheduled_posts.create_campaign') : t('scheduled_posts.upgrade_to_schedule')}
             </Button>
           </div>
         </div>
@@ -453,7 +453,7 @@ export function ScheduledPosts() {
           {(['month', 'week', 'list'] as ViewMode[]).map((mode) => (
             <Button key={mode} variant={viewMode === mode ? 'primary' : 'ghost'} onClick={() => setViewMode(mode)}>
               {mode === 'month' ? <Calendar className="mr-2 h-4 w-4" /> : mode === 'week' ? <Clock3 className="mr-2 h-4 w-4" /> : <List className="mr-2 h-4 w-4" />}
-              {mode[0].toUpperCase() + mode.slice(1)} view
+              {t(`scheduled_posts.view_${mode}`)}
             </Button>
           ))}
         </div>
@@ -463,7 +463,7 @@ export function ScheduledPosts() {
             <div className="mb-6 flex items-center justify-between">
               <h2 className="text-xl font-semibold text-primary">
                 {viewMode === 'list'
-                  ? 'All scheduled activity'
+                  ? t('scheduled_posts.all_scheduled_activity')
                   : currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
               </h2>
               {viewMode !== 'list' && (
@@ -472,7 +472,7 @@ export function ScheduledPosts() {
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => setCurrentDate(new Date())} className="h-8 px-3">
-                    Today
+                    {t('common.today')}
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => setCurrentDate(new Date(year, month + 1, 1))} className="h-8 w-8 p-0">
                     <ChevronRight className="h-4 w-4" />
@@ -493,7 +493,7 @@ export function ScheduledPosts() {
                           <span className="text-sm font-semibold text-primary">{platformNames[post.platform]}</span>
                           {getStatusBadge(post.status)}
                         </div>
-                        <span className="text-xs text-slate-500">{post.scheduled_time ? new Date(post.scheduled_time).toLocaleString() : 'No schedule'}</span>
+                        <span className="text-xs text-slate-500">{post.scheduled_time ? new Date(post.scheduled_time).toLocaleString() : t('scheduled_posts.no_schedule')}</span>
                       </div>
                       <p className="text-xs text-slate-600">{post.videos?.topic}</p>
                     </div>
@@ -547,7 +547,7 @@ export function ScheduledPosts() {
 
           <Card className="p-4 sm:p-6 space-y-4">
             <h3 className="text-lg font-semibold text-primary">{selectedDate ? new Date(selectedDate).toDateString() : 'Queue details'}</h3>
-            {selectedDatePosts.length === 0 ? <p className="text-sm text-slate-500">No items for selected day.</p> : selectedDatePosts.map((post) => {
+            {selectedDatePosts.length === 0 ? <p className="text-sm text-slate-500">{t('scheduled_posts.no_items_for_day')}</p> : selectedDatePosts.map((post) => {
               const Icon = platformIcons[post.platform]
               return (
                 <div key={post.id} className="rounded-xl border border-slate-200 bg-white p-3">
@@ -561,7 +561,7 @@ export function ScheduledPosts() {
                     <div className="mb-2 rounded-lg bg-red-50 p-2 text-xs text-red-700">{post.error_message || 'Publish failed'}</div>
                   )}
                   <div className="flex gap-2">
-                    {post.status === 'pending' && <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setCancelModal(post.id)}>Cancel</Button>}
+                    {post.status === 'pending' && <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setCancelModal(post.id)}>{t('common.cancel')}</Button>}
                     {post.status === 'failed' && <Button variant="secondary" size="sm" className="h-7 text-xs" onClick={() => openRetryModal(post)}>Retry / Edit</Button>}
                   </div>
                 </div>
@@ -573,20 +573,20 @@ export function ScheduledPosts() {
         <div className="grid gap-6 lg:grid-cols-2">
           <Card className="p-5 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-primary">Queue management</h3>
+              <h3 className="text-lg font-semibold text-primary">{t('scheduled_posts.queue_management')}</h3>
               <label className="flex items-center gap-2 text-xs text-slate-600">
                 <input type="checkbox" checked={autoRescheduleMissed} onChange={(e) => setAutoRescheduleMissed(e.target.checked)} />
                 Auto-reschedule missed slots
               </label>
             </div>
-            {upcomingQueue.length === 0 ? <p className="text-sm text-slate-500">No queued posts.</p> : upcomingQueue.slice(0, 6).map((post) => (
+            {upcomingQueue.length === 0 ? <p className="text-sm text-slate-500">{t('scheduled_posts.no_queued_posts')}</p> : upcomingQueue.slice(0, 6).map((post) => (
               <div key={post.id} className="rounded-xl border border-slate-200 p-3">
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-semibold text-primary">{post.videos.topic}</div>
                   <Badge variant="warning">scheduled</Badge>
                 </div>
                 <p className="text-xs text-slate-600">{platformNames[post.platform]} • {new Date(post.scheduled_time || '').toLocaleString()}</p>
-                <p className="mt-1 text-xs text-brand-600">Best-time suggestion: {bestTimeSuggestions[post.platform].join(' / ')}</p>
+                <p className="mt-1 text-xs text-brand-600">{t('scheduled_posts.best_time_suggestion')}: {bestTimeSuggestions[post.platform].join(' / ')}</p>
               </div>
             ))}
             {missedPosts.length > 0 && (
@@ -598,8 +598,8 @@ export function ScheduledPosts() {
           </Card>
 
           <Card className="p-5 space-y-4">
-            <h3 className="text-lg font-semibold text-primary">Campaign approvals & handoff</h3>
-            {campaigns.length === 0 ? <p className="text-sm text-slate-500">No campaigns available.</p> : campaigns.slice(0, 5).map((campaign) => {
+            <h3 className="text-lg font-semibold text-primary">{t('scheduled_posts.campaign_approvals')}</h3>
+            {campaigns.length === 0 ? <p className="text-sm text-slate-500">{t('scheduled_posts.no_campaigns')}</p> : campaigns.slice(0, 5).map((campaign) => {
               const state = approvalByCampaign[campaign.id] || 'creator'
               return (
                 <div key={campaign.id} className="rounded-xl border border-slate-200 p-3 space-y-3">
@@ -630,17 +630,17 @@ export function ScheduledPosts() {
           </Card>
         </div>
 
-        <Modal isOpen={scheduleModal} onClose={() => setScheduleModal(false)} title="Create campaign" size="lg">
+        <Modal isOpen={scheduleModal} onClose={() => setScheduleModal(false)} title={t('scheduled_posts.create_campaign')} size="lg">
           <div className="space-y-5">
             <Select
-              label="Select video"
-              options={[{ value: '', label: 'Choose a video...' }, ...videos.map((v: any) => ({ value: v.id, label: v.topic }))]}
+              label={t('scheduled_posts.select_video')}
+              options={[{ value: '', label: t('scheduled_posts.choose_video') }, ...videos.map((v: any) => ({ value: v.id, label: v.topic }))]}
               value={selectedVideo}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedVideo(e.target.value)}
             />
 
             <div>
-              <label className="mb-2 block text-sm font-semibold text-primary">Platforms</label>
+              <label className="mb-2 block text-sm font-semibold text-primary">{t('scheduled_posts.platforms')}</label>
               <div className="grid grid-cols-2 gap-3">
                 {(Object.keys(platformNames) as Platform[]).map((key) => {
                   const Icon = platformIcons[key]
@@ -660,69 +660,69 @@ export function ScheduledPosts() {
               </div>
             </div>
 
-            <Input type="datetime-local" label="Schedule time (optional)" value={scheduledTime} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setScheduledTime(e.target.value)} />
+            <Input type="datetime-local" label={t('scheduled_posts.schedule_time_optional')} value={scheduledTime} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setScheduledTime(e.target.value)} />
 
             {selectedPlatforms.map((platform) => (
               <div key={platform} className="rounded-xl border border-slate-200 p-3 space-y-3">
                 <p className="text-sm font-semibold text-primary">{platformNames[platform]} variant</p>
                 <Textarea
-                  label="Caption"
+                  label={t('scheduled_posts.caption')}
                   rows={2}
                   value={variantDrafts[platform].caption}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
                     setVariantDrafts((prev) => ({ ...prev, [platform]: { ...prev[platform], caption: e.target.value } }))}
                 />
                 <Input
-                  label="Media URL override"
+                  label={t('scheduled_posts.media_url_override')}
                   value={variantDrafts[platform].mediaUrl}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     setVariantDrafts((prev) => ({ ...prev, [platform]: { ...prev[platform], mediaUrl: e.target.value } }))}
-                  placeholder="Optional per-platform media URL"
+                  placeholder={t('scheduled_posts.media_url_optional')}
                 />
                 <Input
-                  label="Hashtags"
+                  label={t('scheduled_posts.hashtags')}
                   value={variantDrafts[platform].hashtags}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     setVariantDrafts((prev) => ({ ...prev, [platform]: { ...prev[platform], hashtags: e.target.value } }))}
-                  placeholder="#launch #weeklyupdate"
+                  placeholder={t('scheduled_posts.hashtags_placeholder')}
                 />
-                <p className="text-xs text-brand-600">Best-time suggestion: {bestTimeSuggestions[platform].join(' / ')}</p>
+                <p className="text-xs text-brand-600">{t('scheduled_posts.best_time_suggestion')}: {bestTimeSuggestions[platform].join(' / ')}</p>
               </div>
             ))}
 
             <div className="flex gap-3 justify-end pt-2">
-              <Button variant="ghost" className="border border-white/60 bg-white/70 text-slate-500" onClick={() => setScheduleModal(false)}>Cancel</Button>
-              <Button onClick={handleSchedule} loading={scheduling}>Create & schedule</Button>
+              <Button variant="ghost" className="border border-white/60 bg-white/70 text-slate-500" onClick={() => setScheduleModal(false)}>{t('common.cancel')}</Button>
+              <Button onClick={handleSchedule} loading={scheduling}>{t('scheduled_posts.create_and_schedule')}</Button>
             </div>
           </div>
         </Modal>
 
-        <Modal isOpen={retryModalPost !== null} onClose={() => setRetryModalPost(null)} title="Retry failed publish" size="md">
+        <Modal isOpen={retryModalPost !== null} onClose={() => setRetryModalPost(null)} title={t('scheduled_posts.retry_failed_publish')} size="md">
           <div className="space-y-3">
             <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex gap-2 items-start">
               <AlertTriangle className="h-4 w-4 mt-0.5" />
-              <span>{retryModalPost?.error_message || 'Publishing failed. You can edit and retry.'}</span>
+              <span>{retryModalPost?.error_message || t('scheduled_posts.publishing_failed_retry')}</span>
             </div>
-            <Input type="datetime-local" label="Retry at" value={retryTime} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRetryTime(e.target.value)} />
-            <Textarea label="Edit caption before retry" rows={3} value={retryCaption} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setRetryCaption(e.target.value)} />
+            <Input type="datetime-local" label={t('scheduled_posts.retry_at')} value={retryTime} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRetryTime(e.target.value)} />
+            <Textarea label={t('scheduled_posts.edit_caption_before_retry')} rows={3} value={retryCaption} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setRetryCaption(e.target.value)} />
             <div className="flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => setRetryModalPost(null)}>Close</Button>
-              <Button variant="secondary" onClick={handleRetryPost} loading={retrying}><RefreshCw className="h-4 w-4 mr-2" />Retry publish</Button>
+              <Button variant="ghost" onClick={() => setRetryModalPost(null)}>{t('common.close')}</Button>
+              <Button variant="secondary" onClick={handleRetryPost} loading={retrying}><RefreshCw className="h-4 w-4 mr-2" />{t('scheduled_posts.retry_publish')}</Button>
             </div>
           </div>
         </Modal>
 
-        <Modal isOpen={cancelModal !== null} onClose={() => setCancelModal(null)} title="Cancel Post" size="sm">
-          <p className="mb-4 text-sm text-slate-500">Are you sure you want to cancel this scheduled post?</p>
+        <Modal isOpen={cancelModal !== null} onClose={() => setCancelModal(null)} title={t('scheduled_posts.cancel_post')} size="sm">
+          <p className="mb-4 text-sm text-slate-500">{t('scheduled_posts.cancel_post_confirm')}</p>
           <div className="flex gap-3 justify-end">
-            <Button variant="ghost" className="border border-white/60 bg-white/70 text-slate-500" onClick={() => setCancelModal(null)}>Keep it</Button>
-            <Button variant="danger" onClick={() => cancelModal && handleCancel(cancelModal)} loading={cancelling}>Cancel post</Button>
+            <Button variant="ghost" className="border border-white/60 bg-white/70 text-slate-500" onClick={() => setCancelModal(null)}>{t('scheduled_posts.keep_it')}</Button>
+            <Button variant="danger" onClick={() => cancelModal && handleCancel(cancelModal)} loading={cancelling}>{t('scheduled_posts.cancel_post')}</Button>
           </div>
         </Modal>
 
         <Card className="p-4 text-xs text-slate-500 flex items-start gap-2">
           <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5" />
-          Status badges map to lifecycle states: draft, scheduled, published, and failed across calendar, queue, and campaign cards.
+          {t('scheduled_posts.status_badges_hint')}
         </Card>
       </div>
     </Layout>

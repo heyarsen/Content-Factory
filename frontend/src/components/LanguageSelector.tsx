@@ -16,14 +16,14 @@ const languages: { code: Language; name: string; flag: string }[] = [
 ]
 
 export function LanguageSelector({ className = '', showLabel = false }: LanguageSelectorProps) {
-    const { language, setLanguage } = useLanguage()
+    const { language, setLanguage, t } = useLanguage()
 
     return (
         <div className={`flex items-center gap-2 ${className}`}>
             {showLabel && (
                 <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                     <Globe className="w-4 h-4" />
-                    <span>Language:</span>
+                    <span>{t('preferences.language')}:</span>
                 </div>
             )}
             <select

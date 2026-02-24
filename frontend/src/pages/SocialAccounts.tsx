@@ -285,9 +285,9 @@ export function SocialAccounts() {
     <Layout>
       <div className="space-y-10">
         <div className="space-y-2">
-          <h1 className="text-3xl font-semibold text-primary">Social accounts</h1>
+          <h1 className="text-3xl font-semibold text-primary">{t('social_accounts.title')}</h1>
           <p className="text-sm text-slate-500">
-            Connect your social channels, receive social profile images, and keep your accounts ready for posting videos from one workspace.
+            {t('social_accounts.workspace_subtitle')}
           </p>
         </div>
 
@@ -296,14 +296,14 @@ export function SocialAccounts() {
         <Card className="space-y-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold text-primary">Channel connections</h2>
-              <p className="text-sm text-slate-500">Connected channels appear first so you can see what's active at a glance.</p>
+              <h2 className="text-lg font-semibold text-primary">{t('social_accounts.channel_connections')}</h2>
+              <p className="text-sm text-slate-500">{t('social_accounts.channel_connections_desc')}</p>
             </div>
-            <Badge variant="default">{connectedPlatforms.length} connected</Badge>
+            <Badge variant="default">{t('social_accounts.connected_count', { count: connectedPlatforms.length })}</Badge>
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-emerald-700">Active channels</h3>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-emerald-700">{t('social_accounts.active_channels')}</h3>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {connectedPlatforms.map((account) => {
                 const platform = account.platform
@@ -340,26 +340,26 @@ export function SocialAccounts() {
                         <p className="truncate text-sm font-semibold text-primary">
                           {account.account_info?.display_name || platformNames[platform]}
                         </p>
-                        <p className="truncate text-xs text-slate-600">{resolvedHandle || 'Handle unavailable'}</p>
+                        <p className="truncate text-xs text-slate-600">{resolvedHandle || t('social_accounts.handle_unavailable')}</p>
                       </div>
                     </div>
 
                     {!resolvedHandle && account.account_info?.username && isNumericId(account.account_info.username) && (
-                      <p className="text-[11px] text-slate-400">ID: {account.account_info.username}</p>
+                      <p className="text-[11px] text-slate-400">{t('social_accounts.account_id', { id: account.account_info.username })}</p>
                     )}
 
                     <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600">
                       {typeof account.account_info?.follower_count === 'number' && (
-                        <div className="rounded-lg bg-white/80 px-2 py-1">Followers: {account.account_info.follower_count.toLocaleString()}</div>
+                        <div className="rounded-lg bg-white/80 px-2 py-1">{t('social_accounts.followers_label', { count: account.account_info.follower_count.toLocaleString() })}</div>
                       )}
                       {typeof account.account_info?.following_count === 'number' && (
-                        <div className="rounded-lg bg-white/80 px-2 py-1">Following: {account.account_info.following_count.toLocaleString()}</div>
+                        <div className="rounded-lg bg-white/80 px-2 py-1">{t('social_accounts.following_label', { count: account.account_info.following_count.toLocaleString() })}</div>
                       )}
                       {typeof account.account_info?.post_count === 'number' && (
-                        <div className="rounded-lg bg-white/80 px-2 py-1">Posts: {account.account_info.post_count.toLocaleString()}</div>
+                        <div className="rounded-lg bg-white/80 px-2 py-1">{t('social_accounts.posts_label', { count: account.account_info.post_count.toLocaleString() })}</div>
                       )}
                       {typeof account.account_info?.verified === 'boolean' && (
-                        <div className="rounded-lg bg-white/80 px-2 py-1">Verified: {account.account_info.verified ? 'Yes' : 'No'}</div>
+                        <div className="rounded-lg bg-white/80 px-2 py-1">{t('social_accounts.verified_label', { value: account.account_info.verified ? t('preferences.yes') : t('preferences.no') })}</div>
                       )}
                     </div>
 
@@ -384,7 +384,7 @@ export function SocialAccounts() {
                         rel="noreferrer"
                         className="text-xs font-medium text-brand-600 hover:underline"
                       >
-                        View profile
+                        {t('social_accounts.view_profile')}
                       </a>
                     )}
 
@@ -396,7 +396,7 @@ export function SocialAccounts() {
                         className="w-full border border-rose-200 bg-rose-50/70 text-rose-600 hover:border-rose-300 hover:bg-rose-50"
                       >
                         <X className="mr-2 h-4 w-4" />
-                        Disconnect channel
+                        {t('social_accounts.disconnect_channel')}
                       </Button>
                     </div>
                   </Card>
@@ -406,7 +406,7 @@ export function SocialAccounts() {
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Add channel</h3>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t('social_accounts.add_channel')}</h3>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {inactivePlatforms.map((platform) => {
               const account = accounts.find((a: SocialAccount) => a.platform === platform)
@@ -437,7 +437,7 @@ export function SocialAccounts() {
                       className="w-full"
                     >
                       <Link2 className="mr-2 h-4 w-4" />
-                      {isPendingLinkedIn ? 'Pending availability' : 'Connect channel'}
+                      {isPendingLinkedIn ? t('social_accounts.pending_availability') : t('social_accounts.connect_channel')}
                     </Button>
                   </div>
                 </Card>

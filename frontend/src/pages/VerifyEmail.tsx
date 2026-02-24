@@ -4,12 +4,14 @@ import { supabase } from '../lib/supabase'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { LegalFooter } from '../components/layout/LegalFooter'
+import { useLanguage } from '../contexts/LanguageContext'
 
 export function VerifyEmail() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const [status, setStatus] = useState<'verifying' | 'success' | 'error'>('verifying')
   const [error, setError] = useState<string | null>(null)
+  const { t } = useLanguage()
 
   useEffect(() => {
     const verifyEmail = async () => {
@@ -26,7 +28,7 @@ export function VerifyEmail() {
 
       if (!accessToken) {
         setStatus('error')
-        setError('Missing verification token')
+        setError(t('auth.verify_missing_token'))
         return
       }
 
@@ -49,17 +51,17 @@ export function VerifyEmail() {
             navigate('/planning')
           }, 2000)
         } else {
-          throw new Error('Failed to create session')
+          throw new Error(t('auth.verify_session_failed'))
         }
       } catch (err: any) {
         console.error('Verification error:', err)
         setStatus('error')
-        setError(err.message || 'Failed to verify email')
+        setError(err.message || t('auth.verify_failed'))
       }
     }
 
     verifyEmail()
-  }, [searchParams, navigate])
+  }, [searchParams, navigate, t])
 
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-background">
@@ -75,9 +77,9 @@ export function VerifyEmail() {
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-indigo-500 text-white shadow-md">
                 <span className="text-xl font-semibold">N</span>
               </div>
-              <h1 className="text-2xl font-semibold text-primary">Verifying your email</h1>
+              <h1 className="text-2xl font-semibold text-primary">{t('auth.verifying_email_title')}</h1>
               <p className="text-sm text-slate-500">
-                Hang tight while we confirm your access. This should only take a moment.
+                {t('auth.verifying_email_desc')}
               </p>
               <div className="flex justify-center">
                 <div className="h-10 w-10 animate-spin rounded-full border-2 border-brand-200 border-t-transparent" />
@@ -90,12 +92,12 @@ export function VerifyEmail() {
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-brand-500 text-white shadow-md">
                 <span className="text-xl font-semibold">?</span>
               </div>
-              <h1 className="text-2xl font-semibold text-primary">Email verified</h1>
+              <h1 className="text-2xl font-semibold text-primary">{t('auth.email_verified_title')}</h1>
               <p className="text-sm text-slate-500">
-                Your workspace is ready. We&apos;re redirecting you to Creator Studio now.
+                {t('auth.email_verified_desc')}
               </p>
               <Button onClick={() => navigate('/planning')} className="w-full">
-                Go to Creator Studio
+                {t('auth.go_to_creator_studio')}
               </Button>
             </div>
           )}
@@ -105,18 +107,18 @@ export function VerifyEmail() {
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-500 to-brand-500 text-white shadow-md">
                 <span className="text-xl font-semibold">!</span>
               </div>
-              <h1 className="text-2xl font-semibold text-error">Verification failed</h1>
+              <h1 className="text-2xl font-semibold text-error">{t('auth.verification_failed_title')}</h1>
               <p className="text-sm text-slate-500">{error}</p>
               <div className="space-y-3">
                 <Button onClick={() => navigate('/login')} className="w-full">
-                  Go to sign in
+                  {t('auth.back_to_sign_in')}
                 </Button>
                 <Button
                   variant="ghost"
                   className="w-full border border-white/60 bg-white/70 text-slate-500 hover:border-brand-200 hover:text-brand-600"
                   onClick={() => navigate('/signup')}
                 >
-                  Create a new account
+                  {t('auth.create_account_button')}
                 </Button>
               </div>
             </div>

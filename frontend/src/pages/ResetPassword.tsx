@@ -5,6 +5,7 @@ import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { Card } from '../components/ui/Card'
 import { LegalFooter } from '../components/layout/LegalFooter'
+import { useLanguage } from '../contexts/LanguageContext'
 
 export function ResetPassword() {
   const [searchParams] = useSearchParams()
@@ -14,12 +15,13 @@ export function ResetPassword() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
+  const { t } = useLanguage()
 
   const accessToken = searchParams.get('access_token')
 
   useEffect(() => {
     if (!accessToken) {
-      setError('Invalid reset token')
+      setError(t('auth.invalid_reset_token'))
     }
   }, [accessToken])
 
@@ -28,17 +30,17 @@ export function ResetPassword() {
     setError('')
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match')
+      setError(t('auth.passwords_not_match'))
       return
     }
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters')
+      setError(t('auth.password_too_short'))
       return
     }
 
     if (!accessToken) {
-      setError('Invalid reset token')
+      setError(t('auth.invalid_reset_token'))
       return
     }
 
@@ -51,7 +53,7 @@ export function ResetPassword() {
       })
       setSuccess(true)
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to reset password')
+      setError(err.response?.data?.error || t('auth.reset_password_failed'))
     } finally {
       setLoading(false)
     }
@@ -70,12 +72,12 @@ export function ResetPassword() {
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-brand-500 text-white shadow-md">
               <span className="text-xl font-semibold">?</span>
             </div>
-            <h1 className="mt-6 text-3xl font-semibold text-primary">Password updated</h1>
+            <h1 className="mt-6 text-3xl font-semibold text-primary">{t('auth.password_updated_title')}</h1>
             <p className="mt-3 text-sm text-slate-500">
-              Your password has been reset successfully. Use your new credentials next time you sign in.
+              {t('auth.password_updated_desc')}
             </p>
             <Button onClick={() => navigate('/login')} className="mt-8 w-full">
-              Continue to sign in
+              {t('auth.continue_to_sign_in')}
             </Button>
           </Card>
         </div>
@@ -97,8 +99,8 @@ export function ResetPassword() {
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-indigo-500 text-white shadow-md">
               <span className="text-xl font-semibold">N</span>
             </div>
-            <h1 className="text-2xl font-semibold text-primary">Choose a new password</h1>
-            <p className="text-sm text-slate-500">It must be at least 6 characters long and different from your previous one.</p>
+            <h1 className="text-2xl font-semibold text-primary">{t('auth.choose_new_password')}</h1>
+            <p className="text-sm text-slate-500">{t('auth.choose_new_password_desc')}</p>
           </div>
 
           {error && (
@@ -112,7 +114,7 @@ export function ResetPassword() {
               type="password"
               id="password"
               name="password"
-              label="New password"
+              label={t('auth.new_password_label')}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -122,7 +124,7 @@ export function ResetPassword() {
               type="password"
               id="confirmPassword"
               name="confirmPassword"
-              label="Confirm new password"
+              label={t('auth.confirm_password_label')}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
@@ -130,13 +132,13 @@ export function ResetPassword() {
             />
 
             <Button type="submit" className="w-full" loading={loading}>
-              Reset password
+              {t('auth.reset_password_button')}
             </Button>
           </form>
 
           <p className="mt-8 text-center text-sm text-slate-500">
             <Link to="/login" className="font-semibold text-brand-600 hover:text-brand-700">
-              Back to sign in
+              {t('auth.back_to_sign_in')}
             </Link>
           </p>
         </Card>

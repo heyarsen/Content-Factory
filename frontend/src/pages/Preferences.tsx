@@ -240,15 +240,15 @@ export function Preferences() {
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Workspace settings</p>
-            <h1 className="text-3xl font-semibold text-primary">Workspace Preferences</h1>
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('preferences.workspace_settings')}</p>
+            <h1 className="text-3xl font-semibold text-primary">{t('preferences.workspace_preferences_title')}</h1>
             <p className="text-sm text-slate-500">
-              Configure campaign defaults, social channels, and automation behavior used across your workspace.
+              {t('preferences.workspace_preferences_desc')}
             </p>
             <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-600">You are in: Workspace Preferences</span>
+              <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-600">{t('preferences.you_are_in_workspace')}</span>
               <Link to="/profile" className="rounded-full border border-brand-200 bg-brand-50 px-3 py-1 font-medium text-brand-700 transition hover:bg-brand-100">
-                Go to Account settings
+                {t('preferences.go_to_account_settings')}
               </Link>
             </div>
           </div>
@@ -309,7 +309,7 @@ export function Preferences() {
                     <span className="text-sm font-medium text-brand-700">
                       {platformNames[platform] || platform}
                     </span>
-                    <Badge variant="success">Connected</Badge>
+                    <Badge variant="success">{t('social_accounts.status_connected')}</Badge>
                   </div>
                 )
               })}
@@ -369,7 +369,7 @@ export function Preferences() {
                         ? 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                         : 'border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed'
                       }`}
-                    title={!isConnected ? 'Connect this platform in Social Accounts first' : ''}
+                    title={!isConnected ? t('preferences.connect_platform_first') : ''}
                   >
                     {platformNames[platform] || platform}
                     {preferences.default_platforms.includes(platform) && (
