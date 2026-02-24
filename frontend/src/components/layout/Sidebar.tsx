@@ -53,7 +53,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       />
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-56 transform transition-all duration-300 lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed inset-y-0 left-0 z-40 w-60 transform transition-all duration-300 lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
           } ${!isOpen ? 'pointer-events-none lg:pointer-events-auto' : ''}`}
       >
         <div
@@ -79,7 +79,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </button>
           </div>
 
-          <nav className="mt-6 flex flex-1 flex-col gap-1 overflow-y-auto">
+          <nav className="mt-6 flex flex-1 flex-col gap-1.5 overflow-y-auto">
             {navigation.map(({ label, to, icon: Icon, match }) => {
               const isActive = match ? match(location.pathname) : location.pathname === to || location.pathname.startsWith(to + '/')
               return (
@@ -87,21 +87,21 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   key={to}
                   to={to}
                   onClick={onClose}
-                  className={`group relative flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium transition-all duration-200 touch-manipulation active:scale-[0.98] ${isActive
+                  className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-base font-medium transition-all duration-200 touch-manipulation active:scale-[0.98] ${isActive
                     ? 'bg-brand-50 text-brand-600'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                     }`}
                 >
                   <div
-                    className={`flex h-7 w-7 items-center justify-center rounded-lg transition-all duration-200 ${isActive
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200 ${isActive
                       ? 'bg-brand-100 text-brand-600'
                       : 'bg-transparent text-slate-500 group-hover:bg-white/80 group-hover:text-slate-700'
                       }`}
                   >
-                    <Icon className="h-3.5 w-3.5" />
+                    <Icon className="h-[18px] w-[18px]" />
                   </div>
                   <div className="min-w-0">
-                    <span className="block truncate text-[13px]">{label}</span>
+                    <span className="block truncate text-[15px] leading-tight">{label}</span>
                   </div>
                 </NavLink>
               )
@@ -117,18 +117,18 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                       key={to}
                       to={to}
                       onClick={onClose}
-                    className={`group relative flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium transition-all duration-200 touch-manipulation active:scale-[0.98] ${isActive
+                    className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-base font-medium transition-all duration-200 touch-manipulation active:scale-[0.98] ${isActive
                         ? 'bg-brand-50 text-brand-600'
                         : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                         }`}
                     >
                       <div
-                        className={`flex h-7 w-7 items-center justify-center rounded-lg transition-all duration-200 ${isActive
+                        className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200 ${isActive
                           ? 'bg-brand-100 text-brand-600'
                           : 'bg-transparent text-slate-500 group-hover:bg-white/80 group-hover:text-slate-700'
                           }`}
                       >
-                        <Icon className="h-3.5 w-3.5" />
+                        <Icon className="h-[18px] w-[18px]" />
                       </div>
                       <span>{label}</span>
                     </NavLink>

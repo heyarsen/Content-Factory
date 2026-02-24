@@ -54,11 +54,12 @@ export async function createVideo(payload: CreateVideoPayload): Promise<VideoRec
   return data.video as VideoRecord
 }
 
-export async function listVideos(params: ListVideosParams = {}): Promise<VideoRecord[]> {
+export async function listVideos(params: ListVideosParams = {}, timeoutMs?: number): Promise<VideoRecord[]> {
   const { data } = await api.get('/api/videos', {
     params: {
       ...params,
     },
+    ...(timeoutMs ? { timeout: timeoutMs } : {}),
   })
 
   return (data?.videos ?? []) as VideoRecord[]
