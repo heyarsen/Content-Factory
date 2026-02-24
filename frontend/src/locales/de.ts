@@ -5,7 +5,7 @@ export const de = {
         manual_creation: "Manuelle Erstellung",
         automation: "Automatisierung",
         content_studio: "Content-Studio",
-        dms: "Direktnachrichten",
+        dms: "Posteingang",
         trendwatcher: "Trendbeobachter",
         analytics: "Analysen",
         create: "Erstellen",
@@ -183,7 +183,7 @@ export const de = {
     },
 
     instagram_dms: {
-        title: "DMs",
+        title: "Posteingang",
         description: "Verwalte Direktnachrichten in einem chatähnlichen Posteingang.",
         conversations: "Unterhaltungen",
         conversations_count: "{count} Unterhaltungen",
@@ -205,13 +205,13 @@ export const de = {
         },
         empty: {
             title: "Keine Direktnachrichten gefunden",
-            description: "Verbinde ein Social-Konto und erhalte DMs, um sie hier zu sehen.",
+            description: "Verbinde ein Social-Konto und erhalte Direktnachrichten, um sie hier zu sehen.",
         },
         success: {
-            sent: "DM erfolgreich gesendet.",
+            sent: "Nachricht erfolgreich gesendet.",
         },
         errors: {
-            load_failed: "DMs konnten nicht geladen werden",
+            load_failed: "Posteingang-Nachrichten konnten nicht geladen werden",
             recipient_message_required: "Empfänger-ID und Nachricht sind erforderlich.",
             send_failed: "Direktnachricht konnte nicht gesendet werden",
         },
