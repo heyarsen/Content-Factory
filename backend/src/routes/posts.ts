@@ -246,6 +246,7 @@ router.post('/schedule', authenticate, requireSubscription, async (req: AuthRequ
         platforms: normalizedPlatforms, // Array of platform names
         caption: captionToUse,
         scheduledTime: scheduled_time || undefined,
+        forceApiScheduling: Boolean(scheduled_time),
         userId: uploadPostUserId,
         asyncUpload: true, // Use async upload to handle multiple platforms
       })

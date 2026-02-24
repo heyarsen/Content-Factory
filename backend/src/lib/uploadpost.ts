@@ -334,6 +334,7 @@ export interface PostVideoRequest {
   scheduledTime?: string
   userId?: string // Upload-post user profile ID
   asyncUpload?: boolean
+  forceApiScheduling?: boolean
 }
 
 export interface UploadPostResponse {
@@ -403,7 +404,9 @@ async function buildUploadVideoFormData(request: PostVideoRequest): Promise<any>
     formData.append('description', postDescription)
   }
 
-  const skipScheduling = process.env.UPLOADPOST_SKIP_SCHEDULING !== 'false'
+  const skipScheduling = request.forceApiScheduling
+    ? false
+    : process.env.UPLOADPOST_SKIP_SCHEDULING !== 'false'
 
   if (request.scheduledTime && !skipScheduling) {
     let scheduledDate: string
@@ -463,7 +466,9 @@ async function buildUploadVideoFormDataWithBinary(request: PostVideoRequest): Pr
     formData.append('description', postDescription)
   }
 
-  const skipScheduling = process.env.UPLOADPOST_SKIP_SCHEDULING !== 'false'
+  const skipScheduling = request.forceApiScheduling
+    ? false
+    : process.env.UPLOADPOST_SKIP_SCHEDULING !== 'false'
   if (request.scheduledTime && !skipScheduling) {
     const dateObj = new Date(request.scheduledTime)
     if (Number.isNaN(dateObj.getTime())) {
