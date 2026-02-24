@@ -183,7 +183,7 @@ export const de = {
     },
 
     instagram_dms: {
-        title: "DMs",
+        title: "Direktnachrichten",
         description: "Verwalte Direktnachrichten in einem chatähnlichen Posteingang.",
         conversations: "Unterhaltungen",
         conversations_count: "{count} Unterhaltungen",
@@ -205,13 +205,13 @@ export const de = {
         },
         empty: {
             title: "Keine Direktnachrichten gefunden",
-            description: "Verbinde ein Social-Konto und erhalte DMs, um sie hier zu sehen.",
+            description: "Verbinde ein Social-Konto und erhalte Direktnachrichten, um sie hier zu sehen.",
         },
         success: {
-            sent: "DM erfolgreich gesendet.",
+            sent: "Nachricht erfolgreich gesendet.",
         },
         errors: {
-            load_failed: "DMs konnten nicht geladen werden",
+            load_failed: "Nachrichten konnten nicht geladen werden",
             recipient_message_required: "Empfänger-ID und Nachricht sind erforderlich.",
             send_failed: "Direktnachricht konnte nicht gesendet werden",
         },
@@ -679,7 +679,7 @@ export const de = {
     analysts: {
         eyebrow: "Insights",
         title: "Analysen",
-        subtitle: "Live plattformübergreifende Einblicke auf Basis deiner Upload-Post-Analysedaten.",
+        subtitle: "Live plattformübergreifende Einblicke auf Basis deiner Kanal-Analysedaten.",
         load_failed_title: "Analysen konnten nicht geladen werden",
         no_accounts: "Keine verbundenen Social-Accounts gefunden. Verbinde dein Konto, um Analysen zu sehen.",
         followers: "Follower",

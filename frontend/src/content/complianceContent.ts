@@ -60,7 +60,7 @@ const shared: ComplianceDocuments = {
         list: [
           'Supabase — Database & auth hosting — United States (global)',
           'Railway — Hosting/Infrastructure — United States',
-          'Upload-Post — Social posting API — Global',
+          'Social posting API partner — Global',
           'HeyGen — Video generation API — United States',
           'OpenAI — AI content generation — United States',
           'WayForPay — Payments — Ukraine',
