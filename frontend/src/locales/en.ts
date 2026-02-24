@@ -183,6 +183,15 @@ export const en = {
         account: "Account",
         open_navigation: "Open navigation",
     },
+    VIDEO_PLANNING: {
+        UPLOAD_PLAN: {
+            STEP_LABEL: "Step {step} of {total}",
+            STEP_UPLOAD: "Upload",
+        },
+    },
+    GENERATE_VIDEO: {
+        DURATION_SECONDS: "{duration} seconds",
+    },
     sidebar: {
         content_fabrica: "AI SMM",
         creator_studio: "Creator Studio",
