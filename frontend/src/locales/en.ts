@@ -808,6 +808,23 @@ export const en = {
         preview_library_desc: "We're building a library of camera-ready avatars with configurable voice, pacing, and personality presets. Here's a look at the upcoming experience.",
         preview_mockup: "Preview mockup",
         in_queue: "In queue",
+        cards: {
+            nova: {
+                name: "Nova Presenter",
+                tone: "Confident explainer",
+                status: "Studio ready look",
+            },
+            atlas: {
+                name: "Atlas Mentor",
+                tone: "Calm and analytical",
+                status: "Business casual setup",
+            },
+            lyra: {
+                name: "Lyra Storyteller",
+                tone: "Warm narrative voice",
+                status: "Lifestyle visual tone",
+            },
+        },
         title: "Avatars In Development",
         description: "We are currently building the custom AI Avatars feature. Check back soon for updates!",
     },
