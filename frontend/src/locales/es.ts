@@ -5,7 +5,7 @@ export const es = {
         manual_creation: "Creación Manual",
         automation: "Automatización",
         content_studio: "Estudio de Contenido",
-        dms: "Mensajes directos",
+        dms: "Bandeja",
         trendwatcher: "Vigilador de Tendencias",
         analytics: "Analíticas",
         create: "Crear",
@@ -183,7 +183,7 @@ export const es = {
     },
 
     instagram_dms: {
-        title: "DMs",
+        title: "Bandeja",
         description: "Gestiona los mensajes directos en una bandeja estilo chat.",
         conversations: "Conversaciones",
         conversations_count: "{count} conversaciones",
@@ -205,13 +205,13 @@ export const es = {
         },
         empty: {
             title: "No se encontraron mensajes directos",
-            description: "Conecta una cuenta social y recibe DMs para verlos aquí.",
+            description: "Conecta una cuenta social y recibe mensajes directos para verlos aquí.",
         },
         success: {
-            sent: "DM enviado correctamente.",
+            sent: "Mensaje enviado correctamente.",
         },
         errors: {
-            load_failed: "No se pudieron cargar los DMs",
+            load_failed: "No se pudieron cargar los mensajes de la bandeja",
             recipient_message_required: "Se requieren el ID del destinatario y el mensaje.",
             send_failed: "No se pudo enviar el mensaje directo",
         },

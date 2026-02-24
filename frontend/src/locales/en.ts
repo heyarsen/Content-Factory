@@ -5,7 +5,7 @@ export const en = {
         manual_creation: "Manual Creation",
         automation: "Automation",
         content_studio: "Content Studio",
-        dms: "DMs",
+        dms: "Inbox",
         trendwatcher: "Trendwatcher",
         analytics: "Analytics",
         create: "Create",
@@ -197,7 +197,7 @@ export const en = {
     },
 
     instagram_dms: {
-        title: "DMs",
+        title: "Inbox",
         description: "Manage direct messages in a chat-style inbox.",
         conversations: "Conversations",
         conversations_count: "{count} conversations",
@@ -219,13 +219,13 @@ export const en = {
         },
         empty: {
             title: "No direct messages found",
-            description: "Connect a social account and receive DMs to see them here.",
+            description: "Connect a social account and receive direct messages to see them here.",
         },
         success: {
-            sent: "DM sent successfully.",
+            sent: "Message sent successfully.",
         },
         errors: {
-            load_failed: "Unable to load DMs",
+            load_failed: "Unable to load inbox messages",
             recipient_message_required: "Recipient ID and message are required.",
             send_failed: "Failed to send direct message",
         },

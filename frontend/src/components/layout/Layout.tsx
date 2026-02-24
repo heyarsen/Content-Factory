@@ -23,7 +23,7 @@ export function Layout({ children }: { children: ReactNode }) {
   return (
     <div className="relative flex min-h-screen bg-background">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="relative flex min-h-screen flex-1 flex-col lg:pl-60">
+      <div className="relative flex min-h-screen flex-1 flex-col lg:pl-64">
         <Header onToggleSidebar={() => setSidebarOpen((open) => !open)} />
 
         {showBanner && (

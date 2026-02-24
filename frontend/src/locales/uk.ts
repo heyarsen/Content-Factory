@@ -5,7 +5,7 @@ export const uk = {
         manual_creation: "Ручне створення",
         automation: "Автоматизація",
         content_studio: "Контент-студія",
-        dms: "Прямі повідомлення",
+        dms: "Вхідні",
         trendwatcher: "Трендвотчер",
         analytics: "Аналітика",
         create: "Створити",
@@ -183,7 +183,7 @@ export const uk = {
     },
 
     instagram_dms: {
-        title: "DMs",
+        title: "Вхідні",
         description: "Керуйте особистими повідомленнями у вхідних у форматі чату.",
         conversations: "Розмови",
         conversations_count: "{count} розмов",
@@ -205,13 +205,13 @@ export const uk = {
         },
         empty: {
             title: "Особистих повідомлень не знайдено",
-            description: "Підключіть соціальний акаунт і отримуйте DMs, щоб бачити їх тут.",
+            description: "Підключіть соціальний акаунт і отримуйте прямі повідомлення, щоб бачити їх тут.",
         },
         success: {
-            sent: "DM успішно надіслано.",
+            sent: "Повідомлення успішно надіслано.",
         },
         errors: {
-            load_failed: "Не вдалося завантажити DMs",
+            load_failed: "Не вдалося завантажити вхідні повідомлення",
             recipient_message_required: "Потрібні ID отримувача та повідомлення.",
             send_failed: "Не вдалося надіслати особисте повідомлення",
         },

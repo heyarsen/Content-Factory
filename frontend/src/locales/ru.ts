@@ -5,7 +5,7 @@ export const ru = {
         manual_creation: "Ручное создание",
         automation: "Автоматизация",
         content_studio: "Контент-студия",
-        dms: "Личные сообщения",
+        dms: "Входящие",
         trendwatcher: "Трендвотчер",
         analytics: "Аналитика",
         create: "Создать",
@@ -183,7 +183,7 @@ export const ru = {
     },
 
     instagram_dms: {
-        title: "DMs",
+        title: "Входящие",
         description: "Управляйте личными сообщениями в почтовом ящике в формате чата.",
         conversations: "Диалоги",
         conversations_count: "{count} диалогов",
@@ -205,13 +205,13 @@ export const ru = {
         },
         empty: {
             title: "Личные сообщения не найдены",
-            description: "Подключите соцсеть и получайте DMs, чтобы видеть их здесь.",
+            description: "Подключите соцсеть и получайте личные сообщения, чтобы видеть их здесь.",
         },
         success: {
-            sent: "DM успешно отправлен.",
+            sent: "Сообщение успешно отправлено.",
         },
         errors: {
-            load_failed: "Не удалось загрузить DMs",
+            load_failed: "Не удалось загрузить входящие сообщения",
             recipient_message_required: "Требуются ID получателя и сообщение.",
             send_failed: "Не удалось отправить личное сообщение",
         },
