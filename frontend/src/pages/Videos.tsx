@@ -68,6 +68,7 @@ export function Videos() {
   const postModalVideoIdRef = useRef<string | null>(null)
 
   const notifiedVideosRef = useRef<Set<string>>(new Set())
+  const videosCacheKey = `videos_cache:${search || 'all'}:${statusFilter || 'all'}`
 
   // Safety ref to track mounting status
   const mountedRef = useRef(true)
@@ -81,23 +82,48 @@ export function Videos() {
 
   const loadVideos = useCallback(async () => {
     try {
-      const videos = await listVideos({
+      const nextVideos = await listVideos({
         search: search || undefined,
         status: statusFilter,
-      })
+      }, 15000)
       if (mountedRef.current) {
-        setVideos(videos)
+        setVideos(nextVideos)
+        sessionStorage.setItem(videosCacheKey, JSON.stringify({ timestamp: Date.now(), videos: nextVideos }))
       }
     } catch (error) {
       console.error('Failed to load videos:', error)
+      const cached = sessionStorage.getItem(videosCacheKey)
+      if (cached && mountedRef.current) {
+        try {
+          const parsed = JSON.parse(cached) as { timestamp: number; videos: VideoRecord[] }
+          if (Array.isArray(parsed.videos)) {
+            setVideos(parsed.videos)
+          }
+        } catch {
+          // ignore malformed cache
+        }
+      }
     } finally {
       if (mountedRef.current) {
         setLoading(false)
       }
     }
-  }, [search, statusFilter])
+  }, [search, statusFilter, videosCacheKey])
 
   useEffect(() => {
+    const cached = sessionStorage.getItem(videosCacheKey)
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached) as { timestamp: number; videos: VideoRecord[] }
+        if (Array.isArray(parsed.videos) && Date.now() - parsed.timestamp < 180000) {
+          setVideos(parsed.videos)
+          setLoading(false)
+        }
+      } catch {
+        // ignore malformed cache
+      }
+    }
+
     loadVideos()
 
     // Safety timeout for loading state
@@ -109,7 +135,7 @@ export function Videos() {
     }, 10000)
 
     return () => clearTimeout(timeout)
-  }, [loadVideos]) // Removed loading from dependency to avoid loop, but it's safe
+  }, [loadVideos, videosCacheKey]) // Removed loading from dependency to avoid loop, but it's safe
 
   useEffect(() => {
     const refreshOnPostCreated = () => {

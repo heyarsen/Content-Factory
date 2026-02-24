@@ -122,7 +122,7 @@ export function InstagramDMs() {
   const [manualRecipientId, setManualRecipientId] = useState('')
   const [message, setMessage] = useState('')
 
-  const cacheKey = 'instagram_dms_cache_v1'
+  const cacheKey = 'instagram_dms_cache_v2'
 
   const loadCachedDms = () => {
     try {
@@ -133,7 +133,7 @@ export function InstagramDMs() {
       if (!Array.isArray(parsed.dms)) return false
 
       // Keep cache short-lived to avoid stale inbox perception.
-      if (Date.now() - parsed.timestamp > 60_000) {
+      if (Date.now() - parsed.timestamp > 300_000) {
         sessionStorage.removeItem(cacheKey)
         return false
       }
@@ -150,13 +150,25 @@ export function InstagramDMs() {
     try {
       setError(null)
       const dmsResponse = await api.get<ListResponse<InstagramDM>>('/api/social/instagram/dms', {
-        params: { per_page: 30 },
+        params: { per_page: 20 },
+        timeout: 15000,
       })
 
       const nextDms = dmsResponse.data.data || []
       setDms(nextDms)
       sessionStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), dms: nextDms }))
     } catch (err: any) {
+      const cachedValue = sessionStorage.getItem(cacheKey)
+      if (cachedValue) {
+        try {
+          const parsed = JSON.parse(cachedValue) as { timestamp: number; dms: InstagramDM[] }
+          if (Array.isArray(parsed.dms)) {
+            setDms(parsed.dms)
+          }
+        } catch {
+          // ignore malformed cache
+        }
+      }
       setError(err?.response?.data?.error || err?.message || t('instagram_dms.errors.load_failed'))
     } finally {
       setLoading(false)
