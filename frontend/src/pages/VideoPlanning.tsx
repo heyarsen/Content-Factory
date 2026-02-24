@@ -1300,6 +1300,17 @@ export function VideoPlanning() {
 
   const getTimeLabel = (hour: number) => `${String(hour).padStart(2, '0')}:00`
 
+  const getLocalTimeFromIso = (value: string | null | undefined): string => {
+    if (!value) return '00:00'
+
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return '00:00'
+
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    return `${hours}:${minutes}`
+  }
+
   const getTimelineItemsForDate = (dateItems: CalendarItem[]) => {
     const datedItems = dateItems
       .filter((item) => {
@@ -1317,7 +1328,7 @@ export function VideoPlanning() {
         if (!rawTime) return null
 
         const parsedTime = isPost
-          ? new Date(rawTime).toISOString().substring(11, 16)
+          ? getLocalTimeFromIso(rawTime)
           : rawTime.substring(0, 5)
 
         const [hoursPart, minutesPart] = parsedTime.split(':').map(Number)
@@ -2037,14 +2048,14 @@ export function VideoPlanning() {
 
                         if (isScheduledPost(a)) {
                           // For scheduled posts, extract time from ISO string
-                          timeA = a.scheduled_time ? new Date(a.scheduled_time).toISOString().substring(11, 16) : '00:00'
+                          timeA = getLocalTimeFromIso(a.scheduled_time)
                         } else {
                           // For plan items, use scheduled_time directly (HH:MM format)
                           timeA = a.scheduled_time || '00:00'
                         }
 
                         if (isScheduledPost(b)) {
-                          timeB = b.scheduled_time ? new Date(b.scheduled_time).toISOString().substring(11, 16) : '00:00'
+                          timeB = getLocalTimeFromIso(b.scheduled_time)
                         } else {
                           timeB = b.scheduled_time || '00:00'
                         }
