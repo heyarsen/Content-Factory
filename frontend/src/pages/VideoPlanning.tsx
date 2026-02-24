@@ -1833,15 +1833,17 @@ export function VideoPlanning() {
               </div>
 
               {calendarView === 'week' ? (
-                <div className="overflow-x-auto rounded-lg border border-slate-200">
-                  <div className="grid min-w-[860px]" style={{ gridTemplateColumns: '84px repeat(7, minmax(0, 1fr))' }}>
-                    <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Time
-                    </div>
+                <div className="space-y-3">
+                  <div className="space-y-2 sm:hidden">
+                    <p className="rounded-lg border border-brand-100 bg-brand-50/70 px-3 py-2 text-xs text-brand-700">
+                      Mobile week view: each day is stacked for quick scanning. Tap any card to open full details.
+                    </p>
                     {weekDays.map((day) => {
                       const dayKey = getDateKey(day)
+                      const items = getItemsForDate(day)
                       const isToday = dayKey === getDateKey(new Date())
                       const isSelected = dayKey === selectedDate
+
                       return (
                         <button
                           key={dayKey}
@@ -1849,75 +1851,139 @@ export function VideoPlanning() {
                             setSelectedDate(dayKey)
                             setIsDetailDrawerOpen(true)
                           }}
-                          className={`border-b border-r border-slate-200 px-2 py-2 text-center transition ${isSelected
-                            ? 'bg-brand-50 text-brand-700'
+                          className={`w-full rounded-xl border p-3 text-left transition ${isSelected
+                            ? 'border-brand-500 bg-brand-50 shadow-sm'
                             : isToday
-                              ? 'bg-brand-50/60 text-brand-700'
-                              : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                              ? 'border-brand-300 bg-brand-50/60'
+                              : 'border-slate-200 bg-white'
                             }`}
                         >
-                          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            {day.toLocaleDateString('en-US', { weekday: 'short' })}
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <p className="text-sm font-semibold text-primary">
+                              {day.toLocaleDateString(language === 'ru' ? 'ru-RU' : language === 'uk' ? 'uk-UA' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US', {
+                                weekday: 'short',
+                                month: 'short',
+                                day: 'numeric',
+                              })}
+                            </p>
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                              {items.length} items
+                            </span>
                           </div>
-                          <div className="text-sm font-semibold">{day.getDate()}</div>
+                          {items.length > 0 ? (
+                            <div className="space-y-1">
+                              {items.slice(0, 3).map((item) => {
+                                const isPost = isScheduledPost(item)
+                                const displayTopic = isPost
+                                  ? getReadableVideoTitle(item.videos?.topic, 'Auto')
+                                  : getReadableVideoTitle(item.topic || t('video_planning.planned'), item.video_id ? 'Auto' : 'AI')
+
+                                return (
+                                  <p key={item.id} className="truncate text-xs text-slate-600">
+                                    • {displayTopic}
+                                  </p>
+                                )
+                              })}
+                              {items.length > 3 && (
+                                <p className="text-xs font-medium text-brand-600">
+                                  +{items.length - 3} more
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-slate-400">No scheduled items</p>
+                          )}
                         </button>
                       )
                     })}
+                  </div>
 
-                    <div className="relative border-r border-slate-200 bg-slate-50" style={{ height: timelineHours.length * WEEK_TIMELINE_ROW_HEIGHT }}>
-                      {timelineHours.map((hour, hourIndex) => (
-                        <div
-                          key={hour}
-                          className="absolute left-0 right-0 border-b border-slate-200 px-3 text-xs text-slate-500"
-                          style={{ top: hourIndex * WEEK_TIMELINE_ROW_HEIGHT, height: WEEK_TIMELINE_ROW_HEIGHT }}
-                        >
-                          <span className="relative -top-2 inline-block bg-slate-50 pr-1">{getTimeLabel(hour)}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {weekDays.map((date) => {
-                      const dateKey = getDateKey(date)
-                      const items = getItemsForDate(date)
-                      const timelineItems = getTimelineItemsForDate(items)
-                      return (
-                        <div
-                          key={dateKey}
-                          className="relative border-r border-slate-200 bg-white"
-                          onDragOver={(event) => {
-                            if (!draggingItemId) return
-                            event.preventDefault()
-                          }}
-                          onDrop={async (event) => {
-                            event.preventDefault()
-                            if (!draggingItemId) return
-                            await movePlanItemToDate(draggingItemId, dateKey)
-                            setDraggingItemId(null)
-                          }}
-                          style={{ height: timelineHours.length * WEEK_TIMELINE_ROW_HEIGHT }}
-                        >
-                          {timelineHours.map((hour, hourIndex) => (
-                            <div
-                              key={`${dateKey}-${hour}`}
-                              className="absolute inset-x-0 border-b border-slate-100"
-                              style={{ top: hourIndex * WEEK_TIMELINE_ROW_HEIGHT, height: WEEK_TIMELINE_ROW_HEIGHT }}
-                            />
-                          ))}
-
-                          {timelineItems.map((item) => (
-                            <div
-                              key={item.id}
-                              className="absolute left-1 right-1 z-10 rounded-md border border-brand-200 bg-brand-50 px-2 py-1 text-xs shadow-sm"
-                              style={{ top: item.top + 4, minHeight: 42 }}
-                              title={`${item.timeLabel} - ${item.title}`}
-                            >
-                              <div className="font-semibold text-brand-700">{item.timeLabel}</div>
-                              <div className="truncate text-slate-700">{item.title}</div>
+                  <div className="hidden overflow-x-auto rounded-lg border border-slate-200 sm:block">
+                    <div className="grid min-w-[860px]" style={{ gridTemplateColumns: '84px repeat(7, minmax(0, 1fr))' }}>
+                      <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Time
+                      </div>
+                      {weekDays.map((day) => {
+                        const dayKey = getDateKey(day)
+                        const isToday = dayKey === getDateKey(new Date())
+                        const isSelected = dayKey === selectedDate
+                        return (
+                          <button
+                            key={dayKey}
+                            onClick={() => {
+                              setSelectedDate(dayKey)
+                              setIsDetailDrawerOpen(true)
+                            }}
+                            className={`border-b border-r border-slate-200 px-2 py-2 text-center transition ${isSelected
+                              ? 'bg-brand-50 text-brand-700'
+                              : isToday
+                                ? 'bg-brand-50/60 text-brand-700'
+                                : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                              }`}
+                          >
+                            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              {day.toLocaleDateString('en-US', { weekday: 'short' })}
                             </div>
-                          ))}
-                        </div>
-                      )
-                    })}
+                            <div className="text-sm font-semibold">{day.getDate()}</div>
+                          </button>
+                        )
+                      })}
+
+                      <div className="relative border-r border-slate-200 bg-slate-50" style={{ height: timelineHours.length * WEEK_TIMELINE_ROW_HEIGHT }}>
+                        {timelineHours.map((hour, hourIndex) => (
+                          <div
+                            key={hour}
+                            className="absolute left-0 right-0 border-b border-slate-200 px-3 text-xs text-slate-500"
+                            style={{ top: hourIndex * WEEK_TIMELINE_ROW_HEIGHT, height: WEEK_TIMELINE_ROW_HEIGHT }}
+                          >
+                            <span className="relative -top-2 inline-block bg-slate-50 pr-1">{getTimeLabel(hour)}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {weekDays.map((date) => {
+                        const dateKey = getDateKey(date)
+                        const items = getItemsForDate(date)
+                        const timelineItems = getTimelineItemsForDate(items)
+                        return (
+                          <div
+                            key={dateKey}
+                            className="relative border-r border-slate-200 bg-white"
+                            onDragOver={(event) => {
+                              if (!draggingItemId) return
+                              event.preventDefault()
+                            }}
+                            onDrop={async (event) => {
+                              event.preventDefault()
+                              if (!draggingItemId) return
+                              await movePlanItemToDate(draggingItemId, dateKey)
+                              setDraggingItemId(null)
+                            }}
+                            style={{ height: timelineHours.length * WEEK_TIMELINE_ROW_HEIGHT }}
+                          >
+                            {timelineHours.map((hour, hourIndex) => (
+                              <div
+                                key={`${dateKey}-${hour}`}
+                                className="absolute inset-x-0 border-b border-slate-100"
+                                style={{ top: hourIndex * WEEK_TIMELINE_ROW_HEIGHT, height: WEEK_TIMELINE_ROW_HEIGHT }}
+                              />
+                            ))}
+
+                            {timelineItems.map((item) => (
+                              <div
+                                key={item.id}
+                                className="absolute left-1 right-1 z-10 rounded-md border border-brand-200 bg-brand-50 px-2 py-1 text-xs shadow-sm"
+                                style={{ top: item.top + 4, minHeight: 42 }}
+                                title={`${item.timeLabel} - ${item.title}`}
+                              >
+                                <div className="font-semibold text-brand-700">{item.timeLabel}</div>
+                                <div className="truncate text-slate-700">{item.title}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
                 </div>
               ) : (
