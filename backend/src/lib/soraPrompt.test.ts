@@ -29,6 +29,21 @@ test('buildSoraVideoPrompt appends narrative guidance when script is provided', 
   assert.match(prompt, /Start with a simple story\./)
 })
 
+
+test('buildSoraVideoPrompt always uses 15 seconds in prompt text', () => {
+  const prompt = buildSoraVideoPrompt({
+    duration: 30,
+    style: 'Cinematic',
+    topic: 'Long-form storytelling',
+    script: null,
+  })
+
+  assert.match(prompt, /Create a 15-second Cinematic vertical social video about: Long-form storytelling\./)
+  assert.match(prompt, /Keep pacing natural and coherent for the full 15 seconds\./)
+  assert.doesNotMatch(prompt, /30-second/)
+  assert.doesNotMatch(prompt, /full 30 seconds/)
+})
+
 test('buildSoraVideoPrompt caps prompt length at 1000 chars plus ellipsis', () => {
   const prompt = buildSoraVideoPrompt({
     duration: 15,

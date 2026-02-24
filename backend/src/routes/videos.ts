@@ -149,7 +149,7 @@ router.post('/generate', authenticate, async (req: AuthRequest, res: Response) =
     if (generateScript && !finalScript && provider !== 'sora') {
       // Generate script using OpenAI
       const scriptPrompt = `
-Create a 10-second video script that is engaging, specific, and has personality. 
+Create a 15-second video script that is engaging, specific, and has personality. 
 
 TOPIC: ${topic}
 DETAILS: ${description || 'No additional details provided'}
