@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
@@ -115,12 +115,18 @@ export function ProfileSettings() {
     <Layout>
       <div className="space-y-8">
         {/* Header */}
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('common.settings')}</p>
-          <h1 className="text-3xl font-semibold text-primary">{t('preferences.profile_settings')}</h1>
+        <div className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('preferences.account_settings_label')}</p>
+          <h1 className="text-3xl font-semibold text-primary">{t('preferences.profile_security_title')}</h1>
           <p className="text-sm text-slate-500">
-            {t('preferences.profile_settings_desc')}
+            {t('preferences.profile_security_desc')}
           </p>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-600">{t('preferences.you_are_in_account')}</span>
+            <Link to="/preferences" className="rounded-full border border-brand-200 bg-brand-50 px-3 py-1 font-medium text-brand-700 transition hover:bg-brand-100">
+              {t('preferences.go_to_workspace_preferences')}
+            </Link>
+          </div>
         </div>
 
         {/* Email Settings */}

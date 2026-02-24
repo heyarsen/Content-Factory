@@ -4,6 +4,7 @@ import { VideoService } from '../services/videoService.js'
 import { generateVideoCaption } from '../services/captionService.js'
 import { detectLanguage, enhancePromptWithLanguage } from '../lib/languageDetection.js'
 import { enforceScriptWordLimit, getMaxWordsForDuration } from '../lib/scriptLimits.js'
+import { supabase } from '../lib/supabase.js'
 import OpenAI from 'openai'
 import dotenv from 'dotenv'
 
@@ -14,6 +15,18 @@ const openai = new OpenAI({
 })
 
 const router = Router()
+
+const DEFAULT_VIDEO_UPLOAD_BUCKET = 'videos'
+const VIDEO_UPLOAD_BUCKET = process.env.VIDEO_UPLOAD_BUCKET?.trim() || DEFAULT_VIDEO_UPLOAD_BUCKET
+let resolvedVideoUploadBucket = VIDEO_UPLOAD_BUCKET
+
+function getVideoUploadBucket(): string {
+  return resolvedVideoUploadBucket
+}
+
+function sanitizeFileName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9._-]/g, '_')
+}
 
 function handleServiceError(res: Response, error: any, fallbackMessage: string) {
   if (error?.status) {
@@ -31,6 +44,61 @@ function handleServiceError(res: Response, error: any, fallbackMessage: string) 
     (typeof error === 'string' ? error : 'Internal server error')
 
   return res.status(500).json({ error: errorMessage })
+}
+
+async function ensureVideoUploadBucketExists() {
+  const { data: buckets, error: listError } = await supabase.storage.listBuckets()
+
+  if (listError) {
+    throw new Error(
+      `Unable to verify storage bucket "${VIDEO_UPLOAD_BUCKET}": ${listError.message}`,
+    )
+  }
+
+  const bucketExists = buckets?.some((bucket) => bucket.name === VIDEO_UPLOAD_BUCKET)
+  if (bucketExists) {
+    resolvedVideoUploadBucket = VIDEO_UPLOAD_BUCKET
+    return
+  }
+
+  if (VIDEO_UPLOAD_BUCKET === DEFAULT_VIDEO_UPLOAD_BUCKET) {
+    const legacyEnvLiteralBucketName = 'VIDEO_UPLOAD_BUCKET'
+    const legacyBucketExists = buckets?.some((bucket) => bucket.name === legacyEnvLiteralBucketName)
+
+    if (legacyBucketExists) {
+      resolvedVideoUploadBucket = legacyEnvLiteralBucketName
+      console.warn(
+        `Using legacy storage bucket "${legacyEnvLiteralBucketName}". Set VIDEO_UPLOAD_BUCKET=${legacyEnvLiteralBucketName} to remove this fallback.`,
+      )
+      return
+    }
+  }
+
+  const { error: createError } = await supabase.storage.createBucket(VIDEO_UPLOAD_BUCKET, {
+    public: true,
+    fileSizeLimit: '100MB',
+    allowedMimeTypes: ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-matroska'],
+  })
+
+  if (createError?.message?.toLowerCase().includes('maximum allowed size')) {
+    const { error: retryCreateError } = await supabase.storage.createBucket(VIDEO_UPLOAD_BUCKET, {
+      public: true,
+    })
+
+    if (!retryCreateError) {
+      resolvedVideoUploadBucket = VIDEO_UPLOAD_BUCKET
+      return
+    }
+  }
+
+  if (createError) {
+    throw new Error(
+      `Storage bucket "${VIDEO_UPLOAD_BUCKET}" is missing and could not be created automatically: ${createError.message}. ` +
+      'Please create this bucket in Supabase Dashboard > Storage or set VIDEO_UPLOAD_BUCKET to an existing bucket name.',
+    )
+  }
+
+  resolvedVideoUploadBucket = VIDEO_UPLOAD_BUCKET
 }
 
 // Generate video
@@ -81,7 +149,7 @@ router.post('/generate', authenticate, async (req: AuthRequest, res: Response) =
     if (generateScript && !finalScript && provider !== 'sora') {
       // Generate script using OpenAI
       const scriptPrompt = `
-Create a 10-second video script that is engaging, specific, and has personality. 
+Create a 15-second video script that is engaging, specific, and has personality. 
 
 TOPIC: ${topic}
 DETAILS: ${description || 'No additional details provided'}
@@ -184,6 +252,84 @@ FORMAT: Write as a continuous spoken script without timing cues. Make it sound l
     // Return appropriate error response
     const errorMessage = error?.message || 'Video generation failed'
     res.status(500).json({ error: errorMessage })
+  }
+})
+
+router.post('/upload', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const {
+      file_name,
+      mime_type,
+      file_data_base64,
+      duration,
+      topic,
+    } = req.body || {}
+
+    if (!file_name || !mime_type || !file_data_base64) {
+      return res.status(400).json({ error: 'file_name, mime_type and file_data_base64 are required' })
+    }
+
+    if (typeof mime_type !== 'string' || !mime_type.startsWith('video/')) {
+      return res.status(400).json({ error: 'Only video files are allowed' })
+    }
+
+    const fileBuffer = Buffer.from(file_data_base64, 'base64')
+    if (!fileBuffer.length) {
+      return res.status(400).json({ error: 'Uploaded file is empty' })
+    }
+
+    const safeDuration = Math.max(1, Math.min(180, Number(duration) || 60))
+    const safeTopic = typeof topic === 'string' && topic.trim().length > 0
+      ? topic.trim().slice(0, 200)
+      : sanitizeFileName(file_name).replace(/\.[^.]+$/, '').slice(0, 200)
+
+    const objectPath = `${userId}/${Date.now()}-${sanitizeFileName(file_name)}`
+
+    await ensureVideoUploadBucketExists()
+
+    const { error: uploadError } = await supabase.storage
+      .from(getVideoUploadBucket())
+      .upload(objectPath, fileBuffer, {
+        contentType: mime_type,
+        upsert: false,
+      })
+
+    if (uploadError) {
+      return res.status(500).json({ error: `Upload failed: ${uploadError.message}` })
+    }
+
+    const { data: urlData } = supabase.storage.from(getVideoUploadBucket()).getPublicUrl(objectPath)
+
+    const { data: video, error: insertError } = await supabase
+      .from('videos')
+      .insert({
+        user_id: userId,
+        topic: safeTopic,
+        script: null,
+        style: 'professional',
+        duration: safeDuration,
+        status: 'completed',
+        provider: 'sora',
+        heygen_video_id: null,
+        sora_task_id: null,
+        video_url: urlData.publicUrl,
+        avatar_id: null,
+        error_message: null,
+      })
+      .select()
+      .single()
+
+    if (insertError || !video) {
+      return res.status(500).json({ error: insertError?.message || 'Failed to persist uploaded video' })
+    }
+
+    return res.json({
+      success: true,
+      video,
+    })
+  } catch (error: any) {
+    return handleServiceError(res, error, 'Video upload error:')
   }
 })
 

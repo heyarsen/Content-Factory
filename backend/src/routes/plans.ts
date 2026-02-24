@@ -78,7 +78,7 @@ router.post('/', authenticate, requireSubscription, async (req: AuthRequest, res
         start_date,
         end_date: end_date || null,
         enabled: enabled !== false,
-        auto_research: auto_research !== false,
+        auto_research: auto_research === true,
         auto_create: auto_create === true,
         auto_schedule_trigger: auto_schedule_trigger || 'daily',
         trigger_time: trigger_time || null,
@@ -219,6 +219,25 @@ router.patch('/:id', authenticate, async (req: AuthRequest, res: Response) => {
       .single()
 
     if (error) throw error
+
+    // Keep plan items aligned with plan defaults for items that inherit platforms.
+    // We only backfill items where platforms is null, so item-level overrides remain intact.
+    if (Object.prototype.hasOwnProperty.call(updates, 'default_platforms')) {
+      const newDefaultPlatforms = Array.isArray(data.default_platforms) && data.default_platforms.length > 0
+        ? data.default_platforms
+        : null
+
+      const { error: syncItemsError } = await supabase
+        .from('video_plan_items')
+        .update({ platforms: newDefaultPlatforms })
+        .eq('plan_id', id)
+        .is('platforms', null)
+
+      if (syncItemsError) {
+        console.error(`[Plans API] Failed to sync default platforms to null-platform items for plan ${id}:`, syncItemsError)
+      }
+    }
+
     return res.json({ plan: data })
   } catch (error: any) {
     console.error('Update plan error:', error)

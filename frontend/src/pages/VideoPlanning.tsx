@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
@@ -8,10 +8,8 @@ import { Select } from '../components/ui/Select'
 import { Textarea } from '../components/ui/Textarea'
 import { Badge } from '../components/ui/Badge'
 import { Modal } from '../components/ui/Modal'
-import { EmptyState } from '../components/ui/EmptyState'
 import { Skeleton } from '../components/ui/Skeleton'
 import {
-  Calendar,
   Plus,
   Sparkles,
   Check,
@@ -27,6 +25,7 @@ import {
   FileText,
   ExternalLink,
   Video,
+  Upload,
 } from 'lucide-react'
 import api from '../lib/api'
 import { normalizeTimezone, timezones } from '../lib/timezones'
@@ -34,8 +33,80 @@ import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useCreditsContext } from '../contexts/CreditContext'
 import { CreditBanner } from '../components/ui/CreditBanner'
+import { UploadAndPlanModal } from '../components/videos/UploadAndPlanModal'
+import { GenerateVideoModal } from '../components/videos/GenerateVideoModal'
+import { useNotifications } from '../contexts/NotificationContext'
 
 const STATUS_FILTER_KEY = 'video_planning_status_filter'
+const LEGACY_STATUS_FILTER_KEY = 'videoPlanning.statusFilter'
+const CALENDAR_VIEW_KEY = 'video_planning_calendar_view'
+type CalendarView = 'week' | 'month'
+
+const WEEK_TIMELINE_START_HOUR = 0
+const WEEK_TIMELINE_END_HOUR = 23
+const WEEK_TIMELINE_ROW_HEIGHT = 36
+const MIN_VIDEO_TIME_GAP_MINUTES = 15
+
+
+type CalendarVideoSource = 'AI' | 'Auto'
+
+const UUID_LIKE_PATTERN = /^[a-f0-9]{32,}$/i
+
+const getReadableVideoTitle = (title: string | null | undefined, source: CalendarVideoSource = 'AI') => {
+  const safeTitle = (title || '').trim()
+  if (!safeTitle || UUID_LIKE_PATTERN.test(safeTitle)) {
+    return source === 'Auto' ? 'Untitled automation video' : 'Untitled AI video'
+  }
+  return safeTitle
+}
+
+const getLocalDateYMD = (date = new Date()) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const timeToMinutes = (time: string) => {
+  const [hours, minutes] = time.split(':').map(Number)
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null
+  return (hours * 60) + minutes
+}
+
+const minutesToTime = (totalMinutes: number) => {
+  const safeMinutes = Math.max(0, Math.min(totalMinutes, (23 * 60) + 59))
+  const hours = Math.floor(safeMinutes / 60)
+  const minutes = safeMinutes % 60
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+}
+
+const normalizeTimesWithMinimumGap = (times: string[], minGapMinutes: number) => {
+  let previousMinutes: number | null = null
+  let adjusted = false
+
+  const normalizedTimes = times.map((time) => {
+    const parsedMinutes = timeToMinutes(time)
+    if (parsedMinutes === null) return time
+
+    if (previousMinutes === null) {
+      previousMinutes = parsedMinutes
+      return time
+    }
+
+    const minAllowed = previousMinutes + minGapMinutes
+    if (parsedMinutes >= minAllowed) {
+      previousMinutes = parsedMinutes
+      return time
+    }
+
+    adjusted = true
+    const shifted = minutesToTime(minAllowed)
+    previousMinutes = timeToMinutes(shifted)
+    return shifted
+  })
+
+  return { normalizedTimes, adjusted }
+}
 
 interface VideoPlan {
   id: string
@@ -105,14 +176,37 @@ interface ScheduledPost {
   status: 'pending' | 'posted' | 'failed' | 'cancelled' | 'scheduled'
   posted_at: string | null
   error_message: string | null
+  caption?: string | null
   videos?: {
     topic: string
     video_url: string | null
   } | null
 }
 
+type ScheduledPostGroup = {
+  _isScheduledPostGroup: true
+  id: string
+  video_id: string
+  scheduled_date: string
+  scheduled_time: string | null
+  posted_at: string | null
+  status: 'pending' | 'posted' | 'failed' | 'scheduled'
+  caption: string | null
+  videos?: {
+    topic: string
+    video_url: string | null
+  } | null
+  platforms: Array<{
+    platform: ScheduledPost['platform']
+    status: ScheduledPost['status']
+    error_message: string | null
+  }>
+}
+
 export function VideoPlanning() {
+  const isDev = import.meta.env.DEV
   const { t, language } = useLanguage()
+  const { addNotification } = useNotifications()
   const { user } = useAuth()
   const { credits, unlimited, loading: creditsLoading } = useCreditsContext()
   const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')
@@ -127,9 +221,12 @@ export function VideoPlanning() {
   const [plans, setPlans] = useState<VideoPlan[]>([])
   const [selectedPlan, setSelectedPlan] = useState<VideoPlan | null>(null)
   const [planItems, setPlanItems] = useState<VideoPlanItem[]>([])
+  const [calendarPlanItems, setCalendarPlanItems] = useState<VideoPlanItem[]>([])
   const [loading, setLoading] = useState(true)
   const [varietyMetrics, setVarietyMetrics] = useState<any>(null)
   const [createModal, setCreateModal] = useState(false)
+  const [generateVideoModalOpen, setGenerateVideoModalOpen] = useState(false)
+  const [uploadPlanModal, setUploadPlanModal] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     // Initialize with today's date in YYYY-MM-DD format using local timezone
     const today = new Date()
@@ -140,9 +237,25 @@ export function VideoPlanning() {
   })
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([])
   const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [calendarView, setCalendarView] = useState<CalendarView>(() => {
+    if (typeof window === 'undefined') return 'week'
+    const stored = window.localStorage.getItem(CALENDAR_VIEW_KEY)
+    return stored === 'month' ? 'month' : 'week'
+  })
+  const [draggingItemId, setDraggingItemId] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>(() => {
     if (typeof window === 'undefined') return 'all'
-    return localStorage.getItem(STATUS_FILTER_KEY) || 'all'
+    const storedStatusFilter = localStorage.getItem(STATUS_FILTER_KEY)
+    if (storedStatusFilter) return storedStatusFilter
+
+    const legacyStatusFilter = localStorage.getItem(LEGACY_STATUS_FILTER_KEY)
+    if (legacyStatusFilter) {
+      localStorage.setItem(STATUS_FILTER_KEY, legacyStatusFilter)
+      localStorage.removeItem(LEGACY_STATUS_FILTER_KEY)
+      return legacyStatusFilter
+    }
+
+    return 'all'
   })
   const [scriptPreviewItem, setScriptPreviewItem] =
     useState<VideoPlanItem | null>(null)
@@ -167,9 +280,7 @@ export function VideoPlanning() {
 
   // Create plan form
   const [planName, setPlanName] = useState('')
-  const [startDate, setStartDate] = useState(
-    new Date().toISOString().split('T')[0],
-  )
+  const [startDate, setStartDate] = useState(getLocalDateYMD)
   const [endDate, setEndDate] = useState('')
   const [triggerTime, setTriggerTime] = useState('08:00')
   const [defaultPlatforms, setDefaultPlatforms] = useState<string[]>([])
@@ -185,6 +296,7 @@ export function VideoPlanning() {
   const [editPlanModal, setEditPlanModal] = useState<VideoPlan | null>(null)
   const [editingPlan, setEditingPlan] = useState(false)
   const [selectedItem, setSelectedItem] = useState<VideoPlanItem | null>(null)
+
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([])
   const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false)
   // Preset times for quick selection
@@ -201,10 +313,26 @@ export function VideoPlanning() {
     }
   }, [statusFilter])
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(CALENDAR_VIEW_KEY, calendarView)
+    }
+  }, [calendarView])
+
   // Avatar-related functions removed - using AI video generation
 
 
   const [creating, setCreating] = useState(false)
+
+  const handleUploadPlanSuccess = async () => {
+    addNotification({
+      type: 'success',
+      title: t('video_planning.upload_plan.success_title'),
+      message: t('video_planning.upload_plan.success_message'),
+    })
+
+    await Promise.all([loadScheduledPosts(), selectedPlan ? loadPlanItems(selectedPlan.id) : Promise.resolve()])
+  }
   const loadSocialAccounts = async () => {
     try {
       const response = await api.get('/api/social/accounts')
@@ -237,11 +365,6 @@ export function VideoPlanning() {
       console.error('Failed to load user preferences:', error)
     }
   }
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    localStorage.setItem('videoPlanning.statusFilter', statusFilter)
-  }, [statusFilter])
 
   // Avatar-related useEffect removed - using AI video generation
 
@@ -279,6 +402,7 @@ export function VideoPlanning() {
 
   // Smart polling for plan items - only poll frequently when items are in progress
   const pollingIntervalRef = useRef<any | null>(null)
+  const currentPollMsRef = useRef<number | null>(null)
   const lastPollTimeRef = useRef<number>(0)
 
   useEffect(() => {
@@ -287,6 +411,7 @@ export function VideoPlanning() {
         clearInterval(pollingIntervalRef.current)
         pollingIntervalRef.current = null
       }
+      currentPollMsRef.current = null
       return
     }
 
@@ -313,6 +438,7 @@ export function VideoPlanning() {
       clearInterval(pollingIntervalRef.current)
       pollingIntervalRef.current = null
     }
+    currentPollMsRef.current = null
 
     const poll = async () => {
       const now = Date.now()
@@ -328,13 +454,13 @@ export function VideoPlanning() {
       // Use a timeout to check after state updates
       setTimeout(() => {
         const newInterval = getPollInterval()
-        // Only restart if interval changed significantly (more than 5 seconds difference)
-        const currentInterval = pollingIntervalRef.current ? getPollInterval() : null
-        if (!currentInterval || Math.abs(newInterval - currentInterval) > 5000) {
+        const currentInterval = currentPollMsRef.current
+        if (!currentInterval || newInterval !== currentInterval) {
           if (pollingIntervalRef.current) {
             clearInterval(pollingIntervalRef.current)
           }
           pollingIntervalRef.current = setInterval(poll, newInterval)
+          currentPollMsRef.current = newInterval
         }
       }, 1000)
     }
@@ -342,6 +468,7 @@ export function VideoPlanning() {
     // Start polling with initial interval
     const initialInterval = getPollInterval()
     pollingIntervalRef.current = setInterval(poll, initialInterval)
+    currentPollMsRef.current = initialInterval
 
     // Initial load
     poll()
@@ -351,13 +478,23 @@ export function VideoPlanning() {
         clearInterval(pollingIntervalRef.current)
         pollingIntervalRef.current = null
       }
+      currentPollMsRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPlan?.id])
 
   // Update polling interval when planItems change (but don't recreate the effect)
   useEffect(() => {
-    if (!selectedPlan || !pollingIntervalRef.current) return
+    if (!selectedPlan) {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
+      currentPollMsRef.current = null
+      return
+    }
+
+    if (!pollingIntervalRef.current) return
 
     const hasActiveItems = () => {
       return planItems.some(item =>
@@ -375,7 +512,7 @@ export function VideoPlanning() {
     // Debounce the interval update
     const timeoutId = setTimeout(() => {
       const newInterval = getPollInterval()
-      if (pollingIntervalRef.current) {
+      if (pollingIntervalRef.current && currentPollMsRef.current !== newInterval) {
         clearInterval(pollingIntervalRef.current)
 
         const poll = async () => {
@@ -388,17 +525,22 @@ export function VideoPlanning() {
         }
 
         pollingIntervalRef.current = setInterval(poll, newInterval)
+        currentPollMsRef.current = newInterval
       }
     }, 2000)
 
-    return () => clearTimeout(timeoutId)
+    return () => {
+      clearTimeout(timeoutId)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planItems, selectedPlan?.id])
 
   const loadPlans = async () => {
     try {
       const response = await api.get('/api/plans')
-      setPlans(response.data.plans || [])
+      const loadedPlans = response.data.plans || []
+      setPlans(loadedPlans)
+      await loadAllPlanItems(loadedPlans)
 
       // Load variety metrics if we have plans
       if (response.data.plans && response.data.plans.length > 0) {
@@ -422,25 +564,52 @@ export function VideoPlanning() {
 
   const loadPlanItems = async (planId: string) => {
     try {
-      console.log(`[VideoPlanning] Loading plan items for plan ${planId}...`)
+      if (isDev) {
+        console.log(`[VideoPlanning] Loading plan items for plan ${planId}...`)
+      }
       const response = await api.get(`/api/plans/${planId}`)
       const items = response.data.items || []
-      console.log(`[VideoPlanning] API response:`, {
-        planId,
-        itemsCount: items.length,
-        responseData: response.data
+      if (isDev) {
+        console.log(`[VideoPlanning] Plan items API metadata:`, {
+          planId,
+          itemsCount: items.length,
+          hasItems: items.length > 0,
+        })
+      }
+      const normalizedItems = normalizePlanItems(items)
+      setPlanItems(normalizedItems)
+      setCalendarPlanItems((prevItems) => {
+        const remainingItems = prevItems.filter((item) => item.plan_id !== planId)
+        return [...remainingItems, ...normalizedItems]
       })
-      const normalizedItems = items.map((item: VideoPlanItem) => {
+      if (isDev) {
+        console.log(`[VideoPlanning] ✓ Loaded ${items.length} plan items for plan ${planId}`)
+      }
+      if (items.length === 0) {
+        console.warn(`[VideoPlanning] ⚠️ No plan items found for plan ${planId}. Plan might not have items created yet.`)
+      }
+    } catch (error: any) {
+      console.error('Failed to load plan items:', error)
+      console.error('Plan items request failed:', {
+        message: error.message,
+        status: error.response?.status,
+        planId,
+      })
+    }
+  }
+
+  const normalizePlanItems = (items: VideoPlanItem[]): VideoPlanItem[] => {
+    return items.map((item: VideoPlanItem) => {
         const normalizedItemStatus = normalizeStatusValue(item.status) as VideoPlanItem['status']
         const normalizedScriptStatus = normalizeStatusValue(item.script_status) as VideoPlanItem['script_status']
         const normalizedVideoStatus = normalizeStatusValue(item.videos?.status)
         const hasVideoFailure = ['failed', 'error'].includes(normalizedVideoStatus || '')
         const hasItemFailure = Boolean(item.error_message)
-        const status = (hasVideoFailure || hasItemFailure)
+        const status = ((hasVideoFailure || hasItemFailure)
           ? 'failed'
           : (item.video_id && normalizedVideoStatus
             ? normalizedVideoStatus
-            : normalizedItemStatus)
+            : normalizedItemStatus)) as VideoPlanItem['status']
 
         return {
           ...item,
@@ -454,34 +623,21 @@ export function VideoPlanning() {
             : item.videos,
         }
       })
-      setPlanItems(normalizedItems)
-      console.log(`[VideoPlanning] ✓ Loaded ${items.length} plan items for plan ${planId}`)
-      if (items.length > 0) {
-        console.log(`[VideoPlanning] Sample items:`, items.slice(0, 5).map((item: VideoPlanItem) => ({
-          id: item.id,
-          date: item.scheduled_date,
-          dateType: typeof item.scheduled_date,
-          time: item.scheduled_time,
-          topic: item.topic,
-          status: item.status
-        })))
-        // Log date range
-        const dates = items.map((item: VideoPlanItem) => item.scheduled_date).filter(Boolean)
-        if (dates.length > 0) {
-          const sortedDates = [...new Set(dates)].sort()
-          console.log(`[VideoPlanning] Date range: ${sortedDates[0]} to ${sortedDates[sortedDates.length - 1]} (${sortedDates.length} unique dates)`)
-          console.log(`[VideoPlanning] All dates:`, sortedDates.slice(0, 10))
-        }
-      } else {
-        console.warn(`[VideoPlanning] ⚠️ No plan items found for plan ${planId}. Plan might not have items created yet.`)
-      }
-    } catch (error: any) {
-      console.error('Failed to load plan items:', error)
-      console.error('Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      })
+  }
+
+  const loadAllPlanItems = async (plansToLoad: VideoPlan[]) => {
+    if (!plansToLoad.length) {
+      setCalendarPlanItems([])
+      return
+    }
+
+    try {
+      const planResponses = await Promise.all(plansToLoad.map((plan) => api.get(`/api/plans/${plan.id}`)))
+      const allItems = planResponses.flatMap((response) => response.data.items || [])
+      const normalizedItems = normalizePlanItems(allItems)
+      setCalendarPlanItems(normalizedItems)
+    } catch (error) {
+      console.error('Failed to load all plan items for calendar:', error)
     }
   }
 
@@ -495,7 +651,9 @@ export function VideoPlanning() {
         status: normalizeStatusValue(post.status) as ScheduledPost['status'],
       }))
       setScheduledPosts(normalizedPosts)
-      console.log(`[VideoPlanning] Loaded ${posts.length} scheduled posts`)
+      if (isDev) {
+        console.log(`[VideoPlanning] Loaded ${posts.length} scheduled posts`)
+      }
     } catch (error) {
       console.error('Failed to load scheduled posts:', error)
     }
@@ -564,6 +722,16 @@ export function VideoPlanning() {
       return
     }
 
+    const { normalizedTimes, adjusted } = normalizeTimesWithMinimumGap(videoTimes, MIN_VIDEO_TIME_GAP_MINUTES)
+    if (adjusted) {
+      setVideoTimes(normalizedTimes)
+      addNotification({
+        type: 'warning',
+        title: 'Posting times auto-adjusted',
+        message: `Some videos were too close together. Applied a ${MIN_VIDEO_TIME_GAP_MINUTES}-minute minimum gap to prevent overlaps.`,
+      })
+    }
+
     setCreating(true)
     try {
       const response = await api.post('/api/plans', {
@@ -580,7 +748,7 @@ export function VideoPlanning() {
           defaultPlatforms.length > 0 ? defaultPlatforms : null,
         auto_approve: true,
         auto_create: true,
-        video_times: videoTimes.map((time: string) => {
+        video_times: normalizedTimes.map((time: string) => {
           // Ensure time is in HH:MM format (remove :00 if present, then add it back)
           const cleanTime = time.replace(/:00$/, '')
           return cleanTime.length === 5 ? cleanTime : time
@@ -589,13 +757,14 @@ export function VideoPlanning() {
         // Avatars removed - using AI video generation
       })
 
-      console.log(`[VideoPlanning] Plan creation response:`, {
-        plan: response.data.plan,
-        items: response.data.items,
-        itemsCount: response.data.itemsCount ?? response.data.items?.length ?? 0,
-        hasItems: response.data.hasItems ?? (!!response.data.items && response.data.items.length > 0),
-        warning: response.data.warning
-      })
+      if (isDev) {
+        console.log(`[VideoPlanning] Plan creation metadata:`, {
+          planId: response.data.plan?.id,
+          itemsCount: response.data.itemsCount ?? response.data.items?.length ?? 0,
+          hasItems: response.data.hasItems ?? (!!response.data.items && response.data.items.length > 0),
+          warning: response.data.warning,
+        })
+      }
 
       // Show warning if items generation had issues
       if (response.data.warning) {
@@ -603,8 +772,8 @@ export function VideoPlanning() {
         // You could show a toast notification here if you have a toast system
       }
 
-    setPlans([response.data.plan, ...plans])
-    setSelectedPlan(response.data.plan)
+      setPlans([response.data.plan, ...plans])
+      setSelectedPlan(response.data.plan)
 
       // Navigate to plan start date
       if (response.data.plan.start_date) {
@@ -622,21 +791,25 @@ export function VideoPlanning() {
 
       if (hasItems && response.data.items && Array.isArray(response.data.items) && response.data.items.length > 0) {
         setPlanItems(response.data.items)
-        console.log(`[VideoPlanning] ✓ Plan created with ${itemsCount} items`)
+        if (isDev) {
+          console.log(`[VideoPlanning] ✓ Plan created with ${itemsCount} items`)
+        }
       } else {
-        console.warn(`[VideoPlanning] ⚠️ Plan created but no items in response (itemsCount: ${itemsCount}, hasItems: ${hasItems}). Items array:`, response.data.items)
+        console.warn(`[VideoPlanning] ⚠️ Plan created but no items in response (itemsCount: ${itemsCount}, hasItems: ${hasItems})`)
         if (response.data.warning) {
           console.warn(`[VideoPlanning] Server warning: ${response.data.warning}`)
         }
         // Wait a bit then try to load items (might be async creation or items were created but not returned)
         setTimeout(async () => {
-          console.log(`[VideoPlanning] Attempting to load items for plan ${response.data.plan.id}...`)
+          if (isDev) {
+            console.log(`[VideoPlanning] Attempting to load items for plan ${response.data.plan.id}...`)
+          }
           await loadPlanItems(response.data.plan.id)
         }, 1000)
       }
       setCreateModal(false)
       setPlanName('')
-      setStartDate(new Date().toISOString().split('T')[0])
+      setStartDate(getLocalDateYMD())
       setEndDate('')
       // Avatar state reset removed - using AI video generation
       setTriggerTime('08:00')
@@ -726,6 +899,16 @@ export function VideoPlanning() {
       return
     }
 
+    const { normalizedTimes, adjusted } = normalizeTimesWithMinimumGap(videoTimes, MIN_VIDEO_TIME_GAP_MINUTES)
+    if (adjusted) {
+      setVideoTimes(normalizedTimes)
+      addNotification({
+        type: 'warning',
+        title: 'Posting times auto-adjusted',
+        message: `Some videos were too close together. Applied a ${MIN_VIDEO_TIME_GAP_MINUTES}-minute minimum gap to prevent overlaps.`,
+      })
+    }
+
     setEditingPlan(true)
     try {
       await api.patch(`/api/plans/${editPlanModal.id}`, {
@@ -742,6 +925,7 @@ export function VideoPlanning() {
         auto_approve: true,
         auto_create: true,
         timezone: timezone,
+        video_times: normalizedTimes,
       })
 
       // Reload plans to get updated data
@@ -749,7 +933,7 @@ export function VideoPlanning() {
       setEditPlanModal(null)
       // Reset form
       setPlanName('')
-      setStartDate(new Date().toISOString().split('T')[0])
+      setStartDate(getLocalDateYMD())
       setEndDate('')
       setTriggerTime('08:00')
       setDefaultPlatforms([])
@@ -784,6 +968,15 @@ export function VideoPlanning() {
 
 
 
+  const getDefaultSelectedPlatforms = (item?: VideoPlanItem) => {
+    if (item?.platforms?.length) return item.platforms
+    if (selectedPlan?.default_platforms?.length) return selectedPlan.default_platforms
+
+    return socialAccounts
+      .filter((acc: SocialAccount) => acc.status === 'connected')
+      .map((acc: SocialAccount) => acc.platform)
+  }
+
   const handleEditItem = (item: VideoPlanItem) => {
     setEditingItem(item)
     setEditForm({
@@ -793,7 +986,7 @@ export function VideoPlanning() {
       why_important: item.why_important || '',
       useful_tips: item.useful_tips || '',
       caption: item.caption || '',
-      platforms: item.platforms || [],
+      platforms: getDefaultSelectedPlatforms(item),
     })
   }
 
@@ -803,7 +996,7 @@ export function VideoPlanning() {
 
   const handleSaveItem = async () => {
     const targetItem = editingItem || selectedItem
-    if (!targetItem || !selectedPlan) return
+    if (!targetItem) return
 
     try {
       await api.patch(`/api/plans/items/${targetItem.id}`, {
@@ -822,7 +1015,7 @@ export function VideoPlanning() {
       }
 
       setEditingItem(null)
-      loadPlanItems(selectedPlan.id)
+      await loadPlanItems(targetItem.plan_id)
     } catch (error: any) {
       alert(error.response?.data?.error || t('video_planning.update_item_failed'))
     }
@@ -841,7 +1034,7 @@ export function VideoPlanning() {
 
   // Filter items by status (for plan items only, scheduled posts are shown separately)
   const filteredItems = useMemo(() => {
-    if (statusFilter === 'all') return planItems
+    if (statusFilter === 'all') return calendarPlanItems
     if (statusFilter === 'active') {
       const activeStatuses = [
         'pending',
@@ -851,18 +1044,18 @@ export function VideoPlanning() {
         'approved',
         'scheduled',
       ]
-      return planItems.filter((item: VideoPlanItem) => activeStatuses.includes(item.status))
+      return calendarPlanItems.filter((item: VideoPlanItem) => activeStatuses.includes(item.status))
     }
     if (statusFilter === 'completed') {
-      return planItems.filter(
+      return calendarPlanItems.filter(
         (item: VideoPlanItem) => item.status === 'completed' || item.status === 'posted',
       )
     }
     if (statusFilter === 'failed') {
-      return planItems.filter((item: VideoPlanItem) => item.status === 'failed')
+      return calendarPlanItems.filter((item: VideoPlanItem) => item.status === 'failed')
     }
-    return planItems.filter((item: VideoPlanItem) => item.status === statusFilter)
-  }, [planItems, statusFilter])
+    return calendarPlanItems.filter((item: VideoPlanItem) => item.status === statusFilter)
+  }, [calendarPlanItems, statusFilter])
 
   // Filter scheduled posts by status
   const filteredPosts =
@@ -895,7 +1088,9 @@ export function VideoPlanning() {
       const day = String(date.getDate()).padStart(2, '0')
       return `${year}-${month}-${day}`
     } catch (e) {
-      console.warn(`[VideoPlanning] Failed to parse date: ${dateStr}`)
+      if (isDev) {
+        console.warn(`[VideoPlanning] Failed to parse date: ${dateStr}`)
+      }
       return ''
     }
   }
@@ -907,7 +1102,9 @@ export function VideoPlanning() {
         // Database returns scheduled_date as YYYY-MM-DD string, use it directly
         const dateKey = normalizeDate(item.scheduled_date)
         if (!dateKey) {
-          console.warn(`[VideoPlanning] Item ${item.id} has invalid scheduled_date:`, item.scheduled_date)
+          if (isDev) {
+            console.warn(`[VideoPlanning] Item ${item.id} has invalid scheduled_date`)
+          }
           return acc
         }
         if (!acc[dateKey]) acc[dateKey] = []
@@ -920,11 +1117,12 @@ export function VideoPlanning() {
     // Debug logging (only log once when items change)
     if (Object.keys(grouped).length > 0 && filteredItems.length > 0) {
       const dateKeys = Object.keys(grouped).sort()
-      console.log(`[VideoPlanning] Grouped ${filteredItems.length} items into ${dateKeys.length} dates`, {
-        firstDate: dateKeys[0],
-        lastDate: dateKeys[dateKeys.length - 1],
-        sampleDates: dateKeys.slice(0, 3).map(d => ({ date: d, count: grouped[d].length }))
-      })
+      if (isDev) {
+        console.log(`[VideoPlanning] Grouped ${filteredItems.length} items into ${dateKeys.length} dates`, {
+          firstDate: dateKeys[0],
+          lastDate: dateKeys[dateKeys.length - 1],
+        })
+      }
     }
 
     return grouped
@@ -932,24 +1130,18 @@ export function VideoPlanning() {
 
   // Debug warning if items exist but none are grouped
   useEffect(() => {
-    if (planItems.length > 0 && Object.keys(planItemsByDate).length === 0) {
-      console.warn(`[VideoPlanning] WARNING: ${planItems.length} items but none grouped!`, {
-        sampleItems: planItems.slice(0, 3).map(item => ({
-          id: item.id,
-          scheduled_date: item.scheduled_date,
-          normalized: normalizeDate(item.scheduled_date),
-          status: item.status
-        }))
-      })
+    if (isDev && planItems.length > 0 && Object.keys(planItemsByDate).length === 0) {
+      console.warn(`[VideoPlanning] WARNING: ${planItems.length} items but none grouped!`)
     }
-  }, [planItems, planItemsByDate])
+  }, [isDev, planItems, planItemsByDate])
 
   // Group scheduled posts by date (using filtered posts)
   const postsByDate = useMemo(() => {
     return filteredPosts.reduce(
       (acc, post: ScheduledPost) => {
-        if (!post.scheduled_time) return acc
-        const date = new Date(post.scheduled_time)
+        const anchorDate = post.scheduled_time || post.posted_at
+        if (!anchorDate) return acc
+        const date = new Date(anchorDate)
         const dateKey = getDateKey(date)
         if (!dateKey) return acc
         if (!acc[dateKey]) acc[dateKey] = []
@@ -966,13 +1158,28 @@ export function VideoPlanning() {
   )
 
   // Combine plan items and scheduled posts by date
-  type CalendarItem = VideoPlanItem | (ScheduledPost & { _isScheduledPost: true; scheduled_date: string; topic: string })
+  type CalendarItem = VideoPlanItem | ScheduledPostGroup
   const itemsByDate = useMemo(() => {
     const combined: Record<string, CalendarItem[]> = {}
 
+    const postedVideoIdsByDate = new Map<string, Set<string>>()
+    Object.entries(postsByDate).forEach(([date, posts]) => {
+      posts.forEach((post) => {
+        if (!post.video_id) return
+        if (!postedVideoIdsByDate.has(date)) {
+          postedVideoIdsByDate.set(date, new Set())
+        }
+        postedVideoIdsByDate.get(date)?.add(post.video_id)
+      })
+    })
+
     // Add plan items
     Object.keys(planItemsByDate).forEach(date => {
-      combined[date] = [...(planItemsByDate[date] || [])]
+      const scheduledPostVideoIds = postedVideoIdsByDate.get(date)
+      combined[date] = (planItemsByDate[date] || []).filter((item) => {
+        if (!item.video_id) return true
+        return !scheduledPostVideoIds?.has(item.video_id)
+      })
     })
 
     // Add scheduled posts
@@ -980,13 +1187,47 @@ export function VideoPlanning() {
       if (!combined[date]) {
         combined[date] = []
       }
-      // Add scheduled posts to the date, marking them as posts
-      postsByDate[date].forEach((post: ScheduledPost) => {
+      const groupedByVideo = postsByDate[date].reduce((acc, post: ScheduledPost) => {
+        if (!acc[post.video_id]) {
+          acc[post.video_id] = []
+        }
+        acc[post.video_id].push(post)
+        return acc
+      }, {} as Record<string, ScheduledPost[]>)
+
+      Object.values(groupedByVideo).forEach((posts) => {
+        const firstPost = posts[0]
+        const postedTimes = posts
+          .map((post) => post.posted_at)
+          .filter((value): value is string => Boolean(value))
+
+        const failedCount = posts.filter((post) => post.status === 'failed').length
+        const postedCount = posts.filter((post) => post.status === 'posted').length
+        const pendingCount = posts.filter((post) => post.status === 'pending' || post.status === 'scheduled').length
+
+        const groupedStatus: ScheduledPostGroup['status'] = pendingCount > 0
+          ? 'scheduled'
+          : postedCount > 0 && failedCount === 0
+            ? 'posted'
+            : failedCount > 0 && postedCount === 0
+              ? 'failed'
+              : 'scheduled'
+
         combined[date].push({
-          ...post,
-          _isScheduledPost: true,
-          scheduled_date: date, // Add scheduled_date for compatibility
-          topic: post.videos?.topic || 'Scheduled Post',
+          _isScheduledPostGroup: true,
+          id: `post-group-${firstPost.video_id}-${date}`,
+          video_id: firstPost.video_id,
+          scheduled_date: date,
+          scheduled_time: firstPost.scheduled_time,
+          posted_at: postedTimes.length > 0 ? postedTimes.sort()[postedTimes.length - 1] || null : firstPost.posted_at,
+          status: groupedStatus,
+          caption: firstPost.caption || null,
+          videos: firstPost.videos,
+          platforms: posts.map((post) => ({
+            platform: post.platform,
+            status: post.status,
+            error_message: post.error_message,
+          })),
         })
       })
     })
@@ -1019,16 +1260,128 @@ export function VideoPlanning() {
     return date.toLocaleDateString(language === 'ru' ? 'ru-RU' : language === 'uk' ? 'uk-UA' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US', { month: 'long', year: 'numeric' })
   }
 
-  const navigateMonth = (direction: 'prev' | 'next') => {
+
+
+
+  const getStartOfWeek = (date: Date) => {
+    const start = new Date(date)
+    start.setHours(0, 0, 0, 0)
+    start.setDate(start.getDate() - start.getDay())
+    return start
+  }
+
+  const weekDays = useMemo(() => {
+    const start = getStartOfWeek(currentMonth)
+    return Array.from({ length: 7 }, (_, index) => {
+      const day = new Date(start)
+      day.setDate(start.getDate() + index)
+      return day
+    })
+  }, [currentMonth])
+
+  const formatWeekRange = (days: Date[]) => {
+    if (!days.length) return ''
+    const start = days[0]
+    const end = days[days.length - 1]
+    const locale = language === 'ru' ? 'ru-RU' : language === 'uk' ? 'uk-UA' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US'
+    const startMonth = start.toLocaleDateString(locale, { month: 'short' })
+    const endMonth = end.toLocaleDateString(locale, { month: 'short' })
+    const year = end.getFullYear()
+    return `${startMonth} ${start.getDate()} – ${endMonth} ${end.getDate()}, ${year}`
+  }
+
+  const timelineHours = useMemo(
+    () => Array.from(
+      { length: WEEK_TIMELINE_END_HOUR - WEEK_TIMELINE_START_HOUR + 1 },
+      (_, index) => WEEK_TIMELINE_START_HOUR + index,
+    ),
+    [],
+  )
+
+  const getTimeLabel = (hour: number) => `${String(hour).padStart(2, '0')}:00`
+
+  const getLocalTimeFromIso = (value: string | null | undefined): string => {
+    if (!value) return '00:00'
+
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return '00:00'
+
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    return `${hours}:${minutes}`
+  }
+
+  const getTimelineItemsForDate = (dateItems: CalendarItem[]) => {
+    const datedItems = dateItems
+      .filter((item) => {
+        const itemTime = isScheduledPost(item) ? item.scheduled_time || item.posted_at : item.scheduled_time
+        return Boolean(itemTime)
+      })
+      .map((item, index) => {
+        const fallbackTitle = `Video ${index + 1}`
+        const isPost = isScheduledPost(item)
+        const title = isPost
+          ? getReadableVideoTitle(item.videos?.topic, 'Auto') || fallbackTitle
+          : getReadableVideoTitle(item.topic, item.video_id ? 'Auto' : 'AI') || fallbackTitle
+        const rawTime = isPost ? item.scheduled_time || item.posted_at : item.scheduled_time
+
+        if (!rawTime) return null
+
+        const parsedTime = isPost
+          ? getLocalTimeFromIso(rawTime)
+          : rawTime.substring(0, 5)
+
+        const [hoursPart, minutesPart] = parsedTime.split(':').map(Number)
+        if (Number.isNaN(hoursPart) || Number.isNaN(minutesPart)) return null
+
+        const minutesFromStart = (hoursPart - WEEK_TIMELINE_START_HOUR) * 60 + minutesPart
+        if (minutesFromStart < 0 || hoursPart > WEEK_TIMELINE_END_HOUR) return null
+
+        return {
+          id: item.id,
+          top: (minutesFromStart / 60) * WEEK_TIMELINE_ROW_HEIGHT,
+          timeLabel: parsedTime,
+          title,
+        }
+      })
+      .filter((item): item is { id: string; top: number; timeLabel: string; title: string } => Boolean(item))
+
+    return datedItems
+  }
+
+  const navigateCalendar = (direction: 'prev' | 'next') => {
     setCurrentMonth((prev: Date) => {
       const newDate = new Date(prev)
-      if (direction === 'prev') {
-        newDate.setMonth(prev.getMonth() - 1)
+      if (calendarView === 'week') {
+        newDate.setDate(prev.getDate() + (direction === 'prev' ? -7 : 7))
       } else {
-        newDate.setMonth(prev.getMonth() + 1)
+        newDate.setMonth(prev.getMonth() + (direction === 'prev' ? -1 : 1))
       }
       return newDate
     })
+  }
+
+  const movePlanItemToDate = async (itemId: string, dateKey: string) => {
+    try {
+      await api.put(`/api/plans/items/${itemId}`, { scheduled_date: dateKey })
+      if (selectedPlan) {
+        await loadPlanItems(selectedPlan.id)
+      } else {
+        await loadAllPlanItems(plans)
+      }
+      addNotification({
+        type: 'success',
+        title: 'Schedule updated',
+        message: `Moved item to ${new Date(dateKey).toLocaleDateString()}`,
+      })
+    } catch (error) {
+      console.error('Failed to move plan item:', error)
+      addNotification({
+        type: 'error',
+        title: 'Could not move item',
+        message: 'Please try again.',
+      })
+    }
   }
 
   const getItemsForDate = (date: Date | null) => {
@@ -1038,8 +1391,8 @@ export function VideoPlanning() {
   }
 
   // Helper to check if an item is a scheduled post
-  const isScheduledPost = (item: CalendarItem): item is ScheduledPost & { _isScheduledPost: true; scheduled_date: string; topic: string } => {
-    return '_isScheduledPost' in item && (item as any)._isScheduledPost === true
+  const isScheduledPost = (item: CalendarItem): item is ScheduledPostGroup => {
+    return '_isScheduledPostGroup' in item && item._isScheduledPostGroup === true
   }
 
 
@@ -1052,7 +1405,7 @@ export function VideoPlanning() {
       why_important: item.why_important || '',
       useful_tips: item.useful_tips || '',
       caption: item.caption || '',
-      platforms: item.platforms || [],
+      platforms: getDefaultSelectedPlatforms(item),
     })
     setIsDetailDrawerOpen(true)
   }
@@ -1069,13 +1422,13 @@ export function VideoPlanning() {
     const postedCount = scheduledPosts.filter((p: ScheduledPost) => p.status === 'posted').length
 
     return {
-      all: planItems.length + scheduledPosts.length,
-      pending: planItems.filter((i: VideoPlanItem) => i.status === 'pending').length + scheduledCount,
-      ready: planItems.filter((i: VideoPlanItem) => i.status === 'ready').length,
-      completed: planItems.filter((i: VideoPlanItem) => i.status === 'completed').length,
-      scheduled: planItems.filter((i: VideoPlanItem) => i.status === 'scheduled').length + scheduledCount,
-      posted: planItems.filter((i: VideoPlanItem) => i.status === 'posted').length + postedCount,
-      failed: planItems.filter((i: VideoPlanItem) => i.status === 'failed').length + scheduledPosts.filter((p: ScheduledPost) => p.status === 'failed').length,
+      all: calendarPlanItems.length + scheduledPosts.length,
+      pending: calendarPlanItems.filter((i: VideoPlanItem) => i.status === 'pending').length + scheduledCount,
+      ready: calendarPlanItems.filter((i: VideoPlanItem) => i.status === 'ready').length,
+      completed: calendarPlanItems.filter((i: VideoPlanItem) => i.status === 'completed').length,
+      scheduled: calendarPlanItems.filter((i: VideoPlanItem) => i.status === 'scheduled').length + scheduledCount,
+      posted: calendarPlanItems.filter((i: VideoPlanItem) => i.status === 'posted').length + postedCount,
+      failed: calendarPlanItems.filter((i: VideoPlanItem) => i.status === 'failed').length + scheduledPosts.filter((p: ScheduledPost) => p.status === 'failed').length,
     }
   }
 
@@ -1131,7 +1484,7 @@ export function VideoPlanning() {
         variant = 'warning';
         break;
       case 'researching':
-        label = t('video_planning.gathering_research');
+        label = t('video_planning.generating_video');
         variant = 'info';
         showLoader = true;
         break;
@@ -1209,23 +1562,43 @@ export function VideoPlanning() {
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-              {t('video_planning.title')}
+              {t('common.content_studio')}
             </p>
             <h1 className="text-3xl font-semibold text-primary">
-              {t('video_planning.page_title')}
+              Content Calendar
             </h1>
             <p className="text-sm text-slate-500">
-              {t('video_planning.subtitle')}
+              Calendar view of all posted, planned, and upcoming videos.
             </p>
           </div>
-          <Button
-            onClick={() => setCreateModal(true)}
-            leftIcon={<Plus className="h-4 w-4" />}
-            className="w-full md:w-auto"
-            disabled={showUpgrade}
-          >
-            {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : t('video_planning.new_plan')}
-          </Button>
+          <div className="flex w-full items-center gap-2 sm:justify-end md:w-auto">
+            <Button
+              onClick={() => setUploadPlanModal(true)}
+              leftIcon={<Upload className="h-4 w-4" />}
+              variant="secondary"
+              className="w-full sm:w-auto min-h-[44px] px-5"
+              disabled={showUpgrade}
+            >
+              {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : 'Upload video'}
+            </Button>
+            <Button
+              onClick={() => setGenerateVideoModalOpen(true)}
+              leftIcon={<Plus className="h-4 w-4" />}
+              className="w-full sm:w-auto min-h-[44px] px-5 shadow-md shadow-brand-500/20"
+              disabled={showUpgrade}
+            >
+              {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : 'Generate AI video'}
+            </Button>
+            <Button
+              onClick={() => setCreateModal(true)}
+              leftIcon={<Sparkles className="h-4 w-4" />}
+              variant="secondary"
+              className="w-full sm:w-auto min-h-[44px] px-5"
+              disabled={showUpgrade}
+            >
+              {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : 'Create automation'}
+            </Button>
+          </div>
         </div>
 
         {/* Content Variety Metrics */}
@@ -1333,7 +1706,7 @@ export function VideoPlanning() {
         <CreditBanner />
 
         {/* Plan Items Calendar View */}
-        {selectedPlan ? (
+        {(
           <div className="space-y-6">
             {/* Status Summary and Filters */}
             <Card className="p-4">
@@ -1428,64 +1801,135 @@ export function VideoPlanning() {
 
             {/* Calendar Grid */}
             <Card className="p-6">
-              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-xl font-semibold text-primary text-center sm:text-left">
-                  {formatMonthYear(currentMonth)}
+                  {calendarView === 'week' ? formatWeekRange(weekDays) : formatMonthYear(currentMonth)}
                 </h2>
-                <div className="flex justify-center gap-2">
+                <div className="flex items-center justify-center gap-2">
                   <Button
-                    variant="ghost"
+                    variant={calendarView === 'week' ? 'primary' : 'ghost'}
                     size="sm"
-                    onClick={() => navigateMonth('prev')}
-                    className="flex-1 sm:flex-none"
+                    onClick={() => setCalendarView('week')}
                   >
-                    ← {t('video_planning.prev')}
+                    Week (Timeline)
                   </Button>
                   <Button
-                    variant="ghost"
+                    variant={calendarView === 'month' ? 'primary' : 'ghost'}
                     size="sm"
-                    onClick={() => setCurrentMonth(new Date())}
-                    className="flex-1 sm:flex-none"
+                    onClick={() => setCalendarView('month')}
                   >
-                    {t('video_planning.today')}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigateMonth('next')}
-                    className="flex-1 sm:flex-none"
-                  >
-                    {t('video_planning.next')} →
+                    Month
                   </Button>
                 </div>
               </div>
 
-              {/* Calendar Grid */}
-              <div className="grid grid-cols-7 gap-2">
-                {/* Day Headers */}
-                {[
-                  { key: 'sun', label: 'Sun' },
-                  { key: 'mon', label: 'Mon' },
-                  { key: 'tue', label: 'Tue' },
-                  { key: 'wed', label: 'Wed' },
-                  { key: 'thu', label: 'Thu' },
-                  { key: 'fri', label: 'Fri' },
-                  { key: 'sat', label: 'Sat' },
-                ].map((day) => (
-                  <div
-                    key={day.key}
-                    className="p-2 text-center text-xs font-semibold text-slate-500"
-                  >
-                    {t(`video_planning.${day.key}`)}
-                  </div>
-                ))}
+              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-slate-500">Overall calendar for your full content plan: uploads, AI videos, scheduled, and posted.</p>
+                <div className="flex justify-center gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => navigateCalendar('prev')} className="flex-1 sm:flex-none">← {t('video_planning.prev')}</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setCurrentMonth(new Date())} className="flex-1 sm:flex-none">{t('video_planning.today')}</Button>
+                  <Button variant="ghost" size="sm" onClick={() => navigateCalendar('next')} className="flex-1 sm:flex-none">{t('video_planning.next')} →</Button>
+                </div>
+              </div>
 
-                {/* Calendar Days */}
-                {getDaysInMonth(currentMonth).map((date, index) => {
+              {calendarView === 'week' ? (
+                <div className="overflow-x-auto rounded-lg border border-slate-200">
+                  <div className="grid min-w-[860px]" style={{ gridTemplateColumns: '84px repeat(7, minmax(0, 1fr))' }}>
+                    <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Time
+                    </div>
+                    {weekDays.map((day) => {
+                      const dayKey = getDateKey(day)
+                      const isToday = dayKey === getDateKey(new Date())
+                      const isSelected = dayKey === selectedDate
+                      return (
+                        <button
+                          key={dayKey}
+                          onClick={() => {
+                            setSelectedDate(dayKey)
+                            setIsDetailDrawerOpen(true)
+                          }}
+                          className={`border-b border-r border-slate-200 px-2 py-2 text-center transition ${isSelected
+                            ? 'bg-brand-50 text-brand-700'
+                            : isToday
+                              ? 'bg-brand-50/60 text-brand-700'
+                              : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                            }`}
+                        >
+                          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            {day.toLocaleDateString('en-US', { weekday: 'short' })}
+                          </div>
+                          <div className="text-sm font-semibold">{day.getDate()}</div>
+                        </button>
+                      )
+                    })}
+
+                    <div className="relative border-r border-slate-200 bg-slate-50" style={{ height: timelineHours.length * WEEK_TIMELINE_ROW_HEIGHT }}>
+                      {timelineHours.map((hour, hourIndex) => (
+                        <div
+                          key={hour}
+                          className="absolute left-0 right-0 border-b border-slate-200 px-3 text-xs text-slate-500"
+                          style={{ top: hourIndex * WEEK_TIMELINE_ROW_HEIGHT, height: WEEK_TIMELINE_ROW_HEIGHT }}
+                        >
+                          <span className="relative -top-2 inline-block bg-slate-50 pr-1">{getTimeLabel(hour)}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {weekDays.map((date) => {
+                      const dateKey = getDateKey(date)
+                      const items = getItemsForDate(date)
+                      const timelineItems = getTimelineItemsForDate(items)
+                      return (
+                        <div
+                          key={dateKey}
+                          className="relative border-r border-slate-200 bg-white"
+                          onDragOver={(event) => {
+                            if (!draggingItemId) return
+                            event.preventDefault()
+                          }}
+                          onDrop={async (event) => {
+                            event.preventDefault()
+                            if (!draggingItemId) return
+                            await movePlanItemToDate(draggingItemId, dateKey)
+                            setDraggingItemId(null)
+                          }}
+                          style={{ height: timelineHours.length * WEEK_TIMELINE_ROW_HEIGHT }}
+                        >
+                          {timelineHours.map((hour, hourIndex) => (
+                            <div
+                              key={`${dateKey}-${hour}`}
+                              className="absolute inset-x-0 border-b border-slate-100"
+                              style={{ top: hourIndex * WEEK_TIMELINE_ROW_HEIGHT, height: WEEK_TIMELINE_ROW_HEIGHT }}
+                            />
+                          ))}
+
+                          {timelineItems.map((item) => (
+                            <div
+                              key={item.id}
+                              className="absolute left-1 right-1 z-10 rounded-md border border-brand-200 bg-brand-50 px-2 py-1 text-xs shadow-sm"
+                              style={{ top: item.top + 4, minHeight: 42 }}
+                              title={`${item.timeLabel} - ${item.title}`}
+                            >
+                              <div className="font-semibold text-brand-700">{item.timeLabel}</div>
+                              <div className="truncate text-slate-700">{item.title}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-7 gap-2">
+                  {[{ key: 'sun' }, { key: 'mon' }, { key: 'tue' }, { key: 'wed' }, { key: 'thu' }, { key: 'fri' }, { key: 'sat' }].map((day) => (
+                    <div key={day.key} className="p-2 text-center text-xs font-semibold text-slate-500">{t(`video_planning.${day.key}`)}</div>
+                  ))}
+
+                  {getDaysInMonth(currentMonth).map((date, index) => {
                   const dateKey = getDateKey(date)
                   const items = getItemsForDate(date)
-                  const isToday =
-                    date && dateKey === getDateKey(new Date())
+                  const isToday = date && dateKey === getDateKey(new Date())
                   const isSelected = date && dateKey === selectedDate
 
                   return (
@@ -1496,7 +1940,17 @@ export function VideoPlanning() {
                         setSelectedDate(dateKey)
                         setIsDetailDrawerOpen(true)
                       }}
-                      className={`min-h-[120px] rounded-lg border p-2 text-left transition relative ${!date
+                      onDragOver={(event) => {
+                        if (!date || !draggingItemId) return
+                        event.preventDefault()
+                      }}
+                      onDrop={async (event) => {
+                        event.preventDefault()
+                        if (!date || !draggingItemId) return
+                        await movePlanItemToDate(draggingItemId, dateKey)
+                        setDraggingItemId(null)
+                      }}
+                      className={`min-h-[140px] rounded-lg border p-2 text-left transition relative ${!date
                         ? 'border-transparent bg-transparent cursor-default'
                         : isSelected
                           ? 'border-brand-500 bg-brand-50 shadow-md'
@@ -1509,57 +1963,31 @@ export function VideoPlanning() {
                     >
                       {date && (
                         <>
-                          <div className="flex items-center justify-between mb-1">
-                            <div
-                              className={`text-sm font-semibold ${isToday ? 'text-brand-600' : 'text-slate-700'}`}
-                            >
-                              {date.getDate()}
-                            </div>
-                            {items.length > 0 && (
-                              <div className="flex items-center gap-1">
-                                <div className="h-1.5 w-1.5 rounded-full bg-brand-500"></div>
-                                <span className="text-xs font-medium text-slate-600">
-                                  {items.length}
-                                </span>
-                              </div>
-                            )}
+                          <div className="mb-1 flex items-center justify-between">
+                            <div className={`text-sm font-semibold ${isToday ? 'text-brand-600' : 'text-slate-700'}`}>{date.getDate()}</div>
+                            {items.length > 0 && <span className="text-xs font-medium text-slate-600">{items.length}</span>}
                           </div>
                           {items.length > 0 && (
-                            <div className="mt-1 space-y-1 max-h-[88px] overflow-y-auto">
-                              {items.slice(0, 4).map((item) => {
+                            <div className="mt-1 space-y-1 max-h-[104px] overflow-y-auto">
+                              {items.slice(0, 5).map((item) => {
                                 const isPost = isScheduledPost(item)
-                                let status: string
-                                let displayTopic: string
-                                let displayTime: string
-
-                                if (isPost) {
-                                  status = normalizeStatusValue(item.status) || 'pending'
-                                  displayTopic = item.videos?.topic || `${item.platform} Post`
-                                  displayTime = item.scheduled_time
-                                    ? new Date(item.scheduled_time).toLocaleTimeString('en-US', {
-                                      hour: 'numeric',
-                                      minute: '2-digit',
-                                      hour12: true
-                                    })
-                                    : ''
-                                } else {
-                                  status = normalizeStatusValue(item.videos?.status || item.status) || 'pending'
-                                  // Show "Planned" or time if no topic, otherwise show topic
-                                  if (item.topic) {
-                                    displayTopic = item.topic
-                                  } else if (item.scheduled_time) {
-                                    displayTopic = t('video_planning.planned_with_time').replace('{time}', formatTime(item.scheduled_time))
-                                  } else {
-                                    displayTopic = t('video_planning.planned')
-                                  }
-                                  displayTime = item.scheduled_time ? formatTime(item.scheduled_time) : ''
-                                }
+                                const status = normalizeStatusValue((isPost ? item.status : item.videos?.status || item.status)) || 'pending'
+                                const displayTopic = isPost
+                                  ? getReadableVideoTitle(item.videos?.topic, 'Auto')
+                                  : getReadableVideoTitle(
+                                    item.topic || (item.scheduled_time ? t('video_planning.planned_with_time').replace('{time}', formatTime(item.scheduled_time)) : t('video_planning.planned')),
+                                    item.video_id ? 'Auto' : 'AI',
+                                  )
+                                const displayTime = isPost
+                                  ? (item.scheduled_time || item.posted_at ? new Date(item.scheduled_time || item.posted_at || '').toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '')
+                                  : (item.scheduled_time ? formatTime(item.scheduled_time) : '')
 
                                 return (
                                   <div
                                     key={item.id}
-                                    className={`truncate rounded px-1.5 py-1 text-xs border ${status === 'completed' ||
-                                      status === 'posted'
+                                    draggable={!isPost}
+                                    onDragStart={() => !isPost && setDraggingItemId(item.id)}
+                                    className={`truncate rounded px-1.5 py-1 text-xs border ${status === 'completed' || status === 'posted'
                                       ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
                                       : status === 'scheduled'
                                         ? 'bg-purple-50 border-purple-200 text-purple-800'
@@ -1575,77 +2003,27 @@ export function VideoPlanning() {
                                                   ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
                                                   : status === 'researching'
                                                     ? 'bg-cyan-50 border-cyan-200 text-cyan-800'
-                                                    : 'bg-slate-50 border-slate-200 text-slate-700'
-                                      }`}
+                                                    : 'bg-slate-50 border-slate-200 text-slate-700'}`}
                                     title={`${displayTime ? displayTime + ' - ' : ''}${displayTopic} (${status})`}
                                   >
                                     <div className="flex items-center gap-1">
-                                      {displayTime && (
-                                        <span className="text-[10px] font-medium opacity-75">
-                                          {displayTime}
-                                        </span>
-                                      )}
-                                      <span className="flex-1 truncate font-medium">
-                                        {displayTopic}
-                                      </span>
+                                      {displayTime && <span className="text-[10px] font-medium opacity-75">{displayTime}</span>}
+                                      <span className="flex-1 truncate font-medium">{displayTopic}</span>
                                     </div>
                                   </div>
                                 )
                               })}
-                              {items.length > 4 && (
-                                <div className="text-xs font-medium text-slate-500 px-1.5 py-0.5 bg-slate-100 rounded">
-                                  {t('video_planning.more_items').replace('{count}', (items.length - 4).toString())}
-                                </div>
-                              )}
+                              {items.length > 5 && <div className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-500">{t('video_planning.more_items').replace('{count}', (items.length - 5).toString())}</div>}
                             </div>
                           )}
                         </>
                       )}
                     </button>
                   )
-                })}
-              </div>
-
-              {/* Status Legend */}
-              <div className="mt-6 pt-6 border-t border-slate-200">
-                <h3 className="text-sm font-semibold text-slate-700 mb-3">
-                  {t('video_planning.status_legend')}
-                </h3>
-                <div className="flex flex-wrap gap-3 text-xs">
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded border border-yellow-200 bg-yellow-50"></div>
-                    <span className="text-slate-600">{t('video_planning.pending')}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded border border-cyan-200 bg-cyan-50"></div>
-                    <span className="text-slate-600">{t('video_planning.gathering_research')}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded border border-blue-200 bg-blue-50"></div>
-                    <span className="text-slate-600">{t('video_planning.ready')}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded border border-teal-200 bg-teal-50"></div>
-                    <span className="text-slate-600">{t('video_planning.approved')}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded border border-indigo-200 bg-indigo-50"></div>
-                    <span className="text-slate-600">{t('video_planning.generating_video')}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded border border-emerald-200 bg-emerald-50"></div>
-                    <span className="text-slate-600">{t('video_planning.published')}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded border border-purple-200 bg-purple-50"></div>
-                    <span className="text-slate-600">{t('video_planning.scheduled')}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded border border-red-200 bg-red-50"></div>
-                    <span className="text-slate-600">Failed</span>
-                  </div>
+                  })}
                 </div>
-              </div>
+              )}
+
             </Card>
 
             {/* Items for Selected Date */}
@@ -1670,14 +2048,14 @@ export function VideoPlanning() {
 
                         if (isScheduledPost(a)) {
                           // For scheduled posts, extract time from ISO string
-                          timeA = a.scheduled_time ? new Date(a.scheduled_time).toISOString().substring(11, 16) : '00:00'
+                          timeA = getLocalTimeFromIso(a.scheduled_time)
                         } else {
                           // For plan items, use scheduled_time directly (HH:MM format)
                           timeA = a.scheduled_time || '00:00'
                         }
 
                         if (isScheduledPost(b)) {
-                          timeB = b.scheduled_time ? new Date(b.scheduled_time).toISOString().substring(11, 16) : '00:00'
+                          timeB = getLocalTimeFromIso(b.scheduled_time)
                         } else {
                           timeB = b.scheduled_time || '00:00'
                         }
@@ -1688,7 +2066,8 @@ export function VideoPlanning() {
                         const isPost = isScheduledPost(item)
                         if (isPost) {
                           // Render scheduled post differently
-                          const scheduledTime = item.scheduled_time
+                          const displayTime = item.posted_at || item.scheduled_time
+                          const caption = item.caption?.trim() || item.videos?.topic?.trim() || 'No caption name'
                           return (
                             <Card
                               key={item.id}
@@ -1699,7 +2078,7 @@ export function VideoPlanning() {
                                   <div className="flex items-center gap-3">
                                     <Clock className="h-4 w-4 text-slate-400" />
                                     <span className="text-sm font-medium text-slate-600">
-                                      {scheduledTime ? new Date(scheduledTime).toLocaleTimeString(language === 'ru' ? 'ru-RU' : language === 'uk' ? 'uk-UA' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US', {
+                                      {displayTime ? new Date(displayTime).toLocaleTimeString(language === 'ru' ? 'ru-RU' : language === 'uk' ? 'uk-UA' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US', {
                                         hour: 'numeric',
                                         minute: '2-digit',
                                         hour12: true
@@ -1714,17 +2093,35 @@ export function VideoPlanning() {
                                             ? t('video_planning.failed')
                                             : item.status}
                                     </Badge>
-                                    <Badge variant="info">{item.platform}</Badge>
+                                    <div className="flex flex-wrap gap-2">
+                                      {item.platforms.map((platformPost) => {
+                                        const isSuccessful = platformPost.status === 'posted'
+                                        const isFailed = platformPost.status === 'failed'
+                                        const style = isSuccessful
+                                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                          : isFailed
+                                            ? 'border-red-200 bg-red-50 text-red-700'
+                                            : 'border-amber-200 bg-amber-50 text-amber-700'
+
+                                        return (
+                                          <span
+                                            key={`${item.id}-${platformPost.platform}`}
+                                            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${style}`}
+                                            title={platformPost.error_message || undefined}
+                                          >
+                                            {platformPost.platform}
+                                          </span>
+                                        )
+                                      })}
+                                    </div>
                                   </div>
                                   <div>
                                     <h3 className="font-semibold text-primary">
                                       {item.videos?.topic || t('video_planning.scheduled_post')}
                                     </h3>
-                                    {item.videos && (
-                                      <p className="mt-1 text-sm text-slate-600">
-                                        {t('video_planning.video_id')}: {item.video_id}
-                                      </p>
-                                    )}
+                                    <p className="mt-1 text-sm text-slate-600">
+                                      Caption: {caption}
+                                    </p>
                                   </div>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
@@ -2028,21 +2425,25 @@ export function VideoPlanning() {
                 </div>
               )}
           </div>
-        ) : (
-          <EmptyState
-            icon={<Calendar className="w-16 h-16" />}
-            title={t('video_planning.no_plans_yet')}
-            description={t('video_planning.no_plans_desc')}
-            action={
-              <Button
-                onClick={() => setCreateModal(true)}
-                leftIcon={<Plus className="h-4 w-4" />}
-              >
-                {t('video_planning.create_plan')}
-              </Button>
-            }
-          />
+
         )}
+
+        <UploadAndPlanModal
+          isOpen={uploadPlanModal}
+          onClose={() => setUploadPlanModal(false)}
+          onSuccess={handleUploadPlanSuccess}
+        />
+
+        <GenerateVideoModal
+          isOpen={generateVideoModalOpen}
+          onClose={() => setGenerateVideoModalOpen(false)}
+          onSuccess={async () => {
+            await Promise.all([
+              loadScheduledPosts(),
+              selectedPlan ? loadPlanItems(selectedPlan.id) : Promise.resolve(),
+            ])
+          }}
+        />
 
         {/* Item Detail Modal */}
         <Modal
@@ -2253,7 +2654,7 @@ export function VideoPlanning() {
           onClose={() => {
             setCreateModal(false)
             setPlanName('')
-            setStartDate(new Date().toISOString().split('T')[0])
+            setStartDate(getLocalDateYMD())
             setEndDate('')
             setTriggerTime('08:00')
             setDefaultPlatforms([])
@@ -2468,7 +2869,7 @@ export function VideoPlanning() {
             setEditPlanModal(null)
             // Reset form
             setPlanName('')
-            setStartDate(new Date().toISOString().split('T')[0])
+            setStartDate(getLocalDateYMD())
             setEndDate('')
             setTriggerTime('08:00')
             setDefaultPlatforms([])
@@ -2629,7 +3030,7 @@ export function VideoPlanning() {
                 onClick={() => {
                   setEditPlanModal(null)
                   setPlanName('')
-                  setStartDate(new Date().toISOString().split('T')[0])
+                  setStartDate(getLocalDateYMD())
                   setEndDate('')
                   setTriggerTime('08:00')
                   setDefaultPlatforms([])
@@ -2819,7 +3220,7 @@ export function VideoPlanning() {
           {selectedItem && (() => {
             // Get all items for the selected item's date
             const itemDate = selectedItem.scheduled_date
-            const itemsForDate = planItems.filter(item => item.scheduled_date === itemDate)
+            const itemsForDate = calendarPlanItems.filter(item => item.scheduled_date === itemDate)
               .sort((a, b) => {
                 // Sort by scheduled_time
                 const timeA = a.scheduled_time || '00:00'
@@ -3122,15 +3523,22 @@ export function VideoPlanning() {
                         try {
                           const response = await api.post(`/api/plans/items/${selectedItem.id}/refresh-status`)
                           if (response.data.item) {
-                            // Update the item in the planItems array
+                            // Update the item in both selected plan and calendar arrays
                             setPlanItems(prevItems =>
+                              prevItems.map(item =>
+                                item.id === selectedItem.id ? response.data.item : item
+                              )
+                            )
+                            setCalendarPlanItems(prevItems =>
                               prevItems.map(item =>
                                 item.id === selectedItem.id ? response.data.item : item
                               )
                             )
                             // Update selectedItem
                             setSelectedItem(response.data.item)
-                            console.log('[VideoPlanning] Status refreshed:', response.data.message)
+                            if (isDev) {
+                              console.log('[VideoPlanning] Status refreshed:', response.data.message)
+                            }
                           }
                         } catch (error: any) {
                           console.error('[VideoPlanning] Error refreshing status:', error)

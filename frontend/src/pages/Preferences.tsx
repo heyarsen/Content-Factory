@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
@@ -21,6 +22,11 @@ interface Preferences {
   auto_research_default: boolean
   auto_approve_default: boolean
   marketing_emails_enabled: boolean
+  social_goals: string
+  target_platforms: string[]
+  brand_voice: string
+  posting_cadence: string
+  campaign_objective: 'awareness' | 'engagement' | 'leads' | 'sales'
 }
 
 interface SocialAccount {
@@ -58,11 +64,17 @@ export function Preferences() {
     auto_research_default: true,
     auto_approve_default: false,
     marketing_emails_enabled: true,
+    social_goals: '',
+    target_platforms: [],
+    brand_voice: '',
+    posting_cadence: '3_times_week',
+    campaign_objective: 'awareness',
   })
   const [exporting, setExporting] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [draftLanguage, setDraftLanguage] = useState(language)
 
   const platformNames: Record<string, string> = {
     instagram: t('platforms.instagram'),
@@ -78,6 +90,10 @@ export function Preferences() {
     loadPreferences()
     loadSocialAccounts()
   }, [])
+
+  useEffect(() => {
+    setDraftLanguage(language)
+  }, [language])
 
   const resolveDetectedTimezone = async () => {
     const browserTimezone = normalizeTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone) || 'UTC'
@@ -108,19 +124,17 @@ export function Preferences() {
         setPreferences({
           ...storedPreferences,
           marketing_emails_enabled: storedPreferences?.marketing_emails_enabled ?? true,
+          social_goals: storedPreferences?.social_goals ?? '',
+          target_platforms: storedPreferences?.target_platforms ?? [],
+          brand_voice: storedPreferences?.brand_voice ?? '',
+          posting_cadence: storedPreferences?.posting_cadence ?? '3_times_week',
+          campaign_objective: storedPreferences?.campaign_objective ?? 'awareness',
           timezone: timezoneToApply,
         })
       } else {
         setPreferences(prev => ({ ...prev, timezone: timezoneToApply }))
       }
 
-      if (shouldApplyDetectedTimezone && timezoneToApply && normalizedStoredTimezone !== timezoneToApply) {
-        try {
-          await api.put('/api/preferences', { timezone: timezoneToApply })
-        } catch (error) {
-          console.warn('Failed to persist detected timezone:', error)
-        }
-      }
     } catch (error) {
       console.error('Failed to load preferences:', error)
       const resolvedTimezone = await resolveDetectedTimezone()
@@ -139,10 +153,13 @@ export function Preferences() {
       console.error('Failed to load social accounts:', error)
     }
   }
-
   const handleSave = async () => {
     setSaving(true)
     try {
+      if (draftLanguage !== language) {
+        setLanguage(draftLanguage as typeof language)
+      }
+
       await api.put('/api/preferences', preferences)
       toast.success(t('preferences.preferences_saved'))
     } catch (error) {
@@ -222,12 +239,18 @@ export function Preferences() {
       <div className="space-y-8">
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('common.settings')}</p>
-            <h1 className="text-3xl font-semibold text-primary">{t('preferences.title')}</h1>
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('preferences.workspace_settings')}</p>
+            <h1 className="text-3xl font-semibold text-primary">{t('preferences.workspace_preferences_title')}</h1>
             <p className="text-sm text-slate-500">
-              {t('preferences.description')}
+              {t('preferences.workspace_preferences_desc')}
             </p>
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-600">{t('preferences.you_are_in_workspace')}</span>
+              <Link to="/profile" className="rounded-full border border-brand-200 bg-brand-50 px-3 py-1 font-medium text-brand-700 transition hover:bg-brand-100">
+                {t('preferences.go_to_account_settings')}
+              </Link>
+            </div>
           </div>
           <Button onClick={handleSave} loading={saving}>
             {t('common.save')}
@@ -250,15 +273,15 @@ export function Preferences() {
             ].map((lang) => (
               <button
                 key={lang.code}
-                onClick={() => setLanguage(lang.code as any)}
-                className={`flex items-center gap-3 rounded-2xl border-2 p-4 transition-all hover:scale-[1.02] ${language === lang.code
+                onClick={() => setDraftLanguage(lang.code as typeof language)}
+                className={`flex items-center gap-3 rounded-2xl border-2 p-4 transition-all hover:scale-[1.02] ${draftLanguage === lang.code
                   ? 'border-brand-500 bg-brand-50 shadow-md'
                   : 'border-slate-100 bg-white hover:border-brand-200'
                   }`}
               >
                 <span className="text-2xl">{lang.flag}</span>
                 <div className="text-left">
-                  <p className={`text-sm font-semibold ${language === lang.code ? 'text-brand-700' : 'text-slate-700'}`}>
+                  <p className={`text-sm font-semibold ${draftLanguage === lang.code ? 'text-brand-700' : 'text-slate-700'}`}>
                     {lang.name}
                   </p>
                 </div>
@@ -286,7 +309,7 @@ export function Preferences() {
                     <span className="text-sm font-medium text-brand-700">
                       {platformNames[platform] || platform}
                     </span>
-                    <Badge variant="success">Connected</Badge>
+                    <Badge variant="success">{t('social_accounts.status_connected')}</Badge>
                   </div>
                 )
               })}
@@ -346,7 +369,7 @@ export function Preferences() {
                         ? 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                         : 'border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed'
                       }`}
-                    title={!isConnected ? 'Connect this platform in Social Accounts first' : ''}
+                    title={!isConnected ? t('preferences.connect_platform_first') : ''}
                   >
                     {platformNames[platform] || platform}
                     {preferences.default_platforms.includes(platform) && (

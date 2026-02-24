@@ -2,10 +2,46 @@ import { Router, Response } from 'express'
 import { supabase } from '../lib/supabase.js'
 import { getSupabaseClientForUser } from '../lib/supabase.js'
 import { authenticate, AuthRequest, requireSubscription } from '../middleware/auth.js'
-import { createUserProfile, generateUserAccessLink, getUserProfile } from '../lib/uploadpost.js'
+import {
+  createUserProfile,
+  generateUserAccessLink,
+  getUserProfile,
+  getInstagramDMs,
+  getAnalytics,
+  sendDirectMessage,
+  buildUploadPostLookupFromProfile,
+  getProfileAnalytics,
+} from '../lib/uploadpost.js'
 import { maybeEncryptToken } from '../lib/encryption.js'
+import { logSocialConnectionCheck } from '../lib/logger.js'
 
 const router = Router()
+
+async function resolveInstagramLookupForUser(userId: string, userToken?: string) {
+  const userSupabase = userToken ? getSupabaseClientForUser(userToken) : supabase
+
+  const { data: account, error } = await userSupabase
+    .from('social_accounts')
+    .select('platform_account_id, status')
+    .eq('user_id', userId)
+    .eq('platform', 'instagram')
+    .eq('status', 'connected')
+    .not('platform_account_id', 'is', null)
+    .order('connected_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(`Failed to load Instagram account: ${error.message}`)
+  }
+
+  if (!account?.platform_account_id) {
+    return null
+  }
+
+  const profile = await getUserProfile(account.platform_account_id)
+  return buildUploadPostLookupFromProfile(profile)
+}
 
 // Map our platform names to Upload-Post API platform names
 // Note: We use 'x' internally to match Upload-Post API (no mapping needed)
@@ -20,14 +56,10 @@ function mapPlatformToUploadPost(platform: string): string {
 // - social_accounts[platform] is null or empty string if NOT connected
 function isUploadPostPlatformConnected(profile: any, platform: string): boolean {
   if (!profile || !platform) {
-    console.log('[Connection Check] No profile or platform provided')
     return false
   }
 
   const platformLower = platform.toLowerCase()
-
-  // Log the profile structure for debugging
-  console.log('[Connection Check] Checking platform:', platform, 'Profile keys:', Object.keys(profile || {}))
 
   // Handle response structure: profile might be nested in a "profile" key
   const actualProfile = profile.profile || profile
@@ -46,20 +78,16 @@ function isUploadPostPlatformConnected(profile: any, platform: string): boolean 
       socialAccounts[uploadPostPlatformLower] ||
       socialAccounts[uploadPostPlatformName]
 
-    console.log('[Connection Check] social_accounts for platform:', platform, '(Upload-Post name:', uploadPostPlatformName, ') =', platformAccount)
-
     // If platformAccount is an object (not null, not empty string), it's connected
     if (platformAccount && typeof platformAccount === 'object') {
       // Verify it has connection data (display_name, username, etc.)
       if (platformAccount.display_name || platformAccount.username || Object.keys(platformAccount).length > 0) {
-        console.log('[Connection Check] ✓ Platform is CONNECTED. Account data:', platformAccount)
         return true
       }
     }
 
     // If platformAccount is null, empty string, or undefined, it's NOT connected
     if (platformAccount === null || platformAccount === '' || platformAccount === undefined) {
-      console.log('[Connection Check] ✗ Platform is NOT connected (null/empty)')
       return false
     }
   }
@@ -71,23 +99,53 @@ function isUploadPostPlatformConnected(profile: any, platform: string): boolean 
 
     if (platformAccount && typeof platformAccount === 'object') {
       if (platformAccount.display_name || platformAccount.username || Object.keys(platformAccount).length > 0) {
-        console.log('[Connection Check] ✓ Platform is CONNECTED (root level). Account data:', platformAccount)
         return true
       }
     }
 
     if (platformAccount === null || platformAccount === '' || platformAccount === undefined) {
-      console.log('[Connection Check] ✗ Platform is NOT connected (root level, null/empty)')
       return false
     }
   }
 
   // If we get here, social_accounts doesn't exist or platform isn't in it
-  console.log('[Connection Check] ✗ NO connection evidence found. social_accounts:',
-    actualProfile.social_accounts || profile.social_accounts || 'not found')
-  console.log('[Connection Check] Full profile structure (first 1500 chars):',
-    JSON.stringify(actualProfile || profile, null, 2).substring(0, 1500))
   return false
+}
+
+function getRequestCorrelationId(req: AuthRequest): string | undefined {
+  const requestIdHeader = req.headers['x-request-id'] || req.headers['x-correlation-id']
+
+  if (Array.isArray(requestIdHeader)) {
+    return requestIdHeader[0]
+  }
+
+  return typeof requestIdHeader === 'string' ? requestIdHeader : undefined
+}
+
+function toNullableString(value: unknown): string | null {
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value)
+  }
+
+  return null
+}
+
+function sanitizeMetadataRecord(source: Record<string, unknown>) {
+  const metadata: Record<string, string | number | boolean> = {}
+
+  Object.entries(source).forEach(([key, value]) => {
+    if (value === null || value === undefined) return
+    if (['string', 'number', 'boolean'].includes(typeof value)) {
+      metadata[key] = value as string | number | boolean
+    }
+  })
+
+  return metadata
 }
 
 // List connected accounts
@@ -124,15 +182,39 @@ router.get('/accounts', authenticate, requireSubscription, async (req: AuthReque
               socialAccounts[account.platform.toLowerCase()]
 
             if (platformAccount && typeof platformAccount === 'object') {
+              const typedPlatformAccount = platformAccount as Record<string, unknown>
+              const rawSocialImages = typedPlatformAccount.social_images
+              const socialImages = (rawSocialImages && typeof rawSocialImages === 'object')
+                ? rawSocialImages as Record<string, unknown>
+                : null
+              const socialImageUrl = typeof rawSocialImages === 'string' ? rawSocialImages : null
+
               return {
                 ...account,
                 account_info: {
-                  username: platformAccount.username || platformAccount.display_name || null,
-                  display_name: platformAccount.display_name || platformAccount.username || null,
-                  avatar_url: platformAccount.social_images?.profile_picture ||
-                    platformAccount.profile_picture ||
-                    platformAccount.avatar_url ||
+                  username: toNullableString(typedPlatformAccount.username) || toNullableString(typedPlatformAccount.handle) || null,
+                  display_name: toNullableString(typedPlatformAccount.display_name) || toNullableString(typedPlatformAccount.name) || null,
+                  avatar_url: toNullableString(socialImages?.profile_picture) ||
+                    toNullableString(socialImages?.avatar_url) ||
+                    toNullableString(socialImageUrl) ||
+                    toNullableString(typedPlatformAccount.profile_picture) ||
+                    toNullableString(typedPlatformAccount.avatar_url) ||
                     null,
+                  bio: toNullableString(typedPlatformAccount.bio),
+                  profile_url: toNullableString(typedPlatformAccount.profile_url) || toNullableString(typedPlatformAccount.url),
+                  follower_count: typeof typedPlatformAccount.follower_count === 'number'
+                    ? typedPlatformAccount.follower_count
+                    : null,
+                  following_count: typeof typedPlatformAccount.following_count === 'number'
+                    ? typedPlatformAccount.following_count
+                    : null,
+                  post_count: typeof typedPlatformAccount.post_count === 'number'
+                    ? typedPlatformAccount.post_count
+                    : null,
+                  verified: typeof typedPlatformAccount.verified === 'boolean'
+                    ? typedPlatformAccount.verified
+                    : null,
+                  metadata: sanitizeMetadataRecord(typedPlatformAccount),
                 },
               }
             }
@@ -466,9 +548,6 @@ router.post('/callback', authenticate, requireSubscription, async (req: AuthRequ
       const usernameToVerify = uploadPostAccountUsername || uploadPostUsername
       const userProfile = await getUserProfile(usernameToVerify)
 
-      // Log the full profile for debugging
-      console.log('[Callback] Full Upload-Post profile:', JSON.stringify(userProfile, null, 2))
-
       const tokenPayload: Record<string, any> = {}
       if (typeof access_token === 'string' && access_token.trim()) {
         tokenPayload.access_token = maybeEncryptToken(access_token)
@@ -489,13 +568,14 @@ router.post('/callback', authenticate, requireSubscription, async (req: AuthRequ
 
       // Check if platform is actually connected - be VERY strict about this
       const platformConnected = isUploadPostPlatformConnected(userProfile, platform)
-
-      console.log('[Callback] Platform connection check result:', platformConnected, 'for platform:', platform)
+      logSocialConnectionCheck({
+        platform,
+        connected: platformConnected,
+        requestId: getRequestCorrelationId(req),
+      })
 
       // If platform is NOT connected, update status to pending and return error
       if (!platformConnected) {
-        console.log('[Callback] Platform NOT connected. Setting status to pending.')
-
         if (existing) {
           const { error: updateError } = await userSupabase
             .from('social_accounts')
@@ -531,8 +611,6 @@ router.post('/callback', authenticate, requireSubscription, async (req: AuthRequ
           platformConnected: false,
         })
       }
-
-      console.log('[Callback] Platform IS connected. Proceeding with connection.')
 
       if (existing) {
         const { error } = await userSupabase
@@ -636,6 +714,132 @@ router.get('/accounts/:id/status', authenticate, requireSubscription, async (req
   } catch (error: any) {
     console.error('Get account status error:', error)
     res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+router.get('/instagram/dms', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const lookup = await resolveInstagramLookupForUser(userId, req.userToken)
+
+    if (!lookup) {
+      return res.status(400).json({ error: 'Connect Instagram account first to load DMs.' })
+    }
+
+    const dms = await getInstagramDMs({
+      ...lookup,
+      startDate: req.query.start_date as string | undefined,
+      endDate: req.query.end_date as string | undefined,
+      page: req.query.page ? Number(req.query.page) : undefined,
+      perPage: req.query.per_page ? Number(req.query.per_page) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
+      cursor: req.query.cursor as string | undefined,
+      platform: 'instagram',
+    })
+
+    res.json(dms)
+  } catch (error: any) {
+    console.error('Get Instagram DMs error:', error)
+    res.status(500).json({ error: error.message || 'Failed to get Instagram DMs' })
+  }
+})
+
+
+router.post('/instagram/dms/send', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const lookup = await resolveInstagramLookupForUser(userId, req.userToken)
+
+    if (!lookup) {
+      return res.status(400).json({ error: 'Connect Instagram account first to send DMs.' })
+    }
+
+    const recipientId = typeof req.body?.recipient_id === 'string' ? req.body.recipient_id.trim() : ''
+    const message = typeof req.body?.message === 'string' ? req.body.message.trim() : ''
+
+    if (!recipientId || !message) {
+      return res.status(400).json({ error: 'Missing required fields: recipient_id, message' })
+    }
+
+    const result = await sendDirectMessage({
+      ...lookup,
+      platform: 'instagram',
+      recipientId,
+      message,
+    })
+
+    return res.json(result)
+  } catch (error: any) {
+    console.error('Send Instagram DM error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to send Instagram DM' })
+  }
+})
+
+router.get('/instagram/analytics', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!
+    const lookup = await resolveInstagramLookupForUser(userId, req.userToken)
+
+    if (!lookup) {
+      return res.status(400).json({ error: 'Connect Instagram account first to load analytics.' })
+    }
+
+    const metrics = typeof req.query.metrics === 'string'
+      ? req.query.metrics.split(',').map((metric) => metric.trim()).filter(Boolean)
+      : undefined
+
+    const dimensions = typeof req.query.dimensions === 'string'
+      ? req.query.dimensions.split(',').map((dimension) => dimension.trim()).filter(Boolean)
+      : undefined
+
+    const analytics = await getAnalytics({
+      ...lookup,
+      startDate: req.query.start_date as string | undefined,
+      endDate: req.query.end_date as string | undefined,
+      page: req.query.page ? Number(req.query.page) : undefined,
+      perPage: req.query.per_page ? Number(req.query.per_page) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
+      cursor: req.query.cursor as string | undefined,
+      metrics,
+      dimensions,
+      platform: 'instagram',
+    })
+
+    res.json(analytics)
+  } catch (error: any) {
+    console.error('Get Instagram analytics error:', error)
+    res.status(500).json({ error: error.message || 'Failed to get Instagram analytics' })
+  }
+})
+
+router.get('/analytics/:profileUsername', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
+  try {
+    const profileUsername = (req.params.profileUsername || '').trim()
+    const platformsRaw = typeof req.query.platforms === 'string' ? req.query.platforms : ''
+    const platforms = platformsRaw
+      .split(',')
+      .map((platform) => platform.trim().toLowerCase())
+      .filter(Boolean)
+
+    if (!profileUsername) {
+      return res.status(400).json({ error: 'profileUsername path param is required' })
+    }
+
+    if (!platforms.length) {
+      return res.status(400).json({ error: 'platforms query param is required' })
+    }
+
+    const analytics = await getProfileAnalytics({
+      profileUsername,
+      platforms,
+      pageId: typeof req.query.page_id === 'string' ? req.query.page_id : undefined,
+      pageUrn: typeof req.query.page_urn === 'string' ? req.query.page_urn : undefined,
+    })
+
+    return res.json(analytics)
+  } catch (error: any) {
+    console.error('Get profile analytics error:', error)
+    return res.status(500).json({ error: error.message || 'Failed to get profile analytics' })
   }
 })
 

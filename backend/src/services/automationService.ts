@@ -1,6 +1,5 @@
 import { supabase } from '../lib/supabase.js'
 import { PlanService } from './planService.js'
-import { ResearchService } from './researchService.js'
 import { VideoService } from './videoService.js'
 import { SubscriptionService } from './subscriptionService.js'
 import { postVideo } from '../lib/uploadpost.js'
@@ -8,6 +7,11 @@ import { generateVideoCaption } from './captionService.js'
 import { DateTime } from 'luxon'
 
 export class AutomationService {
+  private static isInsufficientCreditsError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message.toLowerCase() : String(error || '').toLowerCase()
+    return message.includes('insufficient credits')
+  }
+
   private static isRetryableUploadError(error: unknown): boolean {
     const message = error instanceof Error ? error.message.toLowerCase() : String(error || '').toLowerCase()
 
@@ -28,24 +32,37 @@ export class AutomationService {
     ].some(fragment => message.includes(fragment))
   }
 
-  private static hasScheduledTimePassed(
+  static hasScheduledTimePassed(
     scheduledTime: string | null | undefined,
     nowInPlanTz: DateTime
   ): boolean {
-    if (!scheduledTime) return true
+    if (scheduledTime == null) return true
 
-    const normalizedTime = scheduledTime.split(':').length === 3
-      ? scheduledTime
-      : `${scheduledTime}:00`
+    const trimmedTime = scheduledTime.trim()
+    if (!trimmedTime) return false
+    const timeMatch = trimmedTime.match(/^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/)
 
-    const scheduledDateTime = DateTime.fromFormat(
-      `${nowInPlanTz.toFormat('yyyy-MM-dd')} ${normalizedTime}`,
-      'yyyy-MM-dd HH:mm:ss',
-      { zone: nowInPlanTz.zoneName || 'UTC' }
-    )
+    if (!timeMatch) return false
 
-    if (!scheduledDateTime.isValid) return false
-    return scheduledDateTime <= nowInPlanTz
+    const hour = Number(timeMatch[1])
+    const minute = Number(timeMatch[2])
+    const second = Number(timeMatch[3] || '0')
+
+    if (
+      Number.isNaN(hour) ||
+      Number.isNaN(minute) ||
+      Number.isNaN(second) ||
+      hour < 0 || hour > 23 ||
+      minute < 0 || minute > 59 ||
+      second < 0 || second > 59
+    ) {
+      return false
+    }
+
+    const scheduledSeconds = hour * 3600 + minute * 60 + second
+    const currentSeconds = nowInPlanTz.hour * 3600 + nowInPlanTz.minute * 60 + nowInPlanTz.second
+
+    return scheduledSeconds <= currentSeconds
   }
 
   private static buildScriptPrompt({
@@ -81,7 +98,6 @@ export class AutomationService {
 
     if (!plans) return
 
-    const now = new Date()
     let pipelineTriggered = false
 
     for (const plan of plans) {
@@ -125,43 +141,37 @@ export class AutomationService {
 
         const { data: pendingItems } = await query.limit(100)
 
+        console.log(
+          `[Automation] Plan ${plan.id}: pending items for ${today} = ${(pendingItems || []).length}`,
+          (pendingItems || []).map(item => ({
+            id: item.id,
+            status: item.status,
+            scheduled_time: item.scheduled_time || 'N/A',
+            topic: item.topic || 'N/A',
+          }))
+        )
+
         const duePendingItems = (pendingItems || [])
           .filter(item => plan.auto_schedule_trigger !== 'time_based' || this.hasScheduledTimePassed(item.scheduled_time, nowInPlanTz))
           .slice(0, plan.videos_per_day)
 
         if (duePendingItems.length > 0) {
-          const researchPromises: Promise<void>[] = []
+          console.log(
+            `[Automation] Plan ${plan.id}: due pending items after time filter = ${duePendingItems.length}`,
+            duePendingItems.map(item => ({ id: item.id, scheduled_time: item.scheduled_time || 'N/A' }))
+          )
+          const topicPreparationPromises: Promise<void>[] = []
 
           for (const item of duePendingItems) {
-            // If item has a topic but status is pending, check if we need to research it
-            if (plan.auto_research) {
-              if (item.topic) {
-                // Has user-provided topic - research it (generateTopicForItem will preserve the topic)
-                // This will research the topic without overwriting it
-                researchPromises.push(
-                  PlanService.generateTopicForItem(item.id, plan.user_id).catch((error) => {
-                    console.error(`Error researching topic for item ${item.id}:`, error)
-                  })
-                )
-              } else {
-                // No topic, generate topic first (which will also research it)
-                researchPromises.push(
-                  PlanService.generateTopicForItem(item.id, plan.user_id).catch((error) => {
-                    console.error(`Error generating topic for item ${item.id}:`, error)
-                  })
-                )
-              }
-            } else if (item.topic) {
-              // Has topic but no auto_research, mark as ready for script generation
-              await supabase
-                .from('video_plan_items')
-                .update({ status: 'ready' })
-                .eq('id', item.id)
-            }
+            topicPreparationPromises.push(
+              PlanService.generateTopicForItem(item.id, plan.user_id).catch((error) => {
+                console.error(`Error preparing topic for item ${item.id}:`, error)
+              })
+            )
           }
 
-          // Wait for all research to complete before generating scripts
-          await Promise.all(researchPromises)
+          // Wait for topic preparation before generating scripts
+          await Promise.all(topicPreparationPromises)
 
           // Small delay to ensure database updates are reflected
           await new Promise(resolve => setTimeout(resolve, 2000))
@@ -178,6 +188,16 @@ export class AutomationService {
           .is('script', null)
 
         const { data: readyItems } = await readyQuery.limit(100)
+
+        console.log(
+          `[Automation] Plan ${plan.id}: ready items without script for ${today} = ${(readyItems || []).length}`,
+          (readyItems || []).map(item => ({
+            id: item.id,
+            status: item.status,
+            scheduled_time: item.scheduled_time || 'N/A',
+            topic: item.topic || 'N/A',
+          }))
+        )
 
         const dueReadyItems = (readyItems || [])
           .filter(item => plan.auto_schedule_trigger !== 'time_based' || this.hasScheduledTimePassed(item.scheduled_time, nowInPlanTz))
@@ -357,26 +377,16 @@ export class AutomationService {
                     continue // Another process already claimed this item
                   }
 
-                  // Get avatar_id and talking_photo_id from plan item (optional - will fall back to default avatar if not provided)
-                  const avatarId = (updatedItem as any).avatar_id
-                  const talkingPhotoId = (updatedItem as any).talking_photo_id
-
                   console.log(`[Video Generation] ✓ Claimed item ${item.id} for immediate video generation`, {
                     topic: updatedItem.topic,
-                    hasAvatarId: !!avatarId,
-                    hasTalkingPhotoId: !!talkingPhotoId,
-                    avatarId: avatarId || 'will use default avatar',
-                    talkingPhotoId: talkingPhotoId || 'none'
+                    scriptLength: updatedItem.script?.length || 0,
                   })
 
-                  // VideoService.requestManualVideo will automatically use default avatar if avatar_id is not provided
                   const video = await VideoService.requestManualVideo(plan.user_id, {
                     topic: updatedItem.topic || 'Video Content',
                     script: updatedItem.script || '',
                     style: 'Cinematic',
                     duration: 30,
-                    avatar_id: avatarId, // Can be undefined - will fall back to default
-                    talking_photo_id: talkingPhotoId, // Look ID if provided
                     plan_item_id: item.id,
                   })
 
@@ -456,6 +466,11 @@ export class AutomationService {
 
     const { data: items } = await query.limit(10)
 
+    console.log(
+      `[Video Generation] Plan ${planId}: approved items queued for ${today}${dueTime ? ` up to ${dueTime}` : ''} = ${(items || []).length}`,
+      (items || []).map(item => ({ id: item.id, scheduled_time: item.scheduled_time || 'N/A', topic: item.topic || 'N/A' }))
+    )
+
     if (!items || items.length === 0) return
 
     for (const item of items) {
@@ -496,20 +511,11 @@ export class AutomationService {
           throw new Error('Missing topic or script for video generation')
         }
 
-        // Get avatar_id and talking_photo_id from plan item (optional - will fall back to default avatar if not provided)
-        const avatarId = (item as any).avatar_id
-        const talkingPhotoId = (item as any).talking_photo_id
-
         console.log(`[Video Generation] Creating video for item ${item.id}`, {
           topic: item.topic,
           scriptLength: item.script?.length || 0,
-          hasAvatarId: !!avatarId,
-          hasTalkingPhotoId: !!talkingPhotoId,
-          avatarId: avatarId || 'will use default avatar',
-          talkingPhotoId: talkingPhotoId || 'none'
         })
 
-        // VideoService.requestManualVideo will automatically use default avatar if avatar_id is not provided
         // Ensure we're using the correct topic - use item.topic as the primary topic
         // The script should already be based on this topic, but we pass both for clarity
         const video = await VideoService.requestManualVideo(userId, {
@@ -517,8 +523,6 @@ export class AutomationService {
           script: item.script, // Script should match the topic
           style: 'Cinematic',
           duration: 30,
-          avatar_id: avatarId, // Can be undefined - will fall back to default avatar
-          talking_photo_id: talkingPhotoId, // Look ID if provided
           plan_item_id: item.id,
           skipDeduction: true,
         })
@@ -559,82 +563,10 @@ export class AutomationService {
   }
 
   /**
-   * Generate research for items with topics but no research
-   * Only processes today's items after trigger time
+   * Research stage removed from automation pipeline.
    */
   static async generateResearchForReadyItems(): Promise<void> {
-    // Get all enabled plans with trigger times and auto_research enabled
-    const { data: plans } = await supabase
-      .from('video_plans')
-      .select('id, trigger_time, timezone, user_id, auto_research, auto_schedule_trigger')
-      .eq('enabled', true)
-      .eq('auto_research', true)
-      .in('auto_schedule_trigger', ['daily', 'time_based'])
-      .not('trigger_time', 'is', null)
-
-    if (!plans || plans.length === 0) return
-
-    // Process each plan that has passed its trigger time today
-    for (const plan of plans) {
-      try {
-        const planTimezone = plan.timezone || 'UTC'
-        const nowInPlanTz = DateTime.now().setZone(planTimezone)
-        const today = nowInPlanTz.toFormat('yyyy-MM-dd')
-
-        // Check if user has an active subscription
-        const hasActiveSub = await SubscriptionService.hasActiveSubscription(plan.user_id)
-        if (!hasActiveSub) {
-          console.log(`[Automation] Skipping research generation for plan ${plan.id} - user ${plan.user_id} has no active subscription`)
-          continue
-        }
-
-        // Check if trigger time has passed
-        if (plan.trigger_time) {
-          const [triggerHourStr, triggerMinuteStr] = plan.trigger_time.split(':')
-          const triggerHour = parseInt(triggerHourStr, 10)
-          const triggerMinute = parseInt(triggerMinuteStr || '0', 10)
-
-          const triggerMinutes = triggerHour * 60 + triggerMinute
-          const currentMinutes = nowInPlanTz.hour * 60 + nowInPlanTz.minute
-
-          // Only process if trigger time has passed
-          if (currentMinutes < triggerMinutes) {
-            continue // Skip this plan, trigger time hasn't arrived yet
-          }
-        }
-
-        // Get items with topics but no research for today
-        const query = supabase
-          .from('video_plan_items')
-          .select('*')
-          .eq('plan_id', plan.id)
-          .eq('scheduled_date', today)
-          .eq('status', 'ready')
-          .not('topic', 'is', null)
-          .is('research_data', null)
-
-        const { data: items } = await query.limit(100)
-
-        const dueItems = (items || []).filter(item =>
-          plan.auto_schedule_trigger !== 'time_based' || this.hasScheduledTimePassed(item.scheduled_time, nowInPlanTz)
-        )
-
-        if (dueItems.length === 0) continue
-
-        for (const item of dueItems) {
-          try {
-            if (!item.topic) continue
-
-            // Generate research for the topic
-            await PlanService.generateTopicForItem(item.id, plan.user_id)
-          } catch (error: any) {
-            console.error(`Error generating research for item ${item.id}:`, error)
-          }
-        }
-      } catch (error: any) {
-        console.error(`Error processing plan ${plan.id} for research generation:`, error)
-      }
-    }
+    return
   }
 
   /**
@@ -893,15 +825,8 @@ export class AutomationService {
               throw new Error('Missing topic or script for video generation')
             }
 
-            // Check and deduct credits before generating video
-
-            // Get avatar_id and talking_photo_id from plan item
-            const avatarId = (item as any).avatar_id
-            const talkingPhotoId = (item as any).talking_photo_id
-
             console.log(`[Video Generation] Creating video for today's item ${item.id} with topic: ${item.topic}`, {
-              hasAvatarId: !!avatarId,
-              hasTalkingPhotoId: !!talkingPhotoId
+              scriptLength: item.script?.length || 0,
             })
 
             // Create video record - this happens synchronously
@@ -910,8 +835,6 @@ export class AutomationService {
               script: item.script,
               style: 'Cinematic',
               duration: 30,
-              avatar_id: avatarId, // Can be undefined - will fall back to default avatar
-              talking_photo_id: talkingPhotoId, // Look ID if provided
               plan_item_id: item.id,
             })
 
@@ -950,7 +873,8 @@ export class AutomationService {
             const errorMessage = error?.message || 'Failed to create video record'
 
             // Reset status back to 'approved' so it can be retried, or mark as 'failed' if it's a persistent error
-            const shouldRetry = !errorMessage.includes('avatar') && !errorMessage.includes('API key')
+            const shouldRetry = !errorMessage.includes('API key')
+              && !this.isInsufficientCreditsError(error)
             await supabase
               .from('video_plan_items')
               .update({
@@ -1900,66 +1824,7 @@ export class AutomationService {
       throw new Error('No topic available for script generation')
     }
 
-    // Check if we have all prompt fields filled - if so, we can skip research or use it as fallback only
-    const hasAllPromptFields = !!(item.description && item.why_important && item.useful_tips)
-
-    // Always (re)run research so scripts are based on fresh data and long topics
-    // But if we have prompt fields, they will take priority
-    const researchCategory = item.category || existingResearch?.Category || existingResearch?.category || 'Lifestyle'
-    let enrichedResearch: any = null
-    try {
-      console.log('[Research] Starting research for item', {
-        itemId,
-        topic: topicToUse,
-        category: researchCategory,
-        planId: item.plan_id,
-        hasPromptFields: hasAllPromptFields,
-        promptDescription: item.description ? 'yes' : 'no',
-        promptWhyImportant: item.why_important ? 'yes' : 'no',
-        promptUsefulTips: item.useful_tips ? 'yes' : 'no',
-      })
-
-      enrichedResearch = await ResearchService.researchTopic(topicToUse, researchCategory, userId)
-
-      console.log('[Research] Completed research for item', {
-        itemId,
-        topic: topicToUse,
-        category: enrichedResearch?.category || researchCategory,
-        hasDescription: !!enrichedResearch?.description,
-        hasTips: !!enrichedResearch?.usefulTips,
-        willUsePromptFields: hasAllPromptFields,
-      })
-
-      // Only update description, why_important, useful_tips if they're not already set (from prompts)
-      // This preserves user-provided values from prompts
-      const updateData: any = {
-        category: enrichedResearch.category || item.category,
-        research_data: enrichedResearch,
-      }
-
-      // Only overwrite if field is empty/null (preserve prompt values)
-      if (!item.description) {
-        updateData.description = enrichedResearch.description
-      }
-      if (!item.why_important) {
-        updateData.why_important = enrichedResearch.whyItMatters
-      }
-      if (!item.useful_tips) {
-        updateData.useful_tips = enrichedResearch.usefulTips
-      }
-
-      await supabase
-        .from('video_plan_items')
-        .update(updateData)
-        .eq('id', itemId)
-    } catch (researchError: any) {
-      console.error('[Research] Failed for item; aborting script generation to avoid low-quality output:', {
-        itemId,
-        topic: topicToUse,
-        error: researchError.message,
-      })
-      throw new Error('Research failed; unable to generate script')
-    }
+    const enrichedResearch: any = existingResearch || null
 
     // Pull a few recent scripts to discourage repetition
     const { data: recentItems } = await supabase
@@ -2104,18 +1969,11 @@ export class AutomationService {
 
     const plan = item.plan as any
 
-    // Check and deduct credits before generating video
-
-    const avatarId = (item as any).avatar_id
-    const talkingPhotoId = (item as any).talking_photo_id
-
     const video = await VideoService.requestManualVideo(plan.user_id, {
       topic: item.topic!,
       script: item.script,
       style: 'Cinematic',
       duration: 30,
-      avatar_id: avatarId, // Can be undefined - will fall back to default avatar
-      talking_photo_id: talkingPhotoId, // Look ID if provided
       plan_item_id: item.id,
     })
 

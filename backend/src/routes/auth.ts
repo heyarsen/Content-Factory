@@ -5,6 +5,17 @@ import { authLimiter } from '../middleware/rateLimiter.js'
 
 const router = Router()
 
+
+const ADMIN_EMAILS = new Set(
+  (process.env.ADMIN_EMAILS || 'heyarsen@icloud.com')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean)
+)
+
+const isAdminEmail = (email?: string | null) => !!email && ADMIN_EMAILS.has(email.toLowerCase())
+
+
 const getClientIp = (req: Request) => {
   const forwarded = req.headers['x-forwarded-for']
   if (typeof forwarded === 'string') {
@@ -77,12 +88,16 @@ router.post('/signup', authLimiter, async (req: Request, res: Response) => {
       return res.status(400).json({ error: error.message })
     }
 
-    // Update user_profiles with preferred language
+    // Ensure user profile exists and apply preferred language.
+    // This protects trial-credit onboarding if DB triggers fail or are missing.
     if (data.user) {
       await supabase
         .from('user_profiles')
-        .update({ preferred_language: preferredLanguage || 'en' })
-        .eq('id', data.user.id)
+        .upsert({
+          id: data.user.id,
+          credits: 3,
+          preferred_language: preferredLanguage || 'en',
+        }, { onConflict: 'id' })
 
       const ipTimezone = await fetchTimezoneFromIp(getClientIp(req))
       const detectedTimezone = normalizeTimezone(ipTimezone) || normalizeTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone) || 'UTC'
@@ -93,7 +108,7 @@ router.post('/signup', authLimiter, async (req: Request, res: Response) => {
           timezone: detectedTimezone,
           default_platforms: [],
           notifications_enabled: true,
-          auto_research_default: true,
+          auto_research_default: false,
           auto_approve_default: false,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' })
@@ -333,8 +348,8 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
       refresh_token: data.session.refresh_token,
       user: data.user,
       profile: {
-        role: (data.user.email === 'heyarsen@icloud.com' || profile?.role === 'admin') ? 'admin' : 'user',
-        hasActiveSubscription: !!profile?.has_active_subscription || (data.user.email === 'heyarsen@icloud.com'),
+        role: (isAdminEmail(data.user.email) || profile?.role === 'admin') ? 'admin' : 'user',
+        hasActiveSubscription: !!profile?.has_active_subscription || isAdminEmail(data.user.email),
         debugReason: profile?.has_active_subscription ? 'Profile Flag' : (latestSub ? `Sub: ${latestSub.status}` : 'No Sub'),
       }
     })
@@ -391,7 +406,14 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
       .from('user_profiles')
       .select('subscription_plan_id, subscription_status, credits')
       .eq('id', req.userId)
-      .single()
+      .maybeSingle()
+
+    // Self-heal missing profiles so new users still receive trial credits.
+    if (!profile) {
+      await supabase
+        .from('user_profiles')
+        .upsert({ id: req.userId, credits: 3, preferred_language: 'en' }, { onConflict: 'id' })
+    }
 
     const hasActiveSubscription = profile?.subscription_status === 'active' || profile?.subscription_status === 'trialing'
 
@@ -399,7 +421,7 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
       user: {
         ...req.user,
         role: (req as any).role,
-        credits: profile?.credits || 0,
+        credits: profile?.credits ?? 3,
         subscription_plan_id: profile?.subscription_plan_id,
         subscription_status: profile?.subscription_status,
         hasActiveSubscription

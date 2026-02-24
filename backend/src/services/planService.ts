@@ -1,5 +1,4 @@
 import { supabase } from '../lib/supabase.js'
-import { ResearchService } from './researchService.js'
 import { ContentService } from './contentService.js'
 import type { Topic } from '../lib/perplexity.js'
 
@@ -74,7 +73,7 @@ export class PlanService {
         start_date: data.start_date,
         end_date: data.end_date || null,
         enabled: data.enabled ?? true,
-        auto_research: data.auto_research ?? true,
+        auto_research: data.auto_research ?? false,
         auto_create: data.auto_create ?? false,
       })
       .select()
@@ -502,7 +501,8 @@ export class PlanService {
   }
 
   /**
-   * Generate topic for a plan item using Perplexity
+   * Generate a topic for a plan item and mark it ready for script generation.
+   * Research is intentionally skipped.
    */
   static async generateTopicForItem(itemId: string, userId: string): Promise<void> {
     // First, check if item already has a topic (user-provided)
@@ -512,9 +512,8 @@ export class PlanService {
       .eq('id', itemId)
       .single()
 
-    // If item already has a topic, don't overwrite it - just research it if needed
+    // If item already has a topic, don't overwrite it - mark ready immediately.
     if (existingItem?.topic) {
-      // Item has a user-provided topic, research it instead of generating a new one
       try {
         // Get the plan item to find category
         const { data: item } = await supabase
@@ -525,39 +524,12 @@ export class PlanService {
 
         if (!item) throw new Error('Plan item not found')
 
-        // Update status to researching
-        await supabase
-          .from('video_plan_items')
-          .update({ status: 'researching' })
-          .eq('id', itemId)
-
-        // Research the existing topic
-        const research = await ResearchService.researchTopic(
-          existingItem.topic,
-          item.category || 'general',
-          userId
-        )
-
-        // Update the plan item with research data but keep the original topic and prompt fields
-        // Only update description, why_important, useful_tips if they're not already set (from prompts)
         const updateData: any = {
-          // Keep the original topic - don't overwrite it
-          category: research.category as string || item.category,
-          research_data: research,
           status: 'ready',
+          error_message: null,
+          category: item.category || 'general',
         }
-        
-        // Only overwrite if field is empty/null (preserve prompt values)
-        if (!item.description) {
-          updateData.description = research.description
-        }
-        if (!item.why_important) {
-          updateData.why_important = research.whyItMatters
-        }
-        if (!item.useful_tips) {
-          updateData.useful_tips = research.usefulTips
-        }
-        
+
         await supabase
           .from('video_plan_items')
           .update(updateData)
@@ -565,22 +537,14 @@ export class PlanService {
         
         return
       } catch (error: any) {
-        console.error('Error researching existing topic:', error)
+        console.error('Error preparing existing topic:', error)
         throw error
       }
     }
 
     // No topic exists, generate a new one
-    // Update status to researching
-    await supabase
-      .from('video_plan_items')
-      .update({ status: 'researching' })
-      .eq('id', itemId)
 
     try {
-      // Generate topics using Perplexity
-      const topics = await ResearchService.generateTopics(userId)
-      
       // Get the plan item to find which category slot it should be
       const { data: item } = await supabase
         .from('video_plan_items')
@@ -590,53 +554,36 @@ export class PlanService {
 
       if (!item) throw new Error('Plan item not found')
 
-      // Get all items for this date to determine which topic to use
+      // Get all items for this date to determine which fallback topic to use
       const { data: sameDateItems } = await supabase
         .from('video_plan_items')
-        .select('category')
+        .select('id, topic, category')
         .eq('plan_id', item.plan_id)
         .eq('scheduled_date', item.scheduled_date)
         .order('scheduled_time')
 
-      const usedCategories = (sameDateItems || [])
-        .map((i: any) => i.category)
-        .filter(Boolean)
-
-      // Find an unused category
-      const availableTopic = topics.find(
-        (t) => !usedCategories.includes(t.Category)
-      ) || topics[0]
-
-      // Research the topic
-      const research = await ResearchService.researchTopic(
-        availableTopic.Idea,
-        availableTopic.Category as string,
-        userId
-      )
+      const position = (sameDateItems || []).findIndex((i: any) => i.id === itemId)
+      const safePosition = position >= 0 ? position + 1 : 1
+      const fallbackTopic = `Video idea ${safePosition}`
+      const fallbackCategory = item.category || 'general'
 
       // Update the plan item
       await supabase
         .from('video_plan_items')
         .update({
-          topic: research.idea,
-          category: research.category as string,
-          description: research.description,
-          why_important: research.whyItMatters,
-          useful_tips: research.usefulTips,
-          research_data: research,
+          topic: fallbackTopic,
+          category: fallbackCategory,
           status: 'ready',
+          error_message: null,
         })
         .eq('id', itemId)
 
     } catch (error: any) {
       // Extract user-friendly error message
-      let errorMessage = error.message || 'Failed to research topic'
+      let errorMessage = error.message || 'Failed to prepare topic'
       
-      // Handle rate limit errors specifically
-      if (errorMessage.includes('Rate limit') || errorMessage.includes('429')) {
-        errorMessage = 'Rate limit exceeded. The research service is temporarily unavailable. Please try again in a few minutes.'
-      } else if (errorMessage.includes('Failed to research topic')) {
-        errorMessage = `Failed to research topic: ${errorMessage}`
+      if (errorMessage.includes('Failed to prepare topic')) {
+        errorMessage = `Failed to prepare topic: ${errorMessage}`
       }
       
       await supabase
@@ -655,7 +602,7 @@ export class PlanService {
    */
   static async getPlanItems(planId: string, userId: string): Promise<VideoPlanItem[]> {
     // Verify plan belongs to user
-    await this.getPlanById(planId, userId)
+    const plan = await this.getPlanById(planId, userId)
 
     const { data, error } = await supabase
       .from('video_plan_items')
@@ -665,7 +612,16 @@ export class PlanService {
       .order('scheduled_time', { ascending: true })
 
     if (error) throw error
-    return data || []
+    const items = data || []
+
+    // If an item has no explicit platforms configured, inherit from plan defaults.
+    // This keeps legacy items and newly-generated items consistent in API responses.
+    return items.map((item: VideoPlanItem) => {
+      if (item.platforms == null && plan.default_platforms != null) {
+        return { ...item, platforms: plan.default_platforms }
+      }
+      return item
+    })
   }
 
   /**
@@ -726,7 +682,7 @@ export class PlanService {
   }
 
   /**
-   * Get items with research but no script
+   * Get items ready for script generation.
    */
   static async getItemsReadyForScriptGeneration(): Promise<VideoPlanItem[]> {
     const { data } = await supabase
@@ -735,7 +691,6 @@ export class PlanService {
       .eq('plan.enabled', true)
       .eq('status', 'ready')
       .is('script', null)
-      .not('research_data', 'is', null)
 
     return data || []
   }

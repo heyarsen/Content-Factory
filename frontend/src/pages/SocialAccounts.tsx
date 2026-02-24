@@ -4,10 +4,18 @@ import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
-import { EmptyState } from '../components/ui/EmptyState'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Modal } from '../components/ui/Modal'
-import { Users, Link2, X, Instagram, Youtube, Facebook, Share2, Linkedin } from 'lucide-react'
+import {
+  Users,
+  Link2,
+  X,
+  Instagram,
+  Youtube,
+  Facebook,
+  Share2,
+  Linkedin,
+} from 'lucide-react'
 import api from '../lib/api'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -24,6 +32,13 @@ interface SocialAccount {
     username?: string | null
     display_name?: string | null
     avatar_url?: string | null
+    bio?: string | null
+    profile_url?: string | null
+    follower_count?: number | null
+    following_count?: number | null
+    post_count?: number | null
+    verified?: boolean | null
+    metadata?: Record<string, string | number | boolean> | null
   } | null
 }
 
@@ -46,6 +61,9 @@ export function SocialAccounts() {
   const [accounts, setAccounts] = useState<SocialAccount[]>([])
   const [loading, setLoading] = useState(true)
   const [connectingPlatform, setConnectingPlatform] = useState<SocialAccount['platform'] | null>(null)
+  const [disconnectModal, setDisconnectModal] = useState<string | null>(null)
+  const [disconnecting, setDisconnecting] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const platformNames: Record<string, string> = {
     instagram: t('platforms.instagram') !== 'platforms.instagram' ? t('platforms.instagram') : 'Instagram',
@@ -56,9 +74,9 @@ export function SocialAccounts() {
     linkedin: t('platforms.linkedin') !== 'platforms.linkedin' ? t('platforms.linkedin') : 'LinkedIn',
     threads: t('platforms.threads') !== 'platforms.threads' ? t('platforms.threads') : 'Threads',
   }
-  const [disconnectModal, setDisconnectModal] = useState<string | null>(null)
-  const [disconnecting, setDisconnecting] = useState(false)
-  const [searchParams, setSearchParams] = useSearchParams()
+
+  const allPlatforms = ['instagram', 'tiktok', 'youtube', 'facebook', 'x', 'linkedin', 'threads'] as const
+
 
   const loadAccounts = useCallback(async () => {
     try {
@@ -75,10 +93,8 @@ export function SocialAccounts() {
     loadAccounts()
   }, [loadAccounts])
 
-  // Refresh subscription status when component mounts
   useEffect(() => {
     if (user?.id) {
-      // Refresh subscription status immediately and then again after 1 second
       refreshSubscriptionStatus()
       setTimeout(() => {
         refreshSubscriptionStatus()
@@ -97,19 +113,63 @@ export function SocialAccounts() {
       nextParams.delete('connected')
       setSearchParams(nextParams, { replace: true })
 
-      // Refresh accounts to reflect the latest status
       loadAccounts()
     }
   }, [searchParams, setSearchParams, loadAccounts])
 
+  const connectedPlatforms = accounts.filter((a: SocialAccount) => a.status === 'connected')
+  const inactivePlatforms = allPlatforms.filter((platform) => {
+    const account = accounts.find((a: SocialAccount) => a.platform === platform)
+    return !account || account.status !== 'connected'
+  })
+
+  const getResolvedHandle = (account?: SocialAccount) => {
+    if (!account) return null
+    const username = account.account_info?.username?.trim()
+    const displayName = account.account_info?.display_name?.trim()
+    const handle = username || displayName
+    if (!handle) return null
+    return handle.startsWith('@') ? handle : `@${handle}`
+  }
+
+  const formatMetadataLabel = (key: string) => key
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+
+  const getMetadataEntries = (account: SocialAccount) => {
+    const metadata = account.account_info?.metadata
+    if (!metadata) return []
+
+    const skipKeys = new Set([
+      'handle',
+      'auth_required',
+      'coreauth_required',
+      'reauth_required',
+      'reauthrequired',
+      'username',
+      'display_name',
+      'name',
+      'bio',
+      'profile_url',
+      'url',
+      'avatar_url',
+      'profile_picture',
+      'social_images',
+      'follower_count',
+      'following_count',
+      'post_count',
+      'verified',
+    ])
+
+    return Object.entries(metadata)
+      .filter(([key]) => !skipKeys.has(key))
+      .slice(0, 4)
+  }
+
+  const isNumericId = (value: string) => /^\d{8,}$/.test(value)
 
   const handleConnect = async (platform: SocialAccount['platform']) => {
-    console.log('[Social] === CONNECTION ATTEMPT START ===')
-    console.log('[Social] Platform:', platform)
-    console.log('[Social] User ID:', user?.id)
-    console.log('[Social] User Email:', user?.email)
-
-    const hasSub = (user?.hasActiveSubscription || user?.role === 'admin')
+    const hasSub = user?.hasActiveSubscription || user?.role === 'admin'
     const safeCanCreate = hasSub || (credits !== null && credits > 0) || unlimited
 
     if (!safeCanCreate) {
@@ -117,20 +177,15 @@ export function SocialAccounts() {
       return
     }
 
-    // Note: Subscription check is also handled by backend middleware
     setConnectingPlatform(platform)
     try {
-      console.log('[Social] Making API call to /api/social/connect')
       const response = await api.post('/api/social/connect', { platform })
-      console.log('[Social] API response:', response.data)
 
       const { accessUrl, uploadPostUsername, redirectUrl } = response.data as {
         accessUrl?: string
         uploadPostUsername?: string
         redirectUrl?: string
       }
-
-      console.log('[Social] Parsed response:', { accessUrl, uploadPostUsername, redirectUrl })
 
       localStorage.removeItem(`uploadpost_jwt_${platform}`)
       localStorage.removeItem(`uploadpost_userid_${platform}`)
@@ -150,54 +205,35 @@ export function SocialAccounts() {
             url.searchParams.set('platform', platform)
           }
           return url.toString()
-        } catch (error) {
+        } catch {
           const separator = baseUrl.includes('?') ? '&' : '?'
           return `${baseUrl}${separator}platform=${platform}`
         }
       }
 
-      // Redirect directly to Upload-Post connection page instead of popup
-      if (accessUrl) {
-        const resolvedAccessUrl = buildPlatformUrl(accessUrl)
-        console.log('[Social] Redirecting to:', resolvedAccessUrl)
-        localStorage.setItem(`uploadpost_access_url_${platform}`, resolvedAccessUrl)
-        // Redirect current window to Upload-Post
-        window.location.href = resolvedAccessUrl
-      } else {
-        console.log('[Social] No accessUrl, using fallback')
-        const fallbackBaseUrl = buildPlatformUrl('https://connect.upload-post.com')
-        console.log('[Social] Redirecting to fallback:', fallbackBaseUrl)
-        localStorage.setItem(`uploadpost_access_url_${platform}`, fallbackBaseUrl)
-        // Redirect current window to Upload-Post
-        window.location.href = fallbackBaseUrl
-      }
+      const resolvedAccessUrl = accessUrl
+        ? buildPlatformUrl(accessUrl)
+        : buildPlatformUrl('https://connect.upload-post.com')
 
-      // Reload accounts to show pending status
+      localStorage.setItem(`uploadpost_access_url_${platform}`, resolvedAccessUrl)
+      window.location.href = resolvedAccessUrl
       loadAccounts()
     } catch (error: any) {
-      console.error('Failed to connect:', error)
       const status = error.response?.status
       let errorMessage = error.response?.data?.error ||
         error.response?.data?.details ||
         error.message ||
         t('social_accounts.initiate_failed')
 
-      // Handle 429 rate limit specifically
       if (status === 429) {
         const retryAfter = error.response?.data?.retryAfter || 60
         errorMessage = t('social_accounts.rate_limit_error').replace('{seconds}', retryAfter.toString())
       }
 
-      // Handle subscription required error specifically
       if (status === 403 && error.response?.data?.code === 'SUBSCRIPTION_REQUIRED') {
         errorMessage = t('social_accounts.subscription_needed_alert')
       }
 
-      console.error('Error details:', {
-        message: errorMessage,
-        fullResponse: error.response?.data,
-        status: error.response?.status,
-      })
       toast.error(errorMessage)
     } finally {
       setConnectingPlatform(null)
@@ -218,6 +254,8 @@ export function SocialAccounts() {
     }
   }
 
+
+
   const getStatusBadge = (status: string) => {
     const variants: Record<string, 'default' | 'success' | 'error'> = {
       connected: 'success',
@@ -227,12 +265,6 @@ export function SocialAccounts() {
     }
     return <Badge variant={variants[status] || 'default'}>{t(`social_accounts.status_${status}`)}</Badge>
   }
-
-  const allPlatforms = ['instagram', 'tiktok', 'youtube', 'facebook', 'x', 'linkedin', 'threads'] as const
-  const connectedPlatforms = accounts
-    .filter((a: SocialAccount) => a.status === 'connected')
-    .map((a: SocialAccount) => a.platform)
-  const availablePlatforms = allPlatforms.filter((p) => !connectedPlatforms.includes(p))
 
   if (loading) {
     return (
@@ -253,116 +285,167 @@ export function SocialAccounts() {
     <Layout>
       <div className="space-y-10">
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('social_accounts.distribution')}</p>
           <h1 className="text-3xl font-semibold text-primary">{t('social_accounts.title')}</h1>
           <p className="text-sm text-slate-500">
-            {t('social_accounts.subtitle')}
+            {t('social_accounts.workspace_subtitle')}
           </p>
         </div>
 
         <CreditBanner />
 
-        {accounts.length === 0 && availablePlatforms.length === 0 ? (
-          <EmptyState
-            icon={<Users className="w-16 h-16" />}
-            title={t('social_accounts.no_accounts_title')}
-            description={t('social_accounts.no_accounts_desc')}
-          />
-        ) : (
-          <div className="grid gap-6 md:grid-cols-2">
-            {allPlatforms.map((platform) => {
-              const account = accounts.find((a: SocialAccount) => a.platform === platform)
-              const Icon = platformIcons[platform]
-              const isConnected = account?.status === 'connected'
+        <Card className="space-y-8">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-primary">{t('social_accounts.channel_connections')}</h2>
+              <p className="text-sm text-slate-500">{t('social_accounts.channel_connections_desc')}</p>
+            </div>
+            <Badge variant="default">{t('social_accounts.connected_count', { count: connectedPlatforms.length })}</Badge>
+          </div>
 
-              return (
-                <Card key={platform} hover className="flex h-full flex-col gap-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-4">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
-                        <Icon className="h-6 w-6" />
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-emerald-700">{t('social_accounts.active_channels')}</h3>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {connectedPlatforms.map((account) => {
+                const platform = account.platform
+                const Icon = platformIcons[platform]
+                const resolvedHandle = getResolvedHandle(account)
+
+                return (
+                  <Card key={platform} hover className="flex h-full flex-col gap-4 border border-emerald-200 bg-emerald-50/40 p-4 shadow-none">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+                        <Icon className="h-5 w-5" />
                       </div>
-                      <div className="space-y-2">
-                        <h3 className="text-lg font-semibold text-primary">{platformNames[platform]}</h3>
-                        {account && getStatusBadge(account.status)}
+                      <div className="space-y-1 min-w-0">
+                        <h3 className="text-sm font-semibold text-primary">{platformNames[platform]}</h3>
+                        {getStatusBadge(account.status)}
                       </div>
                     </div>
-                    {isConnected && (
-                      <span className="text-xs font-medium uppercase tracking-wide text-emerald-500/80">{t('social_accounts.synced')}</span>
-                    )}
-                  </div>
 
-                  {account?.status === 'pending' && (
-                    <div className="rounded-2xl border border-amber-200/70 bg-amber-50/70 px-4 py-3 text-xs text-amber-600">
-                      {t('social_accounts.finish_linking')}
-                    </div>
-                  )}
-
-                  {isConnected && account && (
-                    <div className="space-y-3">
-                      {account.account_info && (account.account_info.username || account.account_info.avatar_url) && (
-                        <div className="flex items-center gap-3 rounded-2xl border border-white/60 bg-white/70 px-4 py-3">
-                          {account.account_info.avatar_url && (
-                            <img
-                              src={account.account_info.avatar_url}
-                              alt={account.account_info.display_name || account.account_info.username || platformNames[platform]}
-                              className="h-8 w-8 rounded-full object-cover"
-                              onError={(e) => {
-                                // Hide image if it fails to load
-                                (e.target as HTMLImageElement).style.display = 'none'
-                              }}
-                            />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            {account.account_info.display_name && (
-                              <div className="text-sm font-medium text-slate-700 truncate">
-                                {account.account_info.display_name}
-                              </div>
-                            )}
-                            {account.account_info.username && (
-                              <div className="text-xs text-slate-500 truncate">
-                                @{account.account_info.username}
-                              </div>
-                            )}
-                          </div>
+                    <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-white/90 p-3">
+                      {account.account_info?.avatar_url ? (
+                        <img
+                          src={account.account_info.avatar_url}
+                          alt={`${account.account_info.display_name || resolvedHandle || platformNames[platform]} avatar`}
+                          className="h-12 w-12 rounded-full border border-emerald-100 object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-700">
+                          {(account.account_info?.display_name || resolvedHandle || platformNames[platform]).slice(0, 2).toUpperCase()}
                         </div>
                       )}
-                      <div className="rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-xs text-slate-500">
-                        {t('social_accounts.connected_on').replace('{date}', new Date(account.connected_at).toLocaleDateString())}
+
+                      <div className="min-w-0 space-y-0.5">
+                        <p className="truncate text-sm font-semibold text-primary">
+                          {account.account_info?.display_name || platformNames[platform]}
+                        </p>
+                        <p className="truncate text-xs text-slate-600">{resolvedHandle || t('social_accounts.handle_unavailable')}</p>
                       </div>
                     </div>
-                  )}
 
-                  <div className="mt-auto">
-                    {isConnected ? (
+                    {!resolvedHandle && account.account_info?.username && isNumericId(account.account_info.username) && (
+                      <p className="text-[11px] text-slate-400">{t('social_accounts.account_id', { id: account.account_info.username })}</p>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600">
+                      {typeof account.account_info?.follower_count === 'number' && (
+                        <div className="rounded-lg bg-white/80 px-2 py-1">{t('social_accounts.followers_label', { count: account.account_info.follower_count.toLocaleString() })}</div>
+                      )}
+                      {typeof account.account_info?.following_count === 'number' && (
+                        <div className="rounded-lg bg-white/80 px-2 py-1">{t('social_accounts.following_label', { count: account.account_info.following_count.toLocaleString() })}</div>
+                      )}
+                      {typeof account.account_info?.post_count === 'number' && (
+                        <div className="rounded-lg bg-white/80 px-2 py-1">{t('social_accounts.posts_label', { count: account.account_info.post_count.toLocaleString() })}</div>
+                      )}
+                      {typeof account.account_info?.verified === 'boolean' && (
+                        <div className="rounded-lg bg-white/80 px-2 py-1">{t('social_accounts.verified_label', { value: account.account_info.verified ? t('preferences.yes') : t('preferences.no') })}</div>
+                      )}
+                    </div>
+
+                    {account.account_info?.bio && (
+                      <p className="line-clamp-2 text-xs text-slate-600">{account.account_info.bio}</p>
+                    )}
+
+                    {getMetadataEntries(account).length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {getMetadataEntries(account).map(([key, value]) => (
+                          <Badge key={`${account.id}-${key}`} variant="default" className="bg-white/90 text-[10px] font-medium text-slate-600">
+                            {formatMetadataLabel(key)}: {String(value)}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+
+                    {account.account_info?.profile_url && (
+                      <a
+                        href={account.account_info.profile_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs font-medium text-brand-600 hover:underline"
+                      >
+                        {t('social_accounts.view_profile')}
+                      </a>
+                    )}
+
+                    <div className="mt-auto">
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setDisconnectModal(account!.id)}
+                        onClick={() => setDisconnectModal(account.id)}
                         className="w-full border border-rose-200 bg-rose-50/70 text-rose-600 hover:border-rose-300 hover:bg-rose-50"
                       >
                         <X className="mr-2 h-4 w-4" />
-                        {t('social_accounts.disconnect')}
+                        {t('social_accounts.disconnect_channel')}
                       </Button>
-                    ) : (
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() => handleConnect(platform)}
-                        loading={connectingPlatform === platform}
-                        disabled={!hasSubscription}
-                        className="w-full"
-                      >
-                        <Link2 className="mr-2 h-4 w-4" />
-                        {t('social_accounts.connect')}
-                      </Button>
-                    )}
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t('social_accounts.add_channel')}</h3>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {inactivePlatforms.map((platform) => {
+              const account = accounts.find((a: SocialAccount) => a.platform === platform)
+              const Icon = platformIcons[platform]
+              const isPendingLinkedIn = platform === 'linkedin' && account?.status === 'pending'
+
+              return (
+                <Card key={platform} hover className="flex h-full flex-col gap-4 border border-slate-100 bg-slate-50/60 p-4 shadow-none">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div className="space-y-1">
+                        <h3 className="text-sm font-semibold text-primary">{platformNames[platform]}</h3>
+                        {account && getStatusBadge(account.status)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-auto">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => handleConnect(platform)}
+                      loading={connectingPlatform === platform}
+                      disabled={!hasSubscription || Boolean(isPendingLinkedIn)}
+                      className="w-full"
+                    >
+                      <Link2 className="mr-2 h-4 w-4" />
+                      {isPendingLinkedIn ? t('social_accounts.pending_availability') : t('social_accounts.connect_channel')}
+                    </Button>
                   </div>
                 </Card>
               )
             })}
           </div>
-        )}
+          </div>
+        </Card>
 
 
         <Modal

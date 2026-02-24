@@ -5,6 +5,15 @@ import api from '../lib/api'
 const profileCache = new Map<string, { data: any; timestamp: number }>()
 const pendingFetches = new Map<string, Promise<any>>()
 
+const ADMIN_EMAILS = new Set(
+  ((import.meta.env.VITE_ADMIN_EMAILS as string | undefined) || 'heyarsen@icloud.com')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean)
+)
+
+const isAdminEmail = (email?: string) => !!email && ADMIN_EMAILS.has(email.toLowerCase())
+
 interface User {
   id: string
   email: string
@@ -29,6 +38,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 const fetchUserRoleAndSubscription = async (userId: string, userEmail: string, forceRefresh: boolean = false) => {
+  const staleCachedData = profileCache.get(userId)?.data
   if (forceRefresh) profileCache.delete(userId)
   const cached = profileCache.get(userId)
   if (!forceRefresh && cached && Date.now() - cached.timestamp < 300000) return cached.data
@@ -57,7 +67,7 @@ const fetchUserRoleAndSubscription = async (userId: string, userEmail: string, f
 
       const profileData = profileRes.data
       const latestSub = subRes.data
-      const isAdmin = userEmail === 'heyarsen@icloud.com' || profileData?.role === 'admin'
+      const isAdmin = isAdminEmail(userEmail) || profileData?.role === 'admin'
 
       let hasActive = false
       let reason = 'NONE'
@@ -89,7 +99,18 @@ const fetchUserRoleAndSubscription = async (userId: string, userEmail: string, f
       return res
     } catch (err: any) {
       console.error('[Auth] Profile Fetch Error or Timeout:', err)
-      return { role: 'user', hasActiveSubscription: false, debugReason: err.message === 'Profile fetch timeout' ? 'Timeout' : 'Error' }
+      if (staleCachedData) {
+        return {
+          ...staleCachedData,
+          debugReason: err.message === 'Profile fetch timeout' ? 'Timeout (cached profile)' : 'Error (cached profile)'
+        }
+      }
+
+      return {
+        role: isAdminEmail(userEmail) ? 'admin' : 'user',
+        hasActiveSubscription: isAdminEmail(userEmail),
+        debugReason: err.message === 'Profile fetch timeout' ? 'Timeout' : 'Error'
+      }
     }
   })()
 
@@ -197,7 +218,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithGoogle: async () => {
         await supabase.auth.signInWithOAuth({
           provider: 'google',
-          options: { redirectTo: `${appUrl}/dashboard` },
+          options: { redirectTo: `${appUrl}/create` },
         })
       },
       resetPassword: async (e) => { await api.post('/api/auth/reset-password', { email: e }) },

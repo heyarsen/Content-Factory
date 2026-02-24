@@ -1,6 +1,15 @@
 import axios from 'axios'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+const getDefaultApiUrl = () => {
+  if (typeof window === 'undefined') {
+    return 'http://localhost:3001'
+  }
+
+  const { protocol, hostname } = window.location
+  return `${protocol}//${hostname}:3001`
+}
+
+const API_URL = import.meta.env.VITE_API_URL || getDefaultApiUrl()
 
 const api = axios.create({
   baseURL: API_URL,

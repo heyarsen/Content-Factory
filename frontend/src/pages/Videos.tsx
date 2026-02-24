@@ -68,6 +68,7 @@ export function Videos() {
   const postModalVideoIdRef = useRef<string | null>(null)
 
   const notifiedVideosRef = useRef<Set<string>>(new Set())
+  const videosCacheKey = `videos_cache:${search || 'all'}:${statusFilter || 'all'}`
 
   // Safety ref to track mounting status
   const mountedRef = useRef(true)
@@ -81,23 +82,48 @@ export function Videos() {
 
   const loadVideos = useCallback(async () => {
     try {
-      const videos = await listVideos({
+      const nextVideos = await listVideos({
         search: search || undefined,
         status: statusFilter,
-      })
+      }, 15000)
       if (mountedRef.current) {
-        setVideos(videos)
+        setVideos(nextVideos)
+        sessionStorage.setItem(videosCacheKey, JSON.stringify({ timestamp: Date.now(), videos: nextVideos }))
       }
     } catch (error) {
       console.error('Failed to load videos:', error)
+      const cached = sessionStorage.getItem(videosCacheKey)
+      if (cached && mountedRef.current) {
+        try {
+          const parsed = JSON.parse(cached) as { timestamp: number; videos: VideoRecord[] }
+          if (Array.isArray(parsed.videos)) {
+            setVideos(parsed.videos)
+          }
+        } catch {
+          // ignore malformed cache
+        }
+      }
     } finally {
       if (mountedRef.current) {
         setLoading(false)
       }
     }
-  }, [search, statusFilter])
+  }, [search, statusFilter, videosCacheKey])
 
   useEffect(() => {
+    const cached = sessionStorage.getItem(videosCacheKey)
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached) as { timestamp: number; videos: VideoRecord[] }
+        if (Array.isArray(parsed.videos) && Date.now() - parsed.timestamp < 180000) {
+          setVideos(parsed.videos)
+          setLoading(false)
+        }
+      } catch {
+        // ignore malformed cache
+      }
+    }
+
     loadVideos()
 
     // Safety timeout for loading state
@@ -109,7 +135,16 @@ export function Videos() {
     }, 10000)
 
     return () => clearTimeout(timeout)
-  }, [loadVideos]) // Removed loading from dependency to avoid loop, but it's safe
+  }, [loadVideos, videosCacheKey]) // Removed loading from dependency to avoid loop, but it's safe
+
+  useEffect(() => {
+    const refreshOnPostCreated = () => {
+      loadVideos()
+    }
+
+    window.addEventListener('content-factory:post-created', refreshOnPostCreated)
+    return () => window.removeEventListener('content-factory:post-created', refreshOnPostCreated)
+  }, [loadVideos])
 
   const loadSocialAccounts = useCallback(async () => {
     try {
@@ -514,7 +549,7 @@ export function Videos() {
       <div className="space-y-10">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('videos.my_videos') || 'My Videos'}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('videos.my_videos') || 'Video Library'}</p>
             <h1 className="text-3xl font-semibold text-primary">{t('videos.library_title')}</h1>
             <p className="text-sm text-slate-500">{t('videos.library_desc')}</p>
           </div>

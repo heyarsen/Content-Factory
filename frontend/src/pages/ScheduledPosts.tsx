@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -12,65 +12,130 @@ import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useCreditsContext } from '../contexts/CreditContext'
 import { useLanguage } from '../contexts/LanguageContext'
-import { Calendar, ChevronLeft, ChevronRight, Instagram, Users, Youtube, Facebook } from 'lucide-react'
+import {
+  AlertTriangle,
+  Calendar,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  Facebook,
+  Instagram,
+  List,
+  RefreshCw,
+  TimerReset,
+  Users,
+  Youtube,
+} from 'lucide-react'
 import { CreditBanner } from '../components/ui/CreditBanner'
+
+type Platform = 'instagram' | 'tiktok' | 'youtube' | 'facebook'
+type ApprovalState = 'creator' | 'reviewer' | 'approver' | 'approved'
+type ViewMode = 'month' | 'week' | 'list'
 
 interface Post {
   id: string
   video_id: string
-  platform: 'instagram' | 'tiktok' | 'youtube' | 'facebook'
+  platform: Platform
   scheduled_time: string | null
-  status: 'pending' | 'posted' | 'failed' | 'cancelled'
+  status: 'pending' | 'posted' | 'failed' | 'cancelled' | 'draft'
   posted_at: string | null
   error_message: string | null
+  caption?: string | null
+  media_url?: string | null
+  hashtags?: string[] | null
   videos: {
     topic: string
     video_url: string | null
   }
 }
 
-const platformIcons = {
+interface VariantDraft {
+  caption: string
+  mediaUrl: string
+  hashtags: string
+}
+
+interface Campaign {
+  id: string
+  videoId: string
+  topic: string
+  posts: Post[]
+  variants: Record<Platform, VariantDraft>
+}
+
+const platformIcons: Record<Platform, any> = {
   instagram: Instagram,
   tiktok: Users,
   youtube: Youtube,
   facebook: Facebook,
 }
 
-const platformNames = {
+const platformNames: Record<Platform, string> = {
   instagram: 'Instagram',
   tiktok: 'TikTok',
   youtube: 'YouTube',
   facebook: 'Facebook',
 }
 
+const emptyVariant = (): VariantDraft => ({ caption: '', mediaUrl: '', hashtags: '' })
+
+const bestTimeSuggestions: Record<Platform, string[]> = {
+  instagram: ['09:30', '12:30', '18:30'],
+  tiktok: ['11:00', '15:00', '20:00'],
+  youtube: ['10:00', '14:00', '19:00'],
+  facebook: ['08:30', '13:00', '17:30'],
+}
+
+const normalizeStatus = (status: Post['status']): 'draft' | 'scheduled' | 'published' | 'failed' => {
+  if (status === 'draft') return 'draft'
+  if (status === 'posted') return 'published'
+  if (status === 'failed') return 'failed'
+  return 'scheduled'
+}
+
+const formatDateKey = (date: Date) => date.toISOString().split('T')[0]
+
 export function ScheduledPosts() {
-  useLanguage()
+  const { t } = useLanguage()
   const { user } = useAuth()
   const { credits, unlimited } = useCreditsContext()
   const hasSubscription = (user?.hasActiveSubscription || user?.role === 'admin') || false
   const safeCanCreate = hasSubscription || (credits !== null && credits > 0) || unlimited
+
   const [posts, setPosts] = useState<Post[]>([])
   const [videos, setVideos] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('all')
+  const [platformFilter, setPlatformFilter] = useState('all')
+  const [viewMode, setViewMode] = useState<ViewMode>('month')
+
   const [scheduleModal, setScheduleModal] = useState(false)
   const [selectedVideo, setSelectedVideo] = useState('')
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([])
   const [scheduledTime, setScheduledTime] = useState('')
-  const [caption, setCaption] = useState('')
+  const [variantDrafts, setVariantDrafts] = useState<Record<Platform, VariantDraft>>({
+    instagram: emptyVariant(),
+    tiktok: emptyVariant(),
+    youtube: emptyVariant(),
+    facebook: emptyVariant(),
+  })
   const [scheduling, setScheduling] = useState(false)
+
   const [cancelModal, setCancelModal] = useState<string | null>(null)
   const [cancelling, setCancelling] = useState(false)
 
-  // Calendar state
-  const [currentDate, setCurrentDate] = useState(new Date())
-  const [selectedDate, setSelectedDate] = useState<string | null>(() => {
-    // Auto-select today's date if it has posts
-    const today = new Date().toISOString().split('T')[0]
-    return today
-  })
+  const [retryModalPost, setRetryModalPost] = useState<Post | null>(null)
+  const [retryTime, setRetryTime] = useState('')
+  const [retryCaption, setRetryCaption] = useState('')
+  const [retrying, setRetrying] = useState(false)
 
-  // Safety ref
+  const [approvalByCampaign, setApprovalByCampaign] = useState<Record<string, ApprovalState>>({})
+  const [autoRescheduleMissed, setAutoRescheduleMissed] = useState(true)
+
+  const [currentDate, setCurrentDate] = useState(new Date())
+  const [selectedDate, setSelectedDate] = useState<string | null>(() => formatDateKey(new Date()))
+
   const mountedRef = useRef(true)
 
   useEffect(() => {
@@ -84,25 +149,17 @@ export function ScheduledPosts() {
     loadPosts()
     loadVideos()
 
-    // Safety timeout
     const timeout = setTimeout(() => {
-      if (loading && mountedRef.current) {
-        console.warn('Scheduled posts loading timed out')
-        setLoading(false)
-      }
+      if (loading && mountedRef.current) setLoading(false)
     }, 10000)
 
     return () => clearTimeout(timeout)
   }, [statusFilter])
 
   useEffect(() => {
-    // Poll for status updates
     const interval = setInterval(() => {
       if (!mountedRef.current) return
-      const pending = posts.filter((p: Post) => p.status === 'pending')
-      if (pending.length > 0) {
-        loadPosts()
-      }
+      if (posts.some((p) => p.status === 'pending')) loadPosts()
     }, 10000)
     return () => clearInterval(interval)
   }, [posts])
@@ -111,29 +168,95 @@ export function ScheduledPosts() {
     try {
       const params: any = {}
       if (statusFilter !== 'all') params.status = statusFilter
-
       const response = await api.get('/api/posts', { params })
-      if (mountedRef.current) {
-        setPosts(response.data.posts || [])
-      }
+      if (mountedRef.current) setPosts(response.data.posts || [])
     } catch (error) {
       console.error('Failed to load posts:', error)
     } finally {
-      if (mountedRef.current) {
-        setLoading(false)
-      }
+      if (mountedRef.current) setLoading(false)
     }
   }
 
   const loadVideos = async () => {
     try {
       const response = await api.get('/api/videos', { params: { status: 'completed' } })
-      if (mountedRef.current) {
-        setVideos(response.data.videos || [])
-      }
+      if (mountedRef.current) setVideos(response.data.videos || [])
     } catch (error) {
       console.error('Failed to load videos:', error)
     }
+  }
+
+  const filteredPosts = useMemo(() => {
+    return posts.filter((post) => {
+      if (platformFilter !== 'all' && post.platform !== platformFilter) return false
+      if (statusFilter === 'all') return true
+      return post.status === statusFilter
+    })
+  }, [posts, platformFilter, statusFilter])
+
+  const postsByDate = useMemo(() => {
+    const grouped: Record<string, Post[]> = {}
+    filteredPosts.forEach((post) => {
+      const dateKey = post.scheduled_time
+        ? formatDateKey(new Date(post.scheduled_time))
+        : post.posted_at
+          ? formatDateKey(new Date(post.posted_at))
+          : formatDateKey(new Date())
+      grouped[dateKey] = [...(grouped[dateKey] || []), post]
+    })
+    return grouped
+  }, [filteredPosts])
+
+  const campaigns = useMemo<Campaign[]>(() => {
+    const grouped = new Map<string, Campaign>()
+    filteredPosts.forEach((post) => {
+      if (!grouped.has(post.video_id)) {
+        grouped.set(post.video_id, {
+          id: `campaign-${post.video_id}`,
+          videoId: post.video_id,
+          topic: post.videos?.topic || 'Untitled campaign',
+          posts: [],
+          variants: {
+            instagram: emptyVariant(),
+            tiktok: emptyVariant(),
+            youtube: emptyVariant(),
+            facebook: emptyVariant(),
+          },
+        })
+      }
+      const campaign = grouped.get(post.video_id)!
+      campaign.posts.push(post)
+      campaign.variants[post.platform] = {
+        caption: post.caption || '',
+        mediaUrl: post.media_url || post.videos?.video_url || '',
+        hashtags: Array.isArray(post.hashtags) ? post.hashtags.join(' ') : '',
+      }
+    })
+    return Array.from(grouped.values())
+  }, [filteredPosts])
+
+  const getStatusBadge = (status: Post['status']) => {
+    const normalized = normalizeStatus(status)
+    const variants: Record<string, 'default' | 'success' | 'error' | 'warning'> = {
+      draft: 'default',
+      scheduled: 'warning',
+      published: 'success',
+      failed: 'error',
+    }
+    return <Badge variant={variants[normalized]}>{normalized}</Badge>
+  }
+
+  const togglePlatform = (platform: Platform) => {
+    setSelectedPlatforms((prev) => (prev.includes(platform) ? prev.filter((p) => p !== platform) : [...prev, platform]))
+  }
+
+  const getSuggestionDateTime = (platform: Platform, baseDate: Date = new Date()) => {
+    const suggestion = bestTimeSuggestions[platform][0]
+    const [hours, minutes] = suggestion.split(':').map(Number)
+    const dt = new Date(baseDate)
+    dt.setHours(hours, minutes, 0, 0)
+    if (dt.getTime() < Date.now()) dt.setDate(dt.getDate() + 1)
+    return new Date(dt.getTime() - dt.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
   }
 
   const handleSchedule = async () => {
@@ -144,28 +267,41 @@ export function ScheduledPosts() {
 
     setScheduling(true)
     try {
-      await api.post('/api/posts/schedule', {
-        video_id: selectedVideo,
-        platforms: selectedPlatforms,
-        scheduled_time: scheduledTime || null,
-        caption: caption || undefined,
-      })
+      for (const platform of selectedPlatforms) {
+        const variant = variantDrafts[platform]
+        const resolvedTime = scheduledTime || getSuggestionDateTime(platform)
+        const hashtags = variant.hashtags
+          .split(' ')
+          .map((tag) => tag.trim())
+          .filter(Boolean)
+          .join(' ')
+
+        await api.post('/api/posts/schedule', {
+          video_id: selectedVideo,
+          platforms: [platform],
+          scheduled_time: resolvedTime,
+          caption: [variant.caption, hashtags].filter(Boolean).join(' ').trim() || undefined,
+        })
+      }
 
       if (mountedRef.current) {
         setScheduleModal(false)
         setSelectedVideo('')
         setSelectedPlatforms([])
         setScheduledTime('')
-        setCaption('')
+        setVariantDrafts({
+          instagram: emptyVariant(),
+          tiktok: emptyVariant(),
+          youtube: emptyVariant(),
+          facebook: emptyVariant(),
+        })
         loadPosts()
       }
     } catch (error: any) {
       console.error('Failed to schedule post:', error)
       alert(error.response?.data?.error || 'Failed to schedule post')
     } finally {
-      if (mountedRef.current) {
-        setScheduling(false)
-      }
+      if (mountedRef.current) setScheduling(false)
     }
   }
 
@@ -174,78 +310,81 @@ export function ScheduledPosts() {
     try {
       await api.delete(`/api/posts/${id}`)
       if (mountedRef.current) {
-        setPosts(posts.filter((p: Post) => p.id !== id))
+        setPosts((prev) => prev.filter((p) => p.id !== id))
         setCancelModal(null)
       }
     } catch (error) {
       console.error('Failed to cancel post:', error)
     } finally {
-      if (mountedRef.current) {
-        setCancelling(false)
-      }
+      if (mountedRef.current) setCancelling(false)
     }
   }
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, 'default' | 'success' | 'error' | 'warning'> = {
-      posted: 'success',
-      pending: 'warning',
-      failed: 'error',
-      cancelled: 'default',
+  const handleAutoReschedule = async (post: Post) => {
+    if (!autoRescheduleMissed || !post.scheduled_time) return
+    try {
+      const nextSlot = getSuggestionDateTime(post.platform, new Date(post.scheduled_time))
+      await api.post('/api/posts/schedule', {
+        video_id: post.video_id,
+        platforms: [post.platform],
+        scheduled_time: nextSlot,
+        caption: post.caption || undefined,
+      })
+      await api.delete(`/api/posts/${post.id}`)
+      loadPosts()
+    } catch (error) {
+      console.error('Failed to auto-reschedule missed post:', error)
     }
-    return <Badge variant={variants[status] || 'default'}>{status}</Badge>
   }
 
-  const togglePlatform = (platform: string) => {
-    setSelectedPlatforms((prev: string[]) =>
-      prev.includes(platform)
-        ? prev.filter((p: string) => p !== platform)
-        : [...prev, platform]
-    )
+  const missedPosts = filteredPosts.filter(
+    (post) => post.status === 'pending' && post.scheduled_time && new Date(post.scheduled_time).getTime() < Date.now(),
+  )
+
+  useEffect(() => {
+    if (!autoRescheduleMissed) return
+    missedPosts.forEach((post) => {
+      handleAutoReschedule(post)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRescheduleMissed, missedPosts.length])
+
+  const openRetryModal = (post: Post) => {
+    setRetryModalPost(post)
+    setRetryCaption(post.caption || '')
+    setRetryTime(getSuggestionDateTime(post.platform))
   }
 
-  // Group posts by date
-  const postsByDate: Record<string, Post[]> = {}
-  posts.forEach((post: Post) => {
-    const dateKey = post.scheduled_time
-      ? new Date(post.scheduled_time).toISOString().split('T')[0]
-      : post.posted_at
-        ? new Date(post.posted_at).toISOString().split('T')[0]
-        : new Date().toISOString().split('T')[0]
-    if (!postsByDate[dateKey]) {
-      postsByDate[dateKey] = []
+  const handleRetryPost = async () => {
+    if (!retryModalPost) return
+    setRetrying(true)
+    try {
+      await api.post('/api/posts/schedule', {
+        video_id: retryModalPost.video_id,
+        platforms: [retryModalPost.platform],
+        scheduled_time: retryTime,
+        caption: retryCaption || undefined,
+      })
+      setRetryModalPost(null)
+      loadPosts()
+    } catch (error) {
+      console.error('Retry scheduling failed:', error)
+      alert('Failed to retry post')
+    } finally {
+      setRetrying(false)
     }
-    postsByDate[dateKey].push(post)
-  })
+  }
 
-  // Calendar utilities
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth()
-
   const firstDayOfMonth = new Date(year, month, 1)
-  const lastDayOfMonth = new Date(year, month + 1, 0)
-  const daysInMonth = lastDayOfMonth.getDate()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
   const startingDayOfWeek = firstDayOfMonth.getDay()
 
-  const previousMonth = () => {
-    setCurrentDate(new Date(year, month - 1, 1))
-  }
-
-  const nextMonth = () => {
-    setCurrentDate(new Date(year, month + 1, 1))
-  }
-
-  const getPostsForDate = (date: Date): Post[] => {
-    const dateKey = date.toISOString().split('T')[0]
-    return postsByDate[dateKey] || []
-  }
-
-  const formatDateKey = (day: number): string => {
-    const date = new Date(year, month, day)
-    return date.toISOString().split('T')[0]
-  }
-
   const selectedDatePosts = selectedDate ? postsByDate[selectedDate] || [] : []
+  const upcomingQueue = [...filteredPosts]
+    .filter((p) => p.status === 'pending' && p.scheduled_time)
+    .sort((a, b) => new Date(a.scheduled_time!).getTime() - new Date(b.scheduled_time!).getTime())
 
   if (loading) {
     return (
@@ -263,22 +402,35 @@ export function ScheduledPosts() {
       <div className="space-y-6 sm:space-y-8">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Automation</p>
-            <h1 className="text-3xl font-semibold text-primary">Calendar</h1>
-            <p className="text-sm text-slate-500">View and manage your scheduled posts.</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('scheduled_posts.automation_eyebrow')}</p>
+            <h1 className="text-3xl font-semibold text-primary">{t('scheduled_posts.calendar_title')}</h1>
+            <p className="text-sm text-slate-500">{t('scheduled_posts.calendar_desc')}</p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Card className="border-dashed border-white/40 p-0">
+          <div className="flex flex-wrap gap-3">
+            <Card className="border-dashed border-white/40 p-0 min-w-[170px]">
               <Select
                 options={[
-                  { value: 'all', label: 'All status' },
-                  { value: 'pending', label: 'Pending' },
-                  { value: 'posted', label: 'Posted' },
+                  { value: 'all', label: 'All statuses' },
+                  { value: 'draft', label: 'Draft' },
+                  { value: 'pending', label: 'Scheduled' },
+                  { value: 'posted', label: 'Published' },
                   { value: 'failed', label: 'Failed' },
-                  { value: 'cancelled', label: 'Cancelled' },
                 ]}
                 value={statusFilter}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setStatusFilter(e.target.value)}
+              />
+            </Card>
+            <Card className="border-dashed border-white/40 p-0 min-w-[170px]">
+              <Select
+                options={[
+                  { value: 'all', label: 'All platforms' },
+                  { value: 'instagram', label: 'Instagram' },
+                  { value: 'tiktok', label: 'TikTok' },
+                  { value: 'youtube', label: 'YouTube' },
+                  { value: 'facebook', label: 'Facebook' },
+                ]}
+                value={platformFilter}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setPlatformFilter(e.target.value)}
               />
             </Card>
             <Button
@@ -290,291 +442,289 @@ export function ScheduledPosts() {
               disabled={!safeCanCreate}
             >
               <Calendar className="mr-2 h-4 w-4" />
-              {safeCanCreate ? 'Schedule post' : 'Upgrade to schedule'}
+              {safeCanCreate ? t('scheduled_posts.create_campaign') : t('scheduled_posts.upgrade_to_schedule')}
             </Button>
           </div>
         </div>
 
         <CreditBanner />
 
+        <div className="grid gap-3 sm:grid-cols-3">
+          {(['month', 'week', 'list'] as ViewMode[]).map((mode) => (
+            <Button key={mode} variant={viewMode === mode ? 'primary' : 'ghost'} onClick={() => setViewMode(mode)}>
+              {mode === 'month' ? <Calendar className="mr-2 h-4 w-4" /> : mode === 'week' ? <Clock3 className="mr-2 h-4 w-4" /> : <List className="mr-2 h-4 w-4" />}
+              {t(`scheduled_posts.view_${mode}`)}
+            </Button>
+          ))}
+        </div>
+
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
-          {/* Calendar - Always visible */}
           <Card className="lg:col-span-2 p-4 sm:p-6">
             <div className="mb-6 flex items-center justify-between">
               <h2 className="text-xl font-semibold text-primary">
-                {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                {viewMode === 'list'
+                  ? t('scheduled_posts.all_scheduled_activity')
+                  : currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
               </h2>
-              <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={previousMonth}
-                  className="h-8 w-8 p-0"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setCurrentDate(new Date())}
-                  className="h-8 px-3"
-                >
-                  Today
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={nextMonth}
-                  className="h-8 w-8 p-0"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-7 gap-1 sm:gap-2">
-              {/* Day headers */}
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                <div key={day} className="text-center text-xs font-semibold uppercase tracking-wide text-slate-400 py-2">
-                  {day}
-                </div>
-              ))}
-
-              {/* Empty cells for days before month starts */}
-              {Array.from({ length: startingDayOfWeek }).map((_, i) => (
-                <div key={`empty-${i}`} className="aspect-square" />
-              ))}
-
-              {/* Calendar days */}
-              {Array.from({ length: daysInMonth }).map((_, i) => {
-                const day = i + 1
-                const dateKey = formatDateKey(day)
-                const dayPosts = getPostsForDate(new Date(year, month, day))
-                const isToday = dateKey === new Date().toISOString().split('T')[0]
-                const isSelected = selectedDate === dateKey
-
-                return (
-                  <button
-                    key={day}
-                    type="button"
-                    onClick={() => setSelectedDate(isSelected ? null : dateKey)}
-                    className={`aspect-square rounded-lg sm:rounded-xl border-2 p-1 sm:p-2 text-left transition touch-manipulation min-h-[44px] ${isSelected
-                      ? 'border-brand-500 bg-brand-50'
-                      : isToday
-                        ? 'border-brand-300 bg-brand-50/50'
-                        : dayPosts.length > 0
-                          ? 'border-blue-200 bg-blue-50/50 hover:border-blue-300'
-                          : 'border-transparent hover:border-slate-200 hover:bg-slate-50'
-                      }`}
-                  >
-                    <div className={`text-sm font-semibold ${isToday ? 'text-brand-600' : 'text-slate-700'}`}>
-                      {day}
-                    </div>
-                    {dayPosts.length > 0 && (
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {dayPosts.slice(0, 2).map((post) => (
-                          <div
-                            key={post.id}
-                            className="h-1.5 w-1.5 rounded-full bg-brand-500"
-                            title={platformNames[post.platform]}
-                          />
-                        ))}
-                        {dayPosts.length > 2 && (
-                          <div className="text-[10px] text-slate-500">+{dayPosts.length - 2}</div>
-                        )}
-                      </div>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </Card>
-
-          {/* Selected Date Posts */}
-          <Card className="p-4 sm:p-6">
-            <h3 className="mb-4 text-lg font-semibold text-primary">
-              {selectedDate
-                ? new Date(selectedDate).toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  month: 'long',
-                  day: 'numeric',
-                  year: 'numeric',
-                })
-                : 'Select a date'}
-            </h3>
-            {selectedDatePosts.length === 0 ? (
-              <div className="space-y-4">
-                <p className="text-sm text-slate-500">
-                  {selectedDate ? 'No posts scheduled for this date' : 'Click on a date to see scheduled posts'}
-                </p>
-                {selectedDate && (
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      // Pre-fill the selected date in the schedule modal
-                      const dateTime = new Date(selectedDate)
-                      dateTime.setHours(12, 0, 0, 0) // Set to noon
-                      const localDateTime = new Date(dateTime.getTime() - dateTime.getTimezoneOffset() * 60000)
-                        .toISOString()
-                        .slice(0, 16)
-                      setScheduledTime(localDateTime)
-                      setScheduleModal(true)
-                    }}
-                    className="w-full"
-                    disabled={!safeCanCreate}
-                  >
-                    <Calendar className="mr-2 h-4 w-4" />
-                    Schedule post for this date
+              {viewMode !== 'list' && (
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => setCurrentDate(new Date(year, month - 1, 1))} className="h-8 w-8 p-0">
+                    <ChevronLeft className="h-4 w-4" />
                   </Button>
-                )}
-              </div>
-            ) : (
+                  <Button variant="ghost" size="sm" onClick={() => setCurrentDate(new Date())} className="h-8 px-3">
+                    {t('common.today')}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setCurrentDate(new Date(year, month + 1, 1))} className="h-8 w-8 p-0">
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {viewMode === 'list' ? (
               <div className="space-y-3">
-                {selectedDatePosts.map((post) => {
+                {filteredPosts.map((post) => {
                   const Icon = platformIcons[post.platform]
                   return (
-                    <div
-                      key={post.id}
-                      className="rounded-xl border border-slate-200 bg-white p-3"
-                    >
-                      <div className="mb-2 flex items-center gap-2">
-                        <Icon className="h-4 w-4 text-slate-500" />
-                        <span className="text-sm font-semibold text-primary">
-                          {platformNames[post.platform]}
-                        </span>
-                        {getStatusBadge(post.status)}
+                    <div key={post.id} className="rounded-xl border border-slate-200 p-3">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Icon className="h-4 w-4 text-slate-500" />
+                          <span className="text-sm font-semibold text-primary">{platformNames[post.platform]}</span>
+                          {getStatusBadge(post.status)}
+                        </div>
+                        <span className="text-xs text-slate-500">{post.scheduled_time ? new Date(post.scheduled_time).toLocaleString() : t('scheduled_posts.no_schedule')}</span>
                       </div>
-                      <p className="mb-2 text-xs text-slate-600">{post.videos.topic}</p>
-                      {post.scheduled_time && (
-                        <p className="text-[10px] text-slate-400">
-                          {new Date(post.scheduled_time).toLocaleTimeString('en-US', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </p>
-                      )}
-                      {post.status === 'pending' && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="mt-2 h-6 text-xs text-red-600 hover:bg-red-50"
-                          onClick={() => setCancelModal(post.id)}
-                        >
-                          Cancel
-                        </Button>
-                      )}
+                      <p className="text-xs text-slate-600">{post.videos?.topic}</p>
                     </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="grid grid-cols-7 gap-1 sm:gap-2">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                  <div key={day} className="text-center text-xs font-semibold uppercase tracking-wide text-slate-400 py-2">{day}</div>
+                ))}
+
+                {Array.from({ length: startingDayOfWeek }).map((_, i) => (
+                  <div key={`empty-${i}`} className="aspect-square" />
+                ))}
+
+                {Array.from({ length: daysInMonth }).map((_, i) => {
+                  const day = i + 1
+                  const dateObj = new Date(year, month, day)
+                  const dateKey = formatDateKey(dateObj)
+                  const dayPosts = postsByDate[dateKey] || []
+                  const isToday = dateKey === formatDateKey(new Date())
+                  const isSelected = selectedDate === dateKey
+                  return (
+                    <button
+                      key={day}
+                      type="button"
+                      onClick={() => setSelectedDate(isSelected ? null : dateKey)}
+                      className={`aspect-square rounded-lg sm:rounded-xl border-2 p-1 sm:p-2 text-left transition ${isSelected
+                        ? 'border-brand-500 bg-brand-50'
+                        : isToday
+                          ? 'border-brand-300 bg-brand-50/50'
+                          : dayPosts.length > 0
+                            ? 'border-blue-200 bg-blue-50/50 hover:border-blue-300'
+                            : 'border-transparent hover:border-slate-200 hover:bg-slate-50'}`}
+                    >
+                      <div className={`text-sm font-semibold ${isToday ? 'text-brand-600' : 'text-slate-700'}`}>{day}</div>
+                      {dayPosts.length > 0 && (
+                        <div className="mt-1 flex flex-wrap items-center gap-1">
+                          {dayPosts.slice(0, 3).map((post) => (
+                            <div key={post.id} className={`h-1.5 w-1.5 rounded-full ${normalizeStatus(post.status) === 'failed' ? 'bg-red-500' : 'bg-brand-500'}`} title={platformNames[post.platform]} />
+                          ))}
+                        </div>
+                      )}
+                    </button>
                   )
                 })}
               </div>
             )}
           </Card>
+
+          <Card className="p-4 sm:p-6 space-y-4">
+            <h3 className="text-lg font-semibold text-primary">{selectedDate ? new Date(selectedDate).toDateString() : 'Queue details'}</h3>
+            {selectedDatePosts.length === 0 ? <p className="text-sm text-slate-500">{t('scheduled_posts.no_items_for_day')}</p> : selectedDatePosts.map((post) => {
+              const Icon = platformIcons[post.platform]
+              return (
+                <div key={post.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="mb-2 flex items-center gap-2">
+                    <Icon className="h-4 w-4 text-slate-500" />
+                    <span className="text-sm font-semibold text-primary">{platformNames[post.platform]}</span>
+                    {getStatusBadge(post.status)}
+                  </div>
+                  <p className="mb-2 text-xs text-slate-600">{post.videos.topic}</p>
+                  {post.status === 'failed' && (
+                    <div className="mb-2 rounded-lg bg-red-50 p-2 text-xs text-red-700">{post.error_message || 'Publish failed'}</div>
+                  )}
+                  <div className="flex gap-2">
+                    {post.status === 'pending' && <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setCancelModal(post.id)}>{t('common.cancel')}</Button>}
+                    {post.status === 'failed' && <Button variant="secondary" size="sm" className="h-7 text-xs" onClick={() => openRetryModal(post)}>Retry / Edit</Button>}
+                  </div>
+                </div>
+              )
+            })}
+          </Card>
         </div>
 
-        <Modal
-          isOpen={scheduleModal}
-          onClose={() => setScheduleModal(false)}
-          title="Schedule Post"
-          size="lg"
-        >
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card className="p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-primary">{t('scheduled_posts.queue_management')}</h3>
+              <label className="flex items-center gap-2 text-xs text-slate-600">
+                <input type="checkbox" checked={autoRescheduleMissed} onChange={(e) => setAutoRescheduleMissed(e.target.checked)} />
+                Auto-reschedule missed slots
+              </label>
+            </div>
+            {upcomingQueue.length === 0 ? <p className="text-sm text-slate-500">{t('scheduled_posts.no_queued_posts')}</p> : upcomingQueue.slice(0, 6).map((post) => (
+              <div key={post.id} className="rounded-xl border border-slate-200 p-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold text-primary">{post.videos.topic}</div>
+                  <Badge variant="warning">scheduled</Badge>
+                </div>
+                <p className="text-xs text-slate-600">{platformNames[post.platform]} • {new Date(post.scheduled_time || '').toLocaleString()}</p>
+                <p className="mt-1 text-xs text-brand-600">{t('scheduled_posts.best_time_suggestion')}: {bestTimeSuggestions[post.platform].join(' / ')}</p>
+              </div>
+            ))}
+            {missedPosts.length > 0 && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 flex items-center gap-2">
+                <TimerReset className="h-4 w-4" />
+                {missedPosts.length} missed slot(s) detected {autoRescheduleMissed ? 'and rescheduling is enabled.' : '— enable auto-rescheduling to move them.'}
+              </div>
+            )}
+          </Card>
+
+          <Card className="p-5 space-y-4">
+            <h3 className="text-lg font-semibold text-primary">{t('scheduled_posts.campaign_approvals')}</h3>
+            {campaigns.length === 0 ? <p className="text-sm text-slate-500">{t('scheduled_posts.no_campaigns')}</p> : campaigns.slice(0, 5).map((campaign) => {
+              const state = approvalByCampaign[campaign.id] || 'creator'
+              return (
+                <div key={campaign.id} className="rounded-xl border border-slate-200 p-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-primary">{campaign.topic}</p>
+                      <p className="text-xs text-slate-500">{campaign.posts.length} platform variant(s)</p>
+                    </div>
+                    <Badge variant={state === 'approved' ? 'success' : 'warning'}>{state}</Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {(Object.keys(campaign.variants) as Platform[]).map((platform) => (
+                      <div key={platform} className="rounded-lg border border-slate-100 p-2">
+                        <p className="font-semibold">{platformNames[platform]}</p>
+                        <p className="truncate text-slate-500">{campaign.variants[platform].caption || 'No caption variant yet'}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => setApprovalByCampaign((prev) => ({ ...prev, [campaign.id]: 'creator' }))}>Creator</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setApprovalByCampaign((prev) => ({ ...prev, [campaign.id]: 'reviewer' }))}>Reviewer</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setApprovalByCampaign((prev) => ({ ...prev, [campaign.id]: 'approver' }))}>Approver</Button>
+                    <Button size="sm" variant="secondary" onClick={() => setApprovalByCampaign((prev) => ({ ...prev, [campaign.id]: 'approved' }))}>Approve</Button>
+                  </div>
+                </div>
+              )
+            })}
+          </Card>
+        </div>
+
+        <Modal isOpen={scheduleModal} onClose={() => setScheduleModal(false)} title={t('scheduled_posts.create_campaign')} size="lg">
           <div className="space-y-5">
             <Select
-              label="Select video"
-              options={[
-                { value: '', label: 'Choose a video...' },
-                ...videos.map((v: any) => ({
-                  value: v.id,
-                  label: v.topic,
-                })),
-              ]}
+              label={t('scheduled_posts.select_video')}
+              options={[{ value: '', label: t('scheduled_posts.choose_video') }, ...videos.map((v: any) => ({ value: v.id, label: v.topic }))]}
               value={selectedVideo}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedVideo(e.target.value)}
             />
 
             <div>
-              <label className="mb-2 block text-sm font-semibold text-primary">
-                Select platforms
-              </label>
+              <label className="mb-2 block text-sm font-semibold text-primary">{t('scheduled_posts.platforms')}</label>
               <div className="grid grid-cols-2 gap-3">
-                {Object.entries(platformNames).map(([key, name]) => {
-                  const Icon = platformIcons[key as keyof typeof platformIcons]
+                {(Object.keys(platformNames) as Platform[]).map((key) => {
+                  const Icon = platformIcons[key]
                   const isSelected = selectedPlatforms.includes(key)
                   return (
                     <button
                       key={key}
                       type="button"
                       onClick={() => togglePlatform(key)}
-                      className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-medium transition ${isSelected
-                        ? 'border-brand-300 bg-brand-50 text-brand-600 shadow-[0_18px_45px_-30px_rgba(99,102,241,0.45)]'
-                        : 'border-white/60 bg-white/70 text-slate-500 hover:border-brand-200 hover:text-brand-600'
-                        }`}
+                      className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-medium transition ${isSelected ? 'border-brand-300 bg-brand-50 text-brand-600' : 'border-white/60 bg-white/70 text-slate-500'}`}
                     >
                       <Icon className="h-5 w-5" />
-                      <span>{name}</span>
+                      <span>{platformNames[key]}</span>
                     </button>
                   )
                 })}
               </div>
             </div>
 
-            <Input
-              type="datetime-local"
-              label="Schedule time (optional)"
-              value={scheduledTime}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setScheduledTime(e.target.value)}
-            />
+            <Input type="datetime-local" label={t('scheduled_posts.schedule_time_optional')} value={scheduledTime} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setScheduledTime(e.target.value)} />
 
-            <Textarea
-              label="Caption (optional)"
-              rows={3}
-              value={caption}
-              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setCaption(e.target.value)}
-              placeholder="Add a caption for your post..."
-            />
+            {selectedPlatforms.map((platform) => (
+              <div key={platform} className="rounded-xl border border-slate-200 p-3 space-y-3">
+                <p className="text-sm font-semibold text-primary">{platformNames[platform]} variant</p>
+                <Textarea
+                  label={t('scheduled_posts.caption')}
+                  rows={2}
+                  value={variantDrafts[platform].caption}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                    setVariantDrafts((prev) => ({ ...prev, [platform]: { ...prev[platform], caption: e.target.value } }))}
+                />
+                <Input
+                  label={t('scheduled_posts.media_url_override')}
+                  value={variantDrafts[platform].mediaUrl}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setVariantDrafts((prev) => ({ ...prev, [platform]: { ...prev[platform], mediaUrl: e.target.value } }))}
+                  placeholder={t('scheduled_posts.media_url_optional')}
+                />
+                <Input
+                  label={t('scheduled_posts.hashtags')}
+                  value={variantDrafts[platform].hashtags}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setVariantDrafts((prev) => ({ ...prev, [platform]: { ...prev[platform], hashtags: e.target.value } }))}
+                  placeholder={t('scheduled_posts.hashtags_placeholder')}
+                />
+                <p className="text-xs text-brand-600">{t('scheduled_posts.best_time_suggestion')}: {bestTimeSuggestions[platform].join(' / ')}</p>
+              </div>
+            ))}
 
             <div className="flex gap-3 justify-end pt-2">
-              <Button
-                variant="ghost"
-                className="border border-white/60 bg-white/70 text-slate-500 hover:border-slate-200 hover:bg-white"
-                onClick={() => setScheduleModal(false)}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleSchedule} loading={scheduling}>
-                Schedule post
-              </Button>
+              <Button variant="ghost" className="border border-white/60 bg-white/70 text-slate-500" onClick={() => setScheduleModal(false)}>{t('common.cancel')}</Button>
+              <Button onClick={handleSchedule} loading={scheduling}>{t('scheduled_posts.create_and_schedule')}</Button>
             </div>
           </div>
         </Modal>
 
-        <Modal
-          isOpen={cancelModal !== null}
-          onClose={() => setCancelModal(null)}
-          title="Cancel Post"
-          size="sm"
-        >
-          <p className="mb-4 text-sm text-slate-500">
-            Are you sure you want to cancel this scheduled post?
-          </p>
-          <div className="flex gap-3 justify-end">
-            <Button
-              variant="ghost"
-              className="border border-white/60 bg-white/70 text-slate-500 hover:border-slate-200 hover:bg-white"
-              onClick={() => setCancelModal(null)}
-            >
-              Keep it
-            </Button>
-            <Button
-              variant="danger"
-              onClick={() => cancelModal && handleCancel(cancelModal)}
-              loading={cancelling}
-            >
-              Cancel post
-            </Button>
+        <Modal isOpen={retryModalPost !== null} onClose={() => setRetryModalPost(null)} title={t('scheduled_posts.retry_failed_publish')} size="md">
+          <div className="space-y-3">
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex gap-2 items-start">
+              <AlertTriangle className="h-4 w-4 mt-0.5" />
+              <span>{retryModalPost?.error_message || t('scheduled_posts.publishing_failed_retry')}</span>
+            </div>
+            <Input type="datetime-local" label={t('scheduled_posts.retry_at')} value={retryTime} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRetryTime(e.target.value)} />
+            <Textarea label={t('scheduled_posts.edit_caption_before_retry')} rows={3} value={retryCaption} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setRetryCaption(e.target.value)} />
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setRetryModalPost(null)}>{t('common.close')}</Button>
+              <Button variant="secondary" onClick={handleRetryPost} loading={retrying}><RefreshCw className="h-4 w-4 mr-2" />{t('scheduled_posts.retry_publish')}</Button>
+            </div>
           </div>
         </Modal>
+
+        <Modal isOpen={cancelModal !== null} onClose={() => setCancelModal(null)} title={t('scheduled_posts.cancel_post')} size="sm">
+          <p className="mb-4 text-sm text-slate-500">{t('scheduled_posts.cancel_post_confirm')}</p>
+          <div className="flex gap-3 justify-end">
+            <Button variant="ghost" className="border border-white/60 bg-white/70 text-slate-500" onClick={() => setCancelModal(null)}>{t('scheduled_posts.keep_it')}</Button>
+            <Button variant="danger" onClick={() => cancelModal && handleCancel(cancelModal)} loading={cancelling}>{t('scheduled_posts.cancel_post')}</Button>
+          </div>
+        </Modal>
+
+        <Card className="p-4 text-xs text-slate-500 flex items-start gap-2">
+          <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5" />
+          {t('scheduled_posts.status_badges_hint')}
+        </Card>
       </div>
     </Layout>
   )
 }
-

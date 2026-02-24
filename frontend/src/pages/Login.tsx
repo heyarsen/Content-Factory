@@ -39,10 +39,10 @@ export function Login() {
     try {
       console.log('[Login] Attempting sign in...')
       await signIn(email, password)
-      console.log('[Login] Sign in successful, navigating to dashboard...')
+      console.log('[Login] Sign in successful, navigating to creator studio...')
       clearTimeout(safetyTimeout)
       setOptimisticLoading(false)
-      navigate('/dashboard')
+      navigate('/planning')
     } catch (err: any) {
       clearTimeout(safetyTimeout)
       setOptimisticLoading(false)

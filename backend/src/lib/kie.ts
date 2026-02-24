@@ -1,6 +1,33 @@
 import axios from 'axios'
 
 const KIE_API_URL = 'https://api.kie.ai/api/v1'
+const POYO_API_URL = process.env.POYO_API_URL || 'https://api.poyo.ai'
+
+const CREATE_TASK_ENDPOINTS: Record<SoraProvider, string[]> = {
+    kie: ['/jobs/createTask'],
+    poyo: ['/api/generate/submit'],
+}
+
+const TASK_DETAILS_ENDPOINTS: Record<SoraProvider, string[]> = {
+    kie: ['/jobs/recordInfo'],
+    poyo: ['/api/task/status', '/api/task-management/status'],
+}
+
+export type SoraProvider = 'kie' | 'poyo'
+export type SoraModel = 'sora-2' | 'sora-2-private' | 'sora-2-stable'
+
+const soraModelMap: Record<SoraModel, string> = {
+    'sora-2': 'sora-2-text-to-video',
+    'sora-2-private': 'sora-2-text-to-video-private',
+    'sora-2-stable': 'sora-2-text-to-video-stable',
+}
+
+const poyoModelMap: Record<SoraModel, string> = {
+    'sora-2': 'sora-2',
+    'sora-2-private': 'sora-2-private',
+    // POYO docs only list sora-2 and sora-2-private.
+    'sora-2-stable': 'sora-2',
+}
 
 /**
  * Retry function with exponential backoff for handling rate limits
@@ -46,12 +73,20 @@ async function retryWithBackoff<T>(
 /**
  * Get KIE API key from environment
  */
-function getKieApiKey(): string {
-    const key = process.env.KIE_API_KEY
+function getApiConfig(provider: SoraProvider): { apiKey: string; baseUrl: string } {
+    const key = provider === 'poyo' ? process.env.POYO_API_KEY : process.env.KIE_API_KEY
     if (!key) {
-        throw new Error('Missing KIE_API_KEY environment variable')
+        throw new Error(
+            provider === 'poyo'
+                ? 'Missing POYO_API_KEY environment variable'
+                : 'Missing KIE_API_KEY environment variable'
+        )
     }
-    return key
+
+    return {
+        apiKey: key,
+        baseUrl: provider === 'poyo' ? POYO_API_URL : KIE_API_URL,
+    }
 }
 
 /**
@@ -64,7 +99,7 @@ export type SoraAspectRatio = 'landscape' | 'portrait'
  * Request payload for creating a Sora text-to-video task
  */
 export interface CreateSoraTaskRequest {
-    model: 'sora-2-text-to-video-stable'
+    model: string
     callBackUrl?: string
     input: {
         prompt: string
@@ -84,6 +119,8 @@ export interface CreateSoraTaskResponse {
     msg: string
     data: {
         taskId: string
+        status?: string
+        createdTime?: string
     }
 }
 
@@ -133,6 +170,65 @@ export function calculateFramesFromDuration(durationSeconds: number): string {
     return Math.min(durationSeconds, maxFrames).toString()
 }
 
+function mapPoyoAspectRatio(aspectRatio: SoraAspectRatio): '9:16' | '16:9' {
+    return aspectRatio === 'landscape' ? '16:9' : '9:16'
+}
+
+function mapPoyoDuration(nFrames?: string): 10 | 15 {
+    const parsed = Number.parseInt(nFrames || '10', 10)
+    return parsed > 10 ? 15 : 10
+}
+
+function normalizeCreateTaskResponse(raw: any, provider: SoraProvider): CreateSoraTaskResponse {
+    if (provider === 'poyo') {
+        return {
+            code: raw?.code ?? 500,
+            msg: raw?.msg || '',
+            data: {
+                taskId: raw?.data?.task_id,
+                status: raw?.data?.status,
+                createdTime: raw?.data?.created_time,
+            },
+        }
+    }
+
+    return raw
+}
+
+function normalizeTaskDetailResponse(raw: any, taskId: string, provider: SoraProvider): SoraTaskDetail {
+    if (provider === 'poyo') {
+        const status: string = raw?.data?.status || raw?.data?.state || 'not_started'
+        const mappedState: 'waiting' | 'success' | 'fail' =
+            status === 'finished' || status === 'success'
+                ? 'success'
+                : status === 'failed' || status === 'fail'
+                    ? 'fail'
+                    : 'waiting'
+
+        const resultUrl = raw?.data?.result_url || raw?.data?.video_url || raw?.data?.url
+        const resultJson = resultUrl ? JSON.stringify({ resultUrls: [resultUrl] }) : null
+
+        return {
+            code: raw?.code ?? 500,
+            msg: raw?.msg || '',
+            data: {
+                taskId,
+                model: raw?.data?.model || 'sora-2',
+                state: mappedState,
+                param: JSON.stringify(raw?.data || {}),
+                resultJson,
+                failCode: raw?.error?.type || null,
+                failMsg: raw?.error?.message || raw?.data?.error_message || null,
+                costTime: null,
+                completeTime: null,
+                createTime: Date.now(),
+            },
+        }
+    }
+
+    return raw
+}
+
 /**
  * Create a Sora text-to-video generation task
  */
@@ -145,56 +241,102 @@ export async function createSoraTask(
         characterIdList?: string[]
         callBackUrl?: string
         language?: string // Optional language parameter
+        model?: SoraModel
+        provider?: SoraProvider
     } = {}
 ): Promise<CreateSoraTaskResponse> {
-    const apiKey = getKieApiKey()
+    const provider = options.provider || 'kie'
+    const { apiKey, baseUrl } = getApiConfig(provider)
 
-    const payload: CreateSoraTaskRequest = {
-        model: 'sora-2-text-to-video-stable',
-        callBackUrl: options.callBackUrl,
-        input: {
-            prompt,
-            aspect_ratio: aspectRatio,
-            n_frames: options.nFrames || '10',
-            remove_watermark: options.removeWatermark ?? true,
-            character_id_list: options.characterIdList,
-            ...(options.language && { language: options.language }),
-        },
-    }
+    const payload: Record<string, any> =
+        provider === 'poyo'
+            ? {
+                model: poyoModelMap[options.model || 'sora-2-stable'],
+                callback_url: options.callBackUrl,
+                input: {
+                    prompt,
+                    duration: mapPoyoDuration(options.nFrames),
+                    aspect_ratio: mapPoyoAspectRatio(aspectRatio),
+                },
+            }
+            : {
+                model: soraModelMap[options.model || 'sora-2-stable'],
+                callBackUrl: options.callBackUrl,
+                input: {
+                    prompt,
+                    aspect_ratio: aspectRatio,
+                    n_frames: options.nFrames || '10',
+                    remove_watermark: options.removeWatermark ?? true,
+                    character_id_list: options.characterIdList,
+                    ...(options.language && { language: options.language }),
+                },
+            }
 
-    console.log('[KIE Sora] Creating task with payload:', {
+    console.log('[Sora API] Creating task with payload:', {
+        provider,
+        model: payload.model,
         prompt: prompt.substring(0, 100) + '...',
-        aspect_ratio: aspectRatio,
-        n_frames: payload.input.n_frames,
+        aspect_ratio: payload.input.aspect_ratio,
+        duration_or_frames: payload.input.duration || payload.input.n_frames,
     })
 
     try {
-        const response = await retryWithBackoff(
-            async () => {
-                return await axios.post<CreateSoraTaskResponse>(
-                    `${KIE_API_URL}/jobs/createTask`,
-                    payload,
-                    {
-                        headers: {
-                            'Authorization': `Bearer ${apiKey}`,
-                            'Content-Type': 'application/json',
-                        },
-                        timeout: 30000,
-                    }
-                )
-            },
-            3, // maxRetries
-            1000 // initialDelay
-        )
+        const endpoints = CREATE_TASK_ENDPOINTS[provider]
+        let response: { data: CreateSoraTaskResponse } | null = null
+        let lastError: any = null
 
-        if (response.data.code !== 200) {
-            throw new Error(`KIE API error: ${response.data.msg}`)
+        for (const endpoint of endpoints) {
+            try {
+                response = await retryWithBackoff(
+                    async () => {
+                        return await axios.post(`${baseUrl}${endpoint}`, payload, {
+                            headers: {
+                                'Authorization': `Bearer ${apiKey}`,
+                                'Content-Type': 'application/json',
+                            },
+                            timeout: 30000,
+                        })
+                    },
+                    3,
+                    1000
+                )
+                break
+            } catch (error: any) {
+                lastError = error
+                const status = error?.response?.status
+                // If endpoint was not found, continue to next known variant.
+                if (status === 404 && provider === 'poyo') {
+                    console.warn(`[Sora API] Endpoint returned 404 for provider=${provider}: ${endpoint}`)
+                    continue
+                }
+                throw error
+            }
         }
 
-        console.log('[KIE Sora] Task created successfully:', response.data.data.taskId)
-        return response.data
+        if (!response) {
+            throw lastError || new Error('Failed to create Sora task: no valid endpoint found')
+        }
+
+        const normalizedResponse = normalizeCreateTaskResponse(response.data, provider)
+
+        if (normalizedResponse.code !== 200) {
+            throw new Error(`KIE API error: ${normalizedResponse.msg}`)
+        }
+
+        if (!normalizedResponse.data.taskId) {
+            throw new Error('KIE API error: missing task id in create task response')
+        }
+
+        console.log('[Sora API] Task created successfully:', normalizedResponse.data.taskId)
+        return normalizedResponse
     } catch (error: any) {
-        console.error('[KIE Sora] Failed to create task:', error)
+        console.error('[Sora API] Failed to create task:', {
+            provider,
+            status: error?.response?.status,
+            code: error?.code,
+            message: error?.message,
+            responseData: error?.response?.data,
+        })
 
         let errorMessage = 'Failed to create Sora video generation task'
 
@@ -203,22 +345,22 @@ export async function createSoraTask(
             const data = error.response.data
 
             if (status === 401) {
-                errorMessage = 'KIE API authentication failed. Please check your KIE_API_KEY environment variable.'
+                errorMessage = `${provider.toUpperCase()} API authentication failed. Please check API key environment variable.`
             } else if (status === 402) {
-                errorMessage = 'Insufficient credits in your KIE account.'
+                errorMessage = `Insufficient credits in your ${provider.toUpperCase()} account.`
             } else if (status === 422) {
                 errorMessage = `Invalid request parameters: ${data?.msg || 'Validation error'}`
             } else if (status === 429) {
-                errorMessage = 'KIE API rate limit exceeded. Please try again later.'
+                errorMessage = `${provider.toUpperCase()} API rate limit exceeded. Please try again later.`
             } else if (status === 455) {
-                errorMessage = 'KIE service is currently undergoing maintenance.'
+                errorMessage = `${provider.toUpperCase()} service is currently undergoing maintenance.`
             } else if (status >= 500) {
-                errorMessage = 'KIE API server error. Please try again later.'
+                errorMessage = `${provider.toUpperCase()} API server error. Please try again later.`
             } else if (data?.msg) {
-                errorMessage = `KIE API error: ${data.msg}`
+                errorMessage = `${provider.toUpperCase()} API error: ${data.msg}`
             }
         } else if (error.code === 'ECONNABORTED') {
-            errorMessage = 'Request timeout while connecting to KIE API.'
+            errorMessage = `Request timeout while connecting to ${provider.toUpperCase()} API.`
         } else if (error.message) {
             errorMessage = error.message
         }
@@ -232,21 +374,43 @@ export async function createSoraTask(
 /**
  * Get task details and status
  */
-export async function getTaskDetails(taskId: string): Promise<SoraTaskDetail> {
-    const apiKey = getKieApiKey()
+export async function getTaskDetails(taskId: string, provider: SoraProvider = 'kie'): Promise<SoraTaskDetail> {
+    const { apiKey, baseUrl } = getApiConfig(provider)
 
     try {
-        // Per docs, task status endpoint is /jobs/recordInfo?taskId=...
-        const response = await axios.get<SoraTaskDetail>(`${KIE_API_URL}/jobs/recordInfo`, {
-            params: { taskId },
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-            },
-            timeout: 15000,
-        })
+        const endpoints = TASK_DETAILS_ENDPOINTS[provider]
+        let response: { data: SoraTaskDetail } | null = null
+        let lastError: any = null
 
-        if (response.data.code !== 200) {
+        for (const endpoint of endpoints) {
+            try {
+                response = await axios.get(`${baseUrl}${endpoint}`, {
+                    params: provider === 'poyo' ? { task_id: taskId } : { taskId },
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`,
+                        'Content-Type': 'application/json',
+                    },
+                    timeout: 15000,
+                })
+                break
+            } catch (error: any) {
+                lastError = error
+                const status = error?.response?.status
+                if (status === 404 && provider === 'poyo') {
+                    console.warn(`[Sora API] Task details endpoint returned 404 for provider=${provider}: ${endpoint}`)
+                    continue
+                }
+                throw error
+            }
+        }
+
+        if (!response) {
+            throw lastError || new Error('Failed to retrieve task status: no valid endpoint found')
+        }
+
+        const normalizedResponse = normalizeTaskDetailResponse(response.data, taskId, provider)
+
+        if (normalizedResponse.code !== 200) {
             if (response.data.msg?.includes('recordInfo is null')) {
                 return {
                     code: 200,
@@ -266,12 +430,19 @@ export async function getTaskDetails(taskId: string): Promise<SoraTaskDetail> {
                 }
             }
 
-            throw new Error(`KIE API error: ${response.data.msg}`)
+            throw new Error(`KIE API error: ${normalizedResponse.msg}`)
         }
 
-        return response.data
+        return normalizedResponse
     } catch (error: any) {
-        console.error('[KIE Sora] Failed to get task details:', error)
+        console.error('[Sora API] Failed to get task details:', {
+            provider,
+            taskId,
+            status: error?.response?.status,
+            code: error?.code,
+            message: error?.message,
+            responseData: error?.response?.data,
+        })
 
         let errorMessage = 'Failed to retrieve task status'
 
@@ -280,11 +451,11 @@ export async function getTaskDetails(taskId: string): Promise<SoraTaskDetail> {
             const data = error.response.data
 
             if (status === 401) {
-                errorMessage = 'KIE API authentication failed.'
+                errorMessage = `${provider.toUpperCase()} API authentication failed.`
             } else if (status === 404) {
                 errorMessage = `Task not found: ${taskId}`
             } else if (data?.msg) {
-                errorMessage = `KIE API error: ${data.msg}`
+                errorMessage = `${provider.toUpperCase()} API error: ${data.msg}`
             }
         } else if (error.message) {
             errorMessage = error.message
@@ -305,6 +476,7 @@ export async function pollTaskUntilComplete(
         maxAttempts?: number
         pollInterval?: number // milliseconds
         onProgress?: (progress: number, status: string) => void
+        provider?: SoraProvider
     } = {}
 ): Promise<SoraTaskDetail> {
     // Increase timeout: 120 attempts * 10s = 20 minutes (video generation can take longer)
@@ -316,7 +488,7 @@ export async function pollTaskUntilComplete(
     while (attempts < maxAttempts) {
         attempts++
 
-        const taskDetail = await getTaskDetails(taskId)
+        const taskDetail = await getTaskDetails(taskId, options.provider || 'kie')
         const state = taskDetail.data.state // API uses 'state', not 'status'
 
         console.log(`[KIE Sora] Task ${taskId} state: ${state} (attempt ${attempts}/${maxAttempts})`)
