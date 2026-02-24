@@ -1,17 +1,16 @@
 import axios from 'axios'
 
 const KIE_API_URL = 'https://api.kie.ai/api/v1'
-const POYO_API_URL = process.env.POYO_API_URL || 'https://api.poyo.ai/api/v1'
+const POYO_API_URL = process.env.POYO_API_URL || 'https://api.poyo.ai'
 
 const CREATE_TASK_ENDPOINTS: Record<SoraProvider, string[]> = {
     kie: ['/jobs/createTask'],
-    // POYO has shipped endpoint variants; try canonical first, then fallbacks.
-    poyo: ['/jobs/createTask', '/jobs/create', '/job/createTask'],
+    poyo: ['/api/generate/submit'],
 }
 
 const TASK_DETAILS_ENDPOINTS: Record<SoraProvider, string[]> = {
     kie: ['/jobs/recordInfo'],
-    poyo: ['/jobs/recordInfo', '/jobs/getTask', '/job/recordInfo'],
+    poyo: ['/api/task/status', '/api/task-management/status'],
 }
 
 export type SoraProvider = 'kie' | 'poyo'
@@ -21,6 +20,13 @@ const soraModelMap: Record<SoraModel, string> = {
     'sora-2': 'sora-2-text-to-video',
     'sora-2-private': 'sora-2-text-to-video-private',
     'sora-2-stable': 'sora-2-text-to-video-stable',
+}
+
+const poyoModelMap: Record<SoraModel, string> = {
+    'sora-2': 'sora-2',
+    'sora-2-private': 'sora-2-private',
+    // POYO docs only list sora-2 and sora-2-private.
+    'sora-2-stable': 'sora-2',
 }
 
 /**
@@ -113,6 +119,8 @@ export interface CreateSoraTaskResponse {
     msg: string
     data: {
         taskId: string
+        status?: string
+        createdTime?: string
     }
 }
 
@@ -162,6 +170,65 @@ export function calculateFramesFromDuration(durationSeconds: number): string {
     return Math.min(durationSeconds, maxFrames).toString()
 }
 
+function mapPoyoAspectRatio(aspectRatio: SoraAspectRatio): '9:16' | '16:9' {
+    return aspectRatio === 'landscape' ? '16:9' : '9:16'
+}
+
+function mapPoyoDuration(nFrames?: string): 10 | 15 {
+    const parsed = Number.parseInt(nFrames || '10', 10)
+    return parsed > 10 ? 15 : 10
+}
+
+function normalizeCreateTaskResponse(raw: any, provider: SoraProvider): CreateSoraTaskResponse {
+    if (provider === 'poyo') {
+        return {
+            code: raw?.code ?? 500,
+            msg: raw?.msg || '',
+            data: {
+                taskId: raw?.data?.task_id,
+                status: raw?.data?.status,
+                createdTime: raw?.data?.created_time,
+            },
+        }
+    }
+
+    return raw
+}
+
+function normalizeTaskDetailResponse(raw: any, taskId: string, provider: SoraProvider): SoraTaskDetail {
+    if (provider === 'poyo') {
+        const status: string = raw?.data?.status || raw?.data?.state || 'not_started'
+        const mappedState: 'waiting' | 'success' | 'fail' =
+            status === 'finished' || status === 'success'
+                ? 'success'
+                : status === 'failed' || status === 'fail'
+                    ? 'fail'
+                    : 'waiting'
+
+        const resultUrl = raw?.data?.result_url || raw?.data?.video_url || raw?.data?.url
+        const resultJson = resultUrl ? JSON.stringify({ resultUrls: [resultUrl] }) : null
+
+        return {
+            code: raw?.code ?? 500,
+            msg: raw?.msg || '',
+            data: {
+                taskId,
+                model: raw?.data?.model || 'sora-2',
+                state: mappedState,
+                param: JSON.stringify(raw?.data || {}),
+                resultJson,
+                failCode: raw?.error?.type || null,
+                failMsg: raw?.error?.message || raw?.data?.error_message || null,
+                costTime: null,
+                completeTime: null,
+                createTime: Date.now(),
+            },
+        }
+    }
+
+    return raw
+}
+
 /**
  * Create a Sora text-to-video generation task
  */
@@ -181,25 +248,36 @@ export async function createSoraTask(
     const provider = options.provider || 'kie'
     const { apiKey, baseUrl } = getApiConfig(provider)
 
-    const payload: CreateSoraTaskRequest = {
-        model: soraModelMap[options.model || 'sora-2-stable'],
-        callBackUrl: options.callBackUrl,
-        input: {
-            prompt,
-            aspect_ratio: aspectRatio,
-            n_frames: options.nFrames || '10',
-            remove_watermark: options.removeWatermark ?? true,
-            character_id_list: options.characterIdList,
-            ...(options.language && { language: options.language }),
-        },
-    }
+    const payload: Record<string, any> =
+        provider === 'poyo'
+            ? {
+                model: poyoModelMap[options.model || 'sora-2-stable'],
+                callback_url: options.callBackUrl,
+                input: {
+                    prompt,
+                    duration: mapPoyoDuration(options.nFrames),
+                    aspect_ratio: mapPoyoAspectRatio(aspectRatio),
+                },
+            }
+            : {
+                model: soraModelMap[options.model || 'sora-2-stable'],
+                callBackUrl: options.callBackUrl,
+                input: {
+                    prompt,
+                    aspect_ratio: aspectRatio,
+                    n_frames: options.nFrames || '10',
+                    remove_watermark: options.removeWatermark ?? true,
+                    character_id_list: options.characterIdList,
+                    ...(options.language && { language: options.language }),
+                },
+            }
 
     console.log('[Sora API] Creating task with payload:', {
         provider,
         model: payload.model,
         prompt: prompt.substring(0, 100) + '...',
-        aspect_ratio: aspectRatio,
-        n_frames: payload.input.n_frames,
+        aspect_ratio: payload.input.aspect_ratio,
+        duration_or_frames: payload.input.duration || payload.input.n_frames,
     })
 
     try {
@@ -211,7 +289,7 @@ export async function createSoraTask(
             try {
                 response = await retryWithBackoff(
                     async () => {
-                        return await axios.post<CreateSoraTaskResponse>(`${baseUrl}${endpoint}`, payload, {
+                        return await axios.post(`${baseUrl}${endpoint}`, payload, {
                             headers: {
                                 'Authorization': `Bearer ${apiKey}`,
                                 'Content-Type': 'application/json',
@@ -239,12 +317,18 @@ export async function createSoraTask(
             throw lastError || new Error('Failed to create Sora task: no valid endpoint found')
         }
 
-        if (response.data.code !== 200) {
-            throw new Error(`KIE API error: ${response.data.msg}`)
+        const normalizedResponse = normalizeCreateTaskResponse(response.data, provider)
+
+        if (normalizedResponse.code !== 200) {
+            throw new Error(`KIE API error: ${normalizedResponse.msg}`)
         }
 
-        console.log('[Sora API] Task created successfully:', response.data.data.taskId)
-        return response.data
+        if (!normalizedResponse.data.taskId) {
+            throw new Error('KIE API error: missing task id in create task response')
+        }
+
+        console.log('[Sora API] Task created successfully:', normalizedResponse.data.taskId)
+        return normalizedResponse
     } catch (error: any) {
         console.error('[Sora API] Failed to create task:', {
             provider,
@@ -300,8 +384,8 @@ export async function getTaskDetails(taskId: string, provider: SoraProvider = 'k
 
         for (const endpoint of endpoints) {
             try {
-                response = await axios.get<SoraTaskDetail>(`${baseUrl}${endpoint}`, {
-                    params: { taskId },
+                response = await axios.get(`${baseUrl}${endpoint}`, {
+                    params: provider === 'poyo' ? { task_id: taskId } : { taskId },
                     headers: {
                         'Authorization': `Bearer ${apiKey}`,
                         'Content-Type': 'application/json',
@@ -324,7 +408,9 @@ export async function getTaskDetails(taskId: string, provider: SoraProvider = 'k
             throw lastError || new Error('Failed to retrieve task status: no valid endpoint found')
         }
 
-        if (response.data.code !== 200) {
+        const normalizedResponse = normalizeTaskDetailResponse(response.data, taskId, provider)
+
+        if (normalizedResponse.code !== 200) {
             if (response.data.msg?.includes('recordInfo is null')) {
                 return {
                     code: 200,
@@ -344,10 +430,10 @@ export async function getTaskDetails(taskId: string, provider: SoraProvider = 'k
                 }
             }
 
-            throw new Error(`KIE API error: ${response.data.msg}`)
+            throw new Error(`KIE API error: ${normalizedResponse.msg}`)
         }
 
-        return response.data
+        return normalizedResponse
     } catch (error: any) {
         console.error('[Sora API] Failed to get task details:', {
             provider,
