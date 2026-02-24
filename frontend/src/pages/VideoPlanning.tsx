@@ -244,6 +244,10 @@ export function VideoPlanning() {
     const stored = window.localStorage.getItem(CALENDAR_VIEW_KEY)
     return stored === 'month' ? 'month' : 'week'
   })
+  const [isMobileCalendar, setIsMobileCalendar] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.innerWidth < 768
+  })
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>(() => {
     if (typeof window === 'undefined') return 'all'
@@ -320,6 +324,22 @@ export function VideoPlanning() {
       window.localStorage.setItem(CALENDAR_VIEW_KEY, calendarView)
     }
   }, [calendarView])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const mediaQuery = window.matchMedia('(max-width: 767px)')
+    const syncMobileState = (event?: MediaQueryListEvent) => {
+      setIsMobileCalendar(event ? event.matches : mediaQuery.matches)
+    }
+
+    syncMobileState()
+    mediaQuery.addEventListener('change', syncMobileState)
+
+    return () => {
+      mediaQuery.removeEventListener('change', syncMobileState)
+    }
+  }, [])
 
   // Avatar-related functions removed - using AI video generation
 
@@ -1281,6 +1301,13 @@ export function VideoPlanning() {
     })
   }, [currentMonth])
 
+  const mobileAgendaDays = useMemo(() => {
+    if (calendarView === 'week') {
+      return weekDays
+    }
+    return getDaysInMonth(currentMonth).filter((date): date is Date => Boolean(date))
+  }, [calendarView, currentMonth, weekDays])
+
   const formatWeekRange = (days: Date[]) => {
     if (!days.length) return ''
     const start = days[0]
@@ -1811,7 +1838,7 @@ export function VideoPlanning() {
                   )}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
                   {[
                     { value: 'all', label: t('video_planning.all') },
                     { value: 'pending', label: t('video_planning.pending') },
@@ -1841,7 +1868,7 @@ export function VideoPlanning() {
                   ))}
                   <button
                     onClick={() => setStatusFilter('all')}
-                    className="ml-auto text-xs font-medium text-slate-500 hover:text-slate-700"
+                    className="ml-2 shrink-0 text-xs font-medium text-slate-500 hover:text-slate-700 sm:ml-auto"
                   >
                     {t('video_planning.clear_filter')}
                   </button>
@@ -1883,7 +1910,71 @@ export function VideoPlanning() {
                 </div>
               </div>
 
-              {calendarView === 'week' ? (
+              {isMobileCalendar ? (
+                <div className="space-y-3">
+                  {mobileAgendaDays.map((date) => {
+                    const dateKey = getDateKey(date)
+                    const items = getItemsForDate(date)
+                    const isToday = dateKey === getDateKey(new Date())
+                    const isSelected = dateKey === selectedDate
+
+                    if (calendarView === 'month' && items.length === 0) return null
+
+                    return (
+                      <button
+                        key={dateKey}
+                        onClick={() => {
+                          setSelectedDate(dateKey)
+                          setIsDetailDrawerOpen(true)
+                        }}
+                        className={`w-full rounded-xl border p-3 text-left transition ${isSelected
+                          ? 'border-brand-500 bg-brand-50 shadow-sm'
+                          : isToday
+                            ? 'border-brand-300 bg-brand-50/70'
+                            : 'border-slate-200 bg-white'
+                          }`}
+                      >
+                        <div className="mb-2 flex items-center justify-between">
+                          <div className="text-sm font-semibold text-slate-700">
+                            {date.toLocaleDateString(language === 'ru' ? 'ru-RU' : language === 'uk' ? 'uk-UA' : language === 'es' ? 'es-ES' : language === 'de' ? 'de-DE' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                          </div>
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                            {items.length}
+                          </span>
+                        </div>
+
+                        {items.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {items.slice(0, 3).map((item) => {
+                              const isPost = isScheduledPost(item)
+                              const displayTopic = isPost
+                                ? getReadableVideoTitle(item.videos?.topic, 'Auto')
+                                : getReadableVideoTitle(item.topic, item.video_id ? 'Auto' : 'AI')
+                              const displayTime = isPost
+                                ? (item.scheduled_time || item.posted_at ? new Date(item.scheduled_time || item.posted_at || '').toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '')
+                                : (item.scheduled_time ? formatTime(item.scheduled_time) : '')
+
+                              return (
+                                <div key={item.id} className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700">
+                                  <span className="font-semibold text-slate-500">{displayTime || 'Any time'}</span>
+                                  <span className="ml-2">{displayTopic}</span>
+                                </div>
+                              )
+                            })}
+                            {items.length > 3 && (
+                              <div className="text-xs font-medium text-slate-500">
+                                +{items.length - 3} more
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-slate-500">No items scheduled</div>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : calendarView === 'week' ? (
                 <div className="overflow-x-auto rounded-lg border border-slate-200">
                   <div className="grid min-w-[860px]" style={{ gridTemplateColumns: '84px repeat(7, minmax(0, 1fr))' }}>
                     <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
