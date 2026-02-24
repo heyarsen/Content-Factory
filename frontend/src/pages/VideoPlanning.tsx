@@ -45,6 +45,8 @@ type CalendarView = 'week' | 'month'
 const WEEK_TIMELINE_START_HOUR = 0
 const WEEK_TIMELINE_END_HOUR = 23
 const WEEK_TIMELINE_ROW_HEIGHT = 36
+const WEEK_TIMELINE_EVENT_DURATION_MINUTES = 55
+const WEEK_TIMELINE_EVENT_MIN_HEIGHT = 52
 const MIN_VIDEO_TIME_GAP_MINUTES = 15
 
 
@@ -1337,16 +1339,65 @@ export function VideoPlanning() {
         const minutesFromStart = (hoursPart - WEEK_TIMELINE_START_HOUR) * 60 + minutesPart
         if (minutesFromStart < 0 || hoursPart > WEEK_TIMELINE_END_HOUR) return null
 
+        const status = normalizeStatusValue(isPost ? item.status : item.videos?.status || item.status) || 'pending'
+        const postPlatformLabel = isPost
+          ? Array.from(new Set(item.platforms.map((platformPost) => platformPost.platform.slice(0, 2).toUpperCase()))).join(' • ')
+          : null
+
         return {
           id: item.id,
+          startMinute: minutesFromStart,
+          endMinute: minutesFromStart + WEEK_TIMELINE_EVENT_DURATION_MINUTES,
           top: (minutesFromStart / 60) * WEEK_TIMELINE_ROW_HEIGHT,
           timeLabel: parsedTime,
           title,
+          status,
+          isPost,
+          postPlatformLabel,
         }
       })
-      .filter((item): item is { id: string; top: number; timeLabel: string; title: string } => Boolean(item))
+      .filter((item): item is {
+        id: string
+        startMinute: number
+        endMinute: number
+        top: number
+        timeLabel: string
+        title: string
+        status: string
+        isPost: boolean
+        postPlatformLabel: string | null
+      } => Boolean(item))
+      .sort((a, b) => a.startMinute - b.startMinute)
 
-    return datedItems
+    const lanesEndMinute: number[] = []
+    return datedItems.map((item) => {
+      let laneIndex = lanesEndMinute.findIndex((laneEnd) => laneEnd <= item.startMinute)
+      if (laneIndex === -1) {
+        laneIndex = lanesEndMinute.length
+        lanesEndMinute.push(item.endMinute)
+      } else {
+        lanesEndMinute[laneIndex] = item.endMinute
+      }
+
+      const concurrentCount = datedItems.filter(
+        (candidate) => candidate.startMinute < item.endMinute && candidate.endMinute > item.startMinute,
+      ).length
+      const laneCount = Math.max(1, concurrentCount)
+      const widthPercent = 100 / laneCount
+      const leftPercent = laneIndex * widthPercent
+
+      return {
+        ...item,
+        laneIndex,
+        laneCount,
+        height: Math.max(
+          WEEK_TIMELINE_EVENT_MIN_HEIGHT,
+          ((item.endMinute - item.startMinute) / 60) * WEEK_TIMELINE_ROW_HEIGHT,
+        ),
+        leftPercent,
+        widthPercent,
+      }
+    })
   }
 
   const navigateCalendar = (direction: 'prev' | 'next') => {
@@ -1904,17 +1955,41 @@ export function VideoPlanning() {
                             />
                           ))}
 
-                          {timelineItems.map((item) => (
-                            <div
-                              key={item.id}
-                              className="absolute left-1 right-1 z-10 rounded-md border border-brand-200 bg-brand-50 px-2 py-1 text-xs shadow-sm"
-                              style={{ top: item.top + 4, minHeight: 42 }}
-                              title={`${item.timeLabel} - ${item.title}`}
-                            >
-                              <div className="font-semibold text-brand-700">{item.timeLabel}</div>
-                              <div className="truncate text-slate-700">{item.title}</div>
-                            </div>
-                          ))}
+                          {timelineItems.map((item) => {
+                            const statusClass = item.status === 'completed' || item.status === 'posted'
+                              ? 'border-emerald-300 bg-emerald-50/95 text-emerald-800'
+                              : item.status === 'scheduled'
+                                ? 'border-purple-300 bg-purple-50/95 text-purple-800'
+                                : item.status === 'ready'
+                                  ? 'border-blue-300 bg-blue-50/95 text-blue-800'
+                                  : item.status === 'failed'
+                                    ? 'border-red-300 bg-red-50/95 text-red-800'
+                                    : 'border-brand-200 bg-brand-50/95 text-brand-800'
+
+                            return (
+                              <div
+                                key={item.id}
+                                className={`absolute z-10 rounded-md border px-2 py-1 text-xs shadow-sm transition hover:z-20 hover:shadow-md ${statusClass}`}
+                                style={{
+                                  top: item.top + 4,
+                                  left: `calc(${item.leftPercent}% + 2px)`,
+                                  width: `calc(${item.widthPercent}% - 4px)`,
+                                  minHeight: item.height,
+                                }}
+                                title={`${item.timeLabel} - ${item.title}`}
+                              >
+                                <div className="flex items-center justify-between gap-1">
+                                  <span className="font-semibold">{item.timeLabel}</span>
+                                  {item.postPlatformLabel && (
+                                    <span className="truncate rounded bg-white/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                                      {item.postPlatformLabel}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="mt-0.5 truncate font-medium">{item.title}</div>
+                              </div>
+                            )
+                          })}
                         </div>
                       )
                     })}
