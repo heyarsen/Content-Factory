@@ -1488,7 +1488,7 @@ export function VideoPlanning() {
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-              Content Studio
+              {t('common.content_studio')}
             </p>
             <h1 className="text-3xl font-semibold text-primary">
               Content Calendar
