@@ -3,30 +3,6 @@ import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
 import { useLanguage } from '../../contexts/LanguageContext'
 
-const avatarCards = [
-  {
-    name: 'Nova Presenter',
-    tone: 'Confident explainer',
-    palette: 'from-violet-400 via-indigo-500 to-blue-500',
-    accent: 'text-violet-100',
-    status: 'Studio ready look',
-  },
-  {
-    name: 'Atlas Mentor',
-    tone: 'Calm and analytical',
-    palette: 'from-emerald-400 via-teal-500 to-cyan-500',
-    accent: 'text-emerald-100',
-    status: 'Business casual setup',
-  },
-  {
-    name: 'Lyra Storyteller',
-    tone: 'Warm narrative voice',
-    palette: 'from-amber-400 via-orange-500 to-rose-500',
-    accent: 'text-orange-100',
-    status: 'Lifestyle visual tone',
-  },
-]
-
 function PlaceholderAvatar({ palette, accent, label }: { palette: string; accent: string; label: string }) {
   return (
     <div className={`relative h-40 overflow-hidden rounded-2xl bg-gradient-to-br ${palette}`}>
@@ -44,6 +20,30 @@ function PlaceholderAvatar({ palette, accent, label }: { palette: string; accent
 
 export function AvatarsPreview() {
   const { t } = useLanguage()
+  const avatarCards = [
+    {
+      name: t('avatars.cards.nova.name'),
+      tone: t('avatars.cards.nova.tone'),
+      palette: 'from-violet-400 via-indigo-500 to-blue-500',
+      accent: 'text-violet-100',
+      status: t('avatars.cards.nova.status'),
+    },
+    {
+      name: t('avatars.cards.atlas.name'),
+      tone: t('avatars.cards.atlas.tone'),
+      palette: 'from-emerald-400 via-teal-500 to-cyan-500',
+      accent: 'text-emerald-100',
+      status: t('avatars.cards.atlas.status'),
+    },
+    {
+      name: t('avatars.cards.lyra.name'),
+      tone: t('avatars.cards.lyra.tone'),
+      palette: 'from-amber-400 via-orange-500 to-rose-500',
+      accent: 'text-orange-100',
+      status: t('avatars.cards.lyra.status'),
+    },
+  ]
+
   return (
     <div className="mx-auto w-full max-w-6xl space-y-8">
       <Card className="border-brand-100/70 bg-gradient-to-br from-white via-white to-brand-50/60 p-6 sm:p-8">
