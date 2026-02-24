@@ -254,7 +254,35 @@ export function Analysts() {
                   <h2 className="text-lg font-semibold text-primary">{t('analysts.platform_breakdown')}</h2>
                 </div>
 
-                <div className="overflow-x-auto">
+                <div className="space-y-3 md:hidden">
+                  {platformEntries.map(([platform, stats]) => {
+                    const followers = Number(stats.followers || 0)
+                    const reach = Number(stats.reach || 0)
+                    const ratio = followers > 0 ? (reach / followers).toFixed(2) : '0.00'
+
+                    return (
+                      <div key={platform} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="mb-3 flex items-center justify-between">
+                          <p className="font-semibold capitalize text-slate-900">{platform}</p>
+                          {stats.message ? (
+                            <span className="rounded-full bg-amber-100 px-2 py-1 text-xs text-amber-700">{stats.message}</span>
+                          ) : (
+                            <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs text-emerald-700">{t('analysts.synced')}</span>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+                          <p>{t('analysts.followers')}: <span className="font-semibold text-slate-900">{formatNumber(stats.followers)}</span></p>
+                          <p>{t('analysts.reach')}: <span className="font-semibold text-slate-900">{formatNumber(stats.reach)}</span></p>
+                          <p>{t('analysts.impressions')}: <span className="font-semibold text-slate-900">{formatNumber(stats.impressions)}</span></p>
+                          <p>{t('analysts.profile_views')}: <span className="font-semibold text-slate-900">{formatNumber(stats.profileViews)}</span></p>
+                          <p className="col-span-2">{t('analysts.reach_follower')}: <span className="font-semibold text-slate-900">{ratio}</span></p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <div className="hidden overflow-x-auto md:block">
                   <table className="min-w-full text-sm">
                     <thead>
                       <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">

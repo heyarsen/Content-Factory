@@ -1571,7 +1571,7 @@ export function VideoPlanning() {
               Calendar view of all posted, planned, and upcoming videos.
             </p>
           </div>
-          <div className="flex w-full items-center gap-2 sm:justify-end md:w-auto">
+          <div className="flex w-full flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end md:w-auto">
             <Button
               onClick={() => setUploadPlanModal(true)}
               leftIcon={<Upload className="h-4 w-4" />}
@@ -1805,7 +1805,7 @@ export function VideoPlanning() {
                 <h2 className="text-xl font-semibold text-primary text-center sm:text-left">
                   {calendarView === 'week' ? formatWeekRange(weekDays) : formatMonthYear(currentMonth)}
                 </h2>
-                <div className="flex items-center justify-center gap-2">
+                <div className="flex flex-wrap items-center justify-center gap-2">
                   <Button
                     variant={calendarView === 'week' ? 'primary' : 'ghost'}
                     size="sm"
@@ -1825,7 +1825,7 @@ export function VideoPlanning() {
 
               <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm text-slate-500">Overall calendar for your full content plan: uploads, AI videos, scheduled, and posted.</p>
-                <div className="flex justify-center gap-2">
+                <div className="flex flex-wrap justify-center gap-2">
                   <Button variant="ghost" size="sm" onClick={() => navigateCalendar('prev')} className="flex-1 sm:flex-none">← {t('video_planning.prev')}</Button>
                   <Button variant="ghost" size="sm" onClick={() => setCurrentMonth(new Date())} className="flex-1 sm:flex-none">{t('video_planning.today')}</Button>
                   <Button variant="ghost" size="sm" onClick={() => navigateCalendar('next')} className="flex-1 sm:flex-none">{t('video_planning.next')} →</Button>
@@ -1921,7 +1921,12 @@ export function VideoPlanning() {
                   </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-7 gap-2">
+                <div className="space-y-3">
+                  <p className="text-xs text-slate-500 sm:hidden">
+                    Swipe horizontally to view the full month calendar.
+                  </p>
+                  <div className="overflow-x-auto rounded-lg border border-slate-200 p-2">
+                    <div className="grid min-w-[700px] grid-cols-7 gap-2">
                   {[{ key: 'sun' }, { key: 'mon' }, { key: 'tue' }, { key: 'wed' }, { key: 'thu' }, { key: 'fri' }, { key: 'sat' }].map((day) => (
                     <div key={day.key} className="p-2 text-center text-xs font-semibold text-slate-500">{t(`video_planning.${day.key}`)}</div>
                   ))}
@@ -1950,7 +1955,7 @@ export function VideoPlanning() {
                         await movePlanItemToDate(draggingItemId, dateKey)
                         setDraggingItemId(null)
                       }}
-                      className={`min-h-[140px] rounded-lg border p-2 text-left transition relative ${!date
+                      className={`relative min-h-[140px] rounded-lg border p-2 text-left transition ${!date
                         ? 'border-transparent bg-transparent cursor-default'
                         : isSelected
                           ? 'border-brand-500 bg-brand-50 shadow-md'
@@ -2021,6 +2026,8 @@ export function VideoPlanning() {
                     </button>
                   )
                   })}
+                    </div>
+                  </div>
                 </div>
               )}
 
