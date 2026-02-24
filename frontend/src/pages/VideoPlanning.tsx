@@ -45,6 +45,7 @@ type CalendarView = 'week' | 'month'
 const WEEK_TIMELINE_START_HOUR = 0
 const WEEK_TIMELINE_END_HOUR = 23
 const WEEK_TIMELINE_ROW_HEIGHT = 36
+const MIN_VIDEO_TIME_GAP_MINUTES = 15
 
 
 type CalendarVideoSource = 'AI' | 'Auto'
@@ -64,6 +65,47 @@ const getLocalDateYMD = (date = new Date()) => {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+const timeToMinutes = (time: string) => {
+  const [hours, minutes] = time.split(':').map(Number)
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null
+  return (hours * 60) + minutes
+}
+
+const minutesToTime = (totalMinutes: number) => {
+  const safeMinutes = Math.max(0, Math.min(totalMinutes, (23 * 60) + 59))
+  const hours = Math.floor(safeMinutes / 60)
+  const minutes = safeMinutes % 60
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+}
+
+const normalizeTimesWithMinimumGap = (times: string[], minGapMinutes: number) => {
+  let previousMinutes: number | null = null
+  let adjusted = false
+
+  const normalizedTimes = times.map((time) => {
+    const parsedMinutes = timeToMinutes(time)
+    if (parsedMinutes === null) return time
+
+    if (previousMinutes === null) {
+      previousMinutes = parsedMinutes
+      return time
+    }
+
+    const minAllowed = previousMinutes + minGapMinutes
+    if (parsedMinutes >= minAllowed) {
+      previousMinutes = parsedMinutes
+      return time
+    }
+
+    adjusted = true
+    const shifted = minutesToTime(minAllowed)
+    previousMinutes = timeToMinutes(shifted)
+    return shifted
+  })
+
+  return { normalizedTimes, adjusted }
 }
 
 interface VideoPlan {
@@ -680,6 +722,16 @@ export function VideoPlanning() {
       return
     }
 
+    const { normalizedTimes, adjusted } = normalizeTimesWithMinimumGap(videoTimes, MIN_VIDEO_TIME_GAP_MINUTES)
+    if (adjusted) {
+      setVideoTimes(normalizedTimes)
+      addNotification({
+        type: 'warning',
+        title: 'Posting times auto-adjusted',
+        message: `Some videos were too close together. Applied a ${MIN_VIDEO_TIME_GAP_MINUTES}-minute minimum gap to prevent overlaps.`,
+      })
+    }
+
     setCreating(true)
     try {
       const response = await api.post('/api/plans', {
@@ -696,7 +748,7 @@ export function VideoPlanning() {
           defaultPlatforms.length > 0 ? defaultPlatforms : null,
         auto_approve: true,
         auto_create: true,
-        video_times: videoTimes.map((time: string) => {
+        video_times: normalizedTimes.map((time: string) => {
           // Ensure time is in HH:MM format (remove :00 if present, then add it back)
           const cleanTime = time.replace(/:00$/, '')
           return cleanTime.length === 5 ? cleanTime : time
@@ -847,6 +899,16 @@ export function VideoPlanning() {
       return
     }
 
+    const { normalizedTimes, adjusted } = normalizeTimesWithMinimumGap(videoTimes, MIN_VIDEO_TIME_GAP_MINUTES)
+    if (adjusted) {
+      setVideoTimes(normalizedTimes)
+      addNotification({
+        type: 'warning',
+        title: 'Posting times auto-adjusted',
+        message: `Some videos were too close together. Applied a ${MIN_VIDEO_TIME_GAP_MINUTES}-minute minimum gap to prevent overlaps.`,
+      })
+    }
+
     setEditingPlan(true)
     try {
       await api.patch(`/api/plans/${editPlanModal.id}`, {
@@ -863,6 +925,7 @@ export function VideoPlanning() {
         auto_approve: true,
         auto_create: true,
         timezone: timezone,
+        video_times: normalizedTimes,
       })
 
       // Reload plans to get updated data
@@ -1950,46 +2013,6 @@ export function VideoPlanning() {
                 </div>
               )}
 
-              {/* Status Legend */}
-              <div className="mt-6 pt-6 border-t border-slate-200">
-                <h3 className="text-sm font-semibold text-slate-700 mb-3">
-                  {t('video_planning.status_legend')}
-                </h3>
-                <div className="flex flex-wrap gap-3 text-xs">
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded border border-yellow-200 bg-yellow-50"></div>
-                    <span className="text-slate-600">{t('video_planning.pending')}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded border border-cyan-200 bg-cyan-50"></div>
-                    <span className="text-slate-600">{t('video_planning.gathering_research')}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded border border-blue-200 bg-blue-50"></div>
-                    <span className="text-slate-600">{t('video_planning.ready')}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded border border-teal-200 bg-teal-50"></div>
-                    <span className="text-slate-600">{t('video_planning.approved')}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded border border-indigo-200 bg-indigo-50"></div>
-                    <span className="text-slate-600">{t('video_planning.generating_video')}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded border border-emerald-200 bg-emerald-50"></div>
-                    <span className="text-slate-600">{t('video_planning.published')}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded border border-purple-200 bg-purple-50"></div>
-                    <span className="text-slate-600">{t('video_planning.scheduled')}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded border border-red-200 bg-red-50"></div>
-                    <span className="text-slate-600">Failed</span>
-                  </div>
-                </div>
-              </div>
             </Card>
 
             {/* Items for Selected Date */}

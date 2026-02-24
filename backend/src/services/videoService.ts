@@ -13,6 +13,8 @@ import type {
   HeyGenVideoResponse,
 } from '../lib/heygen.js'
 import type { Reel, Video } from '../types/database.js'
+import type { SoraModel, SoraProvider } from '../lib/kie.js'
+import { SoraGenerationSettingsService } from './soraGenerationSettingsService.js'
 
 const DEFAULT_REEL_STYLE = 'Cinematic'
 const DEFAULT_REEL_DURATION = 60
@@ -74,6 +76,11 @@ function normalizeVideoStyle(style?: string | null): VideoStyle {
   // Fallback for anything unknown: keep DB insert safe.
   return 'Realistic' as VideoStyle
 }
+
+
+const isValidSoraProvider = (value: unknown): value is SoraProvider => value === 'kie' || value === 'poyo'
+const isValidSoraModel = (value: unknown): value is SoraModel =>
+  value === 'sora-2' || value === 'sora-2-private' || value === 'sora-2-stable'
 
 const DEFAULT_HEYGEN_RESOLUTION =
   process.env.HEYGEN_OUTPUT_RESOLUTION && process.env.HEYGEN_OUTPUT_RESOLUTION.trim().length > 0
@@ -1153,13 +1160,51 @@ export class VideoService {
 
       const { data: equivalentVideos } = await equivalentQuery
       if (equivalentVideos && equivalentVideos.length > 0) {
-        const candidate = equivalentVideos[0]
-        console.log('[Video Generation] Reusing equivalent video:', {
-          videoId: candidate.id,
-          status: candidate.status,
-          created_at: candidate.created_at,
+        const generationMode = input.plan_item_id ? 'automation' : 'manual'
+        const selectedSoraConfig = input.provider === 'sora'
+          ? await SoraGenerationSettingsService.resolveProviderConfig(generationMode)
+          : null
+
+        const compatibleCandidate = equivalentVideos.find((candidate) => {
+          if (!selectedSoraConfig) {
+            return true
+          }
+
+          const candidateProvider = isValidSoraProvider(candidate.sora_provider)
+            ? candidate.sora_provider
+            : null
+          const candidateModel = isValidSoraModel(candidate.sora_model)
+            ? candidate.sora_model
+            : null
+
+          if (!candidateProvider || !candidateModel) {
+            return false
+          }
+
+          return candidateProvider === selectedSoraConfig.provider && candidateModel === selectedSoraConfig.model
         })
-        return candidate
+
+        if (compatibleCandidate) {
+          console.log('[Video Generation] Reusing equivalent video:', {
+            videoId: compatibleCandidate.id,
+            status: compatibleCandidate.status,
+            created_at: compatibleCandidate.created_at,
+            sora_provider: compatibleCandidate.sora_provider,
+            sora_model: compatibleCandidate.sora_model,
+          })
+          return compatibleCandidate
+        }
+
+        if (selectedSoraConfig) {
+          const skippedCandidate = equivalentVideos[0]
+          console.log('[Video Generation] Ignoring equivalent video due to Sora provider/model mismatch:', {
+            skippedVideoId: skippedCandidate.id,
+            skippedProvider: skippedCandidate.sora_provider,
+            skippedModel: skippedCandidate.sora_model,
+            requiredProvider: selectedSoraConfig.provider,
+            requiredModel: selectedSoraConfig.model,
+          })
+        }
       }
 
       const video = await this.createVideoRecord(
