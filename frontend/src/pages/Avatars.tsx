@@ -6,7 +6,7 @@ import { Input } from '../components/ui/Input'
 import { useToast } from '../hooks/useToast'
 import api from '../lib/api'
 import { useLanguage } from '../contexts/LanguageContext'
-import { Loader2, RefreshCcw, Search, Star, UserPlus } from 'lucide-react'
+import { Loader2, Lock, Search, Star, UserPlus } from 'lucide-react'
 import { readAvatarCache, writeAvatarCache } from '../lib/avatarCache'
 
 type AvatarRecord = {
@@ -25,7 +25,6 @@ export function Avatars() {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [addingId, setAddingId] = useState<string | null>(null)
-  const [syncing, setSyncing] = useState(false)
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('All')
   const [publicAvatars, setPublicAvatars] = useState<AvatarRecord[]>([])
@@ -113,19 +112,6 @@ export function Avatars() {
     }
   }
 
-  const handleSyncAvatars = async () => {
-    setSyncing(true)
-    try {
-      await api.post('/api/avatars/sync')
-      toast.success('Sync completed')
-      await loadAvatars()
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Failed to sync avatars')
-    } finally {
-      setSyncing(false)
-    }
-  }
-
   return (
     <Layout>
       <div className="mx-auto w-full max-w-7xl space-y-6">
@@ -137,9 +123,14 @@ export function Avatars() {
             </p>
           </div>
 
-          <Button onClick={handleSyncAvatars} disabled={syncing} className="w-full sm:w-auto">
-            {syncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-2 h-4 w-4" />}
-            Create New Avatar
+          <Button
+            disabled
+            aria-disabled="true"
+            title="Create New Avatar is coming soon"
+            className="w-full cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400 opacity-70 shadow-none hover:bg-slate-100 hover:text-slate-400 disabled:pointer-events-none disabled:opacity-70 sm:w-auto"
+          >
+            <Lock className="mr-2 h-4 w-4" />
+            Create New Avatar (coming soon)
           </Button>
         </Card>
 
