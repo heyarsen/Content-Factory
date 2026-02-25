@@ -57,8 +57,6 @@ export function QuickCreate() {
   const [style, setStyle] = useState('Cinematic')
   const [campaignObjective, setCampaignObjective] = useState('awareness')
   const [selectedChannels, setSelectedChannels] = useState<string[]>([])
-  const [publishOption, setPublishOption] = useState<'now' | 'schedule'>('now')
-  const [scheduledAt, setScheduledAt] = useState('')
   const [duration] = useState(15)
   const [generateCaption, setGenerateCaption] = useState(true)
   const [generatingVideo, setGeneratingVideo] = useState(false)
@@ -112,26 +110,24 @@ export function QuickCreate() {
       return
     }
 
-    if (publishOption === 'schedule' && !scheduledAt) {
-      setFormError('Please choose a schedule date and time.')
-      return
-    }
-
     setGeneratingVideo(true)
     setFormError('')
 
     try {
       const verticalDimension = { ...DEFAULT_VERTICAL_DIMENSION }
+      const ctaSection = ctaText.trim() ? `\n[CTA] ${ctaText.trim()}` : ''
+      const descriptionWithContext = description.trim()
+        ? `[Objective: ${campaignObjective}] ${description.trim()}${ctaSection}`
+        : `Objective: ${campaignObjective}.${ctaText.trim() ? ` CTA: ${ctaText.trim()}` : ''}`
+
       await api.post('/api/videos/generate', {
         topic,
-        description: description ? `[Objective: ${campaignObjective}] ${description}\n[CTA] ${ctaText}` : `Objective: ${campaignObjective}. CTA: ${ctaText}`,
+        description: descriptionWithContext,
         style,
         duration,
         provider: 'sora',
         campaign_objective: campaignObjective,
         channels: selectedChannels,
-        publish_option: publishOption,
-        scheduled_at: publishOption === 'schedule' ? scheduledAt : null,
         generateScript: true,
         generate_caption: generateCaption,
         aspect_ratio: DEFAULT_VERTICAL_ASPECT_RATIO,
@@ -274,27 +270,11 @@ export function QuickCreate() {
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setCampaignObjective(e.target.value)}
                 options={campaignObjectiveOptions}
               />
-
-              <Select
-                label="Publish option"
-                value={publishOption}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setPublishOption(e.target.value as 'now' | 'schedule')}
-                options={[
-                  { value: 'now', label: 'Publish now' },
-                  { value: 'schedule', label: 'Schedule for later' },
-                ]}
-              />
             </div>
 
-            {publishOption === 'schedule' && (
-              <Input
-                type="datetime-local"
-                label="Scheduled publish time"
-                value={scheduledAt}
-                onChange={(e) => setScheduledAt(e.target.value)}
-                required
-              />
-            )}
+            <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-700">
+              Videos generated in Creative Studio stay in your library as drafts. You can publish them later from the Distribution/Posts flow.
+            </div>
 
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Channel(s)</p>
@@ -326,7 +306,7 @@ export function QuickCreate() {
             </div>
 
             <Input
-              label="Call to action"
+              label="Call to action (optional)"
               value={ctaText}
               onChange={(e) => setCtaText(e.target.value)}
             />
