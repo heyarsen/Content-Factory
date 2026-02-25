@@ -42,7 +42,7 @@ export function Login() {
       console.log('[Login] Sign in successful, navigating to creator studio...')
       clearTimeout(safetyTimeout)
       setOptimisticLoading(false)
-      navigate('/planning')
+      navigate('/create')
     } catch (err: any) {
       clearTimeout(safetyTimeout)
       setOptimisticLoading(false)
