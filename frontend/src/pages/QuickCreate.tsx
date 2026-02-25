@@ -7,7 +7,7 @@ import { Input } from '../components/ui/Input'
 import { Textarea } from '../components/ui/Textarea'
 import { Select } from '../components/ui/Select'
 import { Badge } from '../components/ui/Badge'
-import { Sparkles, Video, Share2, Instagram, Youtube, Users, Facebook, AlertTriangle, ChevronDown } from 'lucide-react'
+import { Sparkles, Video, Share2, Instagram, Youtube, Users, Facebook, AlertTriangle, ChevronDown, Image, FileText, Lock } from 'lucide-react'
 import api from '../lib/api'
 import { DEFAULT_VERTICAL_ASPECT_RATIO, DEFAULT_VERTICAL_DIMENSION } from '../lib/videos'
 import { useNotifications } from '../contexts/NotificationContext'
@@ -239,6 +239,7 @@ export function QuickCreate() {
   const [generatingVideo, setGeneratingVideo] = useState(false)
   const [formError, setFormError] = useState('')
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([])
+  const [creativeTab, setCreativeTab] = useState<'video' | 'photo' | 'text'>('video')
 
   const [goals, setGoals] = useState('Increase qualified inbound leads from social content')
   const [audience, setAudience] = useState('Founders and growth marketers at B2B SaaS companies')
@@ -400,6 +401,30 @@ export function QuickCreate() {
     setDescription(suggestion)
   }
 
+  const creativeTabs = [
+    {
+      key: 'video' as const,
+      label: 'Video generation',
+      description: 'Generate a complete video with AI guidance and publishing controls.',
+      icon: Video,
+      unavailable: false,
+    },
+    {
+      key: 'photo' as const,
+      label: 'Photo generation',
+      description: 'Coming soon in Creative Studio.',
+      icon: Image,
+      unavailable: true,
+    },
+    {
+      key: 'text' as const,
+      label: 'Text generation',
+      description: 'Coming soon in Creative Studio.',
+      icon: FileText,
+      unavailable: true,
+    },
+  ]
+
   return (
     <Layout>
       <div className="mx-auto w-full max-w-4xl space-y-6 sm:space-y-8">
@@ -419,10 +444,56 @@ export function QuickCreate() {
         {formError && <div className="rounded-2xl border border-rose-200/80 bg-rose-50/80 px-4 py-3 text-sm text-rose-600">{formError}</div>}
 
         <Card className="p-4 sm:p-6 lg:p-8">
-          <div className="mb-6 flex items-center gap-3">
-            <Sparkles className="h-5 w-5 text-brand-500" />
-            <h2 className="text-xl font-semibold text-primary">{t('common.manual_creation')}</h2>
+          <div className="mb-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <Sparkles className="h-5 w-5 text-brand-500" />
+              <h2 className="text-xl font-semibold text-primary">{t('common.manual_creation')}</h2>
+            </div>
+
+            <div className="grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2 sm:grid-cols-3">
+              {creativeTabs.map((tab) => {
+                const Icon = tab.icon
+                const isActive = creativeTab === tab.key
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setCreativeTab(tab.key)}
+                    className={`rounded-xl border px-3 py-3 text-left transition ${isActive
+                      ? 'border-brand-300 bg-white text-brand-700 shadow-sm'
+                      : 'border-transparent bg-transparent text-slate-500 hover:border-slate-200 hover:bg-white/70'
+                      }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-2 text-sm font-semibold">
+                        <Icon className="h-4 w-4" />
+                        {tab.label}
+                      </span>
+                      {tab.unavailable && (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500">
+                          <Lock className="h-3 w-3" />
+                          Unavailable
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-2 text-xs text-slate-500">{tab.description}</p>
+                  </button>
+                )
+              })}
+            </div>
           </div>
+
+          {creativeTab !== 'video' ? (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-6 text-center">
+              <p className="text-sm font-semibold text-slate-700">
+                {creativeTab === 'photo' ? 'Photo generation is currently unavailable.' : 'Text generation is currently unavailable.'}
+              </p>
+              <p className="mt-2 text-sm text-slate-500">
+                Use <span className="font-semibold text-brand-600">Video generation</span> to continue creating content right now.
+              </p>
+            </div>
+          ) : (
+            <>
 
           {connectedPlatforms.length > 0 && (
             <div className="mb-6 rounded-2xl border border-blue-200/60 bg-blue-50/40 p-4">
@@ -738,6 +809,8 @@ export function QuickCreate() {
               </Button>
             </div>
           </div>
+            </>
+          )}
         </Card>
       </div>
     </Layout>
