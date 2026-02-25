@@ -29,7 +29,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation()
 
   const navigation = [
-    { label: t('common.content_studio') || 'Content Studio', to: '/planning', icon: Clapperboard },
+    { label: t('common.manual_creation') || 'Creative Studio', to: '/create', icon: Sparkles },
+    { label: t('common.content_studio') || 'Content Calendar', to: '/planning', icon: Clapperboard },
     { label: t('common.my_videos') || 'Video Library', to: '/videos', icon: Film },
     { label: t('common.social_accounts') || 'Social Accounts', to: '/social', icon: Share2, match: (pathname: string) => pathname === '/social' },
     { label: t('common.dms') || 'DMs', to: '/social/dms', icon: MessagesSquare },
