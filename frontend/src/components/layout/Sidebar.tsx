@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, useEffect } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import {
   Share2,
@@ -15,6 +15,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext'
 import { useCredits } from '../../hooks/useCredits'
 import { useLanguage } from '../../contexts/LanguageContext'
+import { preloadAvatarCache } from '../../lib/avatarCache'
 
 interface SidebarProps {
   isOpen: boolean
@@ -35,7 +36,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { label: t('common.social_accounts') || 'Social Accounts', to: '/social', icon: Share2, match: (pathname: string) => pathname === '/social' },
     { label: t('common.dms') || 'DMs', to: '/social/dms', icon: MessagesSquare },
     { label: t('common.trendwatcher') || 'Trendwatcher', to: '/trend-searcher', icon: Search },
-    { label: `${t('common.avatars') || 'Avatars'} · HeyGen`, to: '/avatars', icon: User },
+    { label: t('common.avatars') || 'Avatars', to: '/avatars', icon: User },
     { label: t('common.analytics') || 'Analytics', to: '/analytics', icon: BarChart3 },
     { label: t('common.preferences') || 'Preferences', to: '/preferences', icon: SlidersHorizontal },
   ]
@@ -44,6 +45,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { label: t('common.admin_dashboard') || 'Admin Dashboard', to: '/admin', icon: BarChart3 },
     { label: t('common.admin_support') || 'Admin Support', to: '/admin/support', icon: MessagesSquare },
   ]
+
+  useEffect(() => {
+    void preloadAvatarCache().catch(() => {
+      // best effort preload
+    })
+  }, [])
 
   return (
     <Fragment>

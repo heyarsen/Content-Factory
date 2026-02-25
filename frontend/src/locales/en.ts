@@ -15,7 +15,7 @@ export const en = {
         cancel: "Cancel",
         planning: "Video Planning",
         social_accounts: "Social Accounts",
-        avatars: "Old Avatars",
+        avatars: "Avatars",
         admin_dashboard: "Admin Dashboard",
         admin_support: "Admin Support",
         back: "Back",

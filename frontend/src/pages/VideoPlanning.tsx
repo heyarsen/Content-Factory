@@ -1582,12 +1582,12 @@ export function VideoPlanning() {
               {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : 'Upload video'}
             </Button>
             <Button
-              onClick={() => setGenerateVideoModalOpen(true)}
+              onClick={() => navigate('/create')}
               leftIcon={<Plus className="h-4 w-4" />}
               className="w-full sm:w-auto min-h-[44px] px-5 shadow-md shadow-brand-500/20"
               disabled={showUpgrade}
             >
-              {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : 'Generate AI video'}
+              {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : 'Creative Studio'}
             </Button>
             <Button
               onClick={() => setCreateModal(true)}
