@@ -7,6 +7,7 @@ import { useToast } from '../hooks/useToast'
 import api from '../lib/api'
 import { useLanguage } from '../contexts/LanguageContext'
 import { Loader2, RefreshCcw, Search, Star, UserPlus } from 'lucide-react'
+import { readAvatarCache, writeAvatarCache } from '../lib/avatarCache'
 
 type AvatarRecord = {
   id: string
@@ -31,16 +32,28 @@ export function Avatars() {
   const [myAvatars, setMyAvatars] = useState<AvatarRecord[]>([])
 
   const loadAvatars = useCallback(async () => {
+    const cached = readAvatarCache()
+    if (cached) {
+      setPublicAvatars(cached.publicAvatars as AvatarRecord[])
+      setMyAvatars(cached.myAvatars as AvatarRecord[])
+    }
+
     setLoading(true)
     try {
       const [publicResponse, myResponse] = await Promise.all([
         api.get('/api/avatars?public=true'),
         api.get('/api/avatars'),
       ])
-      setPublicAvatars(publicResponse.data?.avatars ?? [])
-      setMyAvatars(myResponse.data?.avatars ?? [])
+      const nextPublicAvatars = publicResponse.data?.avatars ?? []
+      const nextMyAvatars = myResponse.data?.avatars ?? []
+      setPublicAvatars(nextPublicAvatars)
+      setMyAvatars(nextMyAvatars)
+      writeAvatarCache({
+        publicAvatars: nextPublicAvatars,
+        myAvatars: nextMyAvatars,
+      })
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Failed to load avatars from HeyGen')
+      toast.error(error?.response?.data?.error || 'Failed to load avatars')
     } finally {
       setLoading(false)
     }
@@ -80,7 +93,7 @@ export function Avatars() {
   const handleAddPublicAvatar = async (avatar: AvatarRecord) => {
     const heygenId = avatar.heygen_avatar_id || avatar.id
     if (!heygenId) {
-      toast.error('Missing HeyGen avatar id')
+      toast.error('Missing avatar id')
       return
     }
 
@@ -118,23 +131,22 @@ export function Avatars() {
       <div className="mx-auto w-full max-w-7xl space-y-6">
         <Card className="flex flex-col gap-4 border-brand-100/70 bg-gradient-to-br from-white via-white to-brand-50/70 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">HeyGen</p>
             <h1 className="text-2xl font-bold text-primary">{t('common.avatars') || 'Avatars'} Studio</h1>
             <p className="mt-1 text-sm text-slate-600">
-              Browse HeyGen public avatars and add them to your personal avatar workspace.
+              Browse public avatars and add them to your personal avatar workspace.
             </p>
           </div>
 
           <Button onClick={handleSyncAvatars} disabled={syncing} className="w-full sm:w-auto">
             {syncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-2 h-4 w-4" />}
-            Sync My Avatars
+            Create New Avatar
           </Button>
         </Card>
 
         <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
           <Card className="p-4 sm:p-5">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h2 className="text-lg font-semibold text-primary">HeyGen Public Avatar Library</h2>
+              <h2 className="text-lg font-semibold text-primary">Public Avatar Library</h2>
               <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                 <div className="relative w-full sm:w-64">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -217,7 +229,7 @@ export function Avatars() {
             <div className="mt-4 space-y-2">
               {myAvatars.length === 0 ? (
                 <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-                  You don&apos;t have avatars yet. Add one from the HeyGen list.
+                  You don&apos;t have avatars yet. Add one from the public list.
                 </p>
               ) : (
                 myAvatars.slice(0, 12).map((avatar) => (

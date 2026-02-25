@@ -176,10 +176,10 @@ export function formatSpecificError(error: unknown): string {
     return 'Insufficient credits. Please add credits to continue.'
   }
 
-  // HeyGen specific errors
+  // Avatar/video provider specific errors
   if (errorCode === 'insufficient_credit' || 
       extractErrorMessage(error).includes('Insufficient credit')) {
-    return 'Insufficient credit. Please add credits to your HeyGen account.'
+    return 'Insufficient credit. Please add credits to your avatar provider account.'
   }
 
   // Storage bucket errors
@@ -196,4 +196,3 @@ export function formatSpecificError(error: unknown): string {
   // Return default formatted message
   return extractErrorMessage(error)
 }
-
