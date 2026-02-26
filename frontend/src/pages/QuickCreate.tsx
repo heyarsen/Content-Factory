@@ -214,19 +214,77 @@ export function QuickCreate() {
         throw new Error('Missing task id from generation response')
       }
 
+      const parseStatusState = (statusData: any): string => {
+        const rawState = statusData?.state || statusData?.status || statusData?.task_status || statusData?.taskStatus
+        return typeof rawState === 'string' ? rawState.toLowerCase() : ''
+      }
+
+      const extractResultUrl = (statusData: any): string | null => {
+        const candidates = [
+          statusData?.resultJson,
+          statusData?.result_json,
+          statusData?.result,
+          statusData?.output,
+          statusData?.response,
+          statusData,
+        ]
+
+        for (const candidate of candidates) {
+          const parsed = typeof candidate === 'string' ? (() => {
+            try {
+              return JSON.parse(candidate)
+            } catch {
+              return null
+            }
+          })() : candidate
+
+          if (!parsed || typeof parsed !== 'object') {
+            continue
+          }
+
+          const directUrl = parsed?.resultUrl || parsed?.result_url || parsed?.url || parsed?.imageUrl || parsed?.image_url
+          if (typeof directUrl === 'string' && directUrl.trim()) {
+            return directUrl
+          }
+
+          const urlArrays = [
+            parsed?.resultUrls,
+            parsed?.result_urls,
+            parsed?.images,
+            parsed?.urls,
+            parsed?.output,
+          ]
+
+          for (const maybeArray of urlArrays) {
+            if (Array.isArray(maybeArray) && maybeArray.length > 0) {
+              const firstItem = maybeArray[0]
+              if (typeof firstItem === 'string' && firstItem.trim()) {
+                return firstItem
+              }
+              if (firstItem && typeof firstItem === 'object') {
+                const nestedUrl = firstItem.url || firstItem.imageUrl || firstItem.image_url
+                if (typeof nestedUrl === 'string' && nestedUrl.trim()) {
+                  return nestedUrl
+                }
+              }
+            }
+          }
+        }
+
+        return null
+      }
+
       let attempts = 0
-      while (attempts < 30) {
+      while (attempts < 40) {
         attempts += 1
         await new Promise((resolve) => setTimeout(resolve, 2500))
 
         const statusResponse = await api.get(`/api/images/status/${taskId}`)
         const statusData = statusResponse.data?.data
-        const state = statusData?.state
+        const state = parseStatusState(statusData)
 
-        if (state === 'success') {
-          const resultJson = statusData?.resultJson
-          const parsed = typeof resultJson === 'string' ? JSON.parse(resultJson) : resultJson
-          const url = parsed?.resultUrls?.[0]
+        if (['success', 'succeeded', 'completed', 'done', 'finish', 'finished'].includes(state)) {
+          const url = extractResultUrl(statusData)
 
           if (!url) {
             throw new Error('Image finished but no result URL was returned')
@@ -248,7 +306,7 @@ export function QuickCreate() {
           return
         }
 
-        if (state === 'fail') {
+        if (['fail', 'failed', 'error', 'canceled', 'cancelled'].includes(state)) {
           throw new Error(statusData?.failMsg || 'Image generation failed')
         }
       }
