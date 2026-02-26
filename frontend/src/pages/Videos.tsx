@@ -35,6 +35,19 @@ interface SocialAccount {
   status: string
 }
 
+interface LibraryImage {
+  id: string
+  image_url: string
+  prompt: string | null
+  provider_tier: 'nano-banana' | 'nano-banana-pro'
+  aspect_ratio: string
+  created_at: string
+}
+
+type LibraryItem =
+  | { type: 'video'; createdAt: number; video: VideoRecord }
+  | { type: 'photo'; createdAt: number; photo: LibraryImage }
+
 export function Videos() {
   const { addNotification } = useNotifications()
   const { t } = useLanguage()
@@ -48,9 +61,11 @@ export function Videos() {
   console.log('[Videos] Debug:', { hasSubscription, credits, unlimited, safeCanCreate, creditsLoading })
   const [searchParams, setSearchParams] = useSearchParams()
   const [videos, setVideos] = useState<VideoRecord[]>([])
+  const [libraryImages, setLibraryImages] = useState<LibraryImage[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<ListVideosParams['status']>('all')
+  const [libraryFilter, setLibraryFilter] = useState<'all' | 'videos' | 'photos'>('all')
   const [deleteModal, setDeleteModal] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [selectedVideo, setSelectedVideo] = useState<VideoRecord | null>(null)
@@ -69,6 +84,17 @@ export function Videos() {
 
   const notifiedVideosRef = useRef<Set<string>>(new Set())
   const videosCacheKey = `videos_cache:${search || 'all'}:${statusFilter || 'all'}`
+  const filteredVideos = libraryFilter === 'photos' ? [] : videos
+  const filteredPhotos = libraryFilter === 'videos' ? [] : libraryImages
+  const visibleLibraryItems: LibraryItem[] =
+    libraryFilter === 'videos'
+      ? filteredVideos.map((video) => ({ type: 'video', createdAt: new Date(video.created_at).getTime(), video }))
+      : libraryFilter === 'photos'
+        ? filteredPhotos.map((photo) => ({ type: 'photo', createdAt: new Date(photo.created_at).getTime(), photo }))
+        : [
+            ...filteredVideos.map((video) => ({ type: 'video' as const, createdAt: new Date(video.created_at).getTime(), video })),
+            ...filteredPhotos.map((photo) => ({ type: 'photo' as const, createdAt: new Date(photo.created_at).getTime(), photo })),
+          ].sort((a, b) => b.createdAt - a.createdAt)
 
   // Safety ref to track mounting status
   const mountedRef = useRef(true)
@@ -110,6 +136,21 @@ export function Videos() {
     }
   }, [search, statusFilter, videosCacheKey])
 
+
+  const loadLibraryImages = useCallback(async () => {
+    try {
+      const { data } = await api.get('/api/images/library')
+      if (mountedRef.current) {
+        setLibraryImages((data?.images ?? []) as LibraryImage[])
+      }
+    } catch (error) {
+      console.error('Failed to load library images:', error)
+      if (mountedRef.current) {
+        setLibraryImages([])
+      }
+    }
+  }, [])
+
   useEffect(() => {
     const cached = sessionStorage.getItem(videosCacheKey)
     if (cached) {
@@ -125,6 +166,7 @@ export function Videos() {
     }
 
     loadVideos()
+    loadLibraryImages()
 
     // Safety timeout for loading state
     const timeout = setTimeout(() => {
@@ -135,16 +177,22 @@ export function Videos() {
     }, 10000)
 
     return () => clearTimeout(timeout)
-  }, [loadVideos, videosCacheKey]) // Removed loading from dependency to avoid loop, but it's safe
+  }, [loadVideos, loadLibraryImages, videosCacheKey]) // Removed loading from dependency to avoid loop, but it's safe
+
+
+  const refreshLibrary = async () => {
+    setLoading(true)
+    await Promise.all([loadVideos(), loadLibraryImages()])
+  }
 
   useEffect(() => {
     const refreshOnPostCreated = () => {
-      loadVideos()
+      refreshLibrary()
     }
 
     window.addEventListener('content-factory:post-created', refreshOnPostCreated)
     return () => window.removeEventListener('content-factory:post-created', refreshOnPostCreated)
-  }, [loadVideos])
+  }, [refreshLibrary])
 
   const loadSocialAccounts = useCallback(async () => {
     try {
@@ -549,7 +597,7 @@ export function Videos() {
       <div className="space-y-10">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('videos.my_videos') || 'Video Library'}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('videos.my_videos') || 'Library'}</p>
             <h1 className="text-3xl font-semibold text-primary">{t('videos.library_title')}</h1>
             <p className="text-sm text-slate-500">{t('videos.library_desc')}</p>
           </div>
@@ -567,6 +615,27 @@ export function Videos() {
         <CreditBanner />
 
         <Card className="border-dashed border-white/40 p-4 sm:p-6">
+          <div className="mb-4 flex flex-wrap gap-2">
+            {[
+              { key: 'all' as const, label: 'All' },
+              { key: 'videos' as const, label: 'Videos' },
+              { key: 'photos' as const, label: 'Photos' },
+            ].map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setLibraryFilter(item.key)}
+                className={`rounded-full border px-4 py-1.5 text-sm font-medium transition ${
+                  libraryFilter === item.key
+                    ? 'border-brand-300 bg-brand-50 text-brand-700'
+                    : 'border-slate-200 bg-white text-slate-500 hover:border-brand-200 hover:text-brand-600'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
@@ -592,7 +661,7 @@ export function Videos() {
               />
               <Button
                 variant="secondary"
-                onClick={loadVideos}
+                onClick={refreshLibrary}
                 loading={loading}
                 className="h-12 w-12 sm:h-11 sm:w-11 p-0 rounded-2xl sm:rounded-xl active:scale-95"
               >
@@ -602,28 +671,30 @@ export function Videos() {
           </div>
         </Card>
 
-        {videos.length === 0 ? (
+        {visibleLibraryItems.length === 0 ? (
           <EmptyState
             icon={<VideoIcon className="w-16 h-16" />}
-            title={t('videos.no_videos_found')}
-            description={t('videos.no_videos_desc')}
+            title={libraryFilter === 'photos' ? 'No photos found' : t('videos.no_videos_found')}
+            description={libraryFilter === 'photos' ? 'Create your first AI photo from Creative Studio.' : t('videos.no_videos_desc')}
             action={
               <Link to="/create">
-                <Button>{t('videos.create_video')}</Button>
+                <Button>{libraryFilter === 'photos' ? 'Create Photo' : t('videos.create_video')}</Button>
               </Link>
             }
           />
         ) : (
           <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
-            {videos.map((video: VideoRecord) => {
-              const effectiveStatus = getEffectiveStatus(video)
-              return (
-              <Card
-                key={video.id}
-                hover
-                className="flex h-full flex-col gap-5 cursor-pointer p-5 sm:p-6"
-                onClick={(e: React.MouseEvent<HTMLDivElement>) => handleCardClick(video.id, e)}
-              >
+            {visibleLibraryItems.map((item: LibraryItem) => {
+              if (item.type === 'video') {
+                const video = item.video
+                const effectiveStatus = getEffectiveStatus(video)
+                return (
+                  <Card
+                    key={`video-${video.id}`}
+                    hover
+                    className="flex h-full flex-col gap-5 cursor-pointer p-5 sm:p-6"
+                    onClick={(e: React.MouseEvent<HTMLDivElement>) => handleCardClick(video.id, e)}
+                  >
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-2">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{video.style}</p>
@@ -744,7 +815,42 @@ export function Videos() {
                     {t('videos.remove')}
                   </Button>
                 </div>
-              </Card>
+                  </Card>
+                )
+              }
+
+              const image = item.photo
+              return (
+                <Card key={`photo-${image.id}`} className="flex h-full flex-col gap-4 p-5 sm:p-6">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{image.provider_tier.replace('-', ' ')}</p>
+                    <h3 className="text-lg font-semibold leading-tight text-primary line-clamp-2">AI Photo</h3>
+                    <p className="text-xs text-slate-400">{new Date(image.created_at).toLocaleString()}</p>
+                  </div>
+                  <Badge variant="success">completed</Badge>
+                </div>
+                <div className="relative overflow-hidden rounded-2xl border border-white/50 bg-slate-100/70" style={{ aspectRatio: image.aspect_ratio === '1:1' ? '1 / 1' : image.aspect_ratio === '16:9' ? '16 / 9' : image.aspect_ratio === '9:16' ? '9 / 16' : '4 / 5' }}>
+                  <img src={image.image_url} alt={image.prompt || 'AI generated image'} className="h-full w-full object-cover" />
+                </div>
+                {image.prompt && <p className="text-xs text-slate-500 line-clamp-3">{image.prompt}</p>}
+                <div className="mt-auto flex items-center justify-end border-t border-white/60 pt-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="border border-white/60 bg-white/70 text-brand-600 hover:border-brand-200 hover:bg-white"
+                    onClick={() => {
+                      const link = document.createElement('a')
+                      link.href = image.image_url
+                      link.download = `ai-photo-${image.id.slice(0, 6)}.png`
+                      link.click()
+                    }}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    {t('videos.download')}
+                  </Button>
+                </div>
+                </Card>
               )
             })}
           </div>
