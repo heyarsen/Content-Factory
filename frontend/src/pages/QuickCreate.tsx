@@ -232,11 +232,18 @@ export function QuickCreate() {
             throw new Error('Image finished but no result URL was returned')
           }
 
+          await api.post('/api/images/library', {
+            imageUrl: url,
+            prompt: photoPrompt.trim(),
+            providerTier: photoProvider,
+            aspectRatio: photoAspectRatio,
+          })
+
           setPhotoResultUrl(url)
           addNotification({
             type: 'success',
             title: 'Image generated',
-            message: `Your image is ready with ${photoProvider === 'nano-banana-pro' ? 'Nano Banana Pro' : 'Nano Banana'}.`,
+            message: `Your image is ready and saved to Library with ${photoProvider === 'nano-banana-pro' ? 'Nano Banana Pro' : 'Nano Banana'}.`,
           })
           return
         }

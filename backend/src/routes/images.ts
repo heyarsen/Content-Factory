@@ -2,6 +2,7 @@ import express, { Response } from 'express'
 import axios from 'axios'
 import { authenticate, AuthRequest } from '../middleware/auth.js'
 import { CreditsService } from '../services/creditsService.js'
+import { supabase } from '../lib/supabase.js'
 
 const router = express.Router()
 
@@ -110,6 +111,69 @@ router.get('/status/:taskId', async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     console.error('[Nano Banana] Status error:', error.response?.data || error.message)
     return res.status(500).json({ error: error.response?.data?.msg || 'Failed to fetch image status' })
+  }
+})
+
+router.post('/library', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
+    const imageUrl = typeof req.body.imageUrl === 'string' ? req.body.imageUrl.trim() : ''
+    const prompt = typeof req.body.prompt === 'string' ? req.body.prompt.trim() : ''
+    const providerTier: NanoBananaTier = req.body.providerTier === 'nano-banana-pro' ? 'nano-banana-pro' : 'nano-banana'
+    const aspectRatio = typeof req.body.aspectRatio === 'string' ? req.body.aspectRatio : '1:1'
+
+    if (!imageUrl) {
+      return res.status(400).json({ error: 'imageUrl is required' })
+    }
+
+    const { data: image, error } = await supabase
+      .from('image_library')
+      .insert({
+        user_id: userId,
+        image_url: imageUrl,
+        prompt: prompt || null,
+        provider_tier: providerTier,
+        aspect_ratio: aspectRatio,
+      })
+      .select('*')
+      .single()
+
+    if (error) {
+      return res.status(500).json({ error: error.message })
+    }
+
+    return res.json({ image })
+  } catch (error: any) {
+    console.error('[Nano Banana] Save library image error:', error.message)
+    return res.status(500).json({ error: 'Failed to save image to library' })
+  }
+})
+
+router.get('/library', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
+    const { data: images, error } = await supabase
+      .from('image_library')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      return res.status(500).json({ error: error.message })
+    }
+
+    return res.json({ images: images || [] })
+  } catch (error: any) {
+    console.error('[Nano Banana] List library images error:', error.message)
+    return res.status(500).json({ error: 'Failed to fetch library images' })
   }
 })
 
