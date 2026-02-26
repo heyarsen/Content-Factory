@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, useEffect } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import {
   Share2,
@@ -15,6 +15,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext'
 import { useCredits } from '../../hooks/useCredits'
 import { useLanguage } from '../../contexts/LanguageContext'
+import { preloadAvatarCache } from '../../lib/avatarCache'
 
 interface SidebarProps {
   isOpen: boolean
@@ -29,7 +30,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation()
 
   const navigation = [
-    { label: t('common.content_studio') || 'Content Studio', to: '/planning', icon: Clapperboard },
+    { label: t('common.manual_creation') || 'Creative Studio', to: '/create', icon: Sparkles },
+    { label: t('common.content_studio') || 'Content Calendar', to: '/planning', icon: Clapperboard },
     { label: t('common.my_videos') || 'Video Library', to: '/videos', icon: Film },
     { label: t('common.social_accounts') || 'Social Accounts', to: '/social', icon: Share2, match: (pathname: string) => pathname === '/social' },
     { label: t('common.dms') || 'DMs', to: '/social/dms', icon: MessagesSquare },
@@ -43,6 +45,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { label: t('common.admin_dashboard') || 'Admin Dashboard', to: '/admin', icon: BarChart3 },
     { label: t('common.admin_support') || 'Admin Support', to: '/admin/support', icon: MessagesSquare },
   ]
+
+  useEffect(() => {
+    void preloadAvatarCache().catch(() => {
+      // best effort preload
+    })
+  }, [])
 
   return (
     <Fragment>

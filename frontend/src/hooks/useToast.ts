@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { ToastType } from '../components/ui/Toast'
 
 interface Toast {
@@ -20,13 +20,15 @@ export function useToast() {
     setToasts((prev) => prev.filter((toast) => toast.id !== id))
   }, [])
 
-  const toast = {
-    success: (message: string) => addToast(message, 'success'),
-    error: (message: string) => addToast(message, 'error'),
-    info: (message: string) => addToast(message, 'info'),
-    warning: (message: string) => addToast(message, 'warning'),
-  }
+  const toast = useMemo(
+    () => ({
+      success: (message: string) => addToast(message, 'success'),
+      error: (message: string) => addToast(message, 'error'),
+      info: (message: string) => addToast(message, 'info'),
+      warning: (message: string) => addToast(message, 'warning'),
+    }),
+    [addToast]
+  )
 
   return { toasts, addToast, removeToast, toast }
 }
-

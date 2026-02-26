@@ -1576,18 +1576,19 @@ export function VideoPlanning() {
               onClick={() => setUploadPlanModal(true)}
               leftIcon={<Upload className="h-4 w-4" />}
               variant="secondary"
-              className="w-full sm:w-auto min-h-[44px] px-5"
+              className="w-full sm:w-[160px] min-h-[44px] px-5"
               disabled={showUpgrade}
             >
               {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : 'Upload video'}
             </Button>
             <Button
-              onClick={() => setGenerateVideoModalOpen(true)}
+              onClick={() => navigate('/create')}
               leftIcon={<Plus className="h-4 w-4" />}
-              className="w-full sm:w-auto min-h-[44px] px-5 shadow-md shadow-brand-500/20"
+              className="w-full sm:w-[160px] min-h-[44px] px-5"
+              variant="secondary"
               disabled={showUpgrade}
             >
-              {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : 'Generate AI video'}
+              {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : 'Creative Studio'}
             </Button>
             <Button
               onClick={() => setCreateModal(true)}
@@ -1596,7 +1597,7 @@ export function VideoPlanning() {
               className="w-full sm:w-auto min-h-[44px] px-5"
               disabled={showUpgrade}
             >
-              {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : 'Create automation'}
+              {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : t('common.automation') || 'Automation'}
             </Button>
           </div>
         </div>
