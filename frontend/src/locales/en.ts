@@ -1,7 +1,7 @@
 export const en = {
     common: {
         dashboard: "Dashboard",
-        my_videos: "Video Library",
+        my_videos: "Library",
         manual_creation: "Creative Studio",
         automation: "Automation",
         content_studio: "Content Calendar",
@@ -345,9 +345,9 @@ export const en = {
         open_telegram: "Open Telegram",
     },
     videos: {
-        library_title: "Video Library",
+        library_title: "Library",
         library_desc: "View and manage all your videos.",
-        my_videos: "Video Library",
+        my_videos: "Library",
         create_video: "Create Video",
         search_placeholder: "Search videos by topic or style...",
         all_status: "All status",

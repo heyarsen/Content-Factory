@@ -51,6 +51,7 @@ export function Videos() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<ListVideosParams['status']>('all')
+  const [libraryFilter, setLibraryFilter] = useState<'all' | 'videos' | 'photos'>('all')
   const [deleteModal, setDeleteModal] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [selectedVideo, setSelectedVideo] = useState<VideoRecord | null>(null)
@@ -69,6 +70,7 @@ export function Videos() {
 
   const notifiedVideosRef = useRef<Set<string>>(new Set())
   const videosCacheKey = `videos_cache:${search || 'all'}:${statusFilter || 'all'}`
+  const filteredItems = libraryFilter === 'photos' ? [] : videos
 
   // Safety ref to track mounting status
   const mountedRef = useRef(true)
@@ -549,7 +551,7 @@ export function Videos() {
       <div className="space-y-10">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('videos.my_videos') || 'Video Library'}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('videos.my_videos') || 'Library'}</p>
             <h1 className="text-3xl font-semibold text-primary">{t('videos.library_title')}</h1>
             <p className="text-sm text-slate-500">{t('videos.library_desc')}</p>
           </div>
@@ -567,6 +569,27 @@ export function Videos() {
         <CreditBanner />
 
         <Card className="border-dashed border-white/40 p-4 sm:p-6">
+          <div className="mb-4 flex flex-wrap gap-2">
+            {[
+              { key: 'all' as const, label: 'All' },
+              { key: 'videos' as const, label: 'Videos' },
+              { key: 'photos' as const, label: 'Photos' },
+            ].map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setLibraryFilter(item.key)}
+                className={`rounded-full border px-4 py-1.5 text-sm font-medium transition ${
+                  libraryFilter === item.key
+                    ? 'border-brand-300 bg-brand-50 text-brand-700'
+                    : 'border-slate-200 bg-white text-slate-500 hover:border-brand-200 hover:text-brand-600'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
@@ -602,20 +625,20 @@ export function Videos() {
           </div>
         </Card>
 
-        {videos.length === 0 ? (
+        {filteredItems.length === 0 ? (
           <EmptyState
             icon={<VideoIcon className="w-16 h-16" />}
-            title={t('videos.no_videos_found')}
-            description={t('videos.no_videos_desc')}
+            title={libraryFilter === 'photos' ? 'No photos found' : t('videos.no_videos_found')}
+            description={libraryFilter === 'photos' ? 'Create your first AI photo from Creative Studio.' : t('videos.no_videos_desc')}
             action={
               <Link to="/create">
-                <Button>{t('videos.create_video')}</Button>
+                <Button>{libraryFilter === 'photos' ? 'Create Photo' : t('videos.create_video')}</Button>
               </Link>
             }
           />
         ) : (
           <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
-            {videos.map((video: VideoRecord) => {
+            {filteredItems.map((video: VideoRecord) => {
               const effectiveStatus = getEffectiveStatus(video)
               return (
               <Card

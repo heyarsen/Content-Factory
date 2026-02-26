@@ -26,6 +26,7 @@ import dashboardRoutes from './routes/dashboard.js'
 import privacyRoutes from './routes/privacy.js'
 import strategyAssistantRoutes from './routes/strategyAssistant.js'
 import trendsRoutes from './routes/trends.js'
+import imageRoutes from './routes/images.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -309,6 +310,7 @@ app.use('/api/dashboard', dashboardRoutes)
 app.use('/api/privacy', privacyRoutes)
 app.use('/api/strategy-assistant', strategyAssistantRoutes)
 app.use('/api/trends', trendsRoutes)
+app.use('/api/images', imageRoutes)
 
 // Serve static files from frontend build (if exists)
 // Compiled path: backend/dist/server.js -> go up one level to backend/public
