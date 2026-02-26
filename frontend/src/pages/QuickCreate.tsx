@@ -14,6 +14,13 @@ import { useLanguage } from '../contexts/LanguageContext'
 import { useCreditsContext } from '../contexts/CreditContext'
 import { useAuth } from '../contexts/AuthContext'
 
+type NanoBananaProvider = 'nano-banana' | 'nano-banana-pro'
+
+const NANO_BANANA_COSTS: Record<NanoBananaProvider, number> = {
+  'nano-banana': 0.5,
+  'nano-banana-pro': 1,
+}
+
 interface SocialAccount {
   id: string
   platform: string
@@ -63,11 +70,18 @@ export function QuickCreate() {
   const [formError, setFormError] = useState('')
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([])
   const [creativeTab, setCreativeTab] = useState<'video' | 'photo' | 'text'>('video')
+  const [photoPrompt, setPhotoPrompt] = useState('')
+  const [photoAspectRatio, setPhotoAspectRatio] = useState('1:1')
+  const [photoProvider, setPhotoProvider] = useState<NanoBananaProvider>('nano-banana')
+  const [photoResultUrl, setPhotoResultUrl] = useState('')
+  const [generatingPhoto, setGeneratingPhoto] = useState(false)
 
   const [ctaText, setCtaText] = useState('')
 
   const hasSubscription = !!(user?.role === 'admin' || (subscription && ['active', 'pending'].includes(subscription.status)))
   const canGenerateVideo = hasSubscription || unlimited || (credits !== null && credits > 0)
+  const selectedPhotoCost = NANO_BANANA_COSTS[photoProvider]
+  const canGeneratePhoto = hasSubscription || unlimited || (credits !== null && credits >= selectedPhotoCost)
   const connectedPlatforms = socialAccounts
     .filter((acc: SocialAccount) => acc.status === 'connected')
     .map((acc: SocialAccount) => acc.platform)
@@ -160,9 +174,9 @@ export function QuickCreate() {
     {
       key: 'photo' as const,
       label: 'Photo generation',
-      description: 'Coming soon in Creative Studio.',
+      description: 'Generate high-quality images from prompts using Nano Banana models.',
       icon: Image,
-      unavailable: true,
+      unavailable: false,
     },
     {
       key: 'text' as const,
@@ -172,6 +186,74 @@ export function QuickCreate() {
       unavailable: true,
     },
   ]
+
+  const handleGeneratePhoto = async () => {
+    if (!canGeneratePhoto) {
+      setFormError(`You need ${selectedPhotoCost} credit${selectedPhotoCost === 1 ? '' : 's'} for this provider.`)
+      return
+    }
+
+    if (!photoPrompt.trim()) {
+      setFormError('Photo prompt is required.')
+      return
+    }
+
+    setGeneratingPhoto(true)
+    setFormError('')
+
+    try {
+      const createResponse = await api.post('/api/images/generate', {
+        prompt: photoPrompt.trim(),
+        image_size: photoAspectRatio,
+        output_format: 'png',
+        providerTier: photoProvider,
+      })
+
+      const taskId = createResponse.data?.taskId
+      if (!taskId) {
+        throw new Error('Missing task id from generation response')
+      }
+
+      let attempts = 0
+      while (attempts < 30) {
+        attempts += 1
+        await new Promise((resolve) => setTimeout(resolve, 2500))
+
+        const statusResponse = await api.get(`/api/images/status/${taskId}`)
+        const statusData = statusResponse.data?.data
+        const state = statusData?.state
+
+        if (state === 'success') {
+          const resultJson = statusData?.resultJson
+          const parsed = typeof resultJson === 'string' ? JSON.parse(resultJson) : resultJson
+          const url = parsed?.resultUrls?.[0]
+
+          if (!url) {
+            throw new Error('Image finished but no result URL was returned')
+          }
+
+          setPhotoResultUrl(url)
+          addNotification({
+            type: 'success',
+            title: 'Image generated',
+            message: `Your image is ready with ${photoProvider === 'nano-banana-pro' ? 'Nano Banana Pro' : 'Nano Banana'}.`,
+          })
+          return
+        }
+
+        if (state === 'fail') {
+          throw new Error(statusData?.failMsg || 'Image generation failed')
+        }
+      }
+
+      throw new Error('Image generation timed out. Please try again.')
+    } catch (error: any) {
+      console.error('Photo generation error:', error)
+      setFormError(error.response?.data?.error || error.message || t('errors.something_went_wrong'))
+    } finally {
+      setGeneratingPhoto(false)
+    }
+  }
 
   return (
     <Layout>
@@ -225,14 +307,79 @@ export function QuickCreate() {
             </div>
           </div>
 
-          {creativeTab !== 'video' ? (
+          {creativeTab === 'text' ? (
             <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-6 text-center">
               <p className="text-sm font-semibold text-slate-700">
-                {creativeTab === 'photo' ? 'Photo generation is currently unavailable.' : 'Text generation is currently unavailable.'}
+                Text generation is currently unavailable.
               </p>
               <p className="mt-2 text-sm text-slate-500">
                 Use <span className="font-semibold text-brand-600">Video generation</span> to continue creating content right now.
               </p>
+            </div>
+          ) : creativeTab === 'photo' ? (
+            <div className="space-y-5">
+              <Textarea
+                label="Photo prompt"
+                placeholder="Describe the image you want to generate..."
+                rows={4}
+                value={photoPrompt}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setPhotoPrompt(e.target.value)}
+              />
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Select
+                  label="Image provider"
+                  value={photoProvider}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setPhotoProvider(e.target.value as NanoBananaProvider)}
+                  options={[
+                    { value: 'nano-banana', label: 'Nano Banana (0.5 credits)' },
+                    { value: 'nano-banana-pro', label: 'Nano Banana Pro (1 credit)' },
+                  ]}
+                />
+                <Select
+                  label="Aspect ratio"
+                  value={photoAspectRatio}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setPhotoAspectRatio(e.target.value)}
+                  options={[
+                    { value: '1:1', label: '1:1 (Square)' },
+                    { value: '9:16', label: '9:16 (Portrait)' },
+                    { value: '16:9', label: '16:9 (Landscape)' },
+                    { value: '3:4', label: '3:4' },
+                    { value: '4:3', label: '4:3' },
+                    { value: '2:3', label: '2:3' },
+                    { value: '3:2', label: '3:2' },
+                  ]}
+                />
+              </div>
+
+              <div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                {photoProvider === 'nano-banana' ? 'Nano Banana costs 0.5 credits per image.' : 'Nano Banana Pro costs 1 credit per image.'}
+              </div>
+
+              {photoResultUrl && (
+                <div className="space-y-3">
+                  <p className="text-sm font-semibold text-primary">Latest generated image</p>
+                  <img src={photoResultUrl} alt="Generated" className="max-h-[420px] w-full rounded-2xl border border-slate-200 object-contain bg-slate-50" />
+                  <a href={photoResultUrl} target="_blank" rel="noreferrer" className="text-sm font-medium text-brand-600 hover:text-brand-700">
+                    Open full size image
+                  </a>
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row justify-between gap-3 pt-3">
+                <Button variant="ghost" onClick={() => navigate('/videos')} className="w-full sm:w-auto border border-slate-200">
+                  {t('common.cancel')}
+                </Button>
+                <Button
+                  onClick={handleGeneratePhoto}
+                  disabled={generatingPhoto || !canGeneratePhoto}
+                  loading={generatingPhoto}
+                  leftIcon={!generatingPhoto ? <Image className="h-4 w-4" /> : undefined}
+                  className="w-full sm:w-auto shadow-lg shadow-brand-500/20"
+                >
+                  Generate photo ({selectedPhotoCost} credit{selectedPhotoCost === 1 ? '' : 's'})
+                </Button>
+              </div>
             </div>
           ) : (
             <>
