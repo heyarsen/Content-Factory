@@ -44,6 +44,10 @@ interface LibraryImage {
   created_at: string
 }
 
+type LibraryItem =
+  | { type: 'video'; createdAt: number; video: VideoRecord }
+  | { type: 'photo'; createdAt: number; photo: LibraryImage }
+
 export function Videos() {
   const { addNotification } = useNotifications()
   const { t } = useLanguage()
@@ -82,6 +86,15 @@ export function Videos() {
   const videosCacheKey = `videos_cache:${search || 'all'}:${statusFilter || 'all'}`
   const filteredVideos = libraryFilter === 'photos' ? [] : videos
   const filteredPhotos = libraryFilter === 'videos' ? [] : libraryImages
+  const visibleLibraryItems: LibraryItem[] =
+    libraryFilter === 'videos'
+      ? filteredVideos.map((video) => ({ type: 'video', createdAt: new Date(video.created_at).getTime(), video }))
+      : libraryFilter === 'photos'
+        ? filteredPhotos.map((photo) => ({ type: 'photo', createdAt: new Date(photo.created_at).getTime(), photo }))
+        : [
+            ...filteredVideos.map((video) => ({ type: 'video' as const, createdAt: new Date(video.created_at).getTime(), video })),
+            ...filteredPhotos.map((photo) => ({ type: 'photo' as const, createdAt: new Date(photo.created_at).getTime(), photo })),
+          ].sort((a, b) => b.createdAt - a.createdAt)
 
   // Safety ref to track mounting status
   const mountedRef = useRef(true)
@@ -658,7 +671,7 @@ export function Videos() {
           </div>
         </Card>
 
-        {filteredVideos.length + filteredPhotos.length === 0 ? (
+        {visibleLibraryItems.length === 0 ? (
           <EmptyState
             icon={<VideoIcon className="w-16 h-16" />}
             title={libraryFilter === 'photos' ? 'No photos found' : t('videos.no_videos_found')}
@@ -671,15 +684,17 @@ export function Videos() {
           />
         ) : (
           <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
-            {filteredVideos.map((video: VideoRecord) => {
-              const effectiveStatus = getEffectiveStatus(video)
-              return (
-              <Card
-                key={video.id}
-                hover
-                className="flex h-full flex-col gap-5 cursor-pointer p-5 sm:p-6"
-                onClick={(e: React.MouseEvent<HTMLDivElement>) => handleCardClick(video.id, e)}
-              >
+            {visibleLibraryItems.map((item: LibraryItem) => {
+              if (item.type === 'video') {
+                const video = item.video
+                const effectiveStatus = getEffectiveStatus(video)
+                return (
+                  <Card
+                    key={`video-${video.id}`}
+                    hover
+                    className="flex h-full flex-col gap-5 cursor-pointer p-5 sm:p-6"
+                    onClick={(e: React.MouseEvent<HTMLDivElement>) => handleCardClick(video.id, e)}
+                  >
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-2">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{video.style}</p>
@@ -800,12 +815,13 @@ export function Videos() {
                     {t('videos.remove')}
                   </Button>
                 </div>
-              </Card>
-              )
-            })}
+                  </Card>
+                )
+              }
 
-            {filteredPhotos.map((image: LibraryImage) => (
-              <Card key={image.id} className="flex h-full flex-col gap-4 p-5 sm:p-6">
+              const image = item.photo
+              return (
+                <Card key={`photo-${image.id}`} className="flex h-full flex-col gap-4 p-5 sm:p-6">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{image.provider_tier.replace('-', ' ')}</p>
@@ -834,8 +850,9 @@ export function Videos() {
                     {t('videos.download')}
                   </Button>
                 </div>
-              </Card>
-            ))}
+                </Card>
+              )
+            })}
           </div>
         )}
 
