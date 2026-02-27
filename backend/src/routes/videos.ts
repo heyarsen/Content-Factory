@@ -279,7 +279,13 @@ router.post('/upload', authenticate, requireSubscription, async (req: AuthReques
       return res.status(400).json({ error: 'Uploaded file is empty' })
     }
 
-    const safeDuration = Math.max(1, Math.min(180, Number(duration) || 60))
+    // Keep uploads aligned with DB constraints while still accepting short clips.
+    // Supabase stores duration as an integer in seconds, so we clamp and round.
+    const parsedDuration = Number(duration)
+    const safeDuration = Math.min(
+      180,
+      Math.max(1, Number.isFinite(parsedDuration) ? Math.round(parsedDuration) : 60),
+    )
     const safeTopic = typeof topic === 'string' && topic.trim().length > 0
       ? topic.trim().slice(0, 200)
       : sanitizeFileName(file_name).replace(/\.[^.]+$/, '').slice(0, 200)
