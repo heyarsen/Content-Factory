@@ -3,7 +3,7 @@ import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { useToast } from '../hooks/useToast'
-import { Users, Copy, Check, Link, UserPlus, Gift, Share2 } from 'lucide-react'
+import { Users, Copy, Check, UserPlus, Gift, Share2 } from 'lucide-react'
 import api from '../lib/api'
 import { useLanguage } from '../contexts/LanguageContext'
 
