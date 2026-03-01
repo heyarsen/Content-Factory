@@ -47,14 +47,14 @@ const platformIcons = {
 }
 
 const platformNames = {
-  instagram: 'Instagram',
-  tiktok: 'TikTok',
-  youtube: 'YouTube',
-  facebook: 'Facebook',
-}
+  instagram: 'platforms.instagram',
+  tiktok: 'platforms.tiktok',
+  youtube: 'platforms.youtube',
+  facebook: 'platforms.facebook',
+} as const
 
 export function Distribution() {
-  useLanguage()
+  const { t } = useLanguage()
   const { user } = useAuth()
   const { credits, unlimited } = useCreditsContext()
   const hasSubscription = !!(user?.hasActiveSubscription || user?.role === 'admin')
@@ -78,7 +78,7 @@ export function Distribution() {
   const [copiedLink, setCopiedLink] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
 
-  // Scheduled Posts state
+  // {t('scheduled_posts.calendar_title')} state
   const [posts, setPosts] = useState<Post[]>([])
   const [videos, setVideos] = useState<any[]>([])
   const [postsLoading, setPostsLoading] = useState(true)
@@ -161,8 +161,8 @@ export function Distribution() {
     const connectedPlatform = searchParams.get('connected') as SocialAccount['platform'] | null
 
     if (connectedPlatform) {
-      const platformLabel = platformNames[connectedPlatform] || connectedPlatform
-      alert(`Success! ${platformLabel} connected successfully.`)
+      const platformLabel = connectedPlatform ? t(platformNames[connectedPlatform]) : connectedPlatform
+      alert(t('social_accounts.connect_success', { platform: platformLabel || '' }))
 
       const nextParams = new URLSearchParams(searchParams)
       nextParams.delete('connected')
@@ -209,7 +209,7 @@ export function Distribution() {
     } catch (error) {
       console.warn('Clipboard copy failed, falling back to manual copy.', error)
       setCopiedLink(false)
-      const manualCopy = window.prompt('Copy the connection URL below:', connectPortal.url)
+      const manualCopy = window.prompt(t('social_accounts.copy_connection_url_prompt'), connectPortal.url)
       if (manualCopy === null) {
         // User cancelled prompt; nothing else to do
       }
@@ -234,7 +234,7 @@ export function Distribution() {
 
   const handleConnect = async (platform: SocialAccount['platform']) => {
     if (!safeCanCreate) {
-      alert('Subscription or credits required to connect social accounts.')
+      alert(t('social_accounts.subscription_or_credits_required_connect'))
       return
     }
     setConnectingPlatform(platform)
@@ -251,7 +251,7 @@ export function Distribution() {
         redirectUrl?: string
       }
 
-      const platformLabel = platformNames[platform] || platform
+      const platformLabel = t(platformNames[platform])
 
       localStorage.removeItem(`uploadpost_jwt_${platform}`)
       localStorage.removeItem(`uploadpost_userid_${platform}`)
@@ -277,7 +277,7 @@ export function Distribution() {
         }
       }
 
-      const defaultMessage = message || `Account linking initiated for ${platformLabel}.`
+      const defaultMessage = message || t('social_accounts.account_linking_initiated', { platform: platformLabel })
 
       if (accessUrl) {
         const resolvedAccessUrl = buildPlatformUrl(accessUrl)
@@ -290,7 +290,7 @@ export function Distribution() {
             url: resolvedAccessUrl,
             duration,
             redirectUrl,
-            message: `${defaultMessage} We couldn't automatically open the connection portal. Use the link below to continue.`,
+            message: `${defaultMessage} ${t('social_accounts.could_not_open_portal_use_link')}`,
             embedDisabled: true,
           })
         }
@@ -301,18 +301,18 @@ export function Distribution() {
 
         if (!fallbackOpened) {
           const fallbackParts = [
-            `${defaultMessage} We couldn't automatically open the connection portal.`,
+            `${defaultMessage} ${t('social_accounts.could_not_open_portal')}`,
           ]
 
           if (duration) {
-            fallbackParts.push(`Link valid for ${duration}.`)
+            fallbackParts.push(t('social_accounts.link_valid_for', { duration }))
           }
 
-          fallbackParts.push(`Use the button below or visit ${fallbackBaseUrl} to continue linking.`)
+          fallbackParts.push(t('social_accounts.use_button_or_visit', { url: fallbackBaseUrl }))
 
           if (redirectUrl) {
             fallbackParts.push(
-              `Once finished you will be redirected automatically. If that does not happen, revisit: ${redirectUrl}`
+              t('social_accounts.redirect_revisit', { url: redirectUrl })
             )
           }
 
@@ -333,7 +333,7 @@ export function Distribution() {
       const errorMessage = error.response?.data?.error ||
         error.response?.data?.details ||
         error.message ||
-        'Failed to initiate connection'
+        t('social_accounts.initiate_failed')
       console.error('Error details:', {
         message: errorMessage,
         fullResponse: error.response?.data,
@@ -358,14 +358,14 @@ export function Distribution() {
     }
   }
 
-  // Scheduled Posts handlers
+  // {t('scheduled_posts.calendar_title')} handlers
   const handleSchedule = async () => {
     if (!safeCanCreate) {
-      alert('Subscription or credits required to schedule posts.')
+      alert(t('social_accounts.subscription_or_credits_required_schedule'))
       return
     }
     if (!selectedVideo || selectedPlatforms.length === 0) {
-      alert('Please select a video and at least one platform')
+      alert(t('social_accounts.select_video_and_platform'))
       return
     }
 
@@ -385,14 +385,14 @@ export function Distribution() {
       if (failedPosts.length > 0) {
         const errorMessages = failedPosts.map((p: any) => {
           const platform = p.platform as keyof typeof platformNames
-          return `${platformNames[platform] || p.platform}: ${p.error_message || 'Unknown error'}`
+          return `${t(platformNames[platform])}: ${p.error_message || t('dashboard.status_unknown')}`
         }).join('\n')
-        alert(`Some posts failed:\n${errorMessages}`)
+        alert(`${t('social_accounts.some_posts_failed')}\n${errorMessages}`)
       } else {
         // Success - show success message
-        alert(`Successfully scheduled post${posts.length > 1 ? 's' : ''} to ${posts.map((p: any) => {
+        alert(`${t('social_accounts.successfully_scheduled')} ${posts.map((p: any) => {
           const platform = p.platform as keyof typeof platformNames
-          return platformNames[platform] || p.platform
+          return t(platformNames[platform])
         }).join(', ')}`)
       }
 
@@ -404,7 +404,7 @@ export function Distribution() {
       loadPosts()
     } catch (error: any) {
       console.error('Failed to schedule post:', error)
-      const errorMessage = error.response?.data?.error || 'Failed to schedule post'
+      const errorMessage = error.response?.data?.error || t('social_accounts.schedule_post_failed')
       alert(errorMessage)
     } finally {
       setScheduling(false)
@@ -447,18 +447,18 @@ export function Distribution() {
     const bConnected = connectedPlatforms.includes(b)
 
     if (aConnected === bConnected) {
-      return platformNames[a].localeCompare(platformNames[b])
+      return t(platformNames[a]).localeCompare(t(platformNames[b]))
     }
 
     return aConnected ? -1 : 1
   })
 
   const statusFilterOptions = [
-    { value: 'all', label: 'All', count: posts.length },
-    { value: 'pending', label: 'Pending', count: posts.filter((p) => p.status === 'pending').length },
-    { value: 'posted', label: 'Posted', count: posts.filter((p) => p.status === 'posted').length },
-    { value: 'failed', label: 'Failed', count: posts.filter((p) => p.status === 'failed').length },
-    { value: 'cancelled', label: 'Cancelled', count: posts.filter((p) => p.status === 'cancelled').length },
+    { value: 'all', label: t('common.all'), count: posts.length },
+    { value: 'pending', label: t('social_accounts.status_pending'), count: posts.filter((p) => p.status === 'pending').length },
+    { value: 'posted', label: t('social_accounts.status_posted'), count: posts.filter((p) => p.status === 'posted').length },
+    { value: 'failed', label: t('social_accounts.status_failed'), count: posts.filter((p) => p.status === 'failed').length },
+    { value: 'cancelled', label: t('social_accounts.status_cancelled'), count: posts.filter((p) => p.status === 'cancelled').length },
   ]
 
   const togglePlatform = (platform: string) => {
@@ -473,10 +473,10 @@ export function Distribution() {
     <Layout>
       <div className="space-y-10">
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Social Accounts</p>
-          <h1 className="text-3xl font-semibold text-primary">Social Accounts</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('social_accounts.title')}</p>
+          <h1 className="text-3xl font-semibold text-primary">{t('social_accounts.title')}</h1>
           <p className="text-sm text-slate-500">
-            Connect social media accounts for posting videos, handling DMs, managing comments, and future engagement workflows.
+            {t('social_accounts.workspace_subtitle')}
           </p>
         </div>
 
@@ -486,10 +486,10 @@ export function Distribution() {
         <section className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-primary">Social Accounts</h2>
-              <p className="text-sm text-slate-500">Connect channels to push finished videos live automatically.</p>
+              <h2 className="text-xl font-semibold text-primary">{t('social_accounts.title')}</h2>
+              <p className="text-sm text-slate-500">{t('social_accounts.subtitle')}</p>
               <p className="mt-1 text-xs text-slate-400">
-                {connectedPlatforms.length} of {allPlatforms.length} platforms connected
+                {t('social_accounts.connected_total', { connected: connectedPlatforms.length, total: allPlatforms.length })}
               </p>
             </div>
           </div>
@@ -503,8 +503,8 @@ export function Distribution() {
           ) : accounts.length === 0 && availablePlatforms.length === 0 ? (
             <EmptyState
               icon={<Users className="w-16 h-16" />}
-              title="No social accounts connected"
-              description="Connect your social media accounts to start posting your videos automatically."
+              title={t('social_accounts.no_accounts_title')}
+              description={t('social_accounts.no_accounts_desc')}
             />
           ) : (
             <div className="grid gap-6 md:grid-cols-2">
@@ -521,24 +521,24 @@ export function Distribution() {
                           <Icon className="h-6 w-6" />
                         </div>
                         <div className="space-y-2">
-                          <h3 className="text-lg font-semibold text-primary">{platformNames[platform]}</h3>
+                          <h3 className="text-lg font-semibold text-primary">{t(platformNames[platform])}</h3>
                           {account && getStatusBadge(account.status)}
                         </div>
                       </div>
                       {isConnected && (
-                        <span className="text-xs font-medium uppercase tracking-wide text-emerald-500/80">Synced</span>
+                        <span className="text-xs font-medium uppercase tracking-wide text-emerald-500/80">{t('social_accounts.synced')}</span>
                       )}
                     </div>
 
                     {account?.status === 'pending' && (
                       <div className="rounded-2xl border border-amber-200/70 bg-amber-50/70 px-4 py-3 text-xs text-amber-600">
-                        Finish linking in the connection portal. If you closed it, click Connect again to reopen or use the saved link.
+                        {t('social_accounts.finish_linking')}
                       </div>
                     )}
 
                     {isConnected && account && (
                       <div className="rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-xs text-slate-500">
-                        Connected on {new Date(account.connected_at).toLocaleDateString()}.
+                        {t('social_accounts.connected_on', { date: new Date(account.connected_at).toLocaleDateString() })}
                       </div>
                     )}
 
@@ -551,7 +551,7 @@ export function Distribution() {
                           className="w-full border border-rose-200 bg-rose-50/70 text-rose-600 hover:border-rose-300 hover:bg-rose-50"
                         >
                           <X className="mr-2 h-4 w-4" />
-                          Disconnect
+                          {t('social_accounts.disconnect')}
                         </Button>
                       ) : (
                         <Button
@@ -563,7 +563,7 @@ export function Distribution() {
                           className="w-full"
                         >
                           <Link2 className="mr-2 h-4 w-4" />
-                          Connect
+                          {t('social_accounts.connect')}
                         </Button>
                       )}
                     </div>
@@ -574,12 +574,12 @@ export function Distribution() {
           )}
         </section>
 
-        {/* Scheduled Posts Section */}
+        {/* {t('scheduled_posts.calendar_title')} Section */}
         <section className="hidden" aria-hidden="true">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-primary">Scheduled Posts</h2>
-              <p className="text-sm text-slate-500">Activate multi-channel distribution and keep audiences warm.</p>
+              <h2 className="text-xl font-semibold text-primary">{t('scheduled_posts.calendar_title')}</h2>
+              <p className="text-sm text-slate-500">{t('scheduled_posts.calendar_desc')}</p>
             </div>
             <Button
               onClick={() => setScheduleModal(true)}
@@ -587,7 +587,7 @@ export function Distribution() {
               disabled={!safeCanCreate}
             >
               <Calendar className="mr-2 h-4 w-4" />
-              {safeCanCreate ? 'Schedule post' : 'Upgrade to schedule'}
+              {safeCanCreate ? t('social_accounts.schedule_post') : t('scheduled_posts.upgrade_to_schedule')}
             </Button>
           </div>
 
@@ -644,7 +644,7 @@ export function Distribution() {
                         <div className="flex-1 space-y-2">
                           <div className="flex flex-wrap items-center gap-3">
                             <h3 className="text-lg font-semibold text-primary">
-                              {platformNames[post.platform]}
+                              {t(platformNames[post.platform])}
                             </h3>
                             {getStatusBadge(post.status)}
                           </div>
@@ -672,7 +672,7 @@ export function Distribution() {
                           onClick={() => setCancelModal(post.id)}
                         >
                           <X className="mr-2 h-4 w-4" />
-                          Cancel
+                          {t('social_accounts.cancel')}
                         </Button>
                       )}
                     </div>
@@ -694,8 +694,8 @@ export function Distribution() {
           onClose={() => setConnectPortal(null)}
           title={
             connectPortal
-              ? `Connect ${platformNames[connectPortal.platform]}`
-              : 'Connect Social Account'
+              ? t('social_accounts.connect_platform_title', { platform: t(platformNames[connectPortal.platform]) })
+              : t('social_accounts.connect_social_account')
           }
           size="xl"
         >
@@ -703,11 +703,11 @@ export function Distribution() {
             <div className="space-y-5">
               <p className="text-sm text-slate-500">
                 {connectPortal.message ||
-                  `Follow the steps below to link your ${platformNames[connectPortal.platform]} account without leaving this tab.`}
+                  t('social_accounts.account_linking_initiated', { platform: t(platformNames[connectPortal.platform]) })}
               </p>
               {connectPortal.duration && (
                 <div className="text-xs uppercase tracking-wide text-slate-400">
-                  Link valid for {connectPortal.duration}.
+                  {t('social_accounts.link_valid_for', { duration: connectPortal.duration })}
                 </div>
               )}
               <div className="h-[400px] sm:h-[540px] max-h-[60vh] overflow-hidden rounded-3xl border border-white/60 bg-slate-50/70">
@@ -715,7 +715,7 @@ export function Distribution() {
                   <iframe
                     key={connectPortal.url}
                     src={connectPortal.url}
-                    title={`${platformNames[connectPortal.platform]} connection portal`}
+                    title={t('social_accounts.connect_platform_title', { platform: t(platformNames[connectPortal.platform]) })}
                     className="w-full h-full border-0"
                     onError={() => setPortalLoadFailed(true)}
                     onLoad={() => setPortalLoadFailed(false)}
@@ -723,7 +723,7 @@ export function Distribution() {
                   />
                 ) : (
                   <div className="flex h-full flex-col items-center justify-center space-y-4 p-6 text-sm text-slate-500">
-                    <p>We couldn't display the connection portal here. Use the link below to continue.</p>
+                    <p>{t('social_accounts.portal_unavailable_use_link')}</p>
                     <Button
                       type="button"
                       variant="primary"
@@ -731,14 +731,14 @@ export function Distribution() {
                       onClick={() => tryOpenPortalWindow(connectPortal.url)}
                     >
                       <Link2 className="w-4 h-4 mr-2" />
-                      Open in new tab
+                      {t('social_accounts.open_in_new_tab')}
                     </Button>
                   </div>
                 )}
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  Connection URL
+                  {t('social_accounts.connection_url')}
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -760,7 +760,7 @@ export function Distribution() {
               </div>
               {connectPortal.redirectUrl && (
                 <p className="text-xs text-slate-400">
-                  When you finish in the portal you should be redirected automatically. If that does not happen, return to{' '}
+                  {t('social_accounts.redirect_after_finish')}{' '}
                   <span className="font-medium text-slate-600">{connectPortal.redirectUrl}</span>.
                 </p>
               )}
@@ -773,7 +773,7 @@ export function Distribution() {
                   onClick={() => tryOpenPortalWindow(connectPortal.url)}
                 >
                   <Link2 className="mr-2 h-4 w-4" />
-                  Open in new tab
+                  {t('social_accounts.open_in_new_tab')}
                 </Button>
                 <Button
                   type="button"
@@ -782,7 +782,7 @@ export function Distribution() {
                   className="border border-white/60 bg-white/70 text-slate-500 hover:border-slate-200 hover:bg-white"
                   onClick={() => setConnectPortal(null)}
                 >
-                  Close
+                  {t('common.close')}
                 </Button>
               </div>
             </div>
@@ -792,11 +792,11 @@ export function Distribution() {
         <Modal
           isOpen={disconnectModal !== null}
           onClose={() => setDisconnectModal(null)}
-          title="Disconnect Account"
+          title={t('social_accounts.disconnect_title')}
           size="sm"
         >
           <p className="mb-4 text-sm text-slate-500">
-            Are you sure you want to disconnect this account? You won't be able to post to this platform until you reconnect.
+            {t('social_accounts.disconnect_confirm')}
           </p>
           <div className="flex gap-3 justify-end">
             <Button
@@ -804,14 +804,14 @@ export function Distribution() {
               className="border border-white/60 bg-white/70 text-slate-500 hover:border-slate-200 hover:bg-white"
               onClick={() => setDisconnectModal(null)}
             >
-              Cancel
+              {t('social_accounts.cancel')}
             </Button>
             <Button
               variant="danger"
               onClick={() => disconnectModal && handleDisconnect(disconnectModal)}
               loading={disconnecting}
             >
-              Disconnect
+              {t('social_accounts.disconnect')}
             </Button>
           </div>
         </Modal>
@@ -819,14 +819,14 @@ export function Distribution() {
         <Modal
           isOpen={scheduleModal}
           onClose={() => setScheduleModal(false)}
-          title="Schedule Post"
+          title={t('social_accounts.schedule_post_title')}
           size="lg"
         >
           <div className="space-y-5">
             <Select
-              label="Select video"
+              label={t('social_accounts.select_video')}
               options={[
-                { value: '', label: 'Choose a video...' },
+                { value: '', label: t('social_accounts.choose_video') },
                 ...videos.map((v) => ({
                   value: v.id,
                   label: v.topic,
@@ -838,7 +838,7 @@ export function Distribution() {
 
             <div>
               <label className="mb-2 block text-sm font-semibold text-primary">
-                Select platforms
+                {t('social_accounts.select_platforms')}
               </label>
               <div className="grid grid-cols-2 gap-3">
                 {Object.entries(platformNames).map(([key, name]) => {
@@ -855,7 +855,7 @@ export function Distribution() {
                         }`}
                     >
                       <Icon className="h-5 w-5" />
-                      <span>{name}</span>
+                      <span>{t(name)}</span>
                     </button>
                   )
                 })}
@@ -864,17 +864,17 @@ export function Distribution() {
 
             <Input
               type="datetime-local"
-              label="Schedule time (optional)"
+              label={t('social_accounts.schedule_time_optional')}
               value={scheduledTime}
               onChange={(e) => setScheduledTime(e.target.value)}
             />
 
             <Textarea
-              label="Caption (optional)"
+              label={t('social_accounts.caption_optional')}
               rows={3}
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
-              placeholder="Add a caption for your post..."
+              placeholder={t('social_accounts.caption_placeholder')}
             />
 
             <div className="flex gap-3 justify-end pt-2">
@@ -883,10 +883,10 @@ export function Distribution() {
                 className="border border-white/60 bg-white/70 text-slate-500 hover:border-slate-200 hover:bg-white"
                 onClick={() => setScheduleModal(false)}
               >
-                Cancel
+                {t('social_accounts.cancel')}
               </Button>
               <Button onClick={handleSchedule} loading={scheduling}>
-                Schedule post
+                {t('social_accounts.schedule_post')}
               </Button>
             </div>
           </div>
@@ -895,11 +895,11 @@ export function Distribution() {
         <Modal
           isOpen={cancelModal !== null}
           onClose={() => setCancelModal(null)}
-          title="Cancel Post"
+          title={t('social_accounts.cancel_post_title')}
           size="sm"
         >
           <p className="mb-4 text-sm text-slate-500">
-            Are you sure you want to cancel this scheduled post?
+            {t('social_accounts.cancel_post_confirm')}
           </p>
           <div className="flex gap-3 justify-end">
             <Button
@@ -907,14 +907,14 @@ export function Distribution() {
               className="border border-white/60 bg-white/70 text-slate-500 hover:border-slate-200 hover:bg-white"
               onClick={() => setCancelModal(null)}
             >
-              Keep it
+              {t('social_accounts.keep_it')}
             </Button>
             <Button
               variant="danger"
               onClick={() => cancelModal && handleCancel(cancelModal)}
               loading={cancelling}
             >
-              Cancel post
+              {t('social_accounts.cancel_post')}
             </Button>
           </div>
         </Modal>
