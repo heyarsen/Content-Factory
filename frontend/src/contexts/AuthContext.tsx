@@ -27,7 +27,7 @@ interface User {
 interface AuthContextType {
   user: User | null
   loading: boolean
-  signUp: (email: string, password: string, preferredLanguage?: string) => Promise<void>
+  signUp: (email: string, password: string, preferredLanguage?: string, referralCode?: string) => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
   signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
@@ -214,7 +214,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{
       user, loading, signOut, signIn,
-      signUp: async (e, p, l) => { await api.post('/api/auth/signup', { email: e, password: p, preferredLanguage: l }) },
+      signUp: async (e, p, l, r) => { await api.post('/api/auth/signup', { email: e, password: p, preferredLanguage: l, referralCode: r }) },
       signInWithGoogle: async () => {
         await supabase.auth.signInWithOAuth({
           provider: 'google',

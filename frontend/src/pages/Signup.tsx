@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
@@ -24,6 +24,15 @@ export function Signup() {
   const [resending, setResending] = useState(false)
   const { signUp, signInWithGoogle } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const [referralCode, setReferralCode] = useState<string | null>(null)
+
+  useEffect(() => {
+    const ref = searchParams.get('ref')
+    if (ref) {
+      setReferralCode(ref)
+    }
+  }, [searchParams])
 
   const handleResendVerification = async () => {
     if (!email) {
@@ -60,7 +69,7 @@ export function Signup() {
     setLoading(true)
 
     try {
-      await signUp(email, password, language)
+      await signUp(email, password, language, referralCode || undefined)
       setSuccess(true)
       setErr(null)
     } catch (signupErr: any) {

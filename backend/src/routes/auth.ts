@@ -53,7 +53,7 @@ const fetchTimezoneFromIp = async (ip?: string | null) => {
 // Signup
 router.post('/signup', authLimiter, async (req: Request, res: Response) => {
   try {
-    const { email, password, preferredLanguage } = req.body
+    const { email, password, preferredLanguage, referralCode } = req.body
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' })
@@ -115,6 +115,47 @@ router.post('/signup', authLimiter, async (req: Request, res: Response) => {
 
       if (prefError) {
         console.warn('Failed to initialize user preferences:', prefError)
+      }
+    }
+
+    // Apply referral code if provided
+    if (referralCode && data.user) {
+      try {
+        // Find referrer by code
+        const { data: referrer } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('referral_code', referralCode)
+          .single()
+
+        if (referrer && referrer.id !== data.user.id) {
+          // Check if referral already exists
+          const { data: existingRef } = await supabase
+            .from('referrals')
+            .select('id')
+            .eq('referred_id', data.user.id)
+            .single()
+
+          if (!existingRef) {
+            // Create referral record
+            await supabase
+              .from('referrals')
+              .insert({
+                referrer_id: referrer.id,
+                referred_id: data.user.id,
+                credits_awarded: 10,
+                status: 'completed',
+              })
+
+            // Award 10 credits to referrer
+            const { CreditsService } = await import('../services/creditsService.js')
+            await CreditsService.addCredits(referrer.id, 10, 'Referral bonus')
+            console.log(`[Referrals] Awarded 10 credits to referrer ${referrer.id} for new user ${data.user.id}`)
+          }
+        }
+      } catch (refError) {
+        console.error('[Referrals] Error applying referral during signup:', refError)
+        // Don't fail signup if referral fails
       }
     }
 

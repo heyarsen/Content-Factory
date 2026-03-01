@@ -76,6 +76,9 @@ const CookiePolicy = lazy(() =>
 const AcceptableUsePolicy = lazy(() =>
   import('./pages/AcceptableUsePolicy').then((m) => ({ default: m.AcceptableUsePolicy }))
 )
+const Referrals = lazy(() =>
+  import('./pages/Referrals').then((m) => ({ default: m.Referrals }))
+)
 const Dpa = lazy(() => import('./pages/Dpa').then((m) => ({ default: m.Dpa })))
 const CookieConsentManager = lazy(() =>
   import('./components/legal/CookieConsentManager').then((m) => ({ default: m.CookieConsentManager }))
@@ -277,6 +280,14 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <Avatars />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/referrals"
+            element={
+              <ProtectedRoute>
+                <Referrals />
               </ProtectedRoute>
             }
           />
