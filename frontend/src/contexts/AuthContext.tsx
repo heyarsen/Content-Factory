@@ -123,6 +123,28 @@ const fetchUserRoleAndSubscription = async (userId: string, userEmail: string, f
   }
 }
 
+/**
+ * Apply pending referral code if one exists in localStorage.
+ * This handles the case where a user signs up via Google OAuth
+ * and the referral code was saved before the redirect.
+ */
+const applyPendingReferral = async () => {
+  const pendingRef = localStorage.getItem('pending_referral_code')
+  if (!pendingRef) return
+
+  try {
+    console.log(`[Auth] Applying pending referral code: ${pendingRef}`)
+    await api.post('/api/referrals/apply', { referralCode: pendingRef })
+    console.log(`[Auth] Referral code ${pendingRef} applied successfully`)
+    localStorage.removeItem('pending_referral_code')
+  } catch (err: any) {
+    // If referral already applied or invalid, just clear it
+    console.log(`[Auth] Referral apply result:`, err?.response?.data?.error || err.message)
+    // Clear the pending code regardless - don't keep retrying
+    localStorage.removeItem('pending_referral_code')
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
@@ -165,6 +187,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               localStorage.setItem('auth_user', JSON.stringify(uObj))
               setUser(uObj)
             }
+
+            // Apply pending referral code (e.g. after Google OAuth redirect)
+            if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+              applyPendingReferral()
+            }
           }
         } else if (event === 'SIGNED_OUT' || (event === 'INITIAL_SESSION' && !session)) {
           localStorage.removeItem('auth_user')
@@ -205,6 +232,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log('[Auth] Signing out...')
     localStorage.removeItem('auth_user')
     localStorage.removeItem('access_token')
+    localStorage.removeItem('pending_referral_code')
     setUser(null)
     await supabase.auth.signOut()
   }

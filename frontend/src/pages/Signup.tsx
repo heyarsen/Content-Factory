@@ -31,6 +31,14 @@ export function Signup() {
     const ref = searchParams.get('ref')
     if (ref) {
       setReferralCode(ref)
+      // Save to localStorage so it persists through Google OAuth redirect
+      localStorage.setItem('pending_referral_code', ref)
+    } else {
+      // Check if there's a pending referral code from a previous visit
+      const pendingRef = localStorage.getItem('pending_referral_code')
+      if (pendingRef) {
+        setReferralCode(pendingRef)
+      }
     }
   }, [searchParams])
 
@@ -72,12 +80,20 @@ export function Signup() {
       await signUp(email, password, language, referralCode || undefined)
       setSuccess(true)
       setErr(null)
+      // Clear pending referral code after successful signup
+      localStorage.removeItem('pending_referral_code')
     } catch (signupErr: any) {
       setErr(signupErr)
       setError(signupErr.response?.data?.error || signupErr.response?.data?.message || t('auth.signup_failed'))
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleGoogleSignup = async () => {
+    // referralCode is already saved in localStorage from useEffect
+    // After Google OAuth redirect, AuthContext will check and apply it
+    await signInWithGoogle()
   }
 
   if (success) {
@@ -182,6 +198,12 @@ export function Signup() {
                 </div>
               )}
 
+              {referralCode && (
+                <div className="mb-6 rounded-2xl border border-emerald-200/80 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-700">
+                  Referral code applied: <strong>{referralCode}</strong>
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-5">
                 <Input
                   type="email"
@@ -254,7 +276,7 @@ export function Signup() {
                 <Button
                   variant="secondary"
                   className="w-full"
-                  onClick={() => signInWithGoogle()}
+                  onClick={handleGoogleSignup}
                   disabled={loading}
                 >
                   <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
