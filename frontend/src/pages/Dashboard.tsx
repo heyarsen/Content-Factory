@@ -173,13 +173,13 @@ export function Dashboard() {
   const onboardingSteps: OnboardingChecklistStep[] = [
     {
       id: 'connect_social_account',
-      title: 'Connect accounts',
+      title: t('dashboard.connect_accounts'),
       path: '/social',
       completed: Boolean(onboarding?.completedSteps?.includes('connect_social_account')),
     },
     {
       id: 'generate_first_video',
-      title: 'Launch first campaign',
+      title: t('dashboard.launch_campaign'),
       path: '/quick-create',
       completed: Boolean(onboarding?.completedSteps?.includes('generate_first_video')),
     },
@@ -252,7 +252,7 @@ export function Dashboard() {
               <Link to="/quick-create" className="w-full sm:w-auto">
                 <Button className="w-full sm:w-auto border border-white/20 bg-white/20 text-white backdrop-blur hover:bg-white/30 hover:text-white shadow-lg active:scale-[0.98]">
                   <Sparkles className="mr-2 h-4 w-4" />
-                  Launch first campaign
+                  {t('dashboard.launch_campaign')}
                 </Button>
               </Link>
               <Link to="/planning" className="w-full sm:w-auto">
@@ -280,10 +280,10 @@ export function Dashboard() {
 
         <section className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">Social analytics</h2>
+            <h2 className="text-lg font-semibold text-slate-900">{t('dashboard.social_analytics')}</h2>
             <Badge variant="default" className="inline-flex items-center gap-1">
               <BarChart3 className="h-3.5 w-3.5" />
-              Connected Channels
+              {t('dashboard.connected_channels')}
             </Badge>
           </div>
           {analyticsLoading ? (
@@ -294,7 +294,7 @@ export function Dashboard() {
             </div>
           ) : Object.keys(socialAnalytics).length === 0 ? (
             <Card className="p-6">
-              <p className="text-sm text-slate-600">Connect at least one social account to load analytics.</p>
+              <p className="text-sm text-slate-600">{t('dashboard.connect_social_to_load')}</p>
             </Card>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -302,11 +302,11 @@ export function Dashboard() {
                 <Card key={platform} className="p-5">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{platform}</p>
                   <p className="mt-2 text-2xl font-semibold text-slate-900">{analytics.followers ?? 0}</p>
-                  <p className="text-xs text-slate-500">Followers</p>
+                  <p className="text-xs text-slate-500">{t('dashboard.followers')}</p>
                   <div className="mt-3 space-y-1 text-xs text-slate-500">
-                    <p>Reach: {analytics.reach ?? 0}</p>
-                    <p>Impressions: {analytics.impressions ?? 0}</p>
-                    <p>Profile views: {analytics.profileViews ?? 0}</p>
+                    <p>{t('dashboard.reach')}: {analytics.reach ?? 0}</p>
+                    <p>{t('dashboard.impressions')}: {analytics.impressions ?? 0}</p>
+                    <p>{t('dashboard.profile_views')}: {analytics.profileViews ?? 0}</p>
                   </div>
                 </Card>
               ))}
@@ -403,8 +403,8 @@ export function Dashboard() {
                       <Zap className="h-5 w-5" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-bold text-slate-900 leading-tight truncate">Launch first campaign</p>
-                      <p className="mt-0.5 text-[10px] sm:text-xs text-slate-500 leading-none truncate">Build content, captions, and channel mix from one brief</p>
+                      <p className="text-sm font-bold text-slate-900 leading-tight truncate">{t('dashboard.launch_campaign')}</p>
+                      <p className="mt-0.5 text-[10px] sm:text-xs text-slate-500 leading-none truncate">{t('dashboard.launch_campaign_desc')}</p>
                     </div>
                   </div>
                   <ArrowRight className="h-4 w-4 text-brand-600 transition group-hover:translate-x-0.5 shrink-0" />
@@ -443,8 +443,8 @@ export function Dashboard() {
                       <Users className="h-5 w-5" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-bold text-slate-900 leading-tight truncate">Connect accounts</p>
-                      <p className="mt-0.5 text-[10px] sm:text-xs text-slate-500 leading-none truncate">Link destinations to unlock scheduling, inbox, and analytics</p>
+                      <p className="text-sm font-bold text-slate-900 leading-tight truncate">{t('dashboard.connect_accounts')}</p>
+                      <p className="mt-0.5 text-[10px] sm:text-xs text-slate-500 leading-none truncate">{t('dashboard.connect_accounts_desc')}</p>
                       {!canConnectSocial && (
                         <p className="mt-1 text-[10px] sm:text-xs text-amber-700">{t('common.buy_subscription')}</p>
                       )}
