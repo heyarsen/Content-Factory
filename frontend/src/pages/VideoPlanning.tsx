@@ -727,8 +727,8 @@ export function VideoPlanning() {
       setVideoTimes(normalizedTimes)
       addNotification({
         type: 'warning',
-        title: 'Posting times auto-adjusted',
-        message: `Some videos were too close together. Applied a ${MIN_VIDEO_TIME_GAP_MINUTES}-minute minimum gap to prevent overlaps.`,
+        title: t('video_planning.posting_times_adjusted_title'),
+        message: t('video_planning.posting_times_adjusted_message', { minutes: MIN_VIDEO_TIME_GAP_MINUTES }),
       })
     }
 
@@ -904,8 +904,8 @@ export function VideoPlanning() {
       setVideoTimes(normalizedTimes)
       addNotification({
         type: 'warning',
-        title: 'Posting times auto-adjusted',
-        message: `Some videos were too close together. Applied a ${MIN_VIDEO_TIME_GAP_MINUTES}-minute minimum gap to prevent overlaps.`,
+        title: t('video_planning.posting_times_adjusted_title'),
+        message: t('video_planning.posting_times_adjusted_message', { minutes: MIN_VIDEO_TIME_GAP_MINUTES }),
       })
     }
 
@@ -1565,10 +1565,10 @@ export function VideoPlanning() {
               {t('common.content_studio')}
             </p>
             <h1 className="text-3xl font-semibold text-primary">
-              Content Calendar
+              {t('video_planning.content_calendar_title')}
             </h1>
             <p className="text-sm text-slate-500">
-              Calendar view of all posted, planned, and upcoming videos.
+              {t('video_planning.content_calendar_subtitle')}
             </p>
           </div>
           <div className="flex w-full flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end md:w-auto">
@@ -1579,7 +1579,7 @@ export function VideoPlanning() {
               className="w-full sm:w-[160px] min-h-[44px] px-5"
               disabled={showUpgrade}
             >
-              {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : 'Upload video'}
+              {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : t('video_planning.upload_video')}
             </Button>
             <Button
               onClick={() => navigate('/create')}
@@ -1588,7 +1588,7 @@ export function VideoPlanning() {
               variant="secondary"
               disabled={showUpgrade}
             >
-              {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : 'Creative Studio'}
+              {showUpgrade ? t('common.upgrade_required') || 'Subscription Required' : t('common.manual_creation')}
             </Button>
             <Button
               onClick={() => setCreateModal(true)}

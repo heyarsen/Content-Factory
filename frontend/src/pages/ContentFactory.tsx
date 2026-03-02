@@ -9,6 +9,7 @@ import { Badge } from '../components/ui/Badge'
 import { Skeleton } from '../components/ui/Skeleton'
 import api from '../lib/api'
 import { CheckCircle2, Plus, RefreshCw, Save, Trash2 } from 'lucide-react'
+import { useLanguage } from '../contexts/LanguageContext'
 
 type TabKey = 'categories' | 'ideas' | 'research' | 'script'
 
@@ -93,6 +94,7 @@ function SectionTab({ label, active, onClick }: { label: string; active: boolean
 }
 
 function FeedbackBanner({ feedback, onDismiss }: { feedback: Feedback | null; onDismiss: () => void }) {
+  const { t } = useLanguage()
   if (!feedback) return null
 
   const baseClasses = 'flex items-center justify-between rounded-2xl border px-4 py-3 text-sm'
@@ -108,7 +110,7 @@ function FeedbackBanner({ feedback, onDismiss }: { feedback: Feedback | null; on
         {feedback.message}
       </span>
       <button className="text-xs font-medium uppercase tracking-wide text-slate-400" onClick={onDismiss}>
-        dismiss
+        {t('content_factory.dismiss')}
       </button>
     </div>
   )
@@ -125,6 +127,7 @@ function CategoryEditor({
   onDeleted: (categoryId: string) => void
   onError: (message: string) => void
 }) {
+  const { t } = useLanguage()
   const [form, setForm] = useState(() => ({
     category_key: category.category_key,
     name: category.name,
@@ -165,7 +168,7 @@ function CategoryEditor({
   }
 
   const handleDelete = async () => {
-    if (!confirm('Remove this category?')) return
+    if (!confirm(t('content_factory.remove_category_confirm'))) return
     setDeleting(true)
     try {
       await api.delete(`/api/content/categories/${category.id}`)
@@ -182,7 +185,7 @@ function CategoryEditor({
     <Card className="space-y-6 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col">
-          <span className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Category</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">{t('content_factory.category')}</span>
           <span className="text-base font-semibold text-primary">{category.name}</span>
         </div>
         <Badge variant={form.status === 'active' ? 'success' : 'default'}>{form.status}</Badge>
@@ -190,13 +193,13 @@ function CategoryEditor({
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Input
-          label="Display name"
+          label={t('content_factory.display_name')}
           value={form.name}
           onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-          placeholder="e.g., Trading"
+          placeholder={t('content_factory.display_name_placeholder_trading')}
         />
         <Input
-          label="Category key (system)"
+          label={t('content_factory.category_key_system')}
           value={form.category_key}
           onChange={(e) => setForm((prev) => ({ ...prev, category_key: e.target.value }))}
           placeholder="trading"
@@ -205,29 +208,28 @@ function CategoryEditor({
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Select
-          label="Status"
+          label={t('content_factory.status')}
           value={form.status}
           onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value as 'active' | 'inactive' }))}
           options={[
-            { value: 'active', label: 'Active' },
-            { value: 'inactive', label: 'Inactive' },
+            { value: 'active', label: t('content_factory.active') },
+            { value: 'inactive', label: t('content_factory.inactive') },
           ]}
         />
         <div className="rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-xs text-slate-500">
-          <p className="font-semibold text-slate-600">Guideline</p>
+          <p className="font-semibold text-slate-600">{t('content_factory.guideline')}</p>
           <p className="mt-1">
-            Switch inactive to pause a theme without deleting data. Renaming updates both navigation labels and prompt
-            references.
+            {t('content_factory.guideline_copy')}
           </p>
         </div>
       </div>
 
       <Textarea
-        label="Description"
+        label={t('content_factory.description')}
         rows={5}
         value={form.description}
         onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-        placeholder="Describe the narrative angle, tone, and guardrails for this category."
+        placeholder={t('content_factory.description_placeholder')}
       />
 
       <div className="flex flex-col gap-3 pt-2 sm:flex-row">
@@ -238,7 +240,7 @@ function CategoryEditor({
           loading={saving}
           leftIcon={!saving ? <Save className="h-4 w-4" /> : undefined}
         >
-          Save changes
+          {t('content_factory.save_changes')}
         </Button>
         <Button
           type="button"
@@ -248,7 +250,7 @@ function CategoryEditor({
           loading={deleting}
           leftIcon={!deleting ? <Trash2 className="h-4 w-4" /> : undefined}
         >
-          Remove
+          {t('content_factory.remove')}
         </Button>
       </div>
     </Card>
@@ -264,6 +266,8 @@ function NewCategoryCard({
   onCancel: () => void
   onError: (message: string) => void
 }) {
+
+  const { t } = useLanguage()
   const [name, setName] = useState('')
   const [categoryKey, setCategoryKey] = useState('')
   const [status, setStatus] = useState<'active' | 'inactive'>('active')
@@ -280,7 +284,7 @@ function NewCategoryCard({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name || !categoryKey) {
-      onError('Please provide both name and category key')
+      onError(t('content_factory.name_and_key_required'))
       return
     }
 
@@ -311,21 +315,21 @@ function NewCategoryCard({
       <form className="space-y-6" onSubmit={handleSubmit}>
         <div className="flex items-center justify-between">
           <div>
-            <span className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">New category</span>
-            <h3 className="mt-1 text-xl font-semibold text-primary">Launch a fresh theme</h3>
+            <span className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">{t('content_factory.new_category')}</span>
+            <h3 className="mt-1 text-xl font-semibold text-primary">{t('content_factory.launch_fresh_theme')}</h3>
           </div>
         </div>
 
         <div className="grid gap-5 lg:grid-cols-2">
           <Input
-            label="Display name"
+            label={t('content_factory.display_name')}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g., Mindset"
+            placeholder={t('content_factory.display_name_placeholder_mindset')}
             required
           />
           <Input
-            label="Category key (system)"
+            label={t('content_factory.category_key_system')}
             value={categoryKey}
             onChange={(e) => {
               setKeyTouched(true)
@@ -338,30 +342,30 @@ function NewCategoryCard({
 
         <div className="grid gap-5 lg:grid-cols-2">
           <Select
-            label="Status"
+            label={t('content_factory.status')}
             value={status}
             onChange={(e) => setStatus(e.target.value as 'active' | 'inactive')}
             options={[
-              { value: 'active', label: 'Active' },
-              { value: 'inactive', label: 'Inactive' },
+              { value: 'active', label: t('content_factory.active') },
+              { value: 'inactive', label: t('content_factory.inactive') },
             ]}
           />
           <div className="rounded-2xl border border-dashed border-brand-200/60 bg-brand-50/30 px-4 py-3 text-xs text-brand-700">
-            Use a short, URL-safe key. It helps prompts reference this category consistently.
+            {t('content_factory.short_key_hint')}
           </div>
         </div>
 
         <Textarea
-          label="Description"
+          label={t('content_factory.description')}
           rows={5}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Describe tone, guardrails, and expected story angles."
+          placeholder={t('content_factory.description_placeholder_short')}
         />
 
         <div className="flex flex-col gap-3 pt-2 sm:flex-row">
           <Button type="submit" className="sm:w-auto" loading={saving} leftIcon={!saving ? <Save className="h-4 w-4" /> : undefined}>
-            Create category
+            {t('content_factory.create_category')}
           </Button>
           <Button
             type="button"
@@ -370,7 +374,7 @@ function NewCategoryCard({
             onClick={onCancel}
             disabled={saving}
           >
-            Cancel
+            {t('common.cancel')}
           </Button>
         </div>
       </form>
@@ -387,6 +391,8 @@ function IdeasPromptForm({
   onSaved: (prompt: IdeasPrompt) => void
   onError: (message: string) => void
 }) {
+
+  const { t } = useLanguage()
   const [form, setForm] = useState(() =>
     prompt
       ? {
@@ -413,7 +419,7 @@ function IdeasPromptForm({
   if (!prompt || !form) {
     return (
       <Card className="p-6 text-sm text-slate-500">
-        Default prompt not available. Try refreshing the page to re-seed the workspace.
+        {t('content_factory.default_prompt_not_available')}
       </Card>
     )
   }
@@ -441,46 +447,46 @@ function IdeasPromptForm({
     <Card className="space-y-6 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Prompt DNA</p>
-          <h3 className="mt-1 text-2xl font-semibold text-primary">Idea generation rules</h3>
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('content_factory.prompt_dna')}</p>
+          <h3 className="mt-1 text-2xl font-semibold text-primary">{t('content_factory.idea_generation_rules')}</h3>
         </div>
         <Badge variant="default">ID: {prompt.template_key}</Badge>
       </div>
 
       <Textarea
-        label="Persona"
+        label={t('content_factory.persona')}
         rows={8}
         value={form.persona}
         onChange={(e) => setForm({ ...form, persona: e.target.value })}
-        placeholder="Describe the primary persona for idea generation"
+        placeholder={t('content_factory.persona_placeholder_ideas')}
       />
 
       <Textarea
-        label="Business model"
+        label={t('content_factory.business_model')}
         rows={6}
         value={form.business_model}
         onChange={(e) => setForm({ ...form, business_model: e.target.value })}
-        placeholder="Outline how the offer works, benefits, and boundaries"
+        placeholder={t('content_factory.business_model_placeholder')}
       />
 
       <Textarea
-        label="Focus & filters"
+        label={t('content_factory.focus_filters')}
         rows={6}
         value={form.focus}
         onChange={(e) => setForm({ ...form, focus: e.target.value })}
-        placeholder="List the angle priorities and exclusions"
+        placeholder={t('content_factory.focus_filters_placeholder')}
       />
 
       <Input
-        label="Allowed categories"
+        label={t('content_factory.allowed_categories')}
         value={form.categories}
         onChange={(e) => setForm({ ...form, categories: e.target.value })}
-        placeholder="Trading, Lifestyle, Financial Freedom"
+        placeholder={t('content_factory.allowed_categories_placeholder')}
       />
 
       <div className="flex justify-end pt-2">
         <Button onClick={handleSave} disabled={!isDirty} loading={saving} leftIcon={!saving ? <Save className="h-4 w-4" /> : undefined}>
-          Save prompt
+          {t('content_factory.save_prompt')}
         </Button>
       </div>
     </Card>
@@ -496,6 +502,8 @@ function ResearchPromptForm({
   onSaved: (prompt: ResearchPrompt) => void
   onError: (message: string) => void
 }) {
+
+  const { t } = useLanguage()
   const [form, setForm] = useState(() =>
     prompt
       ? {
@@ -522,7 +530,7 @@ function ResearchPromptForm({
   if (!prompt || !form) {
     return (
       <Card className="p-6 text-sm text-slate-500">
-        Default prompt not available. Try refreshing the page to re-seed the workspace.
+        {t('content_factory.default_prompt_not_available')}
       </Card>
     )
   }
@@ -550,47 +558,47 @@ function ResearchPromptForm({
     <Card className="space-y-6 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Prompt DNA</p>
-          <h3 className="mt-1 text-2xl font-semibold text-primary">Research synthesis rules</h3>
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('content_factory.prompt_dna')}</p>
+          <h3 className="mt-1 text-2xl font-semibold text-primary">{t('content_factory.research_synthesis_rules')}</h3>
         </div>
         <Badge variant="default">ID: {prompt.template_key}</Badge>
       </div>
 
       <Textarea
-        label="Persona"
+        label={t('content_factory.persona')}
         rows={8}
         value={form.persona}
         onChange={(e) => setForm({ ...form, persona: e.target.value })}
-        placeholder="Describe who research summaries should speak to"
+        placeholder={t('content_factory.persona_placeholder_research')}
       />
 
       <Textarea
-        label="Core message"
+        label={t('content_factory.core_message')}
         rows={6}
         value={form.core_message}
         onChange={(e) => setForm({ ...form, core_message: e.target.value })}
-        placeholder="What should every research output reaffirm?"
+        placeholder={t('content_factory.core_message_placeholder')}
       />
 
       <Textarea
-        label="Rules"
+        label={t('content_factory.rules')}
         rows={6}
         value={form.rules}
         onChange={(e) => setForm({ ...form, rules: e.target.value })}
-        placeholder="Set structure, tone, and compliance guardrails"
+        placeholder={t('content_factory.rules_placeholder')}
       />
 
       <Textarea
-        label="Notes"
+        label={t('content_factory.notes')}
         rows={4}
         value={form.notes}
         onChange={(e) => setForm({ ...form, notes: e.target.value })}
-        placeholder="Optional clarifications or caveats"
+        placeholder={t('content_factory.notes_placeholder')}
       />
 
       <div className="flex justify-end pt-2">
         <Button onClick={handleSave} disabled={!isDirty} loading={saving} leftIcon={!saving ? <Save className="h-4 w-4" /> : undefined}>
-          Save prompt
+          {t('content_factory.save_prompt')}
         </Button>
       </div>
     </Card>
@@ -606,6 +614,8 @@ function ScriptPromptForm({
   onSaved: (prompt: ScriptPrompt) => void
   onError: (message: string) => void
 }) {
+
+  const { t } = useLanguage()
   const [form, setForm] = useState(() =>
     prompt
       ? {
@@ -634,7 +644,7 @@ function ScriptPromptForm({
   if (!prompt || !form) {
     return (
       <Card className="p-6 text-sm text-slate-500">
-        Default prompt not available. Try refreshing the page to re-seed the workspace.
+        {t('content_factory.default_prompt_not_available')}
       </Card>
     )
   }
@@ -663,20 +673,20 @@ function ScriptPromptForm({
     <Card className="space-y-6 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Prompt DNA</p>
-          <h3 className="mt-1 text-2xl font-semibold text-primary">Script writing rules</h3>
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('content_factory.prompt_dna')}</p>
+          <h3 className="mt-1 text-2xl font-semibold text-primary">{t('content_factory.script_writing_rules')}</h3>
         </div>
         <Badge variant="default">ID: {prompt.template_key}</Badge>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Input
-          label="Duration"
+          label={t('content_factory.duration')}
           value={form.duration}
           onChange={(e) => setForm({ ...form, duration: e.target.value })}
         />
         <Input
-          label="Word range"
+          label={t('content_factory.word_range')}
           value={form.word_range}
           onChange={(e) => setForm({ ...form, word_range: e.target.value })}
         />
@@ -684,19 +694,19 @@ function ScriptPromptForm({
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Input
-          label="Tone"
+          label={t('content_factory.tone')}
           value={form.tone}
           onChange={(e) => setForm({ ...form, tone: e.target.value })}
         />
         <Input
-          label="Structure"
+          label={t('content_factory.structure')}
           value={form.structure}
           onChange={(e) => setForm({ ...form, structure: e.target.value })}
         />
       </div>
 
       <Textarea
-        label="Rules"
+        label={t('content_factory.rules')}
         rows={6}
         value={form.rules}
         onChange={(e) => setForm({ ...form, rules: e.target.value })}
@@ -704,7 +714,7 @@ function ScriptPromptForm({
 
       <div className="flex justify-end pt-2">
         <Button onClick={handleSave} disabled={!isDirty} loading={saving} leftIcon={!saving ? <Save className="h-4 w-4" /> : undefined}>
-          Save prompt
+          {t('content_factory.save_prompt')}
         </Button>
       </div>
     </Card>
@@ -712,6 +722,8 @@ function ScriptPromptForm({
 }
 
 export function ContentFactory() {
+
+  const { t } = useLanguage()
   const [activeTab, setActiveTab] = useState<TabKey>('categories')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -752,17 +764,17 @@ export function ContentFactory() {
 
   const handleCategoryUpdated = (updated: Category) => {
     setCategories((prev) => prev.map((category) => (category.id === updated.id ? updated : category)))
-    setFeedback({ type: 'success', message: 'Category updated' })
+    setFeedback({ type: 'success', message: t('content_factory.category_updated') })
   }
 
   const handleCategoryDeleted = (categoryId: string) => {
     setCategories((prev) => prev.filter((category) => category.id !== categoryId))
-    setFeedback({ type: 'success', message: 'Category removed' })
+    setFeedback({ type: 'success', message: t('content_factory.category_removed') })
   }
 
   const handleCategoryCreated = (category: Category) => {
     setCategories((prev) => [...prev, category])
-    setFeedback({ type: 'success', message: 'Category created' })
+    setFeedback({ type: 'success', message: t('content_factory.category_created') })
   }
 
   const handlePromptSaved = (updated: IdeasPrompt | ResearchPrompt | ScriptPrompt) => {
@@ -771,7 +783,7 @@ export function ContentFactory() {
       research: updated.template_key === prev.research?.template_key ? (updated as ResearchPrompt) : prev.research,
       script: updated.template_key === prev.script?.template_key ? (updated as ScriptPrompt) : prev.script,
     }))
-    setFeedback({ type: 'success', message: 'Prompt updated' })
+    setFeedback({ type: 'success', message: t('content_factory.prompt_updated') })
   }
 
   const handleError = (message: string) => {
@@ -793,11 +805,11 @@ export function ContentFactory() {
       <div className="space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
           <Card className="flex-1 space-y-4 border border-dashed border-brand-200/60 bg-brand-50/30 p-6">
-            <p className="text-sm font-semibold text-brand-700">How we migrated from Sheets</p>
+            <p className="text-sm font-semibold text-brand-700">{t('content_factory.migrated_from_sheets')}</p>
             <ul className="space-y-2 text-sm text-brand-700">
-              <li>? Active categories stay synced with prompt logic and analytics.</li>
-              <li>? Descriptions now power tooltips across the studio.</li>
-              <li>? Sorting and status let you experiment without losing history.</li>
+              <li>• {t('content_factory.migration_point_1')}</li>
+              <li>• {t('content_factory.migration_point_2')}</li>
+              <li>• {t('content_factory.migration_point_3')}</li>
             </ul>
           </Card>
           <Button
@@ -805,7 +817,7 @@ export function ContentFactory() {
             className="h-max rounded-2xl bg-gradient-to-r from-brand-500 to-indigo-500 px-5 py-3 text-sm font-semibold text-white shadow-[0_20px_60px_-30px_rgba(79,70,229,0.8)] hover:shadow-[0_25px_80px_-40px_rgba(79,70,229,0.9)]"
             leftIcon={<Plus className="h-4 w-4" />}
           >
-            New category
+            {t('content_factory.new_category')}
           </Button>
         </div>
 
@@ -819,7 +831,7 @@ export function ContentFactory() {
 
         {sortedCategories.length === 0 ? (
           <Card className="rounded-3xl border border-dashed border-slate-200 bg-white/70 p-10 text-center text-sm text-slate-500">
-            No categories yet. Add your first thematic lane to get started.
+            {t('content_factory.no_categories_yet')}
           </Card>
         ) : (
           <div className="space-y-6">
@@ -852,11 +864,11 @@ export function ContentFactory() {
       return (
         <div className="space-y-6">
           <Card className="space-y-3 border border-dashed border-brand-200/60 bg-brand-50/30 p-6 text-sm text-brand-700">
-            <p className="font-semibold">Idea prompts fuel daily campaign planning:</p>
+            <p className="font-semibold">{t('content_factory.idea_prompts_intro')}</p>
             <ul className="space-y-1">
-              <li>? Persona anchors the generator voice and context.</li>
-              <li>? Business model sets factual boundaries the AI keeps repeating.</li>
-              <li>? Focus defines novelty rules so results stay fresh.</li>
+              <li>• {t('content_factory.idea_prompt_point_1')}</li>
+              <li>• {t('content_factory.idea_prompt_point_2')}</li>
+              <li>• {t('content_factory.idea_prompt_point_3')}</li>
             </ul>
           </Card>
           <IdeasPromptForm prompt={prompts.ideas} onSaved={handlePromptSaved} onError={handleError} />
@@ -868,11 +880,11 @@ export function ContentFactory() {
       return (
         <div className="space-y-6">
           <Card className="space-y-3 border border-dashed border-amber-200/60 bg-amber-50/40 p-6 text-sm text-amber-700">
-            <p className="font-semibold">Research prompts keep analysis on-message:</p>
+            <p className="font-semibold">{t('content_factory.research_prompts_intro')}</p>
             <ul className="space-y-1">
-              <li>? Core message defines what every insight needs to reinforce.</li>
-              <li>? Rules keep compliance, formatting, and tone consistent.</li>
-              <li>? Notes are perfect for campaign-specific adjustments.</li>
+              <li>• {t('content_factory.research_prompt_point_1')}</li>
+              <li>• {t('content_factory.research_prompt_point_2')}</li>
+              <li>• {t('content_factory.research_prompt_point_3')}</li>
             </ul>
           </Card>
           <ResearchPromptForm prompt={prompts.research} onSaved={handlePromptSaved} onError={handleError} />
@@ -883,11 +895,11 @@ export function ContentFactory() {
     return (
       <div className="space-y-6">
         <Card className="space-y-3 border border-dashed border-indigo-200/60 bg-indigo-50/40 p-6 text-sm text-indigo-700">
-          <p className="font-semibold">Script prompts translate ideas into polished videos:</p>
+          <p className="font-semibold">{t('content_factory.script_prompts_intro')}</p>
           <ul className="space-y-1">
-            <li>? Duration and word range align production pacing.</li>
-            <li>? Tone and structure keep scripts bingeable yet factual.</li>
-            <li>? Rules make sure every CTA and compliance line stays sharp.</li>
+            <li>• {t('content_factory.script_prompt_point_1')}</li>
+            <li>• {t('content_factory.script_prompt_point_2')}</li>
+            <li>• {t('content_factory.script_prompt_point_3')}</li>
           </ul>
         </Card>
         <ScriptPromptForm prompt={prompts.script} onSaved={handlePromptSaved} onError={handleError} />
@@ -899,11 +911,10 @@ export function ContentFactory() {
     <Layout>
       <div className="space-y-10">
         <div className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">Content ops</p>
-          <h1 className="text-3xl font-semibold text-primary">Content factory controls</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">{t('content_factory.content_ops')}</p>
+          <h1 className="text-3xl font-semibold text-primary">{t('content_factory.controls_title')}</h1>
           <p className="max-w-3xl text-sm text-slate-500">
-            Manage the strategic pieces we migrated from the Google Sheet: categories, idea prompts, research scripts, and
-            voice rules. Updates apply instantly across the studio.
+            {t('content_factory.controls_description')}
           </p>
         </div>
 
@@ -916,10 +927,10 @@ export function ContentFactory() {
         )}
 
         <div className="flex gap-2 overflow-x-auto rounded-3xl border border-white/60 bg-white/70 p-2 shadow-inner scrollbar-hide">
-          <SectionTab label="Categories" active={activeTab === 'categories'} onClick={() => setActiveTab('categories')} />
-          <SectionTab label="Idea prompt" active={activeTab === 'ideas'} onClick={() => setActiveTab('ideas')} />
-          <SectionTab label="Research prompt" active={activeTab === 'research'} onClick={() => setActiveTab('research')} />
-          <SectionTab label="Script prompt" active={activeTab === 'script'} onClick={() => setActiveTab('script')} />
+          <SectionTab label={t('content_factory.categories_tab')} active={activeTab === 'categories'} onClick={() => setActiveTab('categories')} />
+          <SectionTab label={t('content_factory.idea_prompt_tab')} active={activeTab === 'ideas'} onClick={() => setActiveTab('ideas')} />
+          <SectionTab label={t('content_factory.research_prompt_tab')} active={activeTab === 'research'} onClick={() => setActiveTab('research')} />
+          <SectionTab label={t('content_factory.script_prompt_tab')} active={activeTab === 'script'} onClick={() => setActiveTab('script')} />
         </div>
 
         {activeTab === 'categories' ? renderCategories() : renderPrompts()}
