@@ -119,42 +119,57 @@ router.post('/signup', authLimiter, async (req: Request, res: Response) => {
     }
 
     // Apply referral code if provided
+    // NOTE: We apply the referral immediately after profile upsert above,
+    // so user_profiles for the new user already exists at this point.
     if (referralCode && data.user) {
       try {
+        const newUserId = data.user.id
+        console.log(`[Referrals] Attempting to apply referral code "${referralCode}" for new user ${newUserId}`)
+
         // Find referrer by code
-        const { data: referrer } = await supabase
+        const { data: referrer, error: referrerError } = await supabase
           .from('user_profiles')
           .select('id')
           .eq('referral_code', referralCode)
           .single()
 
-        if (referrer && referrer.id !== data.user.id) {
+        if (referrerError || !referrer) {
+          console.warn(`[Referrals] Referral code "${referralCode}" not found:`, referrerError?.message)
+        } else if (referrer.id === newUserId) {
+          console.warn(`[Referrals] Self-referral attempt by user ${newUserId}`)
+        } else {
           // Check if referral already exists
           const { data: existingRef } = await supabase
             .from('referrals')
             .select('id')
-            .eq('referred_id', data.user.id)
+            .eq('referred_id', newUserId)
             .single()
 
-          if (!existingRef) {
+          if (existingRef) {
+            console.warn(`[Referrals] Referral already applied for user ${newUserId}`)
+          } else {
             // Create referral record
-            await supabase
+            const { error: insertError } = await supabase
               .from('referrals')
               .insert({
                 referrer_id: referrer.id,
-                referred_id: data.user.id,
+                referred_id: newUserId,
                 credits_awarded: 10,
                 status: 'completed',
               })
 
-            // Award 10 credits to referrer
-            const { CreditsService } = await import('../services/creditsService.js')
-            await CreditsService.addCredits(referrer.id, 10, 'Referral bonus')
-            console.log(`[Referrals] Awarded 10 credits to referrer ${referrer.id} for new user ${data.user.id}`)
+            if (insertError) {
+              console.error(`[Referrals] Failed to insert referral record:`, insertError)
+            } else {
+              // Award 10 credits to referrer
+              const { CreditsService } = await import('../services/creditsService.js')
+              await CreditsService.addCredits(referrer.id, 10, 'Referral bonus')
+              console.log(`[Referrals] SUCCESS: Awarded 10 credits to referrer ${referrer.id} for new user ${newUserId}`)
+            }
           }
         }
       } catch (refError) {
-        console.error('[Referrals] Error applying referral during signup:', refError)
+        console.error('[Referrals] Unexpected error applying referral during signup:', refError)
         // Don't fail signup if referral fails
       }
     }
