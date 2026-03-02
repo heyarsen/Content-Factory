@@ -51,7 +51,7 @@ interface UserSubscription {
 export function Credits() {
   const { credits, unlimited, loading: creditsLoading, refreshCredits } = useCredits()
   const { addNotification } = useNotifications()
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { refreshSubscriptionStatus } = useAuth()
   const [plans, setPlans] = useState<SubscriptionPlan[]>([])
   const [loadingPlans, setLoadingPlans] = useState(true)
@@ -433,7 +433,6 @@ export function Credits() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
-    const { language } = useLanguage()
     return date.toLocaleDateString(language === 'en' ? 'en-US' : language === 'ru' ? 'ru-RU' : language === 'uk' ? 'uk-UA' : language === 'es' ? 'es-ES' : 'de-DE', {
       year: 'numeric',
       month: 'short',
