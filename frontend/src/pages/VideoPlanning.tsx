@@ -1812,20 +1812,20 @@ export function VideoPlanning() {
                     size="sm"
                     onClick={() => setCalendarView('week')}
                   >
-                    Week (Timeline)
+                    {t('video_planning.week_timeline_view')}
                   </Button>
                   <Button
                     variant={calendarView === 'month' ? 'primary' : 'ghost'}
                     size="sm"
                     onClick={() => setCalendarView('month')}
                   >
-                    Month
+                    {t('video_planning.month_view')}
                   </Button>
                 </div>
               </div>
 
               <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-slate-500">Overall calendar for your full content plan: uploads, AI videos, scheduled, and posted.</p>
+                <p className="text-sm text-slate-500">{t('video_planning.calendar_overview')}</p>
                 <div className="flex flex-wrap justify-center gap-2">
                   <Button variant="ghost" size="sm" onClick={() => navigateCalendar('prev')} className="flex-1 sm:flex-none">← {t('video_planning.prev')}</Button>
                   <Button variant="ghost" size="sm" onClick={() => setCurrentMonth(new Date())} className="flex-1 sm:flex-none">{t('video_planning.today')}</Button>
@@ -1837,7 +1837,7 @@ export function VideoPlanning() {
                 <div className="space-y-3">
                   <div className="space-y-2 sm:hidden">
                     <p className="rounded-lg border border-brand-100 bg-brand-50/70 px-3 py-2 text-xs text-brand-700">
-                      Mobile week view: each day is stacked for quick scanning. Tap any card to open full details.
+                      {t('video_planning.mobile_week_hint')}
                     </p>
                     {weekDays.map((day) => {
                       const dayKey = getDateKey(day)
@@ -1868,7 +1868,7 @@ export function VideoPlanning() {
                               })}
                             </p>
                             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                              {items.length} items
+                              {t('video_planning.items_count', { count: items.length })}
                             </span>
                           </div>
                           {items.length > 0 ? (
@@ -1887,12 +1887,12 @@ export function VideoPlanning() {
                               })}
                               {items.length > 3 && (
                                 <p className="text-xs font-medium text-brand-600">
-                                  +{items.length - 3} more
+                                  {t('video_planning.more_items', { count: items.length - 3 })}
                                 </p>
                               )}
                             </div>
                           ) : (
-                            <p className="text-xs text-slate-400">No scheduled items</p>
+                            <p className="text-xs text-slate-400">{t('video_planning.no_scheduled_items')}</p>
                           )}
                         </button>
                       )
@@ -2049,7 +2049,7 @@ export function VideoPlanning() {
                                   )}
                                 </div>
                               ) : (
-                                <p className="text-xs text-slate-400">No scheduled items</p>
+                              <p className="text-xs text-slate-400">{t('video_planning.no_scheduled_items')}</p>
                               )}
                             </button>
                           )
@@ -2812,8 +2812,8 @@ export function VideoPlanning() {
           <div className="space-y-4">
             <div>
               <Input
-                label="Plan Name"
-                placeholder="e.g., Daily Trading Content"
+                label={t('video_planning.plan_name')}
+                placeholder={t('video_planning.plan_name_placeholder')}
                 value={planName}
                 onChange={(e) => setPlanName(e.target.value)}
                 required
@@ -3022,8 +3022,8 @@ export function VideoPlanning() {
         >
           <div className="space-y-4">
             <Input
-              label="Plan Name"
-              placeholder="e.g., Daily Trading Content"
+              label={t('video_planning.plan_name')}
+              placeholder={t('video_planning.plan_name_placeholder')}
               value={planName}
               onChange={(e) => setPlanName(e.target.value)}
               required
@@ -3249,13 +3249,13 @@ export function VideoPlanning() {
                   onClick={() => handleRejectScript(scriptPreviewItem.id)}
                   leftIcon={<X className="h-4 w-4" />}
                 >
-                  Reject
+                  {t('video_planning.reject_script')}
                 </Button>
                 <Button
                   onClick={() => handleApproveScript(scriptPreviewItem.id)}
                   leftIcon={<Check className="h-4 w-4" />}
                 >
-                  Approve
+                  {t('video_planning.approve_script')}
                 </Button>
               </div>
             </div>
@@ -3266,7 +3266,7 @@ export function VideoPlanning() {
         <Modal
           isOpen={!!editingItem}
           onClose={() => setEditingItem(null)}
-          title="Edit Plan Item"
+          title={t('video_planning.edit_plan_item')}
           size="lg"
         >
           {editingItem && (
@@ -3275,15 +3275,15 @@ export function VideoPlanning() {
 
               <div className="grid gap-4 md:grid-cols-2">
                 <Input
-                  label="Topic"
+                  label={t('video_planning.topic')}
                   value={editForm.topic}
                   onChange={(e) =>
                     setEditForm((prev) => ({ ...prev, topic: e.target.value }))
                   }
-                  placeholder="Enter topic"
+                  placeholder={t('video_planning.topic_placeholder')}
                 />
                 <Input
-                  label="Scheduled Time"
+                  label={t('video_planning.scheduled_time')}
                   type="time"
                   value={editForm.scheduled_time}
                   onChange={(e) =>
@@ -3296,7 +3296,7 @@ export function VideoPlanning() {
               </div>
 
               <Textarea
-                label="Description"
+                label={t('video_planning.description')}
                 value={editForm.description}
                 onChange={(e) =>
                   setEditForm((prev) => ({
@@ -3307,7 +3307,7 @@ export function VideoPlanning() {
               />
 
               <Textarea
-                label="Why it matters"
+                label={t('video_planning.why_it_matters')}
                 value={editForm.why_important}
                 onChange={(e) =>
                   setEditForm((prev) => ({
@@ -3318,7 +3318,7 @@ export function VideoPlanning() {
               />
 
               <Textarea
-                label="Useful tips"
+                label={t('video_planning.useful_tips')}
                 value={editForm.useful_tips}
                 onChange={(e) =>
                   setEditForm((prev) => ({
@@ -3329,7 +3329,7 @@ export function VideoPlanning() {
               />
 
               <Textarea
-                label="Caption"
+                label={t('video_planning.caption')}
                 value={editForm.caption}
                 onChange={(e) =>
                   setEditForm((prev) => ({
@@ -3341,10 +3341,10 @@ export function VideoPlanning() {
 
               <div className="flex justify-end gap-3 pt-2">
                 <Button variant="ghost" onClick={() => setEditingItem(null)}>
-                  Cancel
+                  {t('video_planning.cancel')}
                 </Button>
                 <Button onClick={handleSaveItem} leftIcon={<Save className="h-4 w-4" />}>
-                  Save changes
+                  {t('video_planning.save_changes')}
                 </Button>
               </div>
             </div>
@@ -3355,7 +3355,7 @@ export function VideoPlanning() {
         <Modal
           isOpen={selectedItem !== null}
           onClose={() => setSelectedItem(null)}
-          title="Plan Item Details"
+          title={t('video_planning.plan_item_details')}
           size="lg"
         >
           {selectedItem && (() => {
@@ -3388,7 +3388,7 @@ export function VideoPlanning() {
                 {itemsForDate.length > 1 && (
                   <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-2">
                     <div className="text-sm text-slate-600">
-                      Item {currentIndex + 1} of {itemsForDate.length}
+                      {t('video_planning.item_pagination', { current: currentIndex + 1, total: itemsForDate.length })}
                     </div>
                     <div className="flex gap-2">
                       <Button
@@ -3397,7 +3397,7 @@ export function VideoPlanning() {
                         onClick={() => navigateToItem('prev')}
                         disabled={!hasPrev}
                       >
-                        ← Prev
+                        ← {t('video_planning.prev')}
                       </Button>
                       <Button
                         variant="ghost"
@@ -3405,7 +3405,7 @@ export function VideoPlanning() {
                         onClick={() => navigateToItem('next')}
                         disabled={!hasNext}
                       >
-                        Next →
+                        {t('video_planning.next')} →
                       </Button>
                     </div>
                   </div>
@@ -3443,7 +3443,7 @@ export function VideoPlanning() {
                 {selectedItem.topic && (
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      Topic
+                      {t('video_planning.topic')}
                     </label>
                     <p className="mt-1 text-lg font-semibold text-primary">
                       {selectedItem.topic}
@@ -3455,7 +3455,7 @@ export function VideoPlanning() {
                 {selectedItem.category && (
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      Category
+                      {t('video_planning.category')}
                     </label>
                     <p className="mt-1 text-sm font-medium text-primary">
                       {selectedItem.category}
@@ -3469,7 +3469,7 @@ export function VideoPlanning() {
                 {selectedItem.description && (
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      Description
+                      {t('video_planning.description')}
                     </label>
                     <p className="mt-1 text-sm text-slate-700">
                       {selectedItem.description}
@@ -3481,7 +3481,7 @@ export function VideoPlanning() {
                 {selectedItem.why_important && (
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      Why It Matters
+                      {t('video_planning.why_it_matters')}
                     </label>
                     <p className="mt-1 text-sm text-slate-700">
                       {selectedItem.why_important}
@@ -3493,7 +3493,7 @@ export function VideoPlanning() {
                 {selectedItem.useful_tips && (
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      Useful Tips
+                      {t('video_planning.useful_tips')}
                     </label>
                     <p className="mt-1 text-sm text-slate-700">
                       {selectedItem.useful_tips}
@@ -3507,13 +3507,13 @@ export function VideoPlanning() {
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-slate-400" />
                       <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                        Script
+                        {t('video_planning.script')}
                       </label>
                       {selectedItem.script_status && (
                         <Badge variant={selectedItem.script_status === 'approved' ? 'success' : selectedItem.script_status === 'rejected' ? 'error' : 'info'}>
-                          {selectedItem.script_status === 'approved' ? 'Approved' :
-                            selectedItem.script_status === 'rejected' ? 'Rejected' :
-                              'Draft'}
+                          {selectedItem.script_status === 'approved' ? t('video_planning.script_status_approved') :
+                            selectedItem.script_status === 'rejected' ? t('video_planning.script_status_rejected') :
+                              t('video_planning.script_status_draft')}
                         </Badge>
                       )}
                     </div>
@@ -3534,7 +3534,7 @@ export function VideoPlanning() {
                           }}
                           leftIcon={<X className="h-4 w-4" />}
                         >
-                          Reject
+                          {t('video_planning.reject')}
                         </Button>
                         <Button
                           size="sm"
@@ -3544,7 +3544,7 @@ export function VideoPlanning() {
                           }}
                           leftIcon={<Check className="h-4 w-4" />}
                         >
-                          Approve
+                          {t('video_planning.approve')}
                         </Button>
                       </div>
                     )}
@@ -3555,7 +3555,7 @@ export function VideoPlanning() {
                 {selectedItem.caption && (
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      Social Media Caption
+                      {t('video_planning.social_media_caption')}
                     </label>
                     <p className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">
                       {selectedItem.caption}
@@ -3567,7 +3567,7 @@ export function VideoPlanning() {
                 {selectedItem.platforms && selectedItem.platforms.length > 0 && (
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      Platforms
+                      {t('video_planning.platforms')}
                     </label>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {selectedItem.platforms.map((platform) => (
@@ -3592,7 +3592,7 @@ export function VideoPlanning() {
                         onClick={() => navigate(`/videos?videoId=${selectedItem.video_id}`)}
                         leftIcon={<ExternalLink className="h-4 w-4" />}
                       >
-                        View Video
+                        {t('video_planning.view_video')}
                       </Button>
                     </div>
                   </div>
@@ -3602,7 +3602,7 @@ export function VideoPlanning() {
                 {selectedItem.error_message && (
                   <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
                     <label className="text-xs font-semibold uppercase tracking-wide text-rose-700">
-                      Error Message
+                      {t('video_planning.error_message')}
                     </label>
                     <p className="mt-1 text-sm text-rose-600">
                       {selectedItem.error_message}
@@ -3616,7 +3616,7 @@ export function VideoPlanning() {
                     {selectedItem.created_at && (
                       <div>
                         <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                          Created
+                          {t('video_planning.created')}
                         </label>
                         <p className="mt-1 text-sm font-medium text-primary">
                           {new Date(selectedItem.created_at).toLocaleString()}
@@ -3626,7 +3626,7 @@ export function VideoPlanning() {
                     {selectedItem.updated_at && (
                       <div>
                         <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                          Updated
+                          {t('video_planning.updated')}
                         </label>
                         <p className="mt-1 text-sm font-medium text-primary">
                           {new Date(selectedItem.updated_at).toLocaleString()}
@@ -3655,7 +3655,7 @@ export function VideoPlanning() {
                     }}
                     leftIcon={<Edit2 className="h-4 w-4" />}
                   >
-                    Edit
+                    {t('video_planning.edit')}
                   </Button>
                   {(selectedItem.status === 'completed' || selectedItem.status === 'scheduled' || selectedItem.status === 'generating') && selectedItem.video_id && (
                     <Button
@@ -3687,7 +3687,7 @@ export function VideoPlanning() {
                       }}
                       leftIcon={<RefreshCw className="h-4 w-4" />}
                     >
-                      Refresh Status
+                      {t('video_planning.refresh_status')}
                     </Button>
                   )}
                   {selectedItem.script && selectedItem.script_status === 'draft' && (
@@ -3700,7 +3700,7 @@ export function VideoPlanning() {
                         }}
                         leftIcon={<X className="h-4 w-4" />}
                       >
-                        Reject Script
+                        {t('video_planning.reject_script')}
                       </Button>
                       <Button
                         onClick={() => {
@@ -3709,7 +3709,7 @@ export function VideoPlanning() {
                         }}
                         leftIcon={<Check className="h-4 w-4" />}
                       >
-                        Approve Script
+                        {t('video_planning.approve_script')}
                       </Button>
                     </>
                   )}

@@ -161,7 +161,7 @@ function CategoryEditor({
       onUpdated(response.data.category)
     } catch (error: any) {
       console.error('Failed to update category:', error)
-      onError(error.response?.data?.error || 'Failed to update category')
+      onError(error.response?.data?.error || t('content_factory.update_category_failed'))
     } finally {
       setSaving(false)
     }
@@ -175,7 +175,7 @@ function CategoryEditor({
       onDeleted(category.id)
     } catch (error: any) {
       console.error('Failed to delete category:', error)
-      onError(error.response?.data?.error || 'Failed to delete category')
+      onError(error.response?.data?.error || t('content_factory.delete_category_failed'))
     } finally {
       setDeleting(false)
     }
@@ -202,7 +202,7 @@ function CategoryEditor({
           label={t('content_factory.category_key_system')}
           value={form.category_key}
           onChange={(e) => setForm((prev) => ({ ...prev, category_key: e.target.value }))}
-          placeholder="trading"
+          placeholder={t('content_factory.category_key_placeholder_trading')}
         />
       </div>
 
@@ -304,7 +304,7 @@ function NewCategoryCard({
       onCancel()
     } catch (error: any) {
       console.error('Failed to create category:', error)
-      onError(error.response?.data?.error || 'Failed to create category')
+      onError(error.response?.data?.error || t('content_factory.create_category_failed'))
     } finally {
       setSaving(false)
     }
@@ -335,7 +335,7 @@ function NewCategoryCard({
               setKeyTouched(true)
               setCategoryKey(e.target.value)
             }}
-            placeholder="mindset"
+            placeholder={t('content_factory.category_key_placeholder_mindset')}
             required
           />
         </div>
@@ -437,7 +437,7 @@ function IdeasPromptForm({
       onSaved(response.data.prompt)
     } catch (error: any) {
       console.error('Failed to update idea prompt:', error)
-      onError(error.response?.data?.error || 'Failed to update idea prompt')
+      onError(error.response?.data?.error || t('content_factory.update_idea_prompt_failed'))
     } finally {
       setSaving(false)
     }
@@ -450,7 +450,7 @@ function IdeasPromptForm({
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('content_factory.prompt_dna')}</p>
           <h3 className="mt-1 text-2xl font-semibold text-primary">{t('content_factory.idea_generation_rules')}</h3>
         </div>
-        <Badge variant="default">ID: {prompt.template_key}</Badge>
+        <Badge variant="default">{t('content_factory.template_id', { id: prompt.template_key })}</Badge>
       </div>
 
       <Textarea
@@ -548,7 +548,7 @@ function ResearchPromptForm({
       onSaved(response.data.prompt)
     } catch (error: any) {
       console.error('Failed to update research prompt:', error)
-      onError(error.response?.data?.error || 'Failed to update research prompt')
+      onError(error.response?.data?.error || t('content_factory.update_research_prompt_failed'))
     } finally {
       setSaving(false)
     }
@@ -561,7 +561,7 @@ function ResearchPromptForm({
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('content_factory.prompt_dna')}</p>
           <h3 className="mt-1 text-2xl font-semibold text-primary">{t('content_factory.research_synthesis_rules')}</h3>
         </div>
-        <Badge variant="default">ID: {prompt.template_key}</Badge>
+        <Badge variant="default">{t('content_factory.template_id', { id: prompt.template_key })}</Badge>
       </div>
 
       <Textarea
@@ -663,7 +663,7 @@ function ScriptPromptForm({
       onSaved(response.data.prompt)
     } catch (error: any) {
       console.error('Failed to update script prompt:', error)
-      onError(error.response?.data?.error || 'Failed to update script prompt')
+      onError(error.response?.data?.error || t('content_factory.update_script_prompt_failed'))
     } finally {
       setSaving(false)
     }
@@ -676,7 +676,7 @@ function ScriptPromptForm({
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('content_factory.prompt_dna')}</p>
           <h3 className="mt-1 text-2xl font-semibold text-primary">{t('content_factory.script_writing_rules')}</h3>
         </div>
-        <Badge variant="default">ID: {prompt.template_key}</Badge>
+        <Badge variant="default">{t('content_factory.template_id', { id: prompt.template_key })}</Badge>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
@@ -751,7 +751,7 @@ export function ContentFactory() {
       setPrompts(response.data.prompts || { ideas: null, research: null, script: null })
     } catch (err: any) {
       console.error('Failed to load content settings:', err)
-      setError(err.response?.data?.error || 'Failed to load content settings')
+      setError(err.response?.data?.error || t('content_factory.load_content_settings_failed'))
     } finally {
       setLoading(false)
     }
