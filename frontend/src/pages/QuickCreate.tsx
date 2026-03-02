@@ -43,12 +43,6 @@ const platformNames: Record<string, string> = {
   x: 'X (Twitter)',
 }
 
-const campaignObjectiveOptions = [
-  { value: 'awareness', label: 'Awareness' },
-  { value: 'engagement', label: 'Engagement' },
-  { value: 'leads', label: 'Leads' },
-  { value: 'sales', label: 'Sales' },
-]
 
 const defaultChannelOptions = ['instagram', 'youtube', 'tiktok', 'facebook', 'x']
 
@@ -57,6 +51,12 @@ export function QuickCreate() {
   const navigate = useNavigate()
   const { addNotification } = useNotifications()
   const { t } = useLanguage()
+  const campaignObjectiveOptions = [
+    { value: 'awareness', label: t('quick_create.objective_awareness') },
+    { value: 'engagement', label: t('quick_create.objective_engagement') },
+    { value: 'leads', label: t('quick_create.objective_leads') },
+    { value: 'sales', label: t('quick_create.objective_sales') },
+  ]
   const { user } = useAuth()
   const { credits, unlimited, subscription } = useCreditsContext()
   const [topic, setTopic] = useState('')
@@ -120,7 +120,7 @@ export function QuickCreate() {
     }
 
     if (!selectedChannels.length) {
-      setFormError('Select at least one channel to continue.')
+      setFormError(t('quick_create.select_channel_error'))
       return
     }
 
@@ -166,22 +166,22 @@ export function QuickCreate() {
   const creativeTabs = [
     {
       key: 'video' as const,
-      label: 'Video generation',
-      description: 'Generate a complete video with AI guidance and publishing controls.',
+      label: t('quick_create.mode_video_label'),
+      description: t('quick_create.mode_video_desc'),
       icon: Video,
       unavailable: false,
     },
     {
       key: 'photo' as const,
-      label: 'Photo generation',
-      description: 'Generate high-quality images from prompts using Nano Banana models.',
+      label: t('quick_create.mode_photo_label'),
+      description: t('quick_create.mode_photo_desc'),
       icon: Image,
       unavailable: false,
     },
     {
       key: 'text' as const,
-      label: 'Text generation',
-      description: 'Coming soon in Creative Studio.',
+      label: t('quick_create.mode_text_label'),
+      description: t('quick_create.mode_text_desc'),
       icon: FileText,
       unavailable: true,
     },
@@ -189,12 +189,12 @@ export function QuickCreate() {
 
   const handleGeneratePhoto = async () => {
     if (!canGeneratePhoto) {
-      setFormError(`You need ${selectedPhotoCost} credit${selectedPhotoCost === 1 ? '' : 's'} for this provider.`)
+      setFormError(t('quick_create.photo_credits_required', { cost: selectedPhotoCost, suffix: selectedPhotoCost === 1 ? '' : 's' }))
       return
     }
 
     if (!photoPrompt.trim()) {
-      setFormError('Photo prompt is required.')
+      setFormError(t('quick_create.photo_prompt_required'))
       return
     }
 
@@ -361,7 +361,7 @@ export function QuickCreate() {
                       {tab.unavailable && (
                         <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500">
                           <Lock className="h-3 w-3" />
-                          Unavailable
+                          {t('common.unavailable')}
                         </span>
                       )}
                     </div>
@@ -375,17 +375,17 @@ export function QuickCreate() {
           {creativeTab === 'text' ? (
             <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-6 text-center">
               <p className="text-sm font-semibold text-slate-700">
-                Text generation is currently unavailable.
+                {t('quick_create.text_unavailable')}
               </p>
               <p className="mt-2 text-sm text-slate-500">
-                Use <span className="font-semibold text-brand-600">Video generation</span> to continue creating content right now.
+                {t('quick_create.use_video_generation_prefix')} <span className="font-semibold text-brand-600">{t('quick_create.mode_video_label')}</span> {t('quick_create.use_video_generation_suffix')}
               </p>
             </div>
           ) : creativeTab === 'photo' ? (
             <div className="space-y-5">
               <Textarea
-                label="Photo prompt"
-                placeholder="Describe the image you want to generate..."
+                label={t('quick_create.photo_prompt_label')}
+                placeholder={t('quick_create.photo_prompt_placeholder')}
                 rows={4}
                 value={photoPrompt}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setPhotoPrompt(e.target.value)}
@@ -393,22 +393,22 @@ export function QuickCreate() {
 
               <div className="grid gap-4 md:grid-cols-2">
                 <Select
-                  label="Image provider"
+                  label={t('quick_create.image_provider')}
                   value={photoProvider}
                   onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setPhotoProvider(e.target.value as NanoBananaProvider)}
                   options={[
-                    { value: 'nano-banana', label: 'Nano Banana (0.5 credits)' },
-                    { value: 'nano-banana-pro', label: 'Nano Banana Pro (1 credit)' },
+                    { value: 'nano-banana', label: t('quick_create.nano_banana_label') },
+                    { value: 'nano-banana-pro', label: t('quick_create.nano_banana_pro_label') },
                   ]}
                 />
                 <Select
-                  label="Aspect ratio"
+                  label={t('quick_create.aspect_ratio')}
                   value={photoAspectRatio}
                   onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setPhotoAspectRatio(e.target.value)}
                   options={[
-                    { value: '1:1', label: '1:1 (Square)' },
-                    { value: '9:16', label: '9:16 (Portrait)' },
-                    { value: '16:9', label: '16:9 (Landscape)' },
+                    { value: '1:1', label: t('quick_create.aspect_square') },
+                    { value: '9:16', label: t('quick_create.aspect_portrait') },
+                    { value: '16:9', label: t('quick_create.aspect_landscape') },
                     { value: '3:4', label: '3:4' },
                     { value: '4:3', label: '4:3' },
                     { value: '2:3', label: '2:3' },
@@ -418,15 +418,15 @@ export function QuickCreate() {
               </div>
 
               <div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
-                {photoProvider === 'nano-banana' ? 'Nano Banana costs 0.5 credits per image.' : 'Nano Banana Pro costs 1 credit per image.'}
+                {photoProvider === 'nano-banana' ? t('quick_create.nano_banana_cost_info') : t('quick_create.nano_banana_pro_cost_info')}
               </div>
 
               {photoResultUrl && (
                 <div className="space-y-3">
-                  <p className="text-sm font-semibold text-primary">Latest generated image</p>
-                  <img src={photoResultUrl} alt="Generated" className="max-h-[420px] w-full rounded-2xl border border-slate-200 object-contain bg-slate-50" />
+                  <p className="text-sm font-semibold text-primary">{t('quick_create.latest_generated_image')}</p>
+                  <img src={photoResultUrl} alt={t('quick_create.generated_image_alt')} className="max-h-[420px] w-full rounded-2xl border border-slate-200 object-contain bg-slate-50" />
                   <a href={photoResultUrl} target="_blank" rel="noreferrer" className="text-sm font-medium text-brand-600 hover:text-brand-700">
-                    Open full size image
+                    {t('quick_create.open_full_size_image')}
                   </a>
                 </div>
               )}
@@ -442,7 +442,7 @@ export function QuickCreate() {
                   leftIcon={!generatingPhoto ? <Image className="h-4 w-4" /> : undefined}
                   className="w-full sm:w-auto shadow-lg shadow-brand-500/20"
                 >
-                  Generate photo ({selectedPhotoCost} credit{selectedPhotoCost === 1 ? '' : 's'})
+                  {t('quick_create.generate_photo_with_cost', { cost: selectedPhotoCost, suffix: selectedPhotoCost === 1 ? '' : 's' })}
                 </Button>
               </div>
             </div>
@@ -451,7 +451,7 @@ export function QuickCreate() {
 
           {connectedPlatforms.length > 0 && (
             <div className="mb-6 rounded-2xl border border-blue-200/60 bg-blue-50/40 p-4">
-              <p className="mb-2 text-sm font-semibold text-blue-700">Connected Social Media</p>
+              <p className="mb-2 text-sm font-semibold text-blue-700">{t('quick_create.connected_social_media')}</p>
               <div className="flex flex-wrap gap-2">
                 {connectedPlatforms.map((platform: string) => {
                   const Icon = platformIcons[platform] || Share2
@@ -477,7 +477,7 @@ export function QuickCreate() {
 
             <div className="grid gap-4 md:grid-cols-2">
               <Select
-                label="Campaign objective"
+                label={t('quick_create.campaign_objective')}
                 value={campaignObjective}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setCampaignObjective(e.target.value)}
                 options={campaignObjectiveOptions}
@@ -485,11 +485,11 @@ export function QuickCreate() {
             </div>
 
             <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-700">
-              Videos generated in Creative Studio stay in your library as drafts. You can publish them later from the Distribution/Posts flow.
+              {t('quick_create.drafts_info')}
             </div>
 
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Channel(s)</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{t('quick_create.channels')}</p>
               <div className="flex flex-wrap gap-2">
                 {(connectedPlatforms.length ? connectedPlatforms : defaultChannelOptions).map((platform: string) => {
                   const selected = selectedChannels.includes(platform)
@@ -518,7 +518,7 @@ export function QuickCreate() {
             </div>
 
             <Input
-              label="Call to action (optional)"
+              label={t('quick_create.call_to_action_optional')}
               value={ctaText}
               onChange={(e) => setCtaText(e.target.value)}
             />
@@ -536,13 +536,13 @@ export function QuickCreate() {
               value={style}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setStyle(e.target.value)}
               options={[
-                { value: 'Cinematic', label: 'Cinematic' },
-                { value: 'Realistic', label: 'Realistic' },
-                { value: 'Anime', label: 'Anime' },
-                { value: '3D Render', label: '3D Render' },
-                { value: 'Cyberpunk', label: 'Cyberpunk' },
-                { value: 'Minimalist', label: 'Minimalist' },
-                { value: 'Documentary', label: 'Documentary' },
+                { value: 'Cinematic', label: t('quick_create.style_cinematic') },
+                { value: 'Realistic', label: t('quick_create.style_realistic') },
+                { value: 'Anime', label: t('quick_create.style_anime') },
+                { value: '3D Render', label: t('quick_create.style_3d_render') },
+                { value: 'Cyberpunk', label: t('quick_create.style_cyberpunk') },
+                { value: 'Minimalist', label: t('quick_create.style_minimalist') },
+                { value: 'Documentary', label: t('quick_create.style_documentary') },
               ]}
               className="w-full"
             />
