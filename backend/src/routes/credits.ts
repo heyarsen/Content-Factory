@@ -37,8 +37,35 @@ const initializeWayForPay = () => {
 initializeWayForPay()
 
 /**
- * GET /api/credits
- * Get user's current credits
+ * @swagger
+ * /api/credits:
+ *   get:
+ *     summary: Get user's current credit balance
+ *     description: Returns the current credit balance and subscription info for the authenticated user.
+ *     tags: [Credits]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Credit balance retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 credits:
+ *                   type: number
+ *                   nullable: true
+ *                   example: 150.5
+ *                 unlimited:
+ *                   type: boolean
+ *                   description: True if user has unlimited credits (null balance)
+ *                 subscription:
+ *                   $ref: '#/components/schemas/SubscriptionPlan'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
  */
 router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
@@ -1226,8 +1253,46 @@ router.get('/check-status/:orderReference', authenticate, async (req: AuthReques
 })
 
 /**
- * GET /api/credits/history
- * Get user's credit transaction history
+ * @swagger
+ * /api/credits/history:
+ *   get:
+ *     summary: Get credit transaction history
+ *     description: Returns a paginated list of credit transactions for the authenticated user.
+ *     tags: [Credits]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *           minimum: 1
+ *           maximum: 200
+ *         description: Number of transactions to return
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *           minimum: 0
+ *         description: Number of transactions to skip
+ *     responses:
+ *       200:
+ *         description: Transaction history retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 transactions:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/CreditTransaction'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
  */
 router.get('/history', authenticate, async (req: AuthRequest, res: Response) => {
   try {

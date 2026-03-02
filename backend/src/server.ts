@@ -1,6 +1,8 @@
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import { initSentry, sentryRequestHandler, sentryErrorHandler } from './lib/sentry.js'
+import { setupSwagger } from './lib/swagger.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { existsSync } from 'fs'
@@ -35,6 +37,9 @@ const __dirname = path.dirname(__filename)
 // Load environment variables
 dotenv.config()
 
+// Initialize Sentry BEFORE creating the Express app
+initSentry()
+
 const app = express()
 const PORT = process.env.PORT || 3001
 
@@ -58,6 +63,9 @@ const corsOrigins = corsOriginEnv
   .flatMap(expandOrigin)
   .filter(Boolean)
 const allowedOrigins = new Set(corsOrigins)
+
+// Sentry request handler — MUST be first middleware
+app.use(sentryRequestHandler())
 
 // Middleware
 app.use(helmet({
@@ -293,6 +301,9 @@ app.get('/diagnostics/supabase', async (req, res) => {
   res.status(statusCode).json(diagnostics)
 })
 
+// Swagger API documentation
+setupSwagger(app)
+
 // API Routes (before static files)
 app.use('/api/auth', authRoutes)
 app.use('/api/videos', videoRoutes)
@@ -372,6 +383,8 @@ if (process.env.NODE_ENV === 'development') {
   })
 }
 
+// Sentry error handler — MUST be before custom error handler
+app.use(sentryErrorHandler())
 // Error handler
 app.use(errorHandler)
 

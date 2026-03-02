@@ -41,6 +41,80 @@ function normalizeVideoStyleForDb(style: any): string {
   return 'Realistic'
 }
 
+/**
+ * @swagger
+ * /api/plans:
+ *   post:
+ *     summary: Create a new content automation plan
+ *     description: Creates a new video content plan with automation settings. Requires an active subscription.
+ *     tags: [Plans]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, videos_per_day, start_date]
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: My Daily Content Plan
+ *               videos_per_day:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 10
+ *                 example: 1
+ *               start_date:
+ *                 type: string
+ *                 format: date
+ *                 example: '2026-03-01'
+ *               end_date:
+ *                 type: string
+ *                 format: date
+ *                 nullable: true
+ *               enabled:
+ *                 type: boolean
+ *                 default: true
+ *               auto_research:
+ *                 type: boolean
+ *                 default: false
+ *               auto_create:
+ *                 type: boolean
+ *                 default: false
+ *               auto_approve:
+ *                 type: boolean
+ *                 default: false
+ *               trigger_time:
+ *                 type: string
+ *                 example: '09:00'
+ *               timezone:
+ *                 type: string
+ *                 example: Europe/Kyiv
+ *               default_platforms:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   enum: [instagram, tiktok, youtube]
+ *     responses:
+ *       201:
+ *         description: Plan created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/VideoPlan'
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
 // Create a new plan
 router.post('/', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
@@ -173,6 +247,32 @@ router.post('/', authenticate, requireSubscription, async (req: AuthRequest, res
   }
 })
 
+/**
+ * @swagger
+ * /api/plans:
+ *   get:
+ *     summary: Get all content plans
+ *     description: Returns all automation plans for the authenticated user. Requires an active subscription.
+ *     tags: [Plans]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Plans retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 plans:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/VideoPlan'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
 // Get all plans for user
 router.get('/', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
@@ -185,6 +285,36 @@ router.get('/', authenticate, requireSubscription, async (req: AuthRequest, res:
   }
 })
 
+/**
+ * @swagger
+ * /api/plans/{id}:
+ *   get:
+ *     summary: Get a specific plan with its items
+ *     tags: [Plans]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Plan ID
+ *     responses:
+ *       200:
+ *         description: Plan retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/VideoPlan'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
 // Get a specific plan with items
 router.get('/:id', authenticate, requireSubscription, async (req: AuthRequest, res: Response) => {
   try {
