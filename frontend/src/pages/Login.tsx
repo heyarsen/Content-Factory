@@ -1,78 +1,30 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Button } from '../components/ui/Button'
-import { Input } from '../components/ui/Input'
 import { Card } from '../components/ui/Card'
-import { Eye, EyeOff } from 'lucide-react'
 import { useLanguage } from '../contexts/LanguageContext'
 import { LanguageSelector } from '../components/LanguageSelector'
 import { LegalFooter } from '../components/layout/LegalFooter'
 
 export function Login() {
   const { t } = useLanguage()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [optimisticLoading, setOptimisticLoading] = useState(false)
-  const { signIn, signInWithGoogle } = useAuth()
-  const navigate = useNavigate()
+  const { signInWithGoogle } = useAuth()
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleGoogleSignIn = async () => {
     setError('')
     setLoading(true)
-    setOptimisticLoading(true) // Immediate loading feedback
-
-    // Safety timeout to prevent infinite loading
-    const safetyTimeout = setTimeout(() => {
-      if (setLoading) {
-        setLoading(false)
-        setOptimisticLoading(false)
-        setError(t('auth.server_error'))
-        console.warn('[Login] Safety timeout triggered')
-      }
-    }, 35000)
-
     try {
-      console.log('[Login] Attempting sign in...')
-      await signIn(email, password)
-      console.log('[Login] Sign in successful, navigating to creator studio...')
-      clearTimeout(safetyTimeout)
-      setOptimisticLoading(false)
-      navigate('/create')
+      await signInWithGoogle()
     } catch (err: any) {
-      clearTimeout(safetyTimeout)
-      setOptimisticLoading(false)
-      console.error('Login error:', err)
-
-      // Extract error message from various possible error formats
       let errorMessage = t('auth.login_failed')
       if (err.response?.data?.error) {
         errorMessage = err.response.data.error
-      } else if (err.response?.data?.message) {
-        errorMessage = err.response.data.message
       } else if (err.message) {
         errorMessage = err.message
-      } else if (err.request && !err.response) {
-        errorMessage = t('auth.server_error')
-      } else if (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT') {
-        errorMessage = t('auth.server_error')
-      } else if (err.code === 'ERR_NETWORK') {
-        errorMessage = t('auth.server_error')
       }
-
-      // Handle 503 Service Unavailable (Supabase down or circuit breaker open)
-      if (err.response?.status === 503) {
-        const retryAfter = err.response?.data?.retryAfter || 30
-        errorMessage = t('auth.retry_after', { retryAfter })
-      } else if (err.response?.status === 401) {
-        // Handle 401 Unauthorized (invalid credentials)
-        errorMessage = t('auth.invalid_credentials')
-      }
-
       setError(errorMessage)
     } finally {
       setLoading(false)
@@ -136,68 +88,13 @@ export function Login() {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <Input
-                  type="email"
-                  id="email"
-                  name="email"
-                  label={t('auth.email_label')}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                />
-                <div className="relative w-full">
-                  <Input
-                    type={showPassword ? 'text' : 'password'}
-                    id="password"
-                    name="password"
-                    label={t('auth.password_label')}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    autoComplete="current-password"
-                    className="pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-[2.625rem] -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                    aria-label={showPassword ? t('auth.hide_password') : t('auth.show_password')}
-                  >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between text-sm">
-                  <Link
-                    to="/forgot-password"
-                    className="font-semibold text-brand-600 transition hover:text-brand-700"
-                  >
-                    {t('auth.forgot_password')}
-                  </Link>
-                </div>
-
-                <Button type="submit" className="w-full" loading={loading || optimisticLoading}>
-                  {t('auth.sign_in')}
-                </Button>
-              </form>
-
-              <div className="relative my-8">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-200" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="bg-white px-2 text-slate-500">{t('auth.continue_with')}</span>
-                </div>
-              </div>
-
               <div className="grid grid-cols-1 gap-4">
                 <Button
                   variant="secondary"
                   className="w-full"
-                  onClick={() => signInWithGoogle()}
+                  onClick={handleGoogleSignIn}
                   disabled={loading}
+                  loading={loading}
                 >
                   <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
                     <path

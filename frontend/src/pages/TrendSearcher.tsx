@@ -115,7 +115,7 @@ export function TrendSearcher() {
               <Button
                 onClick={handleOpenTelegram}
                 disabled={!hasTelegramUrl}
-                className="flex items-center gap-2 bg-white !text-brand-600 hover:bg-white/90 shadow-lg px-6 py-3 text-base font-semibold"
+                className="flex items-center gap-2 bg-slate-900 !text-white hover:bg-slate-800 shadow-lg px-6 py-3 text-base font-semibold"
               >
                 <Send className="h-5 w-5" />
                 {t('trend_searcher.open_telegram') || 'Open in Telegram'}
