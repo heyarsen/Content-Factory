@@ -11,7 +11,6 @@ import {
   Search,
   User,
   Users,
-  Bot,
   X,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -42,7 +41,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { label: t('common.analytics') || 'Analytics', to: '/analytics', icon: BarChart3 },
     { label: t('common.preferences') || 'Preferences', to: '/preferences', icon: SlidersHorizontal },
     { label: t('common.partner_program') || 'Partner Program', to: '/referrals', icon: Users },
-    { label: 'AI SMM Agent', to: '/ai-smm-agent', icon: Bot },
   ]
 
   const adminNavigation = [
