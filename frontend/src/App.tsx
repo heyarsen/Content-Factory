@@ -80,7 +80,7 @@ const Referrals = lazy(() =>
   import('./pages/Referrals').then((m) => ({ default: m.Referrals }))
 )
 const Dpa = lazy(() => import('./pages/Dpa').then((m) => ({ default: m.Dpa })))
-const AiSmmAgentPage = lazy(() => import('./pages/AiSmmAgent').then(m => ({ default: m })))
+const AiSmmAgentPage = lazy(() => import('./pages/AiSmmAgent'))
 const CookieConsentManager = lazy(() =>
   import('./components/legal/CookieConsentManager').then((m) => ({ default: m.CookieConsentManager }))
 )
