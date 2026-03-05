@@ -80,6 +80,7 @@ const Referrals = lazy(() =>
   import('./pages/Referrals').then((m) => ({ default: m.Referrals }))
 )
 const Dpa = lazy(() => import('./pages/Dpa').then((m) => ({ default: m.Dpa })))
+const AiSmmAgentPage = lazy(() => import('./pages/AiSmmAgent').then(m => ({ default: m })))
 const CookieConsentManager = lazy(() =>
   import('./components/legal/CookieConsentManager').then((m) => ({ default: m.CookieConsentManager }))
 )
@@ -298,6 +299,14 @@ function AppContent() {
           <Route path="/legal/cookies" element={<CookiePolicy />} />
           <Route path="/legal/acceptable-use" element={<AcceptableUsePolicy />} />
           <Route path="/legal/dpa" element={<Dpa />} />
+          <Route
+            path="/ai-smm-agent"
+            element={
+              <ProtectedRoute>
+                <AiSmmAgentPage />
+              </ProtectedRoute>
+            }
+          />
 
           <Route path="/" element={<Navigate to="/create" replace />} />
           <Route path="*" element={<Navigate to="/create" replace />} />
