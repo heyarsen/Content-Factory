@@ -1,29 +1,16 @@
 import { useState, useEffect } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Button } from '../components/ui/Button'
-import { Input } from '../components/ui/Input'
 import { Card } from '../components/ui/Card'
-import { Eye, EyeOff } from 'lucide-react'
-import api from '../lib/api'
 import { useLanguage } from '../contexts/LanguageContext'
 import { LanguageSelector } from '../components/LanguageSelector'
 import { LegalFooter } from '../components/layout/LegalFooter'
 
 export function Signup() {
-  const { t, language } = useLanguage()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const { t } = useLanguage()
   const [error, setError] = useState('')
-  const [err, setErr] = useState<any>(null)
-  const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [resending, setResending] = useState(false)
-  const { signUp, signInWithGoogle } = useAuth()
-  const navigate = useNavigate()
+  const { signInWithGoogle } = useAuth()
   const [searchParams] = useSearchParams()
   const [referralCode, setReferralCode] = useState<string | null>(null)
 
@@ -31,10 +18,8 @@ export function Signup() {
     const ref = searchParams.get('ref')
     if (ref) {
       setReferralCode(ref)
-      // Save to localStorage so it persists through Google OAuth redirect
       localStorage.setItem('pending_referral_code', ref)
     } else {
-      // Check if there's a pending referral code from a previous visit
       const pendingRef = localStorage.getItem('pending_referral_code')
       if (pendingRef) {
         setReferralCode(pendingRef)
@@ -42,85 +27,23 @@ export function Signup() {
     }
   }, [searchParams])
 
-  const handleResendVerification = async () => {
-    if (!email) {
-      setError(t('auth.enter_email_error'))
-      return
-    }
-
-    setResending(true)
+  const handleGoogleSignup = async () => {
     setError('')
-    try {
-      await api.post('/api/auth/verify-email', { email })
-      setSuccess(true)
-    } catch (resendErr: any) {
-      setError(resendErr.response?.data?.error || t('auth.resend_failed'))
-    } finally {
-      setResending(false)
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-
-    if (password !== confirmPassword) {
-      setError(t('auth.passwords_not_match'))
-      return
-    }
-
-    if (password.length < 6) {
-      setError(t('auth.password_too_short'))
-      return
-    }
-
     setLoading(true)
-
     try {
-      await signUp(email, password, language, referralCode || undefined)
-      setSuccess(true)
-      setErr(null)
-      // Clear pending referral code after successful signup
-      localStorage.removeItem('pending_referral_code')
-    } catch (signupErr: any) {
-      setErr(signupErr)
-      setError(signupErr.response?.data?.error || signupErr.response?.data?.message || t('auth.signup_failed'))
+      // referralCode is already saved in localStorage from useEffect
+      await signInWithGoogle()
+    } catch (err: any) {
+      let errorMessage = t('auth.signup_failed')
+      if (err.response?.data?.error) {
+        errorMessage = err.response.data.error
+      } else if (err.message) {
+        errorMessage = err.message
+      }
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
-  }
-
-  const handleGoogleSignup = async () => {
-    // referralCode is already saved in localStorage from useEffect
-    // After Google OAuth redirect, AuthContext will check and apply it
-    await signInWithGoogle()
-  }
-
-  if (success) {
-    return (
-      <div className="relative flex min-h-screen flex-col overflow-hidden bg-background">
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-brand-500/10 blur-3xl" />
-          <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-emerald-400/10 blur-3xl" />
-        </div>
-
-        <div className="relative z-10 flex flex-1 items-center justify-center px-4 py-16 sm:px-6 lg:px-8">
-          <Card className="w-full max-w-lg p-10 text-center shadow-[0_45px_95px_-65px_rgba(15,23,42,0.7)]">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-brand-500 text-white shadow-md">
-              <span className="text-xl font-semibold">?</span>
-            </div>
-            <h1 className="mt-6 text-3xl font-semibold text-primary">{t('auth.check_inbox')}</h1>
-            <p className="mt-3 text-sm text-slate-500">
-              {t('auth.verification_sent', { email })}
-            </p>
-            <Button onClick={() => navigate('/login')} className="mt-8 w-full">
-              {t('auth.back_to_sign_in')}
-            </Button>
-          </Card>
-        </div>
-        <LegalFooter className="bg-transparent" />
-      </div>
-    )
   }
 
   return (
@@ -177,24 +100,6 @@ export function Signup() {
               {error && (
                 <div className="mb-6 rounded-2xl border border-rose-200/80 bg-rose-50/80 px-4 py-3 text-sm text-rose-600">
                   {error}
-                  {err?.response?.data?.canLogin && (
-                    <div className="mt-3 space-y-1 text-left">
-                      <Link
-                        to="/login"
-                        className="inline-flex items-center text-sm font-semibold text-brand-600 underline hover:text-brand-700"
-                      >
-                        {t('auth.try_logging_in')}
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={handleResendVerification}
-                        disabled={resending}
-                        className="block text-left text-sm font-semibold text-brand-600 underline hover:text-brand-700 disabled:opacity-60"
-                      >
-                        {resending ? t('auth.sending_email') : t('auth.resend_verification')}
-                      </button>
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -204,103 +109,24 @@ export function Signup() {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <Input
-                  type="email"
-                  id="email"
-                  name="email"
-                  label={t('auth.email_label')}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                />
-                <div className="relative w-full">
-                  <Input
-                    type={showPassword ? 'text' : 'password'}
-                    id="password"
-                    name="password"
-                    label={t('auth.password_label')}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    autoComplete="new-password"
-                    className="pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-[2.625rem] -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                    aria-label={showPassword ? t('auth.hide_password') : t('auth.show_password')}
-                  >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </button>
-                </div>
-                <div className="relative w-full">
-                  <Input
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    label={t('auth.confirm_password_label')}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                    autoComplete="new-password"
-                    className="pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-[2.625rem] -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                    aria-label={showConfirmPassword ? t('auth.hide_password') : t('auth.show_password')}
-                  >
-                    {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </button>
-                </div>
-
-                <Button type="submit" className="w-full" loading={loading}>
-                  {t('auth.create_account_button')}
-                </Button>
-              </form>
-
-              <div className="relative my-8">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-200" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="bg-white px-2 text-slate-500">{t('auth.continue_with')}</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4">
-                <Button
-                  variant="secondary"
-                  className="w-full"
-                  onClick={handleGoogleSignup}
-                  disabled={loading}
-                >
-                  <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
-                    <path
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                      fill="#4285F4"
-                    />
-                    <path
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-1 .67-2.28 1.07-3.71 1.07-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                      fill="#34A853"
-                    />
-                    <path
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                      fill="#FBBC05"
-                    />
-                    <path
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                      fill="#EA4335"
-                    />
+              <button
+                onClick={handleGoogleSignup}
+                disabled={loading}
+                className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:border-slate-400 hover:bg-slate-50 hover:shadow-md active:scale-[0.98] disabled:opacity-60"
+              >
+                {loading ? (
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+                ) : (
+                  <svg className="h-5 w-5 flex-shrink-0" viewBox="0 0 24 24">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-1 .67-2.28 1.07-3.71 1.07-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                     <path d="M1 1h22v22H1z" fill="none" />
                   </svg>
-                  {t('auth.google')}
-                </Button>
-              </div>
+                )}
+                <span>{t('auth.google')}</span>
+              </button>
 
               <p className="mt-6 text-center text-xs text-slate-500">
                 {t('legal.disclosure.signup')}{' '}
