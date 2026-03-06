@@ -13,6 +13,7 @@ import {
   Users,
   X,
   Zap,
+  LayoutDashboard,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCredits } from '../../hooks/useCredits'
@@ -32,6 +33,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation()
 
   const navigation = [
+    { label: t('common.dashboard') || 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
     { label: t('common.manual_creation') || 'Creative Studio', to: '/create', icon: Sparkles },
     { label: t('common.content_studio') || 'Content Calendar', to: '/planning', icon: Clapperboard },
     { label: t('common.my_videos') || 'Video Library', to: '/videos', icon: Film },

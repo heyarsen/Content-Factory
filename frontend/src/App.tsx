@@ -317,8 +317,8 @@ function AppContent() {
             }
           />
 
-          <Route path="/" element={<Navigate to="/create" replace />} />
-          <Route path="*" element={<Navigate to="/create" replace />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Suspense>
       <ToastContainer toasts={toasts} onClose={removeToast} />

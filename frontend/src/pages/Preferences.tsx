@@ -253,12 +253,16 @@ export function Preferences() {
                   {t('preferences.go_to_account_settings')}
                 </Button>
               </Link>
-              <Button onClick={handleSave} loading={saving} className="border border-white/30 bg-white/15 text-white hover:bg-white/25 hover:text-white">
-                {t('common.save')}
-              </Button>
             </div>
           </div>
         </section>
+
+        {/* Save Button */}
+        <div className="flex justify-end">
+          <Button onClick={handleSave} loading={saving} size="lg" className="px-8 py-3 text-base font-semibold shadow-lg">
+            {t('common.save')}
+          </Button>
+        </div>
 
         {/* Language Selection */}
         <Card className="p-6">
