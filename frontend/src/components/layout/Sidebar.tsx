@@ -89,27 +89,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
 
           <nav className="mt-6 flex flex-1 flex-col gap-1.5 overflow-y-auto">
-            {navigation.map(({ label, to, icon: Icon, match, external }) => {
-              const isActive = external ? false : (match ? match(location.pathname) : location.pathname === to || location.pathname.startsWith(to + '/'))
-              if (external) {
-                return (
-                  <a
-                    key={to}
-                    href={to}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={onClose}
-                    className="group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200 touch-manipulation active:scale-[0.98] text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                  >
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200 bg-transparent text-slate-500 group-hover:bg-white/80 group-hover:text-slate-700">
-                      <Icon className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <span className="block truncate text-sm leading-tight">{label}</span>
-                    </div>
-                  </a>
-                )
-              }
+            {navigation.map(({ label, to, icon: Icon, match }) => {
+              const isActive = match ? match(location.pathname) : location.pathname === to || location.pathname.startsWith(to + '/')
               return (
                 <NavLink
                   key={to}

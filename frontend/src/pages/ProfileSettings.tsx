@@ -7,7 +7,7 @@ import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { Badge } from '../components/ui/Badge'
 import { useToast } from '../hooks/useToast'
-import { User, Lock, Mail, LogOut } from 'lucide-react'
+import { User, Mail, LogOut } from 'lucide-react'
 import api from '../lib/api'
 import { useLanguage } from '../contexts/LanguageContext'
 import { CreditCard } from 'lucide-react'
@@ -25,11 +25,6 @@ export function ProfileSettings() {
   const navigate = useNavigate()
   const [emailForm, setEmailForm] = useState({
     email: '',
-  })
-  const [passwordForm, setPasswordForm] = useState({
-    old_password: '',
-    new_password: '',
-    confirm_password: '',
   })
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -54,41 +49,6 @@ export function ProfileSettings() {
       toast.success(t('preferences.email_update_initiated'))
     } catch (error: any) {
       toast.error(error.response?.data?.error || t('preferences.email_update_failed'))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handlePasswordUpdate = async () => {
-    if (!passwordForm.old_password || !passwordForm.new_password) {
-      toast.error(t('preferences.fill_all_fields'))
-      return
-    }
-
-    if (passwordForm.new_password !== passwordForm.confirm_password) {
-      toast.error(t('preferences.passwords_not_match'))
-      return
-    }
-
-    if (passwordForm.new_password.length < 6) {
-      toast.error(t('preferences.password_too_short'))
-      return
-    }
-
-    setSaving(true)
-    try {
-      await api.patch('/api/auth/profile', {
-        old_password: passwordForm.old_password,
-        new_password: passwordForm.new_password,
-      })
-      toast.success(t('preferences.password_updated'))
-      setPasswordForm({
-        old_password: '',
-        new_password: '',
-        confirm_password: '',
-      })
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || t('preferences.password_update_error'))
     } finally {
       setSaving(false)
     }

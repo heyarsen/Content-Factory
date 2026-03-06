@@ -1,4 +1,4 @@
-import { Send, Video, Image, Share2, BarChart2, Eye, Bot, PenTool, TrendingUp, CheckCircle, ArrowRight, Zap } from 'lucide-react'
+import { Send, CheckCircle, ArrowRight, Zap } from 'lucide-react'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
