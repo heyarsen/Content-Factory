@@ -154,44 +154,7 @@ export function ProfileSettings() {
           </div>
         </Card>
 
-        {/* Password Settings */}
-        <Card className="p-6">
-          <div className="mb-6 flex items-center gap-3">
-            <Lock className="h-5 w-5 text-slate-400" />
-            <h2 className="text-lg font-semibold text-primary">{t('preferences.change_password')}</h2>
-          </div>
-          <div className="space-y-4">
-            <Input
-              label={t('preferences.current_password')}
-              type="password"
-              value={passwordForm.old_password}
-              onChange={(e) => setPasswordForm({ ...passwordForm, old_password: e.target.value })}
-              placeholder={t('profile_settings.current_password_placeholder')}
-            />
-            <Input
-              label={t('preferences.new_password')}
-              type="password"
-              value={passwordForm.new_password}
-              onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
-              placeholder={t('profile_settings.new_password_placeholder')}
-            />
-            <Input
-              label={t('preferences.confirm_new_password')}
-              type="password"
-              value={passwordForm.confirm_password}
-              onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })}
-              placeholder={t('profile_settings.confirm_password_placeholder')}
-            />
-            <p className="text-xs text-slate-500">
-              {t('preferences.password_requirement')}
-            </p>
-            <div className="flex justify-end">
-              <Button onClick={handlePasswordUpdate} loading={saving} className="w-full sm:w-auto">
-                {t('preferences.update_password')}
-              </Button>
-            </div>
-          </div>
-        </Card>
+        {/* Password Settings — hidden */}
 
         {/* Account Info */}
         <Card className="p-6">

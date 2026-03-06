@@ -35,10 +35,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { label: t('common.content_studio') || 'Content Calendar', to: '/planning', icon: Clapperboard },
     { label: t('common.my_videos') || 'Video Library', to: '/videos', icon: Film },
     { label: t('common.social_accounts') || 'My Social Media', to: '/social', icon: Share2, match: (pathname: string) => pathname === '/social' },
-    { label: t('common.ai_smm_agent') || 'AI SMM Agent', to: 'https://ai-smm.co', icon: Sparkles, external: true },
+    { label: t('common.ai_smm_agent') || 'AI SMM Agent', to: '/ai-smm-agent', icon: Sparkles },
     { label: t('common.trendwatcher') || 'AI Trendwatcher', to: '/trend-searcher', icon: Search },
     { label: t('common.avatars') || 'AI Avatars', to: '/avatars', icon: User },
-    { label: t('common.analytics') || 'Analytics', to: '/analytics', icon: BarChart3 },
     { label: t('common.preferences') || 'Preferences', to: '/preferences', icon: SlidersHorizontal },
     { label: t('common.partner_program') || 'Partner Program', to: '/referrals', icon: Users },
   ]
