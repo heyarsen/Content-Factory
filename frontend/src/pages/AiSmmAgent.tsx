@@ -1,418 +1,612 @@
-import { Send, CheckCircle, ArrowRight, Zap } from 'lucide-react'
 import { Layout } from '../components/layout/Layout'
-import { Card } from '../components/ui/Card'
-import { Button } from '../components/ui/Button'
-import { useLanguage } from '../contexts/LanguageContext'
 
-const TELEGRAM_BOT_URL = 'https://t.me/Aismmagentbot'
-
-const features = [
-  {
-    emoji: '🎬',
-    titleKey: 'ai_smm_agent.f1_title',
-    titleFallback: 'AI Video Generation',
-    descKey: 'ai_smm_agent.f1_body',
-    descFallback: 'Create stunning videos with Sora 2 and Veo 3.1. From script to finished video in minutes, in 83 languages.',
-    tagKey: 'ai_smm_agent.f1_tag',
-    tagFallback: 'from 50 credits',
-    highlight: true,
-  },
-  {
-    emoji: '📸',
-    titleKey: 'ai_smm_agent.f2_title',
-    titleFallback: 'AI Photo Generation',
-    descKey: 'ai_smm_agent.f2_body',
-    descFallback: 'Professional images with Nana Banana Pro and Nana Banana 2. Photorealistic quality for any social media.',
-    tagKey: 'ai_smm_agent.f2_tag',
-    tagFallback: 'from 10 credits',
-    highlight: false,
-  },
-  {
-    emoji: '📤',
-    titleKey: 'ai_smm_agent.f3_title',
-    titleFallback: 'Auto-Posting',
-    descKey: 'ai_smm_agent.f3_body',
-    descFallback: 'Publish to Instagram, TikTok, YouTube, Facebook, X, LinkedIn, Threads, and Pinterest with one click.',
-    tagKey: 'ai_smm_agent.f3_tag',
-    tagFallback: '10 credits / platform',
-    highlight: false,
-  },
-  {
-    emoji: '📊',
-    titleKey: 'ai_smm_agent.f4_title',
-    titleFallback: 'Deep Analytics',
-    descKey: 'ai_smm_agent.f4_body',
-    descFallback: 'Analyze any Instagram, TikTok, or YouTube account. Get engagement rates, best posts, and AI recommendations.',
-    tagKey: 'ai_smm_agent.f4_tag',
-    tagFallback: '50 credits',
-    highlight: false,
-  },
-  {
-    emoji: '👀',
-    titleKey: 'ai_smm_agent.f5_title',
-    titleFallback: 'Competitor Monitoring',
-    descKey: 'ai_smm_agent.f5_body',
-    descFallback: 'Track competitors 24/7. Compare metrics, find their strengths, and discover growth opportunities.',
-    tagKey: 'ai_smm_agent.f5_tag',
-    tagFallback: '50 credits',
-    highlight: false,
-  },
-  {
-    emoji: '🤖',
-    titleKey: 'ai_smm_agent.f6_title',
-    titleFallback: 'SMM Strategist',
-    descKey: 'ai_smm_agent.f6_body',
-    descFallback: 'Your personal AI consultant. Get tailored strategies, content ideas, and growth plans for your brand.',
-    tagKey: 'ai_smm_agent.f6_tag',
-    tagFallback: '1 credit / request',
-    highlight: false,
-  },
-  {
-    emoji: '✍️',
-    titleKey: 'ai_smm_agent.f7_title',
-    titleFallback: 'AI Copywriter',
-    descKey: 'ai_smm_agent.f7_body',
-    descFallback: 'Professional captions for posts, Reels scripts, Stories text, threads, and carousels. Ready to publish.',
-    tagKey: 'ai_smm_agent.f7_tag',
-    tagFallback: '20 credits',
-    highlight: false,
-  },
-  {
-    emoji: '🔥',
-    titleKey: 'ai_smm_agent.f8_title',
-    titleFallback: 'Trend Analysis',
-    descKey: 'ai_smm_agent.f8_body',
-    descFallback: 'Find viral videos in your niche. Get analysis of why they went viral and AI-generated scripts based on trends.',
-    tagKey: 'ai_smm_agent.f8_tag',
-    tagFallback: 'included',
-    highlight: false,
-  },
-]
-
-const steps = [
-  {
-    number: '1',
-    titleKey: 'ai_smm_agent.step1_title',
-    titleFallback: 'Open the bot',
-    descKey: 'ai_smm_agent.step1_body',
-    descFallback: 'Click the button below and press Start in Telegram. You will receive 100 free credits as a welcome bonus.',
-  },
-  {
-    number: '2',
-    titleKey: 'ai_smm_agent.step2_title',
-    titleFallback: 'Choose a feature',
-    descKey: 'ai_smm_agent.step2_body',
-    descFallback: 'Generate content, analyze accounts, write captions, or connect your social media for auto-posting.',
-  },
-  {
-    number: '3',
-    titleKey: 'ai_smm_agent.step3_title',
-    titleFallback: 'Publish and grow',
-    descKey: 'ai_smm_agent.step3_body',
-    descFallback: 'AI handles the heavy lifting. You focus on your business while your social media grows on autopilot.',
-  },
-]
-
-const reportItems = [
-  { key: 'ai_smm_agent.report_item1', fallback: 'Follower growth and engagement trends' },
-  { key: 'ai_smm_agent.report_item2', fallback: 'Best and worst performing content' },
-  { key: 'ai_smm_agent.report_item3', fallback: 'Competitor comparison charts' },
-  { key: 'ai_smm_agent.report_item4', fallback: 'AI-generated recommendations' },
-]
-
-const pricingRows = [
-  { key: 'ai_smm_agent.price_r1', fallback: 'Account Analytics', cost: '50' },
-  { key: 'ai_smm_agent.price_r2', fallback: 'PDF Report', cost: '+100' },
-  { key: 'ai_smm_agent.price_r3', fallback: 'Photo (Nana Banana Pro)', cost: '20' },
-  { key: 'ai_smm_agent.price_r4', fallback: 'Photo (Nana Banana 2)', cost: '10' },
-  { key: 'ai_smm_agent.price_r5', fallback: 'Video (Sora 2)', cost: '50' },
-  { key: 'ai_smm_agent.price_r6', fallback: 'Video (Veo 3.1)', cost: '60' },
-  { key: 'ai_smm_agent.price_r7', fallback: 'Auto-Post (per platform)', cost: '10' },
-  { key: 'ai_smm_agent.price_r8', fallback: 'AI Copywriter', cost: '20' },
-  { key: 'ai_smm_agent.price_r9', fallback: 'SMM Strategist', cost: '1' },
-  { key: 'ai_smm_agent.price_r10', fallback: 'Competitor Monitoring', cost: '50' },
-]
-
-const creditPacks = [
-  { credits: '100', price: '$1', popular: false },
-  { credits: '600', price: '$5', popular: true },
-  { credits: '1300', price: '$10', popular: false },
-]
-
-const platforms = ['Instagram', 'TikTok', 'YouTube', 'Facebook', 'X (Twitter)', 'LinkedIn', 'Threads', 'Pinterest']
-
-export default function AiSmmAgentPage() {
-  const { t } = useLanguage()
-
-  const handleOpenTelegram = () => {
-    window.open(TELEGRAM_BOT_URL, '_blank', 'noopener,noreferrer')
-  }
-
+export default function AiSmmAgent() {
   return (
     <Layout>
-      <div className="mx-auto max-w-4xl space-y-10 px-4 py-8">
+      {/* Inject scoped styles */}
+      <style>{`
+        .aismmpage {
+          font-family: "Inter", system-ui, -apple-system, sans-serif;
+          background: linear-gradient(160deg, #f8fafc 0%, #eef2ff 50%, #fdf2f8 100%);
+          color: #0f172a;
+          min-height: 100vh;
+          -webkit-font-smoothing: antialiased;
+          padding: 32px 24px 64px;
+          max-width: 1100px;
+          margin: 0 auto;
+        }
 
-        {/* Hero Section */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 via-brand-500 to-indigo-500 p-8 text-white shadow-2xl md:p-12">
-          <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
-          <div className="absolute -bottom-10 -left-10 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
-          <div className="relative flex flex-col items-start gap-6 md:flex-row md:items-center md:justify-between">
-            <div className="space-y-4">
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/20 px-4 py-1.5 text-sm font-medium backdrop-blur-sm">
-                <Zap className="h-4 w-4" />
-                <span>{t('ai_smm_agent.badge') || 'Telegram Bot'}</span>
-              </div>
-              <h1 className="text-3xl font-bold leading-tight md:text-4xl">
-                {t('ai_smm_agent.hero_title') || 'Your personal AI team for social media'}
-              </h1>
-              <p className="max-w-lg text-base text-white/85 md:text-lg">
-                {t('ai_smm_agent.hero_sub') || 'Generate photos and videos, write captions, analyze competitors, and auto-post to 8 platforms. All from one Telegram bot.'}
-              </p>
-              <div className="flex flex-wrap gap-6 pt-2">
-                <div className="text-center">
-                  <div className="text-2xl font-black">8</div>
-                  <div className="text-xs text-white/70">{t('ai_smm_agent.stat_platforms') || 'platforms'}</div>
-                </div>
-                <div className="w-px bg-white/20" />
-                <div className="text-center">
-                  <div className="text-2xl font-black">83</div>
-                  <div className="text-xs text-white/70">{t('ai_smm_agent.stat_languages') || 'languages'}</div>
-                </div>
-                <div className="w-px bg-white/20" />
-                <div className="text-center">
-                  <div className="text-2xl font-black">24/7</div>
-                  <div className="text-xs text-white/70">{t('ai_smm_agent.stat_monitoring') || 'monitoring'}</div>
-                </div>
-              </div>
+        /* ── Buttons ── */
+        .ap-btn {
+          display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+          padding: 14px 24px; border-radius: 999px; text-decoration: none;
+          font-weight: 600; font-size: 15px; border: 1px solid transparent;
+          transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+          cursor: pointer;
+        }
+        .ap-btn-primary {
+          background: #2563eb; color: white;
+          box-shadow: 0 12px 30px rgba(37,99,235,0.25);
+        }
+        .ap-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 16px 34px rgba(37,99,235,0.35); }
+        .ap-btn-secondary {
+          background: rgba(255,255,255,0.7); color: #0f172a;
+          border: 1px solid rgba(148,163,184,0.35);
+        }
+        .ap-btn-secondary:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(15,23,42,0.1); }
+        .ap-btn-telegram {
+          background: #0088cc; color: white;
+          box-shadow: 0 12px 30px rgba(0,136,204,0.3);
+          font-size: 16px; padding: 16px 32px;
+        }
+        .ap-btn-telegram:hover { transform: translateY(-2px); box-shadow: 0 16px 34px rgba(0,136,204,0.4); background: #0077b5; }
+        .ap-btn-large { font-size: 17px; padding: 18px 36px; }
+
+        /* ── Hero ── */
+        .ap-hero {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 48px;
+          align-items: center;
+          padding: 40px 0 64px;
+        }
+        .ap-hero-content { display: flex; flex-direction: column; gap: 24px; }
+        .ap-badge {
+          display: inline-flex; align-items: center; gap: 8px;
+          background: linear-gradient(135deg, rgba(0,136,204,0.1), rgba(124,58,237,0.1));
+          border: 1px solid rgba(0,136,204,0.2);
+          color: #0088cc;
+          font-weight: 600; font-size: 13px;
+          padding: 6px 16px; border-radius: 999px;
+          width: fit-content;
+        }
+        .ap-badge-dot {
+          display: inline-block; width: 8px; height: 8px;
+          background: #0088cc; border-radius: 50%;
+          animation: ap-pulse 2s infinite;
+        }
+        @keyframes ap-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .ap-hero h1 {
+          font-size: clamp(32px, 4vw, 52px);
+          font-weight: 800; line-height: 1.1; letter-spacing: -0.03em;
+          background: linear-gradient(135deg, #0f172a 0%, #2563eb 60%, #7c3aed 100%);
+          -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+          margin: 0;
+        }
+        .ap-hero-sub { font-size: 18px; line-height: 1.6; color: #475569; max-width: 520px; margin: 0; }
+        .ap-hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+        .ap-hero-stats {
+          display: flex; gap: 24px; align-items: center;
+          padding: 20px 0; margin-top: 8px;
+        }
+        .ap-stat-item { display: flex; flex-direction: column; align-items: center; }
+        .ap-stat-number { font-size: 28px; font-weight: 800; color: #2563eb; }
+        .ap-stat-label { font-size: 13px; color: #475569; font-weight: 500; }
+        .ap-stat-divider { width: 1px; height: 36px; background: rgba(148,163,184,0.35); }
+
+        /* ── Phone Mockup ── */
+        .ap-hero-visual { display: flex; justify-content: center; }
+        .ap-phone {
+          width: 300px; background: #1a1a2e; border-radius: 36px; padding: 12px;
+          box-shadow: 0 40px 80px rgba(15,23,42,0.25), 0 0 0 1px rgba(255,255,255,0.1) inset;
+          position: relative;
+        }
+        .ap-phone-notch {
+          width: 120px; height: 28px; background: #1a1a2e;
+          border-radius: 0 0 16px 16px; margin: 0 auto; position: relative; z-index: 2;
+        }
+        .ap-phone-screen { background: #ffffff; border-radius: 24px; overflow: hidden; margin-top: -14px; }
+        .ap-chat-header {
+          display: flex; align-items: center; gap: 10px; padding: 14px 16px;
+          background: linear-gradient(135deg, #0088cc, #0077b5); color: white;
+        }
+        .ap-chat-avatar {
+          width: 36px; height: 36px; background: rgba(255,255,255,0.2); border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          font-weight: 700; font-size: 14px;
+        }
+        .ap-chat-name { font-weight: 600; font-size: 14px; }
+        .ap-chat-status { font-size: 11px; opacity: 0.8; }
+        .ap-chat-messages { padding: 12px; display: flex; flex-direction: column; gap: 8px; min-height: 240px; }
+        .ap-chat-msg {
+          padding: 10px 14px; border-radius: 16px; font-size: 12px; line-height: 1.5;
+          max-width: 85%; animation: ap-fadeInUp 0.5s ease forwards; opacity: 0;
+        }
+        .ap-chat-msg:nth-child(1) { animation-delay: 0.2s; }
+        .ap-chat-msg:nth-child(2) { animation-delay: 0.6s; }
+        .ap-chat-msg:nth-child(3) { animation-delay: 1s; }
+        .ap-chat-msg:nth-child(4) { animation-delay: 1.4s; }
+        .ap-chat-msg:nth-child(5) { animation-delay: 1.8s; }
+        @keyframes ap-fadeInUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .ap-chat-msg.bot { background: #f0f2f5; color: #0f172a; align-self: flex-start; border-bottom-left-radius: 4px; }
+        .ap-chat-msg.user { background: #0088cc; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .ap-chat-input { padding: 12px 16px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af; }
+
+        /* ── Platforms Bar ── */
+        .ap-platforms { text-align: center; padding: 32px 0 48px; }
+        .ap-platforms-label { font-size: 14px; color: #475569; font-weight: 500; margin-bottom: 16px; }
+        .ap-platforms-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+        .ap-platform-pill {
+          background: rgba(255,255,255,0.8); border: 1px solid rgba(148,163,184,0.35);
+          border-radius: 999px; padding: 10px 20px; font-size: 14px; font-weight: 600;
+          color: #0f172a; transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .ap-platform-pill:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(15,23,42,0.08); }
+
+        /* ── Section Heading ── */
+        .ap-section-heading { text-align: center; margin-bottom: 48px; }
+        .ap-section-heading h2 {
+          font-size: clamp(28px, 3vw, 42px); font-weight: 800;
+          letter-spacing: -0.02em; margin-bottom: 12px; margin-top: 0;
+        }
+        .ap-section-heading p { font-size: 17px; color: #475569; max-width: 560px; margin: 0 auto; }
+
+        /* ── Features Grid ── */
+        .ap-features { padding: 48px 0; }
+        .ap-features-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+        .ap-feature-card {
+          background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(219,234,254,0.4));
+          border: 1px solid rgba(148,163,184,0.35); border-radius: 18px;
+          padding: 28px 24px; display: flex; flex-direction: column; gap: 12px;
+          transition: transform 0.25s ease, box-shadow 0.25s ease;
+          position: relative; overflow: hidden;
+        }
+        .ap-feature-card::before {
+          content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+          background: linear-gradient(90deg, #2563eb, #7c3aed); opacity: 0; transition: opacity 0.25s;
+        }
+        .ap-feature-card:hover { transform: translateY(-4px); box-shadow: 0 24px 60px rgba(15,23,42,0.12); }
+        .ap-feature-card:hover::before { opacity: 1; }
+        .ap-feature-highlight {
+          grid-column: span 2;
+          background: linear-gradient(135deg, rgba(37,99,235,0.06), rgba(124,58,237,0.06));
+          border-color: rgba(37,99,235,0.2);
+        }
+        .ap-feature-icon { font-size: 32px; }
+        .ap-feature-card h3 { font-size: 17px; font-weight: 700; margin: 0; }
+        .ap-feature-card p { font-size: 14px; color: #475569; line-height: 1.6; margin: 0; }
+        .ap-feature-tag {
+          display: inline-flex; width: fit-content;
+          background: rgba(37,99,235,0.08); color: #2563eb;
+          font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 999px;
+          margin-top: auto;
+        }
+
+        /* ── Steps ── */
+        .ap-steps { padding: 48px 0; }
+        .ap-steps-grid { display: flex; align-items: center; justify-content: center; gap: 0; }
+        .ap-step-card {
+          background: rgba(255,255,255,0.72); border: 1px solid rgba(148,163,184,0.35);
+          border-radius: 18px; padding: 32px 28px; text-align: center;
+          flex: 1; max-width: 320px;
+          display: flex; flex-direction: column; align-items: center; gap: 12px;
+          transition: transform 0.25s, box-shadow 0.25s;
+        }
+        .ap-step-card:hover { transform: translateY(-4px); box-shadow: 0 24px 60px rgba(15,23,42,0.12); }
+        .ap-step-number {
+          width: 48px; height: 48px;
+          background: linear-gradient(135deg, #2563eb, #7c3aed); color: white;
+          border-radius: 50%; display: flex; align-items: center; justify-content: center;
+          font-size: 20px; font-weight: 800;
+        }
+        .ap-step-card h3 { font-size: 18px; font-weight: 700; margin: 0; }
+        .ap-step-card p { font-size: 14px; color: #475569; line-height: 1.6; margin: 0; }
+        .ap-step-connector {
+          width: 48px; height: 2px;
+          background: linear-gradient(90deg, #2563eb, #7c3aed); flex-shrink: 0;
+        }
+
+        /* ── Reports ── */
+        .ap-reports {
+          display: grid; grid-template-columns: 1fr 1fr;
+          gap: 48px; align-items: center; padding: 64px 0;
+        }
+        .ap-reports-content { display: flex; flex-direction: column; gap: 20px; }
+        .ap-reports-content h2 { font-size: clamp(28px, 3vw, 38px); font-weight: 800; letter-spacing: -0.02em; margin: 0; }
+        .ap-reports-content p { font-size: 16px; color: #475569; line-height: 1.7; margin: 0; }
+        .ap-reports-list { list-style: none; display: flex; flex-direction: column; gap: 10px; padding: 0; margin: 0; }
+        .ap-reports-list li {
+          padding: 10px 16px;
+          background: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(219,234,254,0.5));
+          border: 1px solid rgba(148,163,184,0.35); border-radius: 12px;
+          font-size: 14px; font-weight: 500;
+          display: flex; align-items: center; gap: 10px;
+        }
+        .ap-reports-list li::before {
+          content: "✓"; width: 22px; height: 22px;
+          background: rgba(34,197,94,0.12); color: #22c55e; border-radius: 50%;
+          display: inline-flex; align-items: center; justify-content: center;
+          font-weight: 700; font-size: 12px; flex-shrink: 0;
+        }
+        .ap-reports-visual { display: flex; justify-content: center; }
+        .ap-report-mockup {
+          width: 320px; background: white; border-radius: 18px;
+          border: 1px solid rgba(148,163,184,0.35);
+          box-shadow: 0 24px 60px rgba(15,23,42,0.12); overflow: hidden;
+        }
+        .ap-report-header {
+          background: linear-gradient(135deg, #2563eb, #7c3aed); color: white;
+          padding: 20px 24px; display: flex; justify-content: space-between; align-items: center;
+        }
+        .ap-report-logo { font-weight: 800; font-size: 16px; }
+        .ap-report-title-text { font-size: 13px; opacity: 0.9; }
+        .ap-report-chart { display: flex; align-items: flex-end; gap: 12px; padding: 24px; height: 140px; }
+        .ap-chart-bar {
+          flex: 1; background: linear-gradient(180deg, rgba(37,99,235,0.3), rgba(37,99,235,0.08));
+          border-radius: 6px 6px 0 0; transition: height 0.6s ease;
+        }
+        .ap-chart-bar.highlight { background: linear-gradient(180deg, #2563eb, rgba(37,99,235,0.4)); }
+        .ap-report-metrics {
+          display: flex; justify-content: space-around;
+          padding: 16px 24px 20px; border-top: 1px solid #f1f5f9;
+        }
+        .ap-report-metric { text-align: center; }
+        .ap-metric-value { display: block; font-size: 18px; font-weight: 800; color: #2563eb; }
+        .ap-metric-label { font-size: 11px; color: #475569; font-weight: 500; }
+
+        /* ── Pricing ── */
+        .ap-pricing { padding: 48px 0; }
+        .ap-pricing-table-wrap {
+          max-width: 600px; margin: 0 auto 32px;
+          background: rgba(255,255,255,0.72); border: 1px solid rgba(148,163,184,0.35);
+          border-radius: 18px; overflow: hidden;
+          box-shadow: 0 8px 24px rgba(15,23,42,0.06);
+        }
+        .ap-pricing-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        .ap-pricing-table thead { background: linear-gradient(135deg, rgba(37,99,235,0.06), rgba(124,58,237,0.06)); }
+        .ap-pricing-table th {
+          padding: 14px 20px; text-align: left; font-weight: 700; font-size: 13px;
+          color: #475569; text-transform: uppercase; letter-spacing: 0.05em;
+        }
+        .ap-pricing-table td { padding: 12px 20px; border-top: 1px solid #f1f5f9; }
+        .ap-pricing-table td:last-child { font-weight: 700; color: #2563eb; text-align: center; }
+        .ap-pricing-table tbody tr:hover { background: rgba(37,99,235,0.02); }
+        .ap-credit-packs { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; }
+        .ap-pack-card {
+          background: rgba(255,255,255,0.72); border: 1px solid rgba(148,163,184,0.35);
+          border-radius: 18px; padding: 28px 32px; text-align: center; min-width: 160px;
+          transition: transform 0.25s, box-shadow 0.25s; position: relative;
+        }
+        .ap-pack-card:hover { transform: translateY(-4px); box-shadow: 0 24px 60px rgba(15,23,42,0.12); }
+        .ap-pack-popular { border-color: rgba(37,99,235,0.4); box-shadow: 0 12px 30px rgba(37,99,235,0.15); }
+        .ap-pack-badge {
+          position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+          background: #2563eb; color: white; font-size: 11px; font-weight: 700;
+          padding: 3px 14px; border-radius: 999px;
+        }
+        .ap-pack-credits { font-size: 36px; font-weight: 800; color: #0f172a; }
+        .ap-pack-label { font-size: 13px; color: #475569; font-weight: 500; margin-bottom: 8px; }
+        .ap-pack-price { font-size: 24px; font-weight: 700; color: #2563eb; }
+
+        /* ── Referral ── */
+        .ap-referral { padding: 48px 0; }
+        .ap-referral-card {
+          background: linear-gradient(135deg, rgba(34,197,94,0.08), rgba(37,99,235,0.08));
+          border: 1px solid rgba(34,197,94,0.2); border-radius: 28px;
+          padding: 48px; text-align: center;
+          display: flex; flex-direction: column; align-items: center; gap: 16px;
+        }
+        .ap-referral-icon { font-size: 48px; }
+        .ap-referral-card h2 { font-size: clamp(24px, 3vw, 34px); font-weight: 800; margin: 0; }
+        .ap-referral-card p { font-size: 16px; color: #475569; max-width: 500px; line-height: 1.6; margin: 0; }
+
+        /* ── Final CTA ── */
+        .ap-final-cta {
+          background: linear-gradient(135deg, rgba(37,99,235,0.12), rgba(124,58,237,0.12));
+          border: 1px solid rgba(99,102,241,0.2); border-radius: 28px;
+          padding: 56px 40px; text-align: center;
+          display: flex; flex-direction: column; align-items: center; gap: 16px;
+          margin-top: 16px;
+        }
+        .ap-final-cta h2 { font-size: clamp(28px, 3vw, 42px); font-weight: 800; letter-spacing: -0.02em; margin: 0; }
+        .ap-final-cta p { font-size: 17px; color: #475569; margin: 0; }
+
+        /* ── Responsive ── */
+        @media (max-width: 900px) {
+          .ap-hero { grid-template-columns: 1fr; gap: 32px; text-align: center; }
+          .ap-hero-content { align-items: center; }
+          .ap-hero-sub { max-width: 100%; }
+          .ap-hero-actions { justify-content: center; }
+          .ap-hero-stats { justify-content: center; }
+          .ap-features-grid { grid-template-columns: 1fr 1fr; }
+          .ap-feature-highlight { grid-column: span 2; }
+          .ap-steps-grid { flex-direction: column; gap: 0; }
+          .ap-step-connector { width: 2px; height: 32px; }
+          .ap-reports { grid-template-columns: 1fr; }
+          .ap-reports-visual { order: -1; }
+        }
+        @media (max-width: 600px) {
+          .aismmpage { padding: 24px 16px 48px; }
+          .ap-features-grid { grid-template-columns: 1fr; }
+          .ap-feature-highlight { grid-column: span 1; }
+          .ap-phone { width: 260px; }
+          .ap-credit-packs { flex-direction: column; align-items: center; }
+          .ap-pack-card { width: 100%; max-width: 280px; }
+          .ap-final-cta { padding: 40px 24px; }
+          .ap-referral-card { padding: 32px 24px; }
+        }
+      `}</style>
+
+      <div className="aismmpage">
+
+        {/* ── HERO ── */}
+        <section className="ap-hero">
+          <div className="ap-hero-content">
+            <div className="ap-badge">
+              <span className="ap-badge-dot"></span>
+              Telegram Bot
             </div>
-            <div className="flex-shrink-0">
-              <Button
-                onClick={handleOpenTelegram}
-                className="flex items-center gap-2 bg-slate-900 !text-white hover:bg-slate-800 shadow-lg px-6 py-3 text-base font-semibold"
-              >
-                <Send className="h-5 w-5" />
-                {t('ai_smm_agent.cta_start') || 'Open in Telegram'}
-              </Button>
+            <h1>Your personal AI team for social media</h1>
+            <p className="ap-hero-sub">
+              Generate photos and videos, write captions, analyze competitors, and auto-post to 8 platforms. All from one Telegram bot.
+            </p>
+            <div className="ap-hero-actions">
+              <a className="ap-btn ap-btn-telegram ap-btn-large" href="https://t.me/Aismmagentbot" target="_blank" rel="noopener noreferrer">
+                Open in Telegram
+              </a>
+              <a className="ap-btn ap-btn-secondary" href="#ap-features">
+                See all features
+              </a>
+            </div>
+            <div className="ap-hero-stats">
+              <div className="ap-stat-item">
+                <span className="ap-stat-number">8</span>
+                <span className="ap-stat-label">platforms</span>
+              </div>
+              <div className="ap-stat-divider"></div>
+              <div className="ap-stat-item">
+                <span className="ap-stat-number">83</span>
+                <span className="ap-stat-label">languages</span>
+              </div>
+              <div className="ap-stat-divider"></div>
+              <div className="ap-stat-item">
+                <span className="ap-stat-number">24/7</span>
+                <span className="ap-stat-label">monitoring</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Platforms Bar */}
-        <Card className="p-5">
-          <p className="mb-4 text-center text-sm font-semibold text-slate-500 uppercase tracking-wider">
-            {t('ai_smm_agent.platforms_label') || 'Auto-post to all major platforms'}
-          </p>
-          <div className="flex flex-wrap justify-center gap-2">
-            {platforms.map((platform) => (
-              <span
-                key={platform}
-                className="rounded-full border border-slate-200 bg-slate-50 px-4 py-1.5 text-sm font-medium text-slate-600"
-              >
-                {platform}
-              </span>
+          <div className="ap-hero-visual">
+            <div className="ap-phone">
+              <div className="ap-phone-notch"></div>
+              <div className="ap-phone-screen">
+                <div className="ap-chat-header">
+                  <div className="ap-chat-avatar">AI</div>
+                  <div>
+                    <div className="ap-chat-name">AI SMM Agent</div>
+                    <div className="ap-chat-status">online</div>
+                  </div>
+                </div>
+                <div className="ap-chat-messages">
+                  <div className="ap-chat-msg bot">Welcome! I am your AI SMM assistant. What would you like to do?</div>
+                  <div className="ap-chat-msg user">Analyze my Instagram account</div>
+                  <div className="ap-chat-msg bot">Analyzing @youraccount... Your engagement rate is 4.2%, which is above average!</div>
+                  <div className="ap-chat-msg user">Generate a video about coffee</div>
+                  <div className="ap-chat-msg bot">Creating a Sora 2 video... Done! Ready to publish to all platforms?</div>
+                </div>
+                <div className="ap-chat-input">Type a message...</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── PLATFORMS BAR ── */}
+        <section className="ap-platforms">
+          <p className="ap-platforms-label">Auto-post to all major platforms</p>
+          <div className="ap-platforms-list">
+            {['Instagram','TikTok','YouTube','Facebook','X (Twitter)','LinkedIn','Threads','Pinterest'].map(p => (
+              <div key={p} className="ap-platform-pill">{p}</div>
             ))}
           </div>
-        </Card>
+        </section>
 
-        {/* Features Grid */}
-        <div>
-          <h2 className="mb-2 text-xl font-bold text-slate-800">
-            {t('ai_smm_agent.features_title') || 'Everything you need in one bot'}
-          </h2>
-          <p className="mb-6 text-sm text-slate-500">
-            {t('ai_smm_agent.features_sub') || 'Powerful AI tools that replace an entire SMM team.'}
-          </p>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {features.map(({ emoji, titleKey, titleFallback, descKey, descFallback, tagKey, tagFallback, highlight }) => (
-              <Card
-                key={titleKey}
-                className={`flex flex-col gap-3 p-5 ${highlight ? 'border-brand-200 bg-gradient-to-br from-brand-50/60 to-white' : ''}`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{emoji}</span>
-                    <h3 className="font-semibold text-slate-800">{t(titleKey) || titleFallback}</h3>
-                  </div>
-                  <span className="flex-shrink-0 rounded-full bg-brand-100 px-2.5 py-0.5 text-[11px] font-semibold text-brand-700">
-                    {t(tagKey) || tagFallback}
-                  </span>
-                </div>
-                <p className="text-sm text-slate-500">{t(descKey) || descFallback}</p>
-              </Card>
-            ))}
+        {/* ── FEATURES ── */}
+        <section className="ap-features" id="ap-features">
+          <div className="ap-section-heading">
+            <h2>Everything you need in one bot</h2>
+            <p>Powerful AI tools that replace an entire SMM team.</p>
           </div>
-        </div>
-
-        {/* How It Works */}
-        <div>
-          <h2 className="mb-2 text-xl font-bold text-slate-800">
-            {t('ai_smm_agent.steps_title') || 'Start in 3 simple steps'}
-          </h2>
-          <p className="mb-6 text-sm text-slate-500">
-            {t('ai_smm_agent.steps_sub') || 'No registration. No downloads. Just Telegram.'}
-          </p>
-          <div className="grid gap-4 sm:grid-cols-3">
-            {steps.map(({ number, titleKey, titleFallback, descKey, descFallback }) => (
-              <Card key={number} className="relative overflow-hidden p-5">
-                <div className="absolute right-4 top-3 text-5xl font-black text-slate-100 select-none">
-                  {number}
-                </div>
-                <div className="relative space-y-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-100 text-brand-600 text-sm font-bold">
-                    {number}
-                  </div>
-                  <h3 className="font-semibold text-slate-800">{t(titleKey) || titleFallback}</h3>
-                  <p className="text-sm text-slate-500">{t(descKey) || descFallback}</p>
-                </div>
-              </Card>
-            ))}
+          <div className="ap-features-grid">
+            <article className="ap-feature-card ap-feature-highlight">
+              <div className="ap-feature-icon">🎬</div>
+              <h3>AI Video Generation</h3>
+              <p>Create stunning videos with Sora 2 and Veo 3.1. From script to finished video in minutes, in 83 languages.</p>
+              <div className="ap-feature-tag">from 50 credits</div>
+            </article>
+            <article className="ap-feature-card">
+              <div className="ap-feature-icon">📸</div>
+              <h3>AI Photo Generation</h3>
+              <p>Professional images with Nana Banana Pro and Nana Banana 2. Photorealistic quality for any social media.</p>
+              <div className="ap-feature-tag">from 10 credits</div>
+            </article>
+            <article className="ap-feature-card">
+              <div className="ap-feature-icon">📤</div>
+              <h3>Auto-Posting</h3>
+              <p>Publish to Instagram, TikTok, YouTube, Facebook, X, LinkedIn, Threads, and Pinterest with one click.</p>
+              <div className="ap-feature-tag">10 credits / platform</div>
+            </article>
+            <article className="ap-feature-card">
+              <div className="ap-feature-icon">📊</div>
+              <h3>Deep Analytics</h3>
+              <p>Analyze any Instagram, TikTok, or YouTube account. Get engagement rates, best posts, and AI recommendations.</p>
+              <div className="ap-feature-tag">50 credits</div>
+            </article>
+            <article className="ap-feature-card">
+              <div className="ap-feature-icon">👀</div>
+              <h3>Competitor Monitoring</h3>
+              <p>Track competitors 24/7. Compare metrics, find their strengths, and discover growth opportunities.</p>
+              <div className="ap-feature-tag">50 credits</div>
+            </article>
+            <article className="ap-feature-card">
+              <div className="ap-feature-icon">🤖</div>
+              <h3>SMM Strategist</h3>
+              <p>Your personal AI consultant. Get tailored strategies, content ideas, and growth plans for your brand.</p>
+              <div className="ap-feature-tag">1 credit / request</div>
+            </article>
+            <article className="ap-feature-card">
+              <div className="ap-feature-icon">✍️</div>
+              <h3>AI Copywriter</h3>
+              <p>Professional captions for posts, Reels scripts, Stories text, threads, and carousels. Ready to publish.</p>
+              <div className="ap-feature-tag">20 credits</div>
+            </article>
+            <article className="ap-feature-card">
+              <div className="ap-feature-icon">🔥</div>
+              <h3>Trend Analysis</h3>
+              <p>Find viral videos in your niche. Get analysis of why they went viral and AI-generated scripts based on trends.</p>
+              <div className="ap-feature-tag">included</div>
+            </article>
           </div>
-        </div>
+        </section>
 
-        {/* PDF Reports */}
-        <Card className="p-6">
-          <div className="flex flex-col gap-6 md:flex-row md:items-start">
-            <div className="flex-1 space-y-4">
-              <h2 className="text-xl font-bold text-slate-800">
-                {t('ai_smm_agent.reports_title') || 'Professional PDF Reports'}
-              </h2>
-              <p className="text-sm text-slate-500">
-                {t('ai_smm_agent.reports_body') || 'Get detailed analytics reports with charts, engagement metrics, best and worst posts analysis, and AI-powered recommendations.'}
-              </p>
-              <ul className="space-y-2">
-                {reportItems.map(({ key, fallback }) => (
-                  <li key={key} className="flex items-start gap-2">
-                    <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-500" />
-                    <span className="text-sm text-slate-600">{t(key) || fallback}</span>
-                  </li>
-                ))}
-              </ul>
-              <Button onClick={handleOpenTelegram} className="flex items-center gap-2">
-                <Send className="h-4 w-4" />
-                {t('ai_smm_agent.reports_cta') || 'Get your report'}
-              </Button>
+        {/* ── HOW IT WORKS ── */}
+        <section className="ap-steps">
+          <div className="ap-section-heading">
+            <h2>Start in 3 simple steps</h2>
+            <p>No registration. No downloads. Just Telegram.</p>
+          </div>
+          <div className="ap-steps-grid">
+            <div className="ap-step-card">
+              <div className="ap-step-number">1</div>
+              <h3>Open the bot</h3>
+              <p>Click the button below and press Start in Telegram. You will receive 100 free credits as a welcome bonus.</p>
             </div>
-            <div className="flex-shrink-0 w-full md:w-56">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-md">
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="text-xs font-bold text-brand-600">AI SMM</span>
-                  <span className="text-xs text-slate-400">{t('ai_smm_agent.report_mock_title') || 'Analytics Report'}</span>
+            <div className="ap-step-connector"></div>
+            <div className="ap-step-card">
+              <div className="ap-step-number">2</div>
+              <h3>Choose a feature</h3>
+              <p>Generate content, analyze accounts, write captions, or connect your social media for auto-posting.</p>
+            </div>
+            <div className="ap-step-connector"></div>
+            <div className="ap-step-card">
+              <div className="ap-step-number">3</div>
+              <h3>Publish and grow</h3>
+              <p>AI handles the heavy lifting. You focus on your business while your social media grows on autopilot.</p>
+            </div>
+          </div>
+        </section>
+
+        {/* ── PDF REPORTS ── */}
+        <section className="ap-reports">
+          <div className="ap-reports-content">
+            <h2>Professional PDF Reports</h2>
+            <p>Get detailed analytics reports with charts, engagement metrics, best and worst posts analysis, and AI-powered recommendations. Perfect for clients, teams, or your own strategy planning.</p>
+            <ul className="ap-reports-list">
+              <li>Follower growth and engagement trends</li>
+              <li>Best and worst performing content</li>
+              <li>Competitor comparison charts</li>
+              <li>AI-generated recommendations</li>
+            </ul>
+            <a className="ap-btn ap-btn-primary" href="https://t.me/Aismmagentbot" target="_blank" rel="noopener noreferrer">
+              Get your report
+            </a>
+          </div>
+          <div className="ap-reports-visual">
+            <div className="ap-report-mockup">
+              <div className="ap-report-header">
+                <div className="ap-report-logo">AI SMM</div>
+                <div className="ap-report-title-text">Analytics Report</div>
+              </div>
+              <div className="ap-report-chart">
+                <div className="ap-chart-bar" style={{height:'40%'}}></div>
+                <div className="ap-chart-bar" style={{height:'65%'}}></div>
+                <div className="ap-chart-bar highlight" style={{height:'85%'}}></div>
+                <div className="ap-chart-bar" style={{height:'55%'}}></div>
+                <div className="ap-chart-bar" style={{height:'70%'}}></div>
+                <div className="ap-chart-bar" style={{height:'90%'}}></div>
+              </div>
+              <div className="ap-report-metrics">
+                <div className="ap-report-metric">
+                  <span className="ap-metric-value">4.2%</span>
+                  <span className="ap-metric-label">ER</span>
                 </div>
-                <div className="mb-3 flex items-end gap-1 h-16">
-                  {[40, 65, 85, 55, 70, 90].map((h, i) => (
-                    <div
-                      key={i}
-                      className={`flex-1 rounded-t-sm ${i === 2 || i === 5 ? 'bg-brand-500' : 'bg-slate-200'}`}
-                      style={{ height: `${h}%` }}
-                    />
-                  ))}
+                <div className="ap-report-metric">
+                  <span className="ap-metric-value">12.5K</span>
+                  <span className="ap-metric-label">Followers</span>
                 </div>
-                <div className="grid grid-cols-3 gap-1 text-center">
-                  <div>
-                    <div className="text-sm font-bold text-slate-800">4.2%</div>
-                    <div className="text-[10px] text-slate-400">ER</div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-bold text-slate-800">12.5K</div>
-                    <div className="text-[10px] text-slate-400">{t('ai_smm_agent.report_followers') || 'Followers'}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-bold text-green-600">+23%</div>
-                    <div className="text-[10px] text-slate-400">{t('ai_smm_agent.report_growth') || 'Growth'}</div>
-                  </div>
+                <div className="ap-report-metric">
+                  <span className="ap-metric-value">+23%</span>
+                  <span className="ap-metric-label">Growth</span>
                 </div>
               </div>
             </div>
           </div>
-        </Card>
+        </section>
 
-        {/* Pricing */}
-        <div>
-          <h2 className="mb-2 text-xl font-bold text-slate-800">
-            {t('ai_smm_agent.pricing_title') || 'Simple credit-based pricing'}
-          </h2>
-          <p className="mb-6 text-sm text-slate-500">
-            {t('ai_smm_agent.pricing_sub') || 'Pay only for what you use. No hidden fees. Start with 100 free credits.'}
-          </p>
-          <Card className="overflow-hidden p-0">
-            <table className="w-full text-sm">
+        {/* ── PRICING ── */}
+        <section className="ap-pricing">
+          <div className="ap-section-heading">
+            <h2>Simple credit-based pricing</h2>
+            <p>Pay only for what you use. No hidden fees. Start with 100 free credits.</p>
+          </div>
+          <div className="ap-pricing-table-wrap">
+            <table className="ap-pricing-table">
               <thead>
-                <tr className="border-b border-slate-100 bg-slate-50">
-                  <th className="px-5 py-3 text-left font-semibold text-slate-600">
-                    {t('ai_smm_agent.price_col_feature') || 'Feature'}
-                  </th>
-                  <th className="px-5 py-3 text-right font-semibold text-slate-600">
-                    {t('ai_smm_agent.price_col_cost') || 'Credits'}
-                  </th>
+                <tr>
+                  <th>Feature</th>
+                  <th>Cost (credits)</th>
                 </tr>
               </thead>
               <tbody>
-                {pricingRows.map(({ key, fallback, cost }, i) => (
-                  <tr key={key} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
-                    <td className="px-5 py-2.5 text-slate-700">{t(key) || fallback}</td>
-                    <td className="px-5 py-2.5 text-right font-semibold text-brand-600">{cost}</td>
+                {[
+                  ['Account Analytics','50'],
+                  ['PDF Report','+100'],
+                  ['Photo (Nana Banana Pro)','20'],
+                  ['Photo (Nana Banana 2)','10'],
+                  ['Video (Sora 2)','50'],
+                  ['Video (Veo 3.1)','60'],
+                  ['Auto-Post (per platform)','10'],
+                  ['AI Copywriter','20'],
+                  ['SMM Strategist','1'],
+                  ['Competitor Monitoring','50'],
+                ].map(([feature, cost]) => (
+                  <tr key={feature}>
+                    <td>{feature}</td>
+                    <td>{cost}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </Card>
-          <div className="mt-4 grid grid-cols-3 gap-3">
-            {creditPacks.map(({ credits, price, popular }) => (
-              <Card
-                key={credits}
-                className={`relative flex flex-col items-center gap-1 p-4 text-center ${popular ? 'border-brand-300 bg-gradient-to-br from-brand-50 to-white' : ''}`}
-              >
-                {popular && (
-                  <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-brand-500 px-3 py-0.5 text-[10px] font-bold text-white">
-                    {t('ai_smm_agent.pack_popular') || 'Popular'}
-                  </span>
-                )}
-                <div className="text-2xl font-black text-slate-800">{credits}</div>
-                <div className="text-xs text-slate-500">{t('ai_smm_agent.pack_credits') || 'credits'}</div>
-                <div className="text-lg font-bold text-brand-600">{price}</div>
-              </Card>
-            ))}
           </div>
-        </div>
+          <div className="ap-credit-packs">
+            <div className="ap-pack-card">
+              <div className="ap-pack-credits">100</div>
+              <div className="ap-pack-label">credits</div>
+              <div className="ap-pack-price">$1</div>
+            </div>
+            <div className="ap-pack-card ap-pack-popular">
+              <div className="ap-pack-badge">Popular</div>
+              <div className="ap-pack-credits">600</div>
+              <div className="ap-pack-label">credits</div>
+              <div className="ap-pack-price">$5</div>
+            </div>
+            <div className="ap-pack-card">
+              <div className="ap-pack-credits">1300</div>
+              <div className="ap-pack-label">credits</div>
+              <div className="ap-pack-price">$10</div>
+            </div>
+          </div>
+        </section>
 
-        {/* Referral */}
-        <Card className="flex flex-col items-center gap-4 p-8 text-center bg-gradient-to-br from-amber-50 to-white border-amber-200">
-          <span className="text-4xl">🎁</span>
-          <div className="space-y-2">
-            <h2 className="text-xl font-bold text-slate-800">
-              {t('ai_smm_agent.referral_title') || 'Invite friends, earn credits'}
-            </h2>
-            <p className="text-sm text-slate-500 max-w-sm mx-auto">
-              {t('ai_smm_agent.referral_body') || 'Share your referral link and get 300 credits for each friend who joins. Your friend gets 100 bonus credits too.'}
-            </p>
+        {/* ── REFERRAL ── */}
+        <section className="ap-referral">
+          <div className="ap-referral-card">
+            <div className="ap-referral-icon">🎁</div>
+            <h2>Invite friends, earn credits</h2>
+            <p>Share your referral link and get 300 credits for each friend who joins. Your friend gets 100 bonus credits too.</p>
+            <a className="ap-btn ap-btn-primary" href="https://t.me/Aismmagentbot" target="_blank" rel="noopener noreferrer">
+              Get your referral link
+            </a>
           </div>
-          <Button onClick={handleOpenTelegram} variant="secondary" className="flex items-center gap-2">
-            <Send className="h-4 w-4" />
-            {t('ai_smm_agent.referral_cta') || 'Get your referral link'}
-          </Button>
-        </Card>
+        </section>
 
-        {/* Final CTA */}
-        <Card className="flex flex-col items-center gap-5 p-8 text-center bg-gradient-to-br from-slate-50 to-white">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-100 text-brand-600">
-            <Send className="h-8 w-8" />
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-2xl font-bold text-slate-800">
-              {t('ai_smm_agent.final_title') || 'Ready to automate your social media?'}
-            </h2>
-            <p className="text-slate-500 max-w-sm mx-auto">
-              {t('ai_smm_agent.final_sub') || 'Start for free with 100 credits. No credit card required.'}
-            </p>
-          </div>
-          <Button
-            onClick={handleOpenTelegram}
-            className="flex items-center gap-2 px-8 py-3 text-base font-semibold"
-          >
-            {t('ai_smm_agent.final_cta') || 'Launch AI SMM Agent'}
-            <ArrowRight className="h-5 w-5" />
-          </Button>
-        </Card>
+        {/* ── FINAL CTA ── */}
+        <section className="ap-final-cta">
+          <h2>Ready to automate your social media?</h2>
+          <p>Start for free with 100 credits. No credit card required.</p>
+          <a className="ap-btn ap-btn-telegram ap-btn-large" href="https://t.me/Aismmagentbot" target="_blank" rel="noopener noreferrer">
+            Launch AI SMM Agent
+          </a>
+        </section>
 
       </div>
     </Layout>
