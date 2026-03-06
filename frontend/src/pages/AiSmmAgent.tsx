@@ -1,6 +1,8 @@
 import { Layout } from '../components/layout/Layout'
+import { useLanguage } from '../contexts/LanguageContext'
 
 export default function AiSmmAgent() {
+  const { t } = useLanguage()
   return (
     <Layout>
       {/* Inject scoped styles */}
@@ -334,34 +336,34 @@ export default function AiSmmAgent() {
           <div className="ap-hero-content">
             <div className="ap-badge">
               <span className="ap-badge-dot"></span>
-              Telegram Bot
+              {t('ai_smm_agent.badge')}
             </div>
-            <h1>Your personal AI team for social media</h1>
+            <h1>{t('ai_smm_agent.hero_title')}</h1>
             <p className="ap-hero-sub">
-              Generate photos and videos, write captions, analyze competitors, and auto-post to 8 platforms. All from one Telegram bot.
+              {t('ai_smm_agent.hero_sub')}
             </p>
             <div className="ap-hero-actions">
               <a className="ap-btn ap-btn-telegram ap-btn-large" href="https://t.me/Aismmagentbot" target="_blank" rel="noopener noreferrer">
-                Open in Telegram
+                {t('ai_smm_agent.cta_start')}
               </a>
               <a className="ap-btn ap-btn-secondary" href="#ap-features">
-                See all features
+                {t('ai_smm_agent.cta_features')}
               </a>
             </div>
             <div className="ap-hero-stats">
               <div className="ap-stat-item">
                 <span className="ap-stat-number">8</span>
-                <span className="ap-stat-label">platforms</span>
+                <span className="ap-stat-label">{t('ai_smm_agent.stat_platforms')}</span>
               </div>
               <div className="ap-stat-divider"></div>
               <div className="ap-stat-item">
                 <span className="ap-stat-number">83</span>
-                <span className="ap-stat-label">languages</span>
+                <span className="ap-stat-label">{t('ai_smm_agent.stat_languages')}</span>
               </div>
               <div className="ap-stat-divider"></div>
               <div className="ap-stat-item">
                 <span className="ap-stat-number">24/7</span>
-                <span className="ap-stat-label">monitoring</span>
+                <span className="ap-stat-label">{t('ai_smm_agent.stat_monitoring')}</span>
               </div>
             </div>
           </div>
@@ -374,17 +376,17 @@ export default function AiSmmAgent() {
                   <div className="ap-chat-avatar">AI</div>
                   <div>
                     <div className="ap-chat-name">AI SMM Agent</div>
-                    <div className="ap-chat-status">online</div>
+                    <div className="ap-chat-status">{t('ai_smm_agent.chat_status')}</div>
                   </div>
                 </div>
                 <div className="ap-chat-messages">
-                  <div className="ap-chat-msg bot">Welcome! I am your AI SMM assistant. What would you like to do?</div>
-                  <div className="ap-chat-msg user">Analyze my Instagram account</div>
-                  <div className="ap-chat-msg bot">Analyzing @youraccount... Your engagement rate is 4.2%, which is above average!</div>
-                  <div className="ap-chat-msg user">Generate a video about coffee</div>
-                  <div className="ap-chat-msg bot">Creating a Sora 2 video... Done! Ready to publish to all platforms?</div>
+                  <div className="ap-chat-msg bot">{t('ai_smm_agent.chat_msg1')}</div>
+                  <div className="ap-chat-msg user">{t('ai_smm_agent.chat_msg2')}</div>
+                  <div className="ap-chat-msg bot">{t('ai_smm_agent.chat_msg3')}</div>
+                  <div className="ap-chat-msg user">{t('ai_smm_agent.chat_msg4')}</div>
+                  <div className="ap-chat-msg bot">{t('ai_smm_agent.chat_msg5')}</div>
                 </div>
-                <div className="ap-chat-input">Type a message...</div>
+                <div className="ap-chat-input">{t('ai_smm_agent.chat_input')}</div>
               </div>
             </div>
           </div>
@@ -392,7 +394,7 @@ export default function AiSmmAgent() {
 
         {/* ── PLATFORMS BAR ── */}
         <section className="ap-platforms">
-          <p className="ap-platforms-label">Auto-post to all major platforms</p>
+          <p className="ap-platforms-label">{t('ai_smm_agent.platforms_label')}</p>
           <div className="ap-platforms-list">
             {['Instagram','TikTok','YouTube','Facebook','X (Twitter)','LinkedIn','Threads','Pinterest'].map(p => (
               <div key={p} className="ap-platform-pill">{p}</div>
@@ -403,57 +405,57 @@ export default function AiSmmAgent() {
         {/* ── FEATURES ── */}
         <section className="ap-features" id="ap-features">
           <div className="ap-section-heading">
-            <h2>Everything you need in one bot</h2>
-            <p>Powerful AI tools that replace an entire SMM team.</p>
+            <h2>{t('ai_smm_agent.features_title')}</h2>
+            <p>{t('ai_smm_agent.features_sub')}</p>
           </div>
           <div className="ap-features-grid">
             <article className="ap-feature-card ap-feature-highlight">
               <div className="ap-feature-icon">🎬</div>
-              <h3>AI Video Generation</h3>
-              <p>Create stunning videos with Sora 2 and Veo 3.1. From script to finished video in minutes, in 83 languages.</p>
-              <div className="ap-feature-tag">from 50 credits</div>
+              <h3>{t('ai_smm_agent.f1_title')}</h3>
+              <p>{t('ai_smm_agent.f1_body')}</p>
+              <div className="ap-feature-tag">{t('ai_smm_agent.f1_tag')}</div>
             </article>
             <article className="ap-feature-card">
               <div className="ap-feature-icon">📸</div>
-              <h3>AI Photo Generation</h3>
-              <p>Professional images with Nana Banana Pro and Nana Banana 2. Photorealistic quality for any social media.</p>
-              <div className="ap-feature-tag">from 10 credits</div>
+              <h3>{t('ai_smm_agent.f2_title')}</h3>
+              <p>{t('ai_smm_agent.f2_body')}</p>
+              <div className="ap-feature-tag">{t('ai_smm_agent.f2_tag')}</div>
             </article>
             <article className="ap-feature-card">
               <div className="ap-feature-icon">📤</div>
-              <h3>Auto-Posting</h3>
-              <p>Publish to Instagram, TikTok, YouTube, Facebook, X, LinkedIn, Threads, and Pinterest with one click.</p>
-              <div className="ap-feature-tag">10 credits / platform</div>
+              <h3>{t('ai_smm_agent.f3_title')}</h3>
+              <p>{t('ai_smm_agent.f3_body')}</p>
+              <div className="ap-feature-tag">{t('ai_smm_agent.f3_tag')}</div>
             </article>
             <article className="ap-feature-card">
               <div className="ap-feature-icon">📊</div>
-              <h3>Deep Analytics</h3>
-              <p>Analyze any Instagram, TikTok, or YouTube account. Get engagement rates, best posts, and AI recommendations.</p>
-              <div className="ap-feature-tag">50 credits</div>
+              <h3>{t('ai_smm_agent.f4_title')}</h3>
+              <p>{t('ai_smm_agent.f4_body')}</p>
+              <div className="ap-feature-tag">{t('ai_smm_agent.f4_tag')}</div>
             </article>
             <article className="ap-feature-card">
               <div className="ap-feature-icon">👀</div>
-              <h3>Competitor Monitoring</h3>
-              <p>Track competitors 24/7. Compare metrics, find their strengths, and discover growth opportunities.</p>
-              <div className="ap-feature-tag">50 credits</div>
+              <h3>{t('ai_smm_agent.f5_title')}</h3>
+              <p>{t('ai_smm_agent.f5_body')}</p>
+              <div className="ap-feature-tag">{t('ai_smm_agent.f5_tag')}</div>
             </article>
             <article className="ap-feature-card">
               <div className="ap-feature-icon">🤖</div>
-              <h3>SMM Strategist</h3>
-              <p>Your personal AI consultant. Get tailored strategies, content ideas, and growth plans for your brand.</p>
-              <div className="ap-feature-tag">1 credit / request</div>
+              <h3>{t('ai_smm_agent.f6_title')}</h3>
+              <p>{t('ai_smm_agent.f6_body')}</p>
+              <div className="ap-feature-tag">{t('ai_smm_agent.f6_tag')}</div>
             </article>
             <article className="ap-feature-card">
               <div className="ap-feature-icon">✍️</div>
-              <h3>AI Copywriter</h3>
-              <p>Professional captions for posts, Reels scripts, Stories text, threads, and carousels. Ready to publish.</p>
-              <div className="ap-feature-tag">20 credits</div>
+              <h3>{t('ai_smm_agent.f7_title')}</h3>
+              <p>{t('ai_smm_agent.f7_body')}</p>
+              <div className="ap-feature-tag">{t('ai_smm_agent.f7_tag')}</div>
             </article>
             <article className="ap-feature-card">
               <div className="ap-feature-icon">🔥</div>
-              <h3>Trend Analysis</h3>
-              <p>Find viral videos in your niche. Get analysis of why they went viral and AI-generated scripts based on trends.</p>
-              <div className="ap-feature-tag">included</div>
+              <h3>{t('ai_smm_agent.f8_title')}</h3>
+              <p>{t('ai_smm_agent.f8_body')}</p>
+              <div className="ap-feature-tag">{t('ai_smm_agent.f8_tag')}</div>
             </article>
           </div>
         </section>
@@ -461,26 +463,26 @@ export default function AiSmmAgent() {
         {/* ── HOW IT WORKS ── */}
         <section className="ap-steps">
           <div className="ap-section-heading">
-            <h2>Start in 3 simple steps</h2>
-            <p>No registration. No downloads. Just Telegram.</p>
+            <h2>{t('ai_smm_agent.steps_title')}</h2>
+            <p>{t('ai_smm_agent.steps_sub')}</p>
           </div>
           <div className="ap-steps-grid">
             <div className="ap-step-card">
               <div className="ap-step-number">1</div>
-              <h3>Open the bot</h3>
-              <p>Click the button below and press Start in Telegram. You will receive 100 free credits as a welcome bonus.</p>
+              <h3>{t('ai_smm_agent.step1_title')}</h3>
+              <p>{t('ai_smm_agent.step1_body')}</p>
             </div>
             <div className="ap-step-connector"></div>
             <div className="ap-step-card">
               <div className="ap-step-number">2</div>
-              <h3>Choose a feature</h3>
-              <p>Generate content, analyze accounts, write captions, or connect your social media for auto-posting.</p>
+              <h3>{t('ai_smm_agent.step2_title')}</h3>
+              <p>{t('ai_smm_agent.step2_body')}</p>
             </div>
             <div className="ap-step-connector"></div>
             <div className="ap-step-card">
               <div className="ap-step-number">3</div>
-              <h3>Publish and grow</h3>
-              <p>AI handles the heavy lifting. You focus on your business while your social media grows on autopilot.</p>
+              <h3>{t('ai_smm_agent.step3_title')}</h3>
+              <p>{t('ai_smm_agent.step3_body')}</p>
             </div>
           </div>
         </section>
@@ -488,23 +490,23 @@ export default function AiSmmAgent() {
         {/* ── PDF REPORTS ── */}
         <section className="ap-reports">
           <div className="ap-reports-content">
-            <h2>Professional PDF Reports</h2>
-            <p>Get detailed analytics reports with charts, engagement metrics, best and worst posts analysis, and AI-powered recommendations. Perfect for clients, teams, or your own strategy planning.</p>
+            <h2>{t('ai_smm_agent.reports_title')}</h2>
+            <p>{t('ai_smm_agent.reports_body')}</p>
             <ul className="ap-reports-list">
-              <li>Follower growth and engagement trends</li>
-              <li>Best and worst performing content</li>
-              <li>Competitor comparison charts</li>
-              <li>AI-generated recommendations</li>
+              <li>{t('ai_smm_agent.report_item1')}</li>
+              <li>{t('ai_smm_agent.report_item2')}</li>
+              <li>{t('ai_smm_agent.report_item3')}</li>
+              <li>{t('ai_smm_agent.report_item4')}</li>
             </ul>
             <a className="ap-btn ap-btn-primary" href="https://t.me/Aismmagentbot" target="_blank" rel="noopener noreferrer">
-              Get your report
+              {t('ai_smm_agent.reports_cta')}
             </a>
           </div>
           <div className="ap-reports-visual">
             <div className="ap-report-mockup">
               <div className="ap-report-header">
                 <div className="ap-report-logo">AI SMM</div>
-                <div className="ap-report-title-text">Analytics Report</div>
+                <div className="ap-report-title-text">{t('ai_smm_agent.report_mock_title')}</div>
               </div>
               <div className="ap-report-chart">
                 <div className="ap-chart-bar" style={{height:'40%'}}></div>
@@ -521,11 +523,11 @@ export default function AiSmmAgent() {
                 </div>
                 <div className="ap-report-metric">
                   <span className="ap-metric-value">12.5K</span>
-                  <span className="ap-metric-label">Followers</span>
+                  <span className="ap-metric-label">{t('ai_smm_agent.report_followers')}</span>
                 </div>
                 <div className="ap-report-metric">
                   <span className="ap-metric-value">+23%</span>
-                  <span className="ap-metric-label">Growth</span>
+                  <span className="ap-metric-label">{t('ai_smm_agent.report_growth')}</span>
                 </div>
               </div>
             </div>
@@ -535,30 +537,30 @@ export default function AiSmmAgent() {
         {/* ── PRICING ── */}
         <section className="ap-pricing">
           <div className="ap-section-heading">
-            <h2>Simple credit-based pricing</h2>
-            <p>Pay only for what you use. No hidden fees. Start with 100 free credits.</p>
+            <h2>{t('ai_smm_agent.pricing_title')}</h2>
+            <p>{t('ai_smm_agent.pricing_sub')}</p>
           </div>
           <div className="ap-pricing-table-wrap">
             <table className="ap-pricing-table">
               <thead>
                 <tr>
-                  <th>Feature</th>
-                  <th>Cost (credits)</th>
+                  <th>{t('ai_smm_agent.price_col_feature')}</th>
+                  <th>{t('ai_smm_agent.price_col_cost')}</th>
                 </tr>
               </thead>
               <tbody>
-                {[
-                  ['Account Analytics','50'],
-                  ['PDF Report','+100'],
-                  ['Photo (Nana Banana Pro)','20'],
-                  ['Photo (Nana Banana 2)','10'],
-                  ['Video (Sora 2)','50'],
-                  ['Video (Veo 3.1)','60'],
-                  ['Auto-Post (per platform)','10'],
-                  ['AI Copywriter','20'],
-                  ['SMM Strategist','1'],
-                  ['Competitor Monitoring','50'],
-                ].map(([feature, cost]) => (
+                {([
+                  [t('ai_smm_agent.price_r1'),'50'],
+                  [t('ai_smm_agent.price_r2'),'+100'],
+                  [t('ai_smm_agent.price_r3'),'20'],
+                  [t('ai_smm_agent.price_r4'),'10'],
+                  [t('ai_smm_agent.price_r5'),'50'],
+                  [t('ai_smm_agent.price_r6'),'60'],
+                  [t('ai_smm_agent.price_r7'),'10'],
+                  [t('ai_smm_agent.price_r8'),'20'],
+                  [t('ai_smm_agent.price_r9'),'1'],
+                  [t('ai_smm_agent.price_r10'),'50'],
+                ] as [string,string][]).map(([feature, cost]) => (
                   <tr key={feature}>
                     <td>{feature}</td>
                     <td>{cost}</td>
@@ -570,18 +572,18 @@ export default function AiSmmAgent() {
           <div className="ap-credit-packs">
             <div className="ap-pack-card">
               <div className="ap-pack-credits">100</div>
-              <div className="ap-pack-label">credits</div>
+              <div className="ap-pack-label">{t('ai_smm_agent.pack_credits')}</div>
               <div className="ap-pack-price">$1</div>
             </div>
             <div className="ap-pack-card ap-pack-popular">
-              <div className="ap-pack-badge">Popular</div>
+              <div className="ap-pack-badge">{t('ai_smm_agent.pack_popular')}</div>
               <div className="ap-pack-credits">600</div>
-              <div className="ap-pack-label">credits</div>
+              <div className="ap-pack-label">{t('ai_smm_agent.pack_credits')}</div>
               <div className="ap-pack-price">$5</div>
             </div>
             <div className="ap-pack-card">
               <div className="ap-pack-credits">1300</div>
-              <div className="ap-pack-label">credits</div>
+              <div className="ap-pack-label">{t('ai_smm_agent.pack_credits')}</div>
               <div className="ap-pack-price">$10</div>
             </div>
           </div>
@@ -591,20 +593,20 @@ export default function AiSmmAgent() {
         <section className="ap-referral">
           <div className="ap-referral-card">
             <div className="ap-referral-icon">🎁</div>
-            <h2>Invite friends, earn credits</h2>
-            <p>Share your referral link and get 300 credits for each friend who joins. Your friend gets 100 bonus credits too.</p>
+            <h2>{t('ai_smm_agent.referral_title')}</h2>
+            <p>{t('ai_smm_agent.referral_body')}</p>
             <a className="ap-btn ap-btn-primary" href="https://t.me/Aismmagentbot" target="_blank" rel="noopener noreferrer">
-              Get your referral link
+              {t('ai_smm_agent.referral_cta')}
             </a>
           </div>
         </section>
 
         {/* ── FINAL CTA ── */}
         <section className="ap-final-cta">
-          <h2>Ready to automate your social media?</h2>
-          <p>Start for free with 100 credits. No credit card required.</p>
+          <h2>{t('ai_smm_agent.final_title')}</h2>
+          <p>{t('ai_smm_agent.final_sub')}</p>
           <a className="ap-btn ap-btn-telegram ap-btn-large" href="https://t.me/Aismmagentbot" target="_blank" rel="noopener noreferrer">
-            Launch AI SMM Agent
+            {t('ai_smm_agent.final_cta')}
           </a>
         </section>
 
