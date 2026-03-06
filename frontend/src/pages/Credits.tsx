@@ -447,23 +447,28 @@ export function Credits() {
   return (
     <Layout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">{t('credits.title')}</h1>
-            <p className="mt-2 text-slate-600">{t('credits.subtitle')}</p>
-          </div>
-          <div className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-6 py-4 shadow-sm sm:w-auto">
-            <Coins className="h-6 w-6 text-amber-500" />
-            <div>
-              <p className="text-xs text-slate-500">{t('credits.current_balance')}</p>
-              <p className="text-2xl font-bold text-slate-900">
-                {creditsLoading ? '...' : unlimited ? t('credits.unlimited') : credits ?? 0}
-                {!unlimited && <span className="ml-2 text-sm font-normal text-slate-500">{t('credits.credits_unit')}</span>}
-              </p>
+        {/* Hero Banner */}
+        <section className="relative overflow-hidden rounded-[32px] border border-white/30 bg-gradient-to-br from-amber-500 via-orange-500 to-brand-600 p-6 sm:p-8 text-white shadow-[0_60px_120px_-70px_rgba(245,158,11,0.7)]">
+          <div className="absolute -left-16 top-1/2 h-56 w-56 -translate-y-1/2 rounded-full bg-white/10 blur-3xl" />
+          <div className="absolute -right-16 top-8 h-44 w-44 rounded-full bg-yellow-300/20 blur-3xl" />
+          <div className="relative z-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="max-w-xl space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-white/70">{t('credits.title')}</p>
+              <h1 className="text-3xl font-semibold md:text-4xl">{t('credits.title')}</h1>
+              <p className="text-sm text-white/80">{t('credits.subtitle')}</p>
+            </div>
+            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 px-5 py-4">
+              <Coins className="h-8 w-8 text-yellow-300" />
+              <div>
+                <p className="text-xs text-white/70">{t('credits.current_balance')}</p>
+                <p className="text-2xl font-bold">
+                  {creditsLoading ? '...' : unlimited ? t('credits.unlimited') : credits ?? 0}
+                  {!unlimited && <span className="ml-2 text-sm font-normal text-white/70">{t('credits.credits_unit')}</span>}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+        </section>
 
         {/* Subscription Status */}
         {loadingSubscription ? (

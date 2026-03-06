@@ -284,12 +284,24 @@ export function SocialAccounts() {
   return (
     <Layout>
       <div className="space-y-10">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-semibold text-primary">{t('social_accounts.title')}</h1>
-          <p className="text-sm text-slate-500">
-            {t('social_accounts.workspace_subtitle')}
-          </p>
-        </div>
+        {/* Hero Banner */}
+        <section className="relative overflow-hidden rounded-[32px] border border-white/30 bg-gradient-to-br from-brand-600 via-brand-500 to-indigo-500 p-6 sm:p-8 text-white shadow-[0_60px_120px_-70px_rgba(79,70,229,0.9)]">
+          <div className="absolute -left-16 top-1/2 h-56 w-56 -translate-y-1/2 rounded-full bg-white/10 blur-3xl" />
+          <div className="absolute -right-16 top-8 h-44 w-44 rounded-full bg-cyan-400/30 blur-3xl" />
+          <div className="relative z-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="max-w-xl space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-white/70">{t('common.social_accounts')}</p>
+              <h1 className="text-3xl font-semibold md:text-4xl">{t('social_accounts.title')}</h1>
+              <p className="text-sm text-white/80">{t('social_accounts.workspace_subtitle')}</p>
+            </div>
+            <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 px-5 py-3">
+              <div className="text-center">
+                <p className="text-2xl font-bold">{connectedPlatforms.length}</p>
+                <p className="text-xs text-white/70">{t('social_accounts.connected_count', { count: connectedPlatforms.length }).split(' ')[0] === connectedPlatforms.length.toString() ? t('social_accounts.active_channels') : t('social_accounts.active_channels')}</p>
+              </div>
+            </div>
+          </div>
+        </section>
 
         <CreditBanner />
 

@@ -115,24 +115,27 @@ export function Avatars() {
   return (
     <Layout>
       <div className="mx-auto w-full max-w-7xl space-y-6">
-        <Card className="flex flex-col gap-4 border-brand-100/70 bg-gradient-to-br from-white via-white to-brand-50/70 p-5 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-primary">{t('common.avatars') || 'Avatars'} Studio</h1>
-            <p className="mt-1 text-sm text-slate-600">
-              Browse public avatars and add them to your personal avatar workspace.
-            </p>
+        {/* Hero Banner */}
+        <section className="relative overflow-hidden rounded-[32px] border border-white/30 bg-gradient-to-br from-brand-600 via-brand-500 to-indigo-500 p-6 sm:p-8 text-white shadow-[0_60px_120px_-70px_rgba(79,70,229,0.9)]">
+          <div className="absolute -left-16 top-1/2 h-56 w-56 -translate-y-1/2 rounded-full bg-white/10 blur-3xl" />
+          <div className="absolute -right-16 top-8 h-44 w-44 rounded-full bg-cyan-400/30 blur-3xl" />
+          <div className="relative z-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="max-w-xl space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-white/70">{t('common.avatars')}</p>
+              <h1 className="text-3xl font-semibold md:text-4xl">{t('common.avatars')} Studio</h1>
+              <p className="text-sm text-white/80">{t('avatars.hero_desc') || 'Choose a digital avatar for your videos. Browse hundreds of realistic AI avatars, add your favourites to your workspace and use them in every video you generate.'}</p>
+            </div>
+            <Button
+              disabled
+              aria-disabled="true"
+              title="Create New Avatar is coming soon"
+              className="w-full cursor-not-allowed border border-white/30 bg-white/10 text-white/60 shadow-none hover:bg-white/10 disabled:pointer-events-none disabled:opacity-70 sm:w-auto"
+            >
+              <Lock className="mr-2 h-4 w-4" />
+              {t('avatars.create_coming_soon') || 'Create New Avatar (coming soon)'}
+            </Button>
           </div>
-
-          <Button
-            disabled
-            aria-disabled="true"
-            title="Create New Avatar is coming soon"
-            className="w-full cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400 opacity-70 shadow-none hover:bg-slate-100 hover:text-slate-400 disabled:pointer-events-none disabled:opacity-70 sm:w-auto"
-          >
-            <Lock className="mr-2 h-4 w-4" />
-            Create New Avatar (coming soon)
-          </Button>
-        </Card>
+        </section>
 
         <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
           <Card className="p-4 sm:p-5">

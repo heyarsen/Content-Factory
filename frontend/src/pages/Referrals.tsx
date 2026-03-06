@@ -74,16 +74,22 @@ export function Referrals() {
   return (
     <Layout>
       <div className="mx-auto max-w-4xl space-y-6 px-3 py-4 sm:space-y-8 sm:px-4 sm:py-8">
-        {/* Header */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-indigo-500 text-white shadow-md sm:h-10 sm:w-10">
-              <Users className="h-4 w-4 sm:h-5 sm:w-5" />
+        {/* Hero Banner */}
+        <section className="relative overflow-hidden rounded-[32px] border border-white/30 bg-gradient-to-br from-brand-600 via-brand-500 to-indigo-500 p-6 sm:p-8 text-white shadow-[0_60px_120px_-70px_rgba(79,70,229,0.9)]">
+          <div className="absolute -left-16 top-1/2 h-56 w-56 -translate-y-1/2 rounded-full bg-white/10 blur-3xl" />
+          <div className="absolute -right-16 top-8 h-44 w-44 rounded-full bg-emerald-400/30 blur-3xl" />
+          <div className="relative z-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="max-w-xl space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-white/70">{t('common.partner_program')}</p>
+              <h1 className="text-3xl font-semibold md:text-4xl">{t('referrals.title')}</h1>
+              <p className="text-sm text-white/80">{t('referrals.subtitle')}</p>
             </div>
-            <h1 className="text-xl font-semibold text-primary sm:text-2xl">{t('referrals.title')}</h1>
+            <div className="flex flex-col gap-2 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 px-5 py-4 text-center">
+              <p className="text-3xl font-bold">{info?.total_referrals || 0}</p>
+              <p className="text-xs text-white/70">{t('referrals.total_referrals')}</p>
+            </div>
           </div>
-          <p className="text-xs text-slate-500 sm:text-sm">{t('referrals.subtitle')}</p>
-        </div>
+        </section>
 
         {/* Referral Link Card */}
         <Card className="p-4 sm:p-6">

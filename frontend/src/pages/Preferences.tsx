@@ -237,25 +237,28 @@ export function Preferences() {
   return (
     <Layout>
       <div className="space-y-8">
-        {/* Header */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">{t('preferences.workspace_settings')}</p>
-            <h1 className="text-3xl font-semibold text-primary">{t('preferences.workspace_preferences_title')}</h1>
-            <p className="text-sm text-slate-500">
-              {t('preferences.workspace_preferences_desc')}
-            </p>
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-600">{t('preferences.you_are_in_workspace')}</span>
-              <Link to="/profile" className="rounded-full border border-brand-200 bg-brand-50 px-3 py-1 font-medium text-brand-700 transition hover:bg-brand-100">
-                {t('preferences.go_to_account_settings')}
+        {/* Hero Banner */}
+        <section className="relative overflow-hidden rounded-[32px] border border-white/30 bg-gradient-to-br from-brand-600 via-brand-500 to-indigo-500 p-6 sm:p-8 text-white shadow-[0_60px_120px_-70px_rgba(79,70,229,0.9)]">
+          <div className="absolute -left-16 top-1/2 h-56 w-56 -translate-y-1/2 rounded-full bg-white/10 blur-3xl" />
+          <div className="absolute -right-16 top-8 h-44 w-44 rounded-full bg-cyan-400/30 blur-3xl" />
+          <div className="relative z-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="max-w-xl space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-white/70">{t('preferences.workspace_settings')}</p>
+              <h1 className="text-3xl font-semibold md:text-4xl">{t('preferences.workspace_preferences_title')}</h1>
+              <p className="text-sm text-white/80">{t('preferences.workspace_preferences_desc')}</p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Link to="/profile">
+                <Button className="w-full border border-white/20 bg-white/20 text-white backdrop-blur hover:bg-white/30 hover:text-white shadow-lg">
+                  {t('preferences.go_to_account_settings')}
+                </Button>
               </Link>
+              <Button onClick={handleSave} loading={saving} className="border border-white/30 bg-white/15 text-white hover:bg-white/25 hover:text-white">
+                {t('common.save')}
+              </Button>
             </div>
           </div>
-          <Button onClick={handleSave} loading={saving}>
-            {t('common.save')}
-          </Button>
-        </div>
+        </section>
 
         {/* Language Selection */}
         <Card className="p-6">

@@ -244,13 +244,14 @@ export default function AiAutomation() {
           display: flex; align-items: flex-end; gap: 8px;
           height: 140px; margin-bottom: 12px;
         }
-        .au-bar-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
+        .au-bar-wrap { display: flex; flex-direction: column-reverse; align-items: center; gap: 4px; flex: 1; height: 100%; }
         .au-bar {
           width: 100%; border-radius: 6px 6px 0 0;
           background: linear-gradient(180deg, #2563eb, #7c3aed);
           transition: height 0.5s ease;
+          min-height: 4px;
         }
-        .au-bar-label { font-size: 10px; color: #94a3b8; font-weight: 500; }
+        .au-bar-label { font-size: 10px; color: #94a3b8; font-weight: 500; flex-shrink: 0; }
         .au-chart-metrics {
           display: grid; grid-template-columns: repeat(3, 1fr);
           gap: 12px; margin-top: 16px; padding-top: 16px;

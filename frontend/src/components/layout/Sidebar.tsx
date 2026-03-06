@@ -40,8 +40,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { label: t('common.ai_smm_agent') || 'AI SMM Agent', to: '/ai-smm-agent', icon: Sparkles },
     { label: t('common.trendwatcher') || 'AI Trendwatcher', to: '/trend-searcher', icon: Search },
     { label: t('common.avatars') || 'AI Avatars', to: '/avatars', icon: User },
-    { label: t('common.preferences') || 'Preferences', to: '/preferences', icon: SlidersHorizontal },
     { label: t('common.partner_program') || 'Partner Program', to: '/referrals', icon: Users },
+    { label: t('common.preferences') || 'Preferences', to: '/preferences', icon: SlidersHorizontal },
   ]
 
   const adminNavigation = [
