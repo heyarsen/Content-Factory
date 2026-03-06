@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Layout } from '../components/layout/Layout'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -218,6 +218,7 @@ export function VideoPlanning() {
     return status.toLowerCase()
   }
   const navigate = useNavigate()
+  const location = useLocation()
   const [plans, setPlans] = useState<VideoPlan[]>([])
   const [selectedPlan, setSelectedPlan] = useState<VideoPlan | null>(null)
   const [planItems, setPlanItems] = useState<VideoPlanItem[]>([])
@@ -306,6 +307,16 @@ export function VideoPlanning() {
     { label: t('video_planning.afternoon_preset'), value: '15:00' },
     { label: t('video_planning.evening_preset'), value: '18:00' },
   ]
+  // Open automation modal when navigated from AI Automation page
+  useEffect(() => {
+    const state = location.state as { openAutomation?: boolean } | null
+    if (state?.openAutomation) {
+      setCreateModal(true)
+      // Clear the state so modal doesn't reopen on refresh
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [location.state])
+
   // Persist compact status filter choice
   useEffect(() => {
     if (typeof window !== 'undefined') {

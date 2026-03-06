@@ -12,6 +12,7 @@ import {
   User,
   Users,
   X,
+  Zap,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCredits } from '../../hooks/useCredits'
@@ -35,6 +36,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     { label: t('common.content_studio') || 'Content Calendar', to: '/planning', icon: Clapperboard },
     { label: t('common.my_videos') || 'Video Library', to: '/videos', icon: Film },
     { label: t('common.social_accounts') || 'My Social Media', to: '/social', icon: Share2, match: (pathname: string) => pathname === '/social' },
+    { label: t('common.ai_automation') || 'AI Automation', to: '/ai-automation', icon: Zap },
     { label: t('common.ai_smm_agent') || 'AI SMM Agent', to: '/ai-smm-agent', icon: Sparkles },
     { label: t('common.trendwatcher') || 'AI Trendwatcher', to: '/trend-searcher', icon: Search },
     { label: t('common.avatars') || 'AI Avatars', to: '/avatars', icon: User },

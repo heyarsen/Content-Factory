@@ -81,6 +81,7 @@ const Referrals = lazy(() =>
 )
 const Dpa = lazy(() => import('./pages/Dpa').then((m) => ({ default: m.Dpa })))
 const AiSmmAgentPage = lazy(() => import('./pages/AiSmmAgent'))
+const AiAutomationPage = lazy(() => import('./pages/AiAutomation'))
 const CookieConsentManager = lazy(() =>
   import('./components/legal/CookieConsentManager').then((m) => ({ default: m.CookieConsentManager }))
 )
@@ -304,6 +305,14 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <AiSmmAgentPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/ai-automation"
+            element={
+              <ProtectedRoute>
+                <AiAutomationPage />
               </ProtectedRoute>
             }
           />
